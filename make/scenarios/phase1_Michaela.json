@@ -1,0 +1,326 @@
+{
+  "_README": "Make (Integromat) Scenario Blueprint \u2014 Phase 1: Triage Engine. Import this into Make via Scenarios > Import Blueprint. After import, update every TODO comment field before activating.",
+  "_import_instructions": [
+    "1. In Make, go to Scenarios > Create a new scenario.",
+    "2. Click the three-dot menu > Import Blueprint.",
+    "3. Paste this JSON.",
+    "4. Update all connection fields (Gmail, OpenAI, Google Sheets) to your real Make connections.",
+    "5. Fill in all TODO values in the module parameters.",
+    "6. Clone this scenario once per talent inbox \u2014 each inbox MUST have its own independent scenario."
+  ],
+  "name": "Phase 1 \u2014 Email Triage \u2014 Michaela",
+  "_name_comment": "TODO: Replace Michaela with the talent's name before activating.",
+  "flow": [
+    {
+      "id": 1,
+      "module": "gmail:TriggerNewEmail",
+      "version": 1,
+      "parameters": {
+        "connection": "Gmail - Michaela",
+        "_connection_comment": "TODO: Set this to the Make Gmail OAuth connection for this specific talent's inbox.",
+        "labelIds": [
+          "INBOX"
+        ],
+        "markAsRead": false,
+        "_markAsRead_comment": "Leave false \u2014 the system only archives Score 1 emails; it should not auto-mark everything as read.",
+        "maxResults": 1
+      },
+      "metadata": {
+        "designer": {
+          "x": 0,
+          "y": 0
+        },
+        "expect": [
+          {
+            "name": "id",
+            "type": "text",
+            "label": "Email ID"
+          },
+          {
+            "name": "threadId",
+            "type": "text",
+            "label": "Thread ID"
+          },
+          {
+            "name": "from",
+            "type": "text",
+            "label": "Sender"
+          },
+          {
+            "name": "subject",
+            "type": "text",
+            "label": "Subject"
+          },
+          {
+            "name": "snippet",
+            "type": "text",
+            "label": "Snippet"
+          },
+          {
+            "name": "bodyText",
+            "type": "text",
+            "label": "Body (plain text)"
+          },
+          {
+            "name": "date",
+            "type": "date",
+            "label": "Date Received"
+          }
+        ]
+      }
+    },
+    {
+      "id": 2,
+      "module": "openai-gpt-3:CreateChatCompletion",
+      "version": 1,
+      "parameters": {
+        "connection": "OpenAI - Talent Automation",
+        "_connection_comment": "TODO: Set this to your OpenAI Make connection. Name it 'OpenAI - Talent Automation' in Make Connections.",
+        "model": "gpt-4o-mini",
+        "_model_comment": "Use gpt-4o-mini for triage. Cheaper. Switch to gpt-4o only if classification quality is unacceptable.",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are an email triage assistant for a talent management agency.\nYour only job is to score incoming emails on a scale of 1, 2, or 3.\n\nScore 1 = TRASH \u2014 Do not reply. Archive immediately.\nScore 2 = UNCERTAIN \u2014 Do not reply. Flag for human review.\nScore 3 = RESPOND \u2014 A real business opportunity. Draft a reply.\n\nReturn ONLY a JSON object. No explanation, no extra text. Format:\n{\"score\": <1|2|3>, \"reason\": \"<one sentence>\", \"offer_type\": \"<Sponsored Post|Story|UGC|Affiliate|Event Appearance|Other|Unknown>\", \"proposed_rate_usd\": <number or 0 if not mentioned>, \"brand_name\": \"<brand name or empty string>\"}\n\nSCORING RULES:\n\nScore 1 (Trash) \u2014 ANY of the following:\n- Obvious spam, prize wins, irrelevant newsletters, unsubscribe confirmations\n- No company name or brand identity present\n- Email written in a language other than English\n- Offer amount mentioned AND below talent's minimum rate AND sender is not a recognizable major brand\n- Clear grammar/spelling indicating bot or scam\n- Sender domain is free personal email (gmail.com, yahoo.com, hotmail.com, outlook.com) with no company name in body\n- Auto-reply, out-of-office, delivery failure, unrelated calendar invites\n\nScore 2 (Uncertain) \u2014 NOT clearly Score 1 or 3:\n- Real company reaching out but offer type unclear\n- Offer below minimum rate but could be a real negotiable brand\n- Professional email missing key details (no rate, no deliverables)\n- Unfamiliar company but high email quality\n- Any edge case where you are not confident\n\nScore 3 (Respond) \u2014 ALL must be true:\n- From a real, identifiable brand or company\n- Written in English with professional quality\n- Clearly a collaboration, sponsorship, partnership, or paid opportunity\n- IMPORTANT: If sender is a recognizable major or mid-tier brand, score as 3 REGARDLESS of proposed rate"
+          },
+          {
+            "role": "user",
+            "content": "Talent name: Michaela\nTalent minimum rate (USD): 3500\n\nEmail subject: {{1.subject}}\nEmail sender: {{1.from}}\nEmail sender domain: {{replace(replace(1.from, /.*@/, \"\"), />.*/, \"\")}}\nEmail body:\n---\n{{1.bodyText}}\n---\n\nScore this email. Return only the JSON object."
+          }
+        ],
+        "max_tokens": 200,
+        "temperature": 0.1
+      },
+      "_parameter_comments": {
+        "content_user_TALENT_NAME": "TODO: Replace Michaela in the user message with the actual talent name (hardcoded per scenario).",
+        "content_user_MINIMUM_RATE": "TODO: Replace 3500 with the talent's minimum rate in USD (number only, from config/settings.json)."
+      },
+      "metadata": {
+        "designer": {
+          "x": 300,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 3,
+      "module": "json:ParseJSON",
+      "version": 1,
+      "parameters": {
+        "json": "{{2.result.choices[].message.content}}",
+        "_comment": "Parses the JSON string returned by GPT into structured fields: score, reason, offer_type, proposed_rate_usd, brand_name."
+      },
+      "metadata": {
+        "designer": {
+          "x": 600,
+          "y": 0
+        }
+      }
+    },
+    {
+      "id": 4,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "routes": [
+        {
+          "_label": "Score 1 \u2014 Trash",
+          "flow": [
+            {
+              "id": 5,
+              "module": "gmail:MoveEmail",
+              "version": 1,
+              "parameters": {
+                "connection": "Gmail - Michaela",
+                "emailId": "{{1.id}}",
+                "labelId": "TRASH",
+                "_comment": "Archives the email by moving it to Gmail Trash. NOT permanently deleted \u2014 recoverable for up to 30 days."
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": -150
+                }
+              }
+            },
+            {
+              "id": 6,
+              "module": "google-sheets:AddRow",
+              "version": 1,
+              "parameters": {
+                "connection": "Google Sheets - Talent Automation",
+                "_connection_comment": "TODO: Set this to your Google Sheets Make connection.",
+                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID from config/settings.json.",
+                "sheetName": "Master Log",
+                "values": {
+                  "Timestamp": "{{now}}",
+                  "Talent Name": "Michaela",
+                  "Sender Email": "{{1.from}}",
+                  "Sender Domain": "{{replace(replace(1.from, /.*@/, \"\"), />.*/, \"\")}}",
+                  "Subject": "{{1.subject}}",
+                  "AI Score": "1",
+                  "AI Score Label": "trash",
+                  "Offer Type": "{{3.offer_type}}",
+                  "Proposed Rate (USD)": "{{3.proposed_rate_usd}}",
+                  "Action Taken": "archived",
+                  "Reply Sent": "FALSE",
+                  "Gmail Thread Link": "https://mail.google.com/mail/u/0/#inbox/{{1.threadId}}",
+                  "Notes": "{{3.reason}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 1200,
+                  "y": -150
+                }
+              }
+            }
+          ],
+          "filter": {
+            "name": "Score is 1",
+            "conditions": [
+              [
+                {
+                  "a": "{{3.score}}",
+                  "b": "1",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "_label": "Score 2 \u2014 Uncertain (flag for human review)",
+          "flow": [
+            {
+              "id": 7,
+              "module": "google-sheets:AddRow",
+              "version": 1,
+              "parameters": {
+                "connection": "Google Sheets - Talent Automation",
+                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID.",
+                "sheetName": "Master Log",
+                "values": {
+                  "Timestamp": "{{now}}",
+                  "Talent Name": "Michaela",
+                  "Sender Email": "{{1.from}}",
+                  "Sender Domain": "{{replace(replace(1.from, /.*@/, \"\"), />.*/, \"\")}}",
+                  "Subject": "{{1.subject}}",
+                  "AI Score": "2",
+                  "AI Score Label": "uncertain",
+                  "Offer Type": "{{3.offer_type}}",
+                  "Proposed Rate (USD)": "{{3.proposed_rate_usd}}",
+                  "Action Taken": "flagged for review",
+                  "Reply Sent": "FALSE",
+                  "Gmail Thread Link": "https://mail.google.com/mail/u/0/#inbox/{{1.threadId}}",
+                  "Notes": "{{3.reason}}"
+                }
+              },
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 0
+                }
+              }
+            }
+          ],
+          "filter": {
+            "name": "Score is 2",
+            "conditions": [
+              [
+                {
+                  "a": "{{3.score}}",
+                  "b": "2",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        },
+        {
+          "_label": "Score 3 \u2014 Good email, proceed to reply (Phase 2)",
+          "flow": [
+            {
+              "id": 8,
+              "module": "google-sheets:AddRow",
+              "version": 1,
+              "parameters": {
+                "connection": "Google Sheets - Talent Automation",
+                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID.",
+                "sheetName": "Master Log",
+                "values": {
+                  "Timestamp": "{{now}}",
+                  "Talent Name": "Michaela",
+                  "Sender Email": "{{1.from}}",
+                  "Sender Domain": "{{replace(replace(1.from, /.*@/, \"\"), />.*/, \"\")}}",
+                  "Subject": "{{1.subject}}",
+                  "AI Score": "3",
+                  "AI Score Label": "respond",
+                  "Offer Type": "{{3.offer_type}}",
+                  "Proposed Rate (USD)": "{{3.proposed_rate_usd}}",
+                  "Action Taken": "queued for reply",
+                  "Reply Sent": "FALSE",
+                  "Gmail Thread Link": "https://mail.google.com/mail/u/0/#inbox/{{1.threadId}}",
+                  "Notes": "{{3.reason}}"
+                }
+              },
+              "_comment": "Logs the email as queued. Phase 2 scenario handles the actual reply.",
+              "metadata": {
+                "designer": {
+                  "x": 900,
+                  "y": 150
+                }
+              }
+            }
+          ],
+          "filter": {
+            "name": "Score is 3",
+            "conditions": [
+              [
+                {
+                  "a": "{{3.score}}",
+                  "b": "3",
+                  "o": "text:equal"
+                }
+              ]
+            ]
+          }
+        }
+      ],
+      "metadata": {
+        "designer": {
+          "x": 900,
+          "y": 0
+        }
+      }
+    }
+  ],
+  "metadata": {
+    "instant": true,
+    "_instant_comment": "true = scenario fires in real-time when email arrives (webhook-based Gmail trigger). Required for live triage.",
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false
+    },
+    "zone": "us1.make.com",
+    "_zone_comment": "TODO: Update to your Make workspace zone if not us1."
+  },
+  "_TODO_checklist": [
+    "Replace every Michaela placeholder with the actual talent's first name",
+    "Replace every 3500 with the talent's minimum rate in USD (number only)",
+    "Replace every [MASTER_LOG_SHEET_ID] with the Google Sheet ID for the master log",
+    "Set the Gmail connection to this talent's specific OAuth connection in Make",
+    "Set the Google Sheets connection to your Make Google Sheets connection",
+    "Set the OpenAI connection to your Make OpenAI connection",
+    "Clone this scenario once per talent inbox \u2014 do NOT share one scenario across inboxes",
+    "Test on 2-3 inboxes with historical emails before activating all inboxes",
+    "Monitor master log daily for misclassifications and tune triage.md prompt accordingly"
+  ]
+}
