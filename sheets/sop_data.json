@@ -1,0 +1,1098 @@
+{
+  "Sylvia": {
+    "full_name": "Sylvia Van Hoeven",
+    "manager": "Cara",
+    "category": "Beauty",
+    "min_rate_usd": 1000,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "SYLVIA",
+        "response": "Manager: Cara"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Sylvia!! I\u2019m happy to share her media kit HERE + rates below:\n\u2022 1 TikTok (beauty): $2,000\n\u2022 1 TikTok (fashion): $1,000\n\u2028\u2022 1 IG Reel: $850\n\u2028\u2022 1 UGC Video: $1,500 (usage to be negotiated)\n\nSylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers! \n\nPlease let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($1,000)",
+        "response": "Thank you for reaching out to Sylvia to collab!! However her rates are higher than your offer. I\u2019m happy to share her media kit HERE + rates below:\n\u2022 1 TikTok (beauty): $2,000\n\u2022 1 TikTok (fashion): $1,000\n\u2028\u2022 1 IG Reel: $850\n\u2028\u2022 1 UGC Video: $1,500 (usage to be negotiated)\n\nSylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers! \n\nPlease let us know what account you'd like her to post on in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $1,500\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Sylvia. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Sylvia's standard rate is $2,000 per video! HERE is her media kit. Below is her bundle pricing:\n\n3 videos (90%) \u2192 $5,400\n5 videos (85%) \u2192 $8,500\n10 videos (75%) \u2192 $15,000\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (beauty or fashion focused) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nSylvia would LOVE to get some PR. Her address is:\n5883 E Thomas Rd Scottsdale, AZ  85251\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $1,000",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "Comes back with a rate under $1,000",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $700 per video)",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "IF deal was good and sent to Cara",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to Revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Trin": {
+    "full_name": "Trinity Blair",
+    "manager": "Chenni",
+    "category": "Lifestyle",
+    "min_rate_usd": 2000,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "TRINITY",
+        "response": "Manager: Chenni"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Trinity!! I\u2019m happy to share her media kit HERE + rates below:\n\u2022 1 TikTok: $4,000\n\u2028\u2022 1 IG Reel: $2,000\n\u2028\u2022  Podcast Feature: $1,500\n\u2028\u2022 1 UGC Video: $1,500 (usage to be negotiated)\n\nTrinity's pricing reflects her 3.3M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($2,000)",
+        "response": "Thank you for reaching out to Trinity to collab!! However her rates are higher than your offer. I\u2019m happy to share her media kit HERE + rates below:\n\u2022 1 TikTok: $4,000\n\u2028\u2022 1 IG Reel: $2,000\n\u2028\u2022  Podcast Feature: $1,500\n\u2028\u2022 1 UGC Video: $1,500 (usage to be negotiated)\n\nTrinity's pricing reflects her 3.3M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any room to expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate that is OVER $3,000\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Trinity. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Trinity's standard rate is $4,000 per video! HERE is her media kit. Below is her bundle pricing:\n\n3 videos (85%) \u2192 $10,000\n5 videos (80%) \u2192 $16,000\n10 videos (70%) \u2192 $28,000\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "Delete :)"
+      },
+      {
+        "trigger": "Fan Mail / Advice Wanted",
+        "response": "Move to Fan Mail"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nTrinity would LOVE to get some PR. Her address is:\n7579 Goldenfruit Cir, Riverside, CA 92507\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/above $2,000",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "Comes back with a rate under $2,000",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $1,500 per video)",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "IF deal was good and sent to Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to Revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Sam": {
+    "full_name": "Sam Jones",
+    "manager": "Cara",
+    "category": "Home/Living",
+    "min_rate_usd": 700,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "SAM JONES",
+        "response": "Manager: Cara"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Sam!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $900\n\u2028\u2022 1 IG Reel: $600\n\u2028\u2022 1 UGC Video: $1,500 (usage can be added on for an additional cost)\n\nSam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over $150k!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($700)",
+        "response": "Thank you for reaching out to Sam to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $900\n\u2028\u2022 1 IG Reel: $600\n\u2028\u2022 1 UGC Video: $1,500 (usage can be added on for an additional cost)\n\nSam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over $150k!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any room to expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $900\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Sam. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Her standard rate is $900 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,400\n5 videos (85%) \u2192 $3,800\n10 videos (75%) \u2192 $6,750\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "UGC offer / rate request",
+        "response": "Sam's UGC rate is around $1,500 per video! HERE is her media kit for review. \n\nIf you have this budget\u00a0I can loop in her team to go through the rest of the\u00a0details :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nSam would LOVE to get some PR. Her address is:\n3190 Nicol Point Way NE, Tuscaloosa, AL 35406\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/above $700",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "Initially offered a rate below $700",
+        "response": "Move it to Revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $500 per video)",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "IF deal was good and sent to Cara",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Britt": {
+    "full_name": "Brittanie Hammer",
+    "manager": "Chenni",
+    "category": "Home/Living",
+    "min_rate_usd": 900,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "BRITT",
+        "response": "Manager: Chenni"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Britt!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $1,250\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nBritt's pricing reflects her extremely high conversion rate from content that truly sells. Her last month GMV was $669k & she was TikTok\u2019s 2025 Home Creator of the Year!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($900)",
+        "response": "Thank you for reaching out to Britt to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $1,250\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nBritt's pricing reflects her extremely high conversion rate from content that truly sells. Her last month GMV was $669k & she was TikTok\u2019s 2025 Home Creator of the Year!!\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $1,250\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Britt. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Britt's standard rate is $1,250 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $3,350\n5 videos (85%) \u2192 $5,300\n10 videos (75%) \u2192 $9,350\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (home products) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nBritt would LOVE to get some PR. Her address is:\n33500 Willo Rd Avon, OH 44011\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/above $900",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "Comes back with a rate under $900",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $700 per video)",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "IF deal was good and sent to Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to Revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Allee": {
+    "full_name": "Allee Baray",
+    "manager": "Chenni",
+    "category": "Fashion",
+    "min_rate_usd": 650,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "ALLEE",
+        "response": "Manager: Chenni"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Allee!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok (Main): $850\n\u2022 1 TikTok (2nd account): $700\n\u2022 1 TikTok (3rd account): $500\n\u2028\u2022 1 UGC Video: $800 (usage to be negotiated)\n\nAllee's pricing reflects her extremely high conversion rate from content that truly sells. Her last month GMV was $490k+ & that was just her main account. She is a TikTok Shop Star and has a great pulse on what her viewers are wanting to buy!!\n\nPlease let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($650)",
+        "response": "Thank you for reaching out to Allee to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok (Main): $850\n\u2022 1 TikTok (2nd account): $700\n\u2022 1 TikTok (3rd account): $500\n\u2028\u2022 1 UGC Video: $800 (usage to be negotiated)\n\nAllee's pricing reflects her extremely high conversion rate from content that truly sells. Her last month GMV was $490k+ & that was just her main account. She is a TikTok Shop Star and has a great pulse on what her viewers are wanting to buy!!\n\nPlease let us know what account you'd like her to post on in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $800\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Allee. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Allee's standard rate is $850 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,300\n5 videos (85%) \u2192 $3,600\n10 videos (75%) \u2192 $6,300\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. She also has mutliple, high GMV driving accounts so she can post across her accounts! Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nAllee would LOVE to get some PR. Her address is:\n37141 Bush Sunflower Ct Murrieta 92562 CA\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/above $650",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "Comes back with a rate under $650",
+        "response": "Move it to Revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $500 per video)",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "IF deal was good and sent to Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to Revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Lizz": {
+    "full_name": "Lizz Freixas",
+    "manager": "Chenni",
+    "category": "Fashion",
+    "min_rate_usd": 600,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "LIZZ",
+        "response": "Manager: Chenni"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Lizz!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2028\u2022 1 UGC Video: $900 (usage to be negotiated)\n\nLizz's pricing reflects her extremely high conversion rate from content that truly sells. Her monthly GMV is $550k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super high for a shop creator which is ideal for brand collabs.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($600)",
+        "response": "Thank you for reaching out to Lizz to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2028\u2022 1 UGC Video: $900 (usage to be negotiated)\n\nLizz's pricing reflects her extremely high conversion rate from content that truly sells. Her monthly GMV is $550k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super high for a shop creator which is ideal for brand collabs.\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $700\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Lizz. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Lizz's standard rate is $750 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,000\n5 videos (85%) \u2192 $3,100\n10 videos (75%) \u2192 $5,600\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nLizz would LOVE to get some PR. Her address is:\n4256 S Valentina Bay Millcreek UT, 84107\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/above $600",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "Comes back with a rate under $600",
+        "response": "Move it to Revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $500 per video)",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "IF deal was good and sent to Cara",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Katrina": {
+    "full_name": "Katrina",
+    "manager": "Chenni",
+    "category": "Fashion",
+    "min_rate_usd": 300,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Katrina!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $500\n\u2022 Cross posting to IG Reels: + $150\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($300)",
+        "response": "Thank you for reaching out to Katrina to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $500\n\u2022 Cross posting to IG Reels: + $150\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $600\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Katrina. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Katrina's standard rate is $500 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $1,350\n5 videos (85%) \u2192 $2,100\n10 videos (75%) \u2192 $3,750\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nKatrina would LOVE to get some PR. Her address is:\n12002 Bradenton Ct, Fredericksburg, VA, 22407\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $650",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/below $650",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "Comes back with a rate under $200",
+        "response": "Move it to Revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (offers something close)",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "IF deal was good and sent to Cara or Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to Revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Jenn": {
+    "full_name": "Jenn Lyles",
+    "manager": "Chenni",
+    "category": "Fashion",
+    "min_rate_usd": 300,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "JENN",
+        "response": "Manager: Chenni"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Jenn!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $500\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nJenn's pricing reflects her extremely high conversion rate (consistent $400k+ monthly GMV). She's a TikTok Shop Star who shares relatable, authentic finds with her audience through engaging, trust-first content that drives attention and connection!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($300)",
+        "response": "Thank you for reaching out to Jenn to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $500\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nJenn's pricing reflects her extremely high conversion rate (consistent $400k+ monthly GMV). She's a TikTok Shop Star who shares relatable, authentic finds with her audience through engaging, trust-first content that drives attention and connection!!\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $600\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Jenn. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Jenn's standard rate is $500 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $1,350\n5 videos (85%) \u2192 $2,100\n10 videos (75%) \u2192 $3,750\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nJenn would LOVE to get some PR. Her address is:\n4054 St Andrews Lane Spring Hill, TN 37174\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/above $400",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "Comes back with a rate under $400",
+        "response": "Move it to Revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $400 per video)",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "IF deal was good and sent to Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPublic Speaking\nTikTok / Brand / Event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Angela": {
+    "full_name": "Angela Callisto",
+    "manager": "Chenni",
+    "category": "Fashion",
+    "min_rate_usd": 600,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "ANGELA",
+        "response": "Manager: Chenni"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Angela!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nAngela's pricing reflects her extremely high conversion rate (consistent $450k+ monthly GMV). She's a TikTok Shop Star who specializes in real friend-to-friend recommendations for fashion & beauty based on her authenticity!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($600)",
+        "response": "Thank you for reaching out to Angela to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nAngela's pricing reflects her extremely high conversion rate (consistent $450k+ monthly GMV). She's a TikTok Shop Star who specializes in real friend-to-friend recommendations for fashion & beauty based on her authenticity!!\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $750\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Angela. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Angela's standard rate is $750 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,000\n5 videos (85%) \u2192 $3,100\n10 videos (75%) \u2192 $5,600\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nAngela would LOVE to get some PR. Her address is:\n8397 Black Walnut Drive East Amherst NY 14051\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $600",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "Comes back with a rate under $600",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $500 per video)",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "IF deal was good and sent to Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPublic Speaking\nTikTok / Brand / Event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Colleen": {
+    "full_name": "Colleen Fusco",
+    "manager": "Cara",
+    "category": "Beauty",
+    "min_rate_usd": 800,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "COLLEEN",
+        "response": "Manager: Cara"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Colleen!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $1,000\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nColleen's pricing reflects her creating high-quality, polished content with a bestie beauty vibe that feels authentic, relatable, and brand-elevating!! Plus she's a TikTok Shop Star so she's also known for driving conversions in her collabs.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($800)",
+        "response": "Thank you for reaching out to Colleen to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $1,000\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nColleen's pricing reflects her creating high-quality, polished content with a bestie beauty vibe that feels authentic, relatable, and brand-elevating!! Plus she's a TikTok Shop Star so she's also known for driving conversions in her collabs.\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate that is OVER $1,000\nfor one post",
+        "response": "Thank you for the offer! I think this collab could be a good fit for Colleen. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Colleen's standard rate is $1,000 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,700\n5 videos (85%) \u2192 $4,250\n10 videos (75%) \u2192 $7,500\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (make up focused) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nColleen would LOVE to get some PR. Her address is:\n22232 MacFarlane Dr, Woodland Hills, CA 91364\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/above $800",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "Comes back with a rate under $800",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (at least $700 per video)",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "IF deal was good and sent to Cara or Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Alana": {
+    "full_name": "Alana Calviello",
+    "manager": "Nicole",
+    "category": "Fashion",
+    "min_rate_usd": 400,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "ALANA",
+        "response": "Manager: Nicole"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Alana!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $500 (usage to be negotiated)\n\nAlana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent $250k+ monthly GMV). She is strong in the fashion category but has sales across beauty & health/wellness too! \n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($400)",
+        "response": "Thank you for reaching out to Alana to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $500 (usage to be negotiated)\n\nAlana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent $250k+ monthly GMV). She is strong in the fashion category but has sales across beauty & health/wellness too! \n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $750\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Alana. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Alana's standard rate is $750 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,000\n5 videos (85%) \u2192 $3,100\n10 videos (75%) \u2192 $5,600\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion, wellness, beauty) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nAlana would LOVE to get some PR!! Her address is:\n160 Water Street APT 24R New York, NY 10038\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $300\n(including bundles)",
+        "response": "CC Nicole"
+      },
+      {
+        "trigger": "Comes back with a rate under $300",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "IF deal was good and sent to Nicole",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPublic Speaking\nTikTok / Brand / Event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the Select chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Nicole still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Grayson": {
+    "full_name": "Grayson Finks",
+    "manager": "Nicole",
+    "category": "Fashion",
+    "min_rate_usd": 300,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "GRAYSON",
+        "response": "Manager: Nicole"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Grayson!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nGrayson's pricing reflects her high quality fashion content & the effort she puts in to drive conversions (consistent $60k+ monthly GMV)!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($300)",
+        "response": "Thank you for reaching out to Grayson to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nGrayson's pricing reflects her high quality fashion content & the effort she puts in to drive conversions (consistent $60k+ monthly GMV)!!\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $450\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Grayson. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Grayson's standard rate is $500 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,000\n5 videos (85%) \u2192 $3,150\n10 videos (75%) \u2192 $5,600\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nGrayson would LOVE to get some PR!! Her address is:\n441 Race St Charleston, SC 29403\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $300\n(including bundles)",
+        "response": "CC Nicole"
+      },
+      {
+        "trigger": "Comes back with a rate under $300",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "IF deal was good and sent to Nicole",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPublic Speaking\nTikTok / Brand / Event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the Select chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Nicole still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Kylika": {
+    "full_name": "Kylika Miller",
+    "manager": "Nicole",
+    "category": "Beauty",
+    "min_rate_usd": 400,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "KYLIKA",
+        "response": "Manager: Nicole"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Kylika!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $600 (usage to be negotiated)\n\nKylika's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her fashion & beauty recommendations on TikTok Shop!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($400)",
+        "response": "Thank you for reaching out to Kylika to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $750\n\u2022 1 IG Reels: $500\n\u2028\u2022 1 UGC Video: $600 (usage to be negotiated)\n\nKylika's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her fashion & beauty recommendations on TikTok Shop!!\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $750\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Kylika. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Kylika's standard rate is $750 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,000\n5 videos (85%) \u2192 $3,100\n10 videos (75%) \u2192 $5,600\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion, wellness, beauty) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nKylika would LOVE to get some PR!! Her address is:\n1430 Werthman Dr. Waukee, IA 50263\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $400\n(including bundles)",
+        "response": "CC Nicole"
+      },
+      {
+        "trigger": "Comes back with a rate under $400",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "IF deal was good and sent to Nicole",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPublic Speaking\nTikTok / Brand / Event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the Select chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Nicole still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Anastasiya": {
+    "full_name": "Anastasiya",
+    "manager": "Cara",
+    "category": "Fashion/Beauty",
+    "min_rate_usd": 600,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "ANASTASIYA",
+        "response": "Manager: Cara"
+      },
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Anastasiya!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok (Main): $800\n\u2022 1 TikTok (Backup): $800\n\u2022 1 IG Reels: $750\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nAnastasiya's pricing reflects her high-quality, polished content with a bestie beauty vibe that feels authentic, relatable, and brand-elevating!! Plus she's a UGC expert so she knows how to make videos that convert!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($600)",
+        "response": "Thank you for reaching out to Anastasiya to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok (Main): $800\n\u2022 1 TikTok (Backup): $800\n\u2022 1 IG Reels: $750\n\u2028\u2022 1 UGC Video: $1,000 (usage to be negotiated)\n\nAnastasiya's pricing reflects her high-quality, polished content with a bestie beauty vibe that feels authentic, relatable, and brand-elevating!! Plus she's a UGC expert so she knows how to make videos that convert!!\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $800\nfor one post",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Anastasiya. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Anastasiya's standard rate is $800 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,150\n5 videos (85%) \u2192 $3,400\n10 videos (75%) \u2192 $6,000\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion or beauty) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "UGC offer / rate request",
+        "response": "Anastasiya's UGC rate is around $1,000 per video! HERE is her media kit for review. \n\nIf you have this budget\u00a0I can loop in her team to go through the rest of the\u00a0details :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nAnastasiya would LOVE to get some PR!! Her address is:\n3193 W Grandview St, Springfield, MO 65803\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $500\nOR\nif the brand agrees to bundle pricing (at least $500 per video)",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "Comes back with a rate under $500",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "IF deal was good and sent to Nicole",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPublic Speaking\nTikTok / Brand / Event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the Select chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Nicole still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "KatrinaD": {
+    "full_name": "Katrina D",
+    "manager": "Cara",
+    "category": "Fashion (livestream)",
+    "min_rate_usd": 150,
+    "rate_unit": "per hour",
+    "rules": [
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Thank you so much for reaching out about a potential partnership with Katrina!! I\u2019m happy to share her rates below:\n\u2022 Dedicated TikTok Shop Livestream: $300 / hour\n\u2022 Integrated TikTok Shop Livestream: $200 / hour\n\u2022 1 TikTok Shop Post: $600\n\u2022 1 IG Reel: $500\n\u2028\u2022 1 UGC Video: $700 (usage to be negotiated)\n\nKatrina's pricing reflects her proven success with livestreaming (consistent $300k+ monthly GMV)!! She dominates the fashion category & we'd love to find a way to work together with your brand!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward."
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum \n($150 per hour)",
+        "response": "Thank you for reaching out to Katrina to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 Dedicated TikTok Shop Livestream: $300 / hour\n\u2022 Integrated TikTok Shop Livestream: $200 / hour\n\u2022 1 TikTok Shop Post: $600\n\u2022 1 IG Reel: $500\n\u2028\u2022 1 UGC Video: $700 (usage to be negotiated)\n\nKatrina's pricing reflects her proven success with livestreaming (consistent $300k+ monthly GMV)!! She dominates the fashion category & we'd love to find a way to work together with your brand!!\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget."
+      },
+      {
+        "trigger": "Initally offered a rate that is OVER $250\nper hour\n\n*you might have to do math ($$ / hour ask)",
+        "response": "Hi,\n\nThank you for the offer! I think this collab could be a good fit for Katrina. Looping her in management team who can move forward with this convo!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Katrina's standard rate for livestreams is $300 per hour! Below is her bundle hour pricing:\n\n4 hours ($275 / hour) \u2192 $1,100\n6 hours ($250 / hour) \u2192 $1,500\n8 hours ($225 / hour) \u2192 $1,800\n\nWe\u2019ve found bundles usually perform better since the products being featured in multiple of her lives, making it feel like a product she TRULY loves. These hours can be used throughout the month / over a period of time. We can discuss more with her direct management if you're interested!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (fashion) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nKatrina would LOVE to get some PR!! Her address is:\n38 River Rock Court, Azusa, CA 91702\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $150 per hour\n(including bundles)",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "Comes back with a rate under $150 per hour",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "IF deal was good and sent to Cara",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPublic Speaking\nTikTok / Brand / Event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the Talent Managers chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  },
+  "Michaela": {
+    "full_name": "Michaela",
+    "manager": "Cara",
+    "category": "Fashion/Beauty",
+    "min_rate_usd": 3500,
+    "rate_unit": "per video",
+    "rules": [
+      {
+        "trigger": "Asking for rates or a potential to collab",
+        "response": "Hi,\n\nThank you so much for reaching out about a potential partnership with Michaela!! I\u2019m happy to share her media kit HERE and rates below:\n\u2022 1 TikTok: $6,000\n\u2028\u2022 1 IG Reel: $3,500\n\nMichaela\u2019s pricing reflects her high-quality, conversion-focused content and consistent performance for brands!\n\nPlease let us know if you have any questions moving forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate below her minimum ($3,500)",
+        "response": "Hi,\n\nThank you so much for reaching out about a potential partnership with Michaela!! However her rates are higher than your offer. I\u2019m happy to share her media kit HERE and rates below for visibility:\n\u2022 1 TikTok: $6,000\n\u2028\u2022 1 IG Reel: $3,500\n\nMichaela\u2019s pricing reflects her high-quality, conversion-focused content and consistent performance for brands!\n\nPlease let us know if you have the budget to move forward. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Initially offered a rate that is CLOSE to or at her minimum ($2,500-3,500)",
+        "response": "Hi,\n\nThank you so much for reaching out about a potential partnership with Michaela!! However her rates are a tad higher than your offer. I\u2019m happy to share her media kit HERE and rates below for visibility:\n\u2022 1 TikTok: $6,000\n\u2028\u2022 1 IG Reel: $3,500\n\nMichaela\u2019s pricing reflects her high-quality, conversion-focused content and consistent performance for brands!\n\nPlease let us know if you can expand your budget. We\u2019d love to explore working together!"
+      },
+      {
+        "trigger": "Asking for bundle rates",
+        "response": "Thank you so much for reaching out about a potential partnership with Michaela!! Her standard rate is $6,000 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $16,200\n5 videos (85%) \u2192 $25,500\n10 videos (75%) \u2192 $45,000\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+      },
+      {
+        "trigger": "All of the above responses",
+        "response": "Move to A Initial Response"
+      },
+      {
+        "trigger": "Initially offered a rate that is OVER $5,000",
+        "response": "Thank you so much for reaching out about a potential partnership with Michaela!!I think this collab could be a really good fit. Looping her in management team who can move forward with this convo!!"
+      },
+      {
+        "trigger": "Initially offered a rate below $1,000",
+        "response": "Move it to revisit"
+      },
+      {
+        "trigger": "Commission Only offer",
+        "response": "If product is GOOD (make up / fashion focused) - move to Commission Only\n\nIf tragic or spammy - Delete :)"
+      },
+      {
+        "trigger": "PR Request\nfrom notable brand",
+        "response": "Hi,\n\nMichaela would LOVE to get some PR! Her address is:\n8 Beith Lane, Bella Vista, AR, 72715\n\nLet me know when it's sent & the tracking number is avaialble so I can pass her way :)"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers above $4,000",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand offers at/below $4,000",
+        "response": "CC Chenni"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nBUNDLE CONVO\nif the brand agrees to pricing (offers something close)",
+        "response": "CC Cara"
+      },
+      {
+        "trigger": "IF deal was good and sent to Cara or Chenni",
+        "response": "Move to Ongoing TBC"
+      },
+      {
+        "trigger": "convos marked A Inital Response:\nif the brand cannot budge on budget",
+        "response": "Move to revisit"
+      },
+      {
+        "trigger": "Anything related to:\nPanel / TikTok Invites\nBrand or event invites\nSpecial legit inquires",
+        "response": "Ask for consult in the talent chat!!"
+      },
+      {
+        "trigger": "Tagged emails in inbox \n(as collab is ongoing or replies come in)",
+        "response": "When you see an email marked with a previous tag\n1. make sure it has Cara or Chenni still CC'd    (brands sometimes don't reply all)\n2. move to whatever folder it was already labeled as"
+      }
+    ]
+  }
+}
