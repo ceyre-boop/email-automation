@@ -1,0 +1,264 @@
+{
+  "_README": "Make Scenario Blueprint — Phase 2: Auto-Reply Engine. Import AFTER Phase 1 is stable and the SOP sheet audit with Britney is complete. This scenario is triggered by a webhook from Phase 1 (or can run on a schedule polling Score 3 rows in the master log). One scenario handles all talents — it dynamically looks up the correct SOP tab.",
+  "_import_instructions": [
+    "1. Complete the SOP sheet audit with Britney FIRST. All talent tabs must match sheets/sop_matrix_template.csv.",
+    "2. Import this blueprint into Make.",
+    "3. Fill in all TODO values below.",
+    "4. Keep send_delay_minutes at 15 during all testing.",
+    "5. Test on 2-3 inboxes and manually review every outbound reply before approving broader rollout."
+  ],
+  "_architecture_note": "This scenario reads 'queued for reply' rows from the master log (Score 3, Reply Sent = FALSE), processes them, sends the reply, then updates the log row. Running on a schedule (every 5 minutes) is the recommended approach during Phase 2 to keep it simple.",
+
+  "name": "Phase 2 — Auto-Reply Engine",
+
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:SearchRows",
+      "version": 1,
+      "parameters": {
+        "connection": "Google Sheets - Talent Automation",
+        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+        "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID.",
+        "sheetName": "Master Log",
+        "filter": {
+          "conditions": [
+            [
+              { "a": "Action Taken", "b": "queued for reply", "o": "text:equal" },
+              { "a": "Reply Sent", "b": "FALSE", "o": "text:equal" }
+            ]
+          ]
+        },
+        "limit": 10,
+        "_limit_comment": "Process up to 10 queued emails per run. Adjust as needed."
+      },
+      "metadata": { "designer": { "x": 0, "y": 0 } }
+    },
+
+    {
+      "id": 2,
+      "module": "google-sheets:GetValues",
+      "version": 1,
+      "parameters": {
+        "connection": "Google Sheets - Talent Automation",
+        "spreadsheetId": "[SOP_MATRIX_SHEET_ID]",
+        "_spreadsheetId_comment": "TODO: Fill in Britney's SOP matrix Google Sheet ID.",
+        "sheetName": "{{1.`Talent Name`}}",
+        "_sheetName_comment": "Dynamically reads the tab named after the talent. Tab names must exactly match the Talent Name column in the master log.",
+        "range": "A:F",
+        "_range_comment": "Reads columns A through F: Offer Type, Minimum Rate, Response Template, Auto-Respond Flag, Brand Blacklist, Special Rules."
+      },
+      "metadata": { "designer": { "x": 300, "y": 0 } }
+    },
+
+    {
+      "id": 3,
+      "module": "tools:SetVariable",
+      "version": 1,
+      "parameters": {
+        "name": "sop_row",
+        "value": "{{first(filter(2.values, row => row[0] == 1.`Offer Type`))}}",
+        "_comment": "Finds the row in the SOP sheet where column A (Offer Type) matches the email's offer type detected during triage. If no match, falls back to 'Other' row.",
+        "_fallback_comment": "TODO: Add a fallback filter for 'Other' offer type if the primary match returns empty."
+      },
+      "metadata": { "designer": { "x": 600, "y": 0 } }
+    },
+
+    {
+      "id": 4,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "routes": [
+        {
+          "_label": "Auto-Respond Flag = ESCALATE or NO — route to Score 2 behavior",
+          "flow": [
+            {
+              "id": 5,
+              "module": "google-sheets:UpdateRow",
+              "version": 1,
+              "parameters": {
+                "connection": "Google Sheets - Talent Automation",
+                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "sheetName": "Master Log",
+                "rowNumber": "{{1.rowNumber}}",
+                "values": {
+                  "Action Taken": "escalated to human",
+                  "Notes": "Auto-Respond Flag = {{3.sop_row[3]}} — routed to human review"
+                }
+              },
+              "metadata": { "designer": { "x": 900, "y": -100 } }
+            }
+          ],
+          "filter": {
+            "name": "ESCALATE or NO",
+            "conditions": [
+              [
+                { "a": "{{3.sop_row[3]}}", "b": "YES", "o": "text:notEqual" }
+              ]
+            ]
+          }
+        },
+
+        {
+          "_label": "Auto-Respond Flag = YES — proceed to draft and send reply",
+          "flow": [
+            {
+              "id": 6,
+              "module": "openai-gpt-3:CreateChatCompletion",
+              "version": 1,
+              "parameters": {
+                "connection": "OpenAI - Talent Automation",
+                "model": "gpt-4o",
+                "_model_comment": "Always use gpt-4o for reply drafting. Do NOT substitute gpt-4o-mini here.",
+                "messages": [
+                  {
+                    "role": "system",
+                    "content": "You are a professional talent management assistant drafting email replies on behalf of talent.\n\nYour job is to fill in the provided SOP response template using details from the original email.\nWrite as if you are the talent's team — professional, warm, and concise.\n\nRules:\n- Replace ALL placeholders: [BRAND_NAME], [TALENT_NAME], [OFFER_TYPE], [PROPOSED_RATE], [MINIMUM_RATE]\n- If a placeholder value is unknown, replace it with a natural phrase\n- Do NOT add commentary, disclaimers, or AI-related text outside the email\n- Do NOT invent specifics not present in the original email\n- Output ONLY the finished email reply text, ready to send. No subject line. No preamble.\n\nIf the SOP template or talent rules indicate ESCALATE for this offer type, output exactly:\nESCALATE: <one-sentence reason>"
+                  },
+                  {
+                    "role": "user",
+                    "content": "Talent name: {{1.`Talent Name`}}\nTalent minimum rate for this offer type (USD): {{3.sop_row[1]}}\nOffer type: {{1.`Offer Type`}}\nBrand name: {{1.`Notes`}}\nProposed rate from email (USD): {{1.`Proposed Rate (USD)`}}\n\nSOP response template:\n---\n{{3.sop_row[2]}}\n---\n\nSpecial rules for this talent:\n---\n{{3.sop_row[5]}}\n---\n\nAuto-respond flag: {{3.sop_row[3]}}\n\nOriginal email body is not stored in log — retrieve from Gmail thread below and include in this call if possible.\n\nGmail Thread Link: {{1.`Gmail Thread Link`}}\n\nDraft the reply now. Output only the finished email text."
+                  }
+                ],
+                "max_tokens": 800,
+                "temperature": 0.4,
+                "_note": "TODO: In production, fetch the original email body from Gmail using the thread ID and inject it into the user message above. The log stores the thread link but not the full body. Add a gmail:GetEmail module before this step and pass the body text into this prompt."
+              },
+              "metadata": { "designer": { "x": 900, "y": 100 } }
+            },
+
+            {
+              "id": 7,
+              "module": "builtin:BasicRouter",
+              "version": 1,
+              "parameters": {},
+              "routes": [
+                {
+                  "_label": "GPT returned ESCALATE — route to human",
+                  "flow": [
+                    {
+                      "id": 8,
+                      "module": "google-sheets:UpdateRow",
+                      "version": 1,
+                      "parameters": {
+                        "connection": "Google Sheets - Talent Automation",
+                        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                        "sheetName": "Master Log",
+                        "rowNumber": "{{1.rowNumber}}",
+                        "values": {
+                          "Action Taken": "escalated to human",
+                          "Notes": "GPT returned ESCALATE: {{6.result.choices[].message.content}}"
+                        }
+                      },
+                      "metadata": { "designer": { "x": 1200, "y": 50 } }
+                    }
+                  ],
+                  "filter": {
+                    "name": "GPT said ESCALATE",
+                    "conditions": [
+                      [{ "a": "{{6.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:matchRegexp" }]
+                    ]
+                  }
+                },
+
+                {
+                  "_label": "Reply drafted — apply send delay then send",
+                  "flow": [
+                    {
+                      "id": 9,
+                      "module": "sleep",
+                      "version": 1,
+                      "parameters": {
+                        "delay": 900,
+                        "_comment": "900 seconds = 15 minutes. This is the supervisor review window. Change to 0 to disable delay after QA sign-off. Value in seconds."
+                      },
+                      "metadata": { "designer": { "x": 1200, "y": 150 } }
+                    },
+
+                    {
+                      "id": 10,
+                      "module": "gmail:ReplyToThread",
+                      "version": 1,
+                      "parameters": {
+                        "connection": "Gmail - {{1.`Talent Name`}}",
+                        "_connection_comment": "TODO: Make connection names for each talent Gmail must be in format 'Gmail - [TalentFirstName]' and match exactly the Talent Name in the log. This dynamic lookup requires all connections to be consistently named.",
+                        "threadId": "{{last(split(1.`Gmail Thread Link`, \"/\"))}}",
+                        "_threadId_comment": "Extracts the thread ID from the Gmail link stored in the log.",
+                        "to": "{{1.`Sender Email`}}",
+                        "body": "{{6.result.choices[].message.content}}",
+                        "bodyType": "text",
+                        "_bodyType_comment": "Send as plain text. Change to 'html' only if SOP templates contain HTML formatting."
+                      },
+                      "metadata": { "designer": { "x": 1500, "y": 150 } }
+                    },
+
+                    {
+                      "id": 11,
+                      "module": "google-sheets:UpdateRow",
+                      "version": 1,
+                      "parameters": {
+                        "connection": "Google Sheets - Talent Automation",
+                        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                        "sheetName": "Master Log",
+                        "rowNumber": "{{1.rowNumber}}",
+                        "values": {
+                          "Action Taken": "replied",
+                          "Reply Sent": "TRUE",
+                          "Notes": "Auto-replied at {{now}}"
+                        }
+                      },
+                      "metadata": { "designer": { "x": 1800, "y": 150 } }
+                    }
+                  ],
+                  "filter": {
+                    "name": "Normal reply",
+                    "conditions": [
+                      [{ "a": "{{6.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:notMatchRegexp" }]
+                    ]
+                  }
+                }
+              ],
+              "metadata": { "designer": { "x": 1200, "y": 100 } }
+            }
+          ],
+          "filter": {
+            "name": "Auto-respond YES",
+            "conditions": [
+              [{ "a": "{{3.sop_row[3]}}", "b": "YES", "o": "text:equal" }]
+            ]
+          }
+        }
+      ],
+      "metadata": { "designer": { "x": 900, "y": 0 } }
+    }
+  ],
+
+  "metadata": {
+    "instant": false,
+    "_instant_comment": "false = runs on a schedule (every 5 minutes recommended during Phase 2). Not webhook-based.",
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "_sequential_comment": "true = emails are processed one at a time to avoid race conditions when updating log rows."
+    },
+    "zone": "us1.make.com",
+    "_zone_comment": "TODO: Update to your Make workspace zone."
+  },
+
+  "_TODO_checklist": [
+    "Complete SOP sheet audit with Britney BEFORE activating this scenario",
+    "All SOP tab names must exactly match talent names in the master log (case-sensitive)",
+    "Replace [MASTER_LOG_SHEET_ID] with the master log Sheet ID",
+    "Replace [SOP_MATRIX_SHEET_ID] with Britney's SOP matrix Sheet ID",
+    "Set Gmail connection names in Make to exactly 'Gmail - [TalentFirstName]' format",
+    "Add a gmail:GetEmail module before step 6 to inject the original email body into the GPT reply prompt (see TODO note in step 6)",
+    "Keep send delay at 900 seconds (15 minutes) during all Phase 2 testing",
+    "After QA sign-off (5 days), reduce or remove send delay at supervisor's discretion",
+    "Test on 2-3 inboxes first — manually review every outbound reply before approving broader rollout"
+  ]
+}

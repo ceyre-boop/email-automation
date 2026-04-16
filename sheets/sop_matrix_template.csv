@@ -1,0 +1,60 @@
+Offer Type,Minimum Rate,Response Template,Auto-Respond Flag,Brand Blacklist,Special Rules
+Sponsored Post,1000,"Hi [BRAND_NAME],
+
+Thank you for reaching out! [TALENT_NAME] would love to explore a partnership.
+
+For a [OFFER_TYPE], [TALENT_NAME]'s rate starts at $[MINIMUM_RATE]. Based on your proposal of $[PROPOSED_RATE], we'd like to discuss whether there's room to align.
+
+Could you share more details about deliverables, timeline, and usage rights? We want to make sure this is a great fit for both sides.
+
+Looking forward to connecting!
+
+[TALENT_NAME]'s Team",YES,,
+Story,500,"Hi [BRAND_NAME],
+
+Thanks for thinking of [TALENT_NAME]! We're always open to Story collaborations.
+
+For a [OFFER_TYPE], [TALENT_NAME]'s rate is $[MINIMUM_RATE]. Your offer of $[PROPOSED_RATE] — let's talk and see if we can make the numbers work.
+
+Please share campaign details and timeline and we'll get back to you quickly.
+
+Best,
+[TALENT_NAME]'s Team",YES,,
+UGC,500,"Hi [BRAND_NAME],
+
+[TALENT_NAME] would be excited to create UGC content for your brand!
+
+For [OFFER_TYPE], rates start at $[MINIMUM_RATE]. We see your offer is $[PROPOSED_RATE] — we'd love to discuss scope and deliverables to find a number that works.
+
+Please send over the brief and we'll follow up.
+
+Best,
+[TALENT_NAME]'s Team",YES,,
+Affiliate,0,"Hi [BRAND_NAME],
+
+Thank you for the affiliate opportunity!
+
+[TALENT_NAME] does consider affiliate partnerships on a case-by-case basis. Could you share the commission structure, product details, and average conversion rates?
+
+We'll review and get back to you shortly.
+
+[TALENT_NAME]'s Team",ESCALATE,,Only accept affiliate deals with commission >= 15%
+Event Appearance,2000,"Hi [BRAND_NAME],
+
+Thanks for the invitation for [TALENT_NAME] to appear at your event!
+
+For [OFFER_TYPE], [TALENT_NAME]'s rate starts at $[MINIMUM_RATE]. Your current offer of $[PROPOSED_RATE] — let's connect to discuss the event details, expectations, and whether we can align on terms.
+
+Please share the event date, location, and requirements and we'll follow up promptly.
+
+Best,
+[TALENT_NAME]'s Team",ESCALATE,,All event appearances require manager review regardless of rate
+Other,500,"Hi [BRAND_NAME],
+
+Thank you for reaching out about a potential collaboration with [TALENT_NAME]!
+
+Could you share more details about what you have in mind — including deliverables, timeline, usage rights, and your proposed budget? This will help us give you a proper response.
+
+Looking forward to learning more!
+
+[TALENT_NAME]'s Team",YES,,

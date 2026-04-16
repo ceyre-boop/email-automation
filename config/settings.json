@@ -1,0 +1,69 @@
+{
+  "_comment": "Global configuration for the Talent Inbox Automation system. Fill in all TODO values before deploying.",
+
+  "openai": {
+    "triage_model": "gpt-4o-mini",
+    "_triage_model_comment": "Use gpt-4o-mini for triage (cheaper, nearly as accurate). Switch to gpt-4o only if quality drops.",
+    "reply_model": "gpt-4o",
+    "_reply_model_comment": "Always use gpt-4o for reply drafting — quality matters here.",
+    "max_tokens_triage": 200,
+    "max_tokens_reply": 800,
+    "temperature_triage": 0.1,
+    "_temperature_comment": "Low temperature for triage = consistent, deterministic scoring.",
+    "temperature_reply": 0.4
+  },
+
+  "triage": {
+    "global_minimum_rate_usd": 0,
+    "_global_minimum_rate_comment": "TODO: Set a global dollar floor (e.g. 50). Any offer below this = Score 1 regardless of brand. Set to 0 to disable.",
+    "score_1_label": "trash",
+    "score_2_label": "uncertain",
+    "score_3_label": "respond"
+  },
+
+  "reply": {
+    "send_delay_minutes": 15,
+    "_send_delay_comment": "Minutes to wait after drafting before sending. Set to 0 to disable. Keep at 15 during Phase 2 testing.",
+    "send_delay_enabled": true
+  },
+
+  "digest": {
+    "send_time": "08:00",
+    "_send_time_comment": "TODO: Confirm exact time with supervisor.",
+    "timezone": "America/New_York",
+    "_timezone_comment": "TODO: Confirm supervisor timezone.",
+    "recipient_email": "",
+    "_recipient_email_comment": "TODO: Fill in supervisor email address (or comma-separated list for multiple recipients).",
+    "subject_template": "Daily Inbox Report — {{DATE}} — {{TOTAL}} emails processed, {{NEEDS_REVIEW}} need review"
+  },
+
+  "google_sheets": {
+    "master_log_sheet_id": "",
+    "_master_log_sheet_id_comment": "TODO: Paste the Google Sheet ID for the master activity log (from the URL: docs.google.com/spreadsheets/d/SHEET_ID/edit).",
+    "master_log_tab_name": "Master Log",
+    "sop_matrix_sheet_id": "",
+    "_sop_matrix_sheet_id_comment": "TODO: Paste the Google Sheet ID for Britney's SOP matrix.",
+    "sop_matrix_tab_prefix": "",
+    "_sop_matrix_tab_prefix_comment": "Optional prefix for talent tab names, e.g. 'Talent_'. Leave empty if tabs are named by first name only."
+  },
+
+  "talents": [
+    {
+      "name": "Sylvia",
+      "gmail_connection_name": "Gmail - Sylvia",
+      "_gmail_connection_comment": "TODO: This must match the exact connection name set up in Make for this talent's Gmail account.",
+      "sop_tab_name": "Sylvia",
+      "minimum_rate_usd": 1000,
+      "_minimum_rate_comment": "Per-talent minimum. Overrides global_minimum_rate_usd for this talent."
+    }
+    // TODO: Add one entry per talent. Duplicate the block above for each Gmail inbox.
+    // Required fields: name, gmail_connection_name, sop_tab_name, minimum_rate_usd
+  ],
+
+  "make": {
+    "workspace_zone": "us1.make.com",
+    "_workspace_zone_comment": "TODO: Confirm your Make workspace zone (us1, eu1, etc.).",
+    "error_alert_email": "",
+    "_error_alert_email_comment": "TODO: Email address to receive immediate error alerts when a Make scenario fails or OAuth expires."
+  }
+}
