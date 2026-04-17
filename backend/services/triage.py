@@ -93,21 +93,30 @@ def _apply_special_routing(
 
     if talent_key == "Katrina":
         # Dual-manager escalation: all Score-3 offers are escalated at the reply stage.
-        # Rate > $650 → CC Cara; rate ≤ $650 (or unknown) → CC Chenni.
+        # Threshold comes from confidence_policy.json special_talent_routing.Katrina.
+        # Rate > threshold → CC Cara; rate ≤ threshold (or unknown) → CC Chenni.
         # No score change here — score-3 proceeds to the reply engine which applies
         # the SOP escalation. Logged so the routing intent is visible in server logs.
+        katrina_cfg = policy.get("special_talent_routing", {}).get("Katrina", {})
+        # condition_a text is "If proposed_rate_usd > 650" — parse the threshold
+        # defensively, falling back to the canonical $650 if parsing fails.
+        _raw = katrina_cfg.get("condition_a", "")
+        try:
+            cara_threshold = float(re.search(r">\s*(\d+)", _raw).group(1))  # type: ignore[union-attr]
+        except (AttributeError, ValueError):
+            cara_threshold = 650.0
         if score == 3:
-            if proposed_rate > 650:
+            if proposed_rate > cara_threshold:
                 logger.info(
-                    "Katrina dual-manager rule: rate $%s > $650 threshold → "
+                    "Katrina dual-manager rule: rate $%s > $%s threshold → "
                     "reply engine will escalate to Cara",
-                    proposed_rate,
+                    proposed_rate, cara_threshold,
                 )
             else:
                 logger.info(
-                    "Katrina dual-manager rule: rate $%s ≤ $650 (or unknown) → "
+                    "Katrina dual-manager rule: rate $%s ≤ $%s (or unknown) → "
                     "reply engine will escalate to Chenni",
-                    proposed_rate,
+                    proposed_rate, cara_threshold,
                 )
 
     if talent_key == "KatrinaD":

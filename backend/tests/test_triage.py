@@ -118,30 +118,44 @@ def test_other_talent_not_affected():
 
 def test_katrina_score3_high_rate_unchanged():
     """Katrina: rate > $650 — score stays 3 (reply engine will escalate to Cara)."""
-    policy = {"special_talent_routing": {}}
+    policy = {"special_talent_routing": {"Katrina": {"condition_a": "If proposed_rate_usd > 650"}}}
     result = _apply_special_routing("Katrina", 3, "Sponsored Post", 700.0, policy)
+    assert result == 3
+
+
+def test_katrina_score3_high_rate_well_above_threshold():
+    """Katrina: rate well above $650 still stays 3."""
+    policy = {"special_talent_routing": {"Katrina": {"condition_a": "If proposed_rate_usd > 650"}}}
+    result = _apply_special_routing("Katrina", 3, "Sponsored Post", 5000.0, policy)
     assert result == 3
 
 
 def test_katrina_score3_low_rate_unchanged():
     """Katrina: rate ≤ $650 — score stays 3 (reply engine will escalate to Chenni)."""
-    policy = {"special_talent_routing": {}}
+    policy = {"special_talent_routing": {"Katrina": {"condition_a": "If proposed_rate_usd > 650"}}}
     result = _apply_special_routing("Katrina", 3, "Sponsored Post", 400.0, policy)
     assert result == 3
 
 
 def test_katrina_score3_unknown_rate_unchanged():
     """Katrina: unknown rate (0) — score stays 3."""
-    policy = {"special_talent_routing": {}}
+    policy = {"special_talent_routing": {"Katrina": {"condition_a": "If proposed_rate_usd > 650"}}}
     result = _apply_special_routing("Katrina", 3, "Sponsored Post", 0.0, policy)
     assert result == 3
 
 
 def test_katrina_score1_not_affected():
     """Katrina: score-1 offers are not upgraded."""
-    policy = {"special_talent_routing": {}}
+    policy = {"special_talent_routing": {"Katrina": {"condition_a": "If proposed_rate_usd > 650"}}}
     result = _apply_special_routing("Katrina", 1, "Sponsored Post", 800.0, policy)
     assert result == 1
+
+
+def test_katrina_threshold_fallback_when_policy_missing():
+    """Katrina: gracefully uses $650 fallback when policy entry is absent."""
+    policy = {"special_talent_routing": {}}
+    result = _apply_special_routing("Katrina", 3, "Sponsored Post", 700.0, policy)
+    assert result == 3
 
 
 def test_katrinad_score_unchanged():
