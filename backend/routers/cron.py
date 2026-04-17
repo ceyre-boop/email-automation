@@ -38,7 +38,7 @@ def cron_poll(db: Session = Depends(get_db)):
         return {"ok": True, "summary": summary}
     except Exception as exc:  # noqa: BLE001
         logger.error("Poll failed: %s", exc)
-        return {"ok": False, "error": str(exc)}
+        return {"ok": False, "error": "Polling failed — check server logs for details."}
 
 
 @router.get("/api/status")

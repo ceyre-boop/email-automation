@@ -6,6 +6,7 @@ GET  /auth/callback                    → receive code, store tokens, show succ
 """
 from __future__ import annotations
 
+import html as html_lib
 import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -108,7 +109,9 @@ def oauth_callback(
     logger.info("Token stored for talent_key=%s email=%s", talent_key, email)
 
     talent_name = talent_map[talent_key].get("full_name", talent_key)
-    return HTMLResponse(content=_success_page(talent_name))
+    # HTML-escape before interpolating into the success page
+    talent_name_escaped = html_lib.escape(talent_name)
+    return HTMLResponse(content=_success_page(talent_name_escaped))
 
 
 def _success_page(talent_name: str) -> str:
