@@ -1,0 +1,154 @@
+{
+  "_README": "Make Scenario Blueprint — Phase 5: Weekly Ops Dashboard. A scheduled scenario that runs every Monday morning and emails the supervisor a 7-day performance summary across all talent inboxes. Provides week-over-week trend visibility that the daily digest cannot.",
+  "_import_instructions": [
+    "1. Import this blueprint into Make as a new standalone scenario.",
+    "2. Set the schedule to run Monday mornings (recommend 8:30 AM — 30 minutes after the daily digest).",
+    "3. Fill in all TODO values.",
+    "4. This scenario does NOT need to be cloned — one instance covers all inboxes.",
+    "5. Activate only after Phase 3 (daily digest) is stable and at least 7 days of log data exists."
+  ],
+
+  "name": "Phase 5 — Weekly Ops Dashboard",
+
+  "flow": [
+    {
+      "id": 1,
+      "module": "builtin:BasicScheduler",
+      "version": 1,
+      "parameters": {
+        "interval": "week",
+        "day": "Monday",
+        "time": "08:30",
+        "_time_comment": "Runs at 8:30 AM every Monday — 30 minutes after the daily digest so the supervisor gets both reports before starting their week.",
+        "timezone": "America/New_York",
+        "_timezone_comment": "TODO: Confirm supervisor timezone."
+      },
+      "metadata": { "designer": { "x": 0, "y": 0 } }
+    },
+
+    {
+      "id": 2,
+      "module": "google-sheets:SearchRows",
+      "version": 1,
+      "parameters": {
+        "connection": "Google Sheets - Talent Automation",
+        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+        "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID.",
+        "sheetName": "Master Log",
+        "filter": {
+          "conditions": [
+            [
+              {
+                "a": "Timestamp",
+                "b": "{{dateAdd(now, -7, 'days')}}",
+                "o": "date:greaterThanOrEqual",
+                "_comment": "All log rows from the past 7 days."
+              }
+            ]
+          ]
+        },
+        "limit": 5000,
+        "_limit_comment": "Set high enough to capture a full week across all 16+ inboxes."
+      },
+      "metadata": { "designer": { "x": 300, "y": 0 } }
+    },
+
+    {
+      "id": 3,
+      "module": "tools:SetVariable",
+      "version": 1,
+      "parameters": {
+        "name": "weekly_stats",
+        "value": {
+          "total_processed": "{{length(2.rows)}}",
+          "total_trash": "{{length(filter(2.rows, row => row.`AI Score Label` == 'trash'))}}",
+          "total_replied": "{{length(filter(2.rows, row => row.`Reply Sent` == 'TRUE'))}}",
+          "total_uncertain": "{{length(filter(2.rows, row => row.`AI Score Label` == 'uncertain'))}}",
+          "total_escalated": "{{length(filter(2.rows, row => row.`Action Taken` == 'escalated to human'))}}",
+          "total_errors": "{{length(filter(2.rows, row => startsWith(row.`Action Taken`, 'pending')))}}",
+          "reply_rate_pct": "{{round(divide(length(filter(2.rows, row => row.`Reply Sent` == 'TRUE')), max(length(2.rows), 1)) * 100, 1)}}",
+          "trash_rate_pct": "{{round(divide(length(filter(2.rows, row => row.`AI Score Label` == 'trash')), max(length(2.rows), 1)) * 100, 1)}}",
+          "uncertain_rate_pct": "{{round(divide(length(filter(2.rows, row => row.`AI Score Label` == 'uncertain')), max(length(2.rows), 1)) * 100, 1)}}"
+        }
+      },
+      "metadata": { "designer": { "x": 600, "y": 0 } }
+    },
+
+    {
+      "id": 4,
+      "module": "tools:SetVariable",
+      "version": 1,
+      "parameters": {
+        "name": "per_talent_stats",
+        "value": {
+          "_comment": "Groups rows by Talent Name and computes per-talent metrics. Make's filter/map functions are used here. Talent names are hardcoded from config/settings.json.",
+          "rows": "{{map(['Sylvia','Trin','Sam','Britt','Allee','Lizz','Katrina','Jenn','Angela','Colleen','Alana','Grayson','Kylika','Anastasiya','KatrinaD','Michaela'], name => {'talent': name, 'total': length(filter(2.rows, r => r.`Talent Name` == name)), 'replied': length(filter(2.rows, r => r.`Talent Name` == name AND r.`Reply Sent` == 'TRUE')), 'trash': length(filter(2.rows, r => r.`Talent Name` == name AND r.`AI Score Label` == 'trash')), 'uncertain': length(filter(2.rows, r => r.`Talent Name` == name AND r.`AI Score Label` == 'uncertain')), 'escalated': length(filter(2.rows, r => r.`Talent Name` == name AND r.`Action Taken` == 'escalated to human'))})}}"
+        }
+      },
+      "metadata": { "designer": { "x": 900, "y": 0 } }
+    },
+
+    {
+      "id": 5,
+      "module": "tools:SetVariable",
+      "version": 1,
+      "parameters": {
+        "name": "dashboard_html",
+        "value": "<!DOCTYPE html><html><body style='font-family: Arial, sans-serif; max-width: 800px; margin: auto;'>\n<h2 style='color: #333;'>Weekly Ops Dashboard — {{formatDate(dateAdd(now, -7, 'days'), 'MMM D')}} – {{formatDate(now, 'MMM D, YYYY')}}</h2>\n\n<h3 style='border-bottom: 2px solid #1976d2; color: #1976d2; padding-bottom: 8px;'>7-Day System Summary</h3>\n<table style='width:100%; border-collapse:collapse; margin-bottom:24px;'>\n  <tr style='background:#e3f2fd;'>\n    <th style='text-align:left;padding:10px;border:1px solid #ddd;'>Metric</th>\n    <th style='text-align:right;padding:10px;border:1px solid #ddd;'>This Week</th>\n    <th style='text-align:right;padding:10px;border:1px solid #ddd;'>Rate</th>\n  </tr>\n  <tr><td style='padding:8px;border:1px solid #ddd;'>📧 Total Emails Processed</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.total_processed}}</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>100%</td></tr>\n  <tr><td style='padding:8px;border:1px solid #ddd;'>✅ Auto-Replied</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.total_replied}}</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.reply_rate_pct}}%</td></tr>\n  <tr><td style='padding:8px;border:1px solid #ddd;'>🗑️ Archived as Trash</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.total_trash}}</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.trash_rate_pct}}%</td></tr>\n  <tr style='background:#fff8e1;'><td style='padding:8px;border:1px solid #ddd;'>⚠️ Flagged for Human Review</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.total_uncertain}}</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.uncertain_rate_pct}}%</td></tr>\n  <tr><td style='padding:8px;border:1px solid #ddd;'>🔼 Escalated to Manager</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>{{3.weekly_stats.total_escalated}}</td><td style='text-align:right;padding:8px;border:1px solid #ddd;'>—</td></tr>\n  {{if(3.weekly_stats.total_errors > 0, '<tr style=\"background:#ffebee;\"><td style=\"padding:8px;border:1px solid #ddd;\">❌ Processing Errors</td><td style=\"text-align:right;padding:8px;border:1px solid #ddd;\">' + 3.weekly_stats.total_errors + '</td><td style=\"text-align:right;padding:8px;border:1px solid #ddd;\">—</td></tr>', '')}}\n</table>\n\n<h3 style='border-bottom: 2px solid #1976d2; color: #1976d2; padding-bottom: 8px;'>Per-Talent Breakdown</h3>\n<table style='width:100%; border-collapse:collapse; margin-bottom:24px;'>\n  <tr style='background:#e3f2fd;'>\n    <th style='text-align:left;padding:8px;border:1px solid #ddd;'>Talent</th>\n    <th style='text-align:right;padding:8px;border:1px solid #ddd;'>Total</th>\n    <th style='text-align:right;padding:8px;border:1px solid #ddd;'>Replied</th>\n    <th style='text-align:right;padding:8px;border:1px solid #ddd;'>Trash</th>\n    <th style='text-align:right;padding:8px;border:1px solid #ddd;'>Review</th>\n    <th style='text-align:right;padding:8px;border:1px solid #ddd;'>Escalated</th>\n  </tr>\n  {{join(map(4.per_talent_stats.rows, t => if(t.total > 0, '<tr><td style=\"padding:6px;border:1px solid #ddd;\">' + t.talent + '</td><td style=\"text-align:right;padding:6px;border:1px solid #ddd;\">' + t.total + '</td><td style=\"text-align:right;padding:6px;border:1px solid #ddd;\">' + t.replied + '</td><td style=\"text-align:right;padding:6px;border:1px solid #ddd;\">' + t.trash + '</td><td style=\"text-align:right;padding:6px;border:1px solid #ddd;\">' + t.uncertain + '</td><td style=\"text-align:right;padding:6px;border:1px solid #ddd;\">' + t.escalated + '</td></tr>', '')), '')}}\n</table>\n\n<h3 style='border-bottom: 2px solid #1976d2; color: #1976d2; padding-bottom: 8px;'>Health Indicators</h3>\n<p>{{if(3.weekly_stats.uncertain_rate_pct > 30, '⚠️ HIGH REVIEW RATE: ' + 3.weekly_stats.uncertain_rate_pct + '% of emails needed human review this week (target: under 20%). Consider tuning the triage prompt — many Score 2s may indicate the AI is being too conservative.', '✅ Review rate is within target range (' + 3.weekly_stats.uncertain_rate_pct + '%).')}}</p>\n<p>{{if(3.weekly_stats.trash_rate_pct > 80, '⚠️ VERY HIGH TRASH RATE: ' + 3.weekly_stats.trash_rate_pct + '% of emails scored as trash. Verify the triage prompt is not being too aggressive — check Gmail Trash folders for any misclassified real opportunities.', '✅ Trash rate looks normal (' + 3.weekly_stats.trash_rate_pct + '%).')}}</p>\n<p>{{if(3.weekly_stats.total_errors > 0, '❌ ' + 3.weekly_stats.total_errors + ' email(s) failed to process this week. Check the Error Log tab in the master log sheet and the Error Log tab for details.', '✅ No processing errors this week.')}}</p>\n\n<hr style='margin:24px 0;'>\n<p style='font-size:12px;color:#999;'>Weekly Ops Dashboard — Talent Inbox Automation. To adjust settings: config/settings.json. To tune triage: prompts/triage.md. QA test suite: tests/triage_test_cases.json.</p>\n</body></html>"
+      },
+      "metadata": { "designer": { "x": 1200, "y": 0 } }
+    },
+
+    {
+      "id": 6,
+      "module": "gmail:SendAnEmail",
+      "version": 1,
+      "parameters": {
+        "connection": "Gmail - Supervisor",
+        "_connection_comment": "TODO: Set this to the supervisor's Gmail connection in Make.",
+        "to": "[SUPERVISOR_EMAIL]",
+        "_to_comment": "TODO: Fill in supervisor email. Same recipient as daily digest.",
+        "subject": "Weekly Ops Report — {{formatDate(dateAdd(now, -7, 'days'), 'MMM D')}}–{{formatDate(now, 'MMM D')}} — {{3.weekly_stats.total_processed}} emails, {{3.weekly_stats.total_replied}} replied, {{3.weekly_stats.uncertain_rate_pct}}% review rate",
+        "html": "{{5.dashboard_html}}",
+        "contentType": "html"
+      },
+      "metadata": { "designer": { "x": 1500, "y": 0 } }
+    }
+  ],
+
+  "metadata": {
+    "instant": false,
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 1,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false
+    },
+    "zone": "us1.make.com",
+    "_zone_comment": "TODO: Update to your Make workspace zone."
+  },
+
+  "_health_thresholds": {
+    "_comment": "Thresholds used in the health indicators section of the dashboard email. Adjust as the system matures.",
+    "uncertain_rate_warning_pct": 30,
+    "_uncertain_note": "If more than 30% of emails go to Score 2 (human review), the triage prompt may be too conservative. Review Score 2 emails from the week to identify patterns and refine the prompt.",
+    "trash_rate_warning_pct": 80,
+    "_trash_note": "If more than 80% of emails are scored as trash, verify the triage prompt is not being overly aggressive. Sample 10-15 trash emails from that week.",
+    "target_uncertain_rate_pct": 20,
+    "_target_note": "After 4+ weeks of tuning, a healthy system should route fewer than 20% of emails to human review.",
+    "target_reply_rate_pct_of_non_trash": 70,
+    "_reply_rate_note": "Of emails that are NOT trash, at least 70% should be auto-replied by Phase 2. Lower rates indicate ESCALATE flags are too broad or offer types are not matching SOP rows."
+  },
+
+  "_TODO_checklist": [
+    "Activate only after at least 7 days of production data exists in the master log",
+    "Replace [MASTER_LOG_SHEET_ID] with the master log Google Sheet ID",
+    "Replace [SUPERVISOR_EMAIL] with supervisor email address",
+    "Set Gmail connection to supervisor's account",
+    "Confirm timezone matches the daily digest (America/New_York default)",
+    "Review health threshold values in _health_thresholds and adjust for your team's reality after Week 1",
+    "Consider adding a second recipient (e.g. the agency owner) for the weekly report after the system is stable"
+  ]
+}

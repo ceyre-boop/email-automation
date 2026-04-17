@@ -1,60 +1,42 @@
-Offer Type,Minimum Rate,Response Template,Auto-Respond Flag,Brand Blacklist,Special Rules
-Sponsored Post,1000,"Hi [BRAND_NAME],
+Trigger / Scenario,Response / Action
+Asking for rates or a potential to collab,"Thank you so much for reaching out about a potential partnership with [TALENT_NAME]!! I'm happy to share her rates below:
+[RATE_BLOCK]
 
-Thank you for reaching out! [TALENT_NAME] would love to explore a partnership.
+[TALENT_DESCRIPTION]
 
-For a [OFFER_TYPE], [TALENT_NAME]'s rate starts at $[MINIMUM_RATE]. Based on your proposal of $[PROPOSED_RATE], we'd like to discuss whether there's room to align.
+Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!"
+Initially offered a rate below her minimum,"Thank you for reaching out to [TALENT_NAME] to collab!! However her rates are higher than your offer. I'm happy to share her rates below:
+[RATE_BLOCK]
 
-Could you share more details about deliverables, timeline, and usage rights? We want to make sure this is a great fit for both sides.
+[TALENT_DESCRIPTION]
 
-Looking forward to connecting!
+Please let us know what type of collab you're looking for in your offer + if you can expand your budget. We'd love to explore working together!"
+Initially offered a rate OVER the good-deal threshold for one post,"Hi,
 
-[TALENT_NAME]'s Team",YES,,
-Story,500,"Hi [BRAND_NAME],
+Thank you for the offer! I think this collab could be a good fit for [TALENT_NAME]. Looping her in management team who can move forward with this convo!"
+Asking for bundle rates,"[TALENT_NAME]'s standard rate is [STANDARD_RATE] per video! Below is her bundle pricing:
 
-Thanks for thinking of [TALENT_NAME]! We're always open to Story collaborations.
+3 videos (90%) → [BUNDLE_3]
+5 videos (85%) → [BUNDLE_5]
+10 videos (75%) → [BUNDLE_10]
 
-For a [OFFER_TYPE], [TALENT_NAME]'s rate is $[MINIMUM_RATE]. Your offer of $[PROPOSED_RATE] — let's talk and see if we can make the numbers work.
+We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!"
+All of the above responses (after initial rate reply sent),Move to A Initial Response
+Commission Only offer — product is relevant to talent's category,Move to Commission Only
+Commission Only offer — product is spammy or off-category,Delete
+PR Request from notable brand,"Hi,
 
-Please share campaign details and timeline and we'll get back to you quickly.
+[TALENT_NAME] would LOVE to get some PR. Her address is:
+[SHIPPING_ADDRESS]
 
-Best,
-[TALENT_NAME]'s Team",YES,,
-UGC,500,"Hi [BRAND_NAME],
-
-[TALENT_NAME] would be excited to create UGC content for your brand!
-
-For [OFFER_TYPE], rates start at $[MINIMUM_RATE]. We see your offer is $[PROPOSED_RATE] — we'd love to discuss scope and deliverables to find a number that works.
-
-Please send over the brief and we'll follow up.
-
-Best,
-[TALENT_NAME]'s Team",YES,,
-Affiliate,0,"Hi [BRAND_NAME],
-
-Thank you for the affiliate opportunity!
-
-[TALENT_NAME] does consider affiliate partnerships on a case-by-case basis. Could you share the commission structure, product details, and average conversion rates?
-
-We'll review and get back to you shortly.
-
-[TALENT_NAME]'s Team",ESCALATE,,Only accept affiliate deals with commission >= 15%
-Event Appearance,2000,"Hi [BRAND_NAME],
-
-Thanks for the invitation for [TALENT_NAME] to appear at your event!
-
-For [OFFER_TYPE], [TALENT_NAME]'s rate starts at $[MINIMUM_RATE]. Your current offer of $[PROPOSED_RATE] — let's connect to discuss the event details, expectations, and whether we can align on terms.
-
-Please share the event date, location, and requirements and we'll follow up promptly.
-
-Best,
-[TALENT_NAME]'s Team",ESCALATE,,All event appearances require manager review regardless of rate
-Other,500,"Hi [BRAND_NAME],
-
-Thank you for reaching out about a potential collaboration with [TALENT_NAME]!
-
-Could you share more details about what you have in mind — including deliverables, timeline, usage rights, and your proposed budget? This will help us give you a proper response.
-
-Looking forward to learning more!
-
-[TALENT_NAME]'s Team",YES,,
+Let me know when it's sent & the tracking number is available so I can pass her way"
+convos marked A Initial Response: brand offers above manager threshold,CC [SENIOR_MANAGER]
+convos marked A Initial Response: brand offers at/below manager threshold,CC [JUNIOR_MANAGER]
+Brand comes back with a very low rate (below floor),Move to Revisit
+convos marked A Initial Response: BUNDLE CONVO — brand agrees to pricing,CC [MANAGER]
+IF deal was good and sent to manager,Move to Ongoing TBC
+convos marked A Initial Response: brand cannot budge on budget,Move to Revisit
+Panel / TikTok Invites / Brand or event invites / Special legit inquiries,Ask for consult in the talent chat!!
+Tagged emails in inbox (collab ongoing or replies coming in),"When you see an email marked with a previous tag:
+1. Make sure manager is still CC'd (brands sometimes don't reply all)
+2. Move to whatever folder it was already labeled as"

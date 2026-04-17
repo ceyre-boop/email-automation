@@ -22,8 +22,10 @@
   },
 
   "reply": {
+    "draft_mode": true,
+    "_draft_mode_comment": "true = Phase 2 saves replies as Gmail Drafts for supervisor review instead of sending. Set to false only after Marco approves full autonomous send (~1 month trial). When draft_mode is false, send_delay_minutes applies.",
     "send_delay_minutes": 15,
-    "_send_delay_comment": "Minutes to wait after drafting before sending. Set to 0 to disable. Keep at 15 during Phase 2 testing.",
+    "_send_delay_comment": "Minutes to wait after drafting before sending. Only applies when draft_mode is false. Set to 0 to disable. Keep at 15 during Phase 2 testing.",
     "send_delay_enabled": true
   },
 
@@ -39,9 +41,9 @@
 
   "google_sheets": {
     "master_log_sheet_id": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
-    "_master_log_sheet_id_comment": "TODO: Paste the Google Sheet ID for the master activity log (from the URL: docs.google.com/spreadsheets/d/SHEET_ID/edit).",
+    "_master_log_sheet_id_comment": "Master Activity Log Google Sheet (provided 2026-04-17). Tab name: 'Master Log'.",
     "master_log_tab_name": "Master Log",
-    "sop_matrix_sheet_id": "",
+    "sop_matrix_sheet_id": "1NCH4BClugnuGwvDX3NR0cyw5kP1XElyvpjmvEjEnAyQ",
     "_sop_matrix_sheet_id_comment": "TODO: Paste the Google Sheet ID for the SOP matrix. See sheets/sop_data.json for the full SOP data already extracted from the uploaded XLSX."
   },
 
@@ -109,6 +111,8 @@
     {
       "key": "Katrina",
       "full_name": "Katrina",
+      "inbox_email": "katrina@taboost.me",
+      "_inbox_email_comment": "Active test inbox for Phase 1 + 2 trial. Connect this address as 'Gmail - Katrina' in Make Connections.",
       "gmail_connection_name": "Gmail - Katrina",
       "sop_tab_name": "Katrina",
       "manager": "Chenni",

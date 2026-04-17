@@ -150,7 +150,7 @@
               "parameters": {
                 "connection": "Google Sheets - Talent Automation",
                 "_connection_comment": "TODO: Set this to your Google Sheets Make connection.",
-                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "spreadsheetId": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
                 "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID from config/settings.json.",
                 "sheetName": "Master Log",
                 "values": {
@@ -162,6 +162,7 @@
                   "AI Score": "1",
                   "AI Score Label": "trash",
                   "Offer Type": "{{3.offer_type}}",
+                  "Brand Name": "{{3.brand_name}}",
                   "Proposed Rate (USD)": "{{3.proposed_rate_usd}}",
                   "Action Taken": "archived",
                   "Reply Sent": "FALSE",
@@ -199,7 +200,7 @@
               "version": 1,
               "parameters": {
                 "connection": "Google Sheets - Talent Automation",
-                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "spreadsheetId": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
                 "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID.",
                 "sheetName": "Master Log",
                 "values": {
@@ -211,6 +212,7 @@
                   "AI Score": "2",
                   "AI Score Label": "uncertain",
                   "Offer Type": "{{3.offer_type}}",
+                  "Brand Name": "{{3.brand_name}}",
                   "Proposed Rate (USD)": "{{3.proposed_rate_usd}}",
                   "Action Taken": "flagged for review",
                   "Reply Sent": "FALSE",
@@ -248,7 +250,7 @@
               "version": 1,
               "parameters": {
                 "connection": "Google Sheets - Talent Automation",
-                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "spreadsheetId": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
                 "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID.",
                 "sheetName": "Master Log",
                 "values": {
@@ -260,6 +262,7 @@
                   "AI Score": "3",
                   "AI Score Label": "respond",
                   "Offer Type": "{{3.offer_type}}",
+                  "Brand Name": "{{3.brand_name}}",
                   "Proposed Rate (USD)": "{{3.proposed_rate_usd}}",
                   "Action Taken": "queued for reply",
                   "Reply Sent": "FALSE",
@@ -313,14 +316,13 @@
     "_zone_comment": "TODO: Update to your Make workspace zone if not us1."
   },
   "_TODO_checklist": [
-    "Replace every Katrina placeholder with the actual talent's first name",
-    "Replace every 300 with the talent's minimum rate in USD (number only)",
-    "Replace every [MASTER_LOG_SHEET_ID] with the Google Sheet ID for the master log",
-    "Set the Gmail connection to this talent's specific OAuth connection in Make",
-    "Set the Google Sheets connection to your Make Google Sheets connection",
-    "Set the OpenAI connection to your Make OpenAI connection",
-    "Clone this scenario once per talent inbox \u2014 do NOT share one scenario across inboxes",
-    "Test on 2-3 inboxes with historical emails before activating all inboxes",
-    "Monitor master log daily for misclassifications and tune triage.md prompt accordingly"
+    "Katrina placeholder is already set — this file is Katrina-specific",
+    "Minimum rate is already set to 300 (Katrina's minimum)",
+    "Master Log Sheet ID already filled in (14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8) — no replacements needed",
+    "Set the Gmail connection to 'Gmail - Katrina' (OAuth for katrina@taboost.me) in Make",
+    "Set the Google Sheets connection to 'Google Sheets - Talent Automation' in Make",
+    "Set the OpenAI connection to 'OpenAI - Talent Automation' in Make",
+    "HOW IT WORKS: This scenario watches katrina@taboost.me inbox — it scores incoming emails from brands (Score 1 = trash/archive, Score 2 = flag for review, Score 3 = queue for draft reply). Score 3 emails are picked up by Phase 2 and a draft reply is saved FROM katrina@taboost.me back to the sender.",
+    "Monitor master log daily for misclassifications and tune prompts/triage.md prompt accordingly"
   ]
 }

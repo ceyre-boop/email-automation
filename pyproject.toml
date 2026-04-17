@@ -1,0 +1,12 @@
+[tool.poetry]
+name = "email-automation"
+version = "1.0.0"
+description = "Talent Inbox Automation — multi-inbox polling, GPT drafting, unified review queue"
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.11"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"

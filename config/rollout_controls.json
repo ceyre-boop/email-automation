@@ -1,0 +1,163 @@
+{
+  "_README": "Rollout Controls — Talent Inbox Automation",
+  "_purpose": "Defines the pilot cohort, staged activation order, per-inbox kill switches, and rollback states. Use this file to control exactly which inboxes are active at any given time and track the rollout status of each phase per talent.",
+  "_version": "1.0",
+  "_update_instructions": "Update the 'status' field for each talent as you activate their scenarios. Do not activate a phase for a talent until the previous phase is confirmed stable.",
+
+  "pilot_cohort": {
+    "_comment": "Katrina's inbox (katrina@taboost.me) is the sole active test inbox for the initial trial. All other inboxes remain inactive until Katrina's pilot is confirmed stable.",
+    "inboxes": ["Katrina"],
+    "rationale": {
+      "Katrina": "Only real email address available for testing right now (katrina@taboost.me). Dual escalation logic makes it a good stress-test for routing rules."
+    },
+    "pilot_duration_hours": 48,
+    "success_criteria": [
+      "Katrina's inbox fires the scenario for at least 5 real emails",
+      "Triage scores visible in master log — no blank rows",
+      "Score 1 emails appear in Gmail Trash (not inbox)",
+      "Score 2 and 3 emails logged with correct labels",
+      "Score 3 emails produce a Gmail Draft in Katrina's inbox (not sent — Draft only)",
+      "No error alert emails received during the 48-hour pilot",
+      "Marco reviews drafts and confirms triage + draft quality is acceptable"
+    ]
+  },
+
+  "activation_order": {
+    "_comment": "After the pilot cohort is confirmed stable, activate the remaining inboxes in these batches. Wait at least 24 hours between batches to catch issues before they spread to all inboxes.",
+    "batch_1_post_pilot": {
+      "inboxes": ["Sylvia", "Britt", "Allee"],
+      "description": "High-GMV fashion and beauty creators. Activate after pilot is confirmed stable.",
+      "prerequisite": "Pilot inbox (Katrina) confirmed stable for 48 hours"
+    },
+    "batch_2": {
+      "inboxes": ["Lizz", "Jenn", "Angela"],
+      "description": "Fashion-focused mid-range creators.",
+      "prerequisite": "Batch 1 confirmed stable for 24 hours"
+    },
+    "batch_3": {
+      "inboxes": ["Anastasiya", "Kylika", "Alana", "Grayson"],
+      "description": "Remaining standard creators.",
+      "prerequisite": "Batch 2 confirmed stable for 24 hours"
+    },
+    "batch_4_special": {
+      "inboxes": ["Michaela", "KatrinaD"],
+      "description": "Special handling required (dual manager escalation, hourly rate). Activate last — after all standard inboxes are stable and the confidence_policy.json special talent routing is confirmed working.",
+      "prerequisite": "Batch 3 confirmed stable. Katrina and Michaela dual-manager logic tested manually."
+    }
+  },
+
+  "inbox_status": {
+    "_comment": "Track the current activation status of each inbox per phase. Update these values as you activate each scenario. Statuses: inactive, pilot, active, paused, disabled.",
+    "_statuses": {
+      "inactive": "Not yet activated. Scenario exists but is off in Make.",
+      "pilot": "Active in Make but only being monitored — no autonomous replies yet.",
+      "active": "Fully active and running autonomously.",
+      "paused": "Temporarily suspended (e.g. talent requested pause, or investigating an issue). Will resume.",
+      "disabled": "Permanently stopped (e.g. talent left the agency)."
+    },
+
+    "Sylvia":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Trin":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate in Batch 1 after Katrina pilot is confirmed stable" },
+    "Sam":         { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate in Batch 1 after Katrina pilot is confirmed stable" },
+    "Britt":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Allee":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Multi-account complexity — review confidence_policy.json before Phase 2" },
+    "Lizz":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Katrina":     { "phase1_triage": "pilot", "phase2_reply": "pilot", "notes": "ACTIVE TEST INBOX — katrina@taboost.me. Phase 2 in DRAFT MODE (saves drafts, does not send). Dual manager escalation — set Auto-Respond Flag = ESCALATE for all rows until routing confirmed" },
+    "Jenn":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Angela":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Colleen":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate in Batch 1 after Katrina pilot is confirmed stable" },
+    "Alana":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Grayson":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Kylika":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "Anastasiya":  { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
+    "KatrinaD":    { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Hourly rate model — activate last, after special rate logic is confirmed" },
+    "Michaela":    { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Highest rates + dual manager — activate last, after special routing logic is confirmed" }
+  },
+
+  "kill_switches": {
+    "_comment": "Procedures to quickly pause or disable individual inboxes without affecting others. Each inbox has its own independent scenario in Make — pausing one does not affect the others.",
+    "pause_single_inbox": {
+      "steps": [
+        "1. Go to Make → Scenarios.",
+        "2. Find the Phase 1 scenario for the affected talent (e.g. 'Phase 1 — Email Triage — Trin').",
+        "3. Click the toggle to turn the scenario OFF.",
+        "4. Update config/rollout_controls.json → inbox_status → [talent] → phase1_triage to 'paused'.",
+        "5. Note the reason in the 'notes' field for that talent.",
+        "6. The talent's inbox will continue receiving emails in Gmail — they are just not being auto-processed.",
+        "7. When ready to resume: turn the scenario back ON. Update status to 'active'."
+      ]
+    },
+    "pause_all_inboxes": {
+      "steps": [
+        "1. Go to Make → Scenarios.",
+        "2. Select all Phase 1 scenarios (use the checkbox on the scenario list page).",
+        "3. Click 'Deactivate' to turn all off simultaneously.",
+        "4. Also deactivate the Phase 2 and Phase 3 scenarios.",
+        "5. Note the reason and timestamp in inbox_status notes for each talent.",
+        "6. No emails will be processed until scenarios are reactivated.",
+        "7. Resume by reactivating the pilot cohort first, then the other batches in activation order."
+      ],
+      "when_to_use": "Full pause is appropriate when: a critical bug is discovered, OpenAI or Make is experiencing widespread issues, a bad reply is found and the root cause is unknown."
+    },
+    "disable_phase2_only": {
+      "steps": [
+        "1. Go to Make → Scenarios → find 'Phase 2 — Auto-Reply Engine'.",
+        "2. Turn the scenario OFF.",
+        "3. Phase 1 triage continues to run — emails are still scored and logged.",
+        "4. All Score 3 emails are logged as 'queued for reply' but no replies are sent.",
+        "5. The supervisor manually reviews queued emails in the master log.",
+        "6. Resume Phase 2 after fixing the root cause."
+      ],
+      "when_to_use": "Disable Phase 2 only when reply quality issues are found but triage is still working correctly."
+    }
+  },
+
+  "rollback_checklist": {
+    "_comment": "If a phase needs to be rolled back completely (not just paused), follow this checklist.",
+    "rollback_phase2_to_phase1_only": [
+      "Turn off Phase 2 (Auto-Reply Engine) scenario in Make.",
+      "Review the master log for any emails that are stuck in 'queued for reply' status.",
+      "For each stuck email: manually decide whether to reply, ignore, or move to uncertain.",
+      "Update the log rows to reflect the manual action taken.",
+      "Investigate and fix the root cause.",
+      "Run tests/reply_test_cases.json to validate the fix.",
+      "Reactivate Phase 2 starting with the pilot inbox (Katrina).",
+      "Keep 15-minute send delay active after rollback — do not disable until 5 clean days pass."
+    ],
+    "rollback_phase1_completely": [
+      "Turn off ALL Phase 1 scenarios in Make (see pause_all_inboxes above).",
+      "Turn off Phase 2 and Phase 3 scenarios.",
+      "Access each talent Gmail inbox directly and process emails manually.",
+      "Investigate the failure using the Error Log tab in the master log sheet.",
+      "Fix the root cause (see docs/failure_playbooks.md).",
+      "Run node scripts/preflight_validator.js and confirm all checks pass.",
+      "Reactivate pilot inbox (Katrina) scenario only.",
+      "Run tests/triage_test_cases.json to validate triage quality.",
+      "Monitor for 24 hours before reactivating all inboxes."
+    ]
+  },
+
+  "qa_period": {
+    "duration_days": 5,
+    "description": "During the 5-day QA period (Days 24-28 per the build plan), the supervisor reviews 100% of outbound replies BEFORE marking the system fully autonomous. The 15-minute send delay provides the review window.",
+    "daily_qa_checklist": [
+      "Open the master log — check all rows with Action Taken = 'replied' from the past 24 hours.",
+      "For each reply: verify the reply text was sent correctly (spot-check 3-5 Gmail sent folders).",
+      "Check for any placeholder text ([BRAND_NAME], [TALENT_NAME]) in sent replies.",
+      "Check for any internal routing language ('CC Cara', 'Move to Revisit') in sent replies.",
+      "Check that no physical addresses appeared in sent replies.",
+      "Log any issues found in the 'Override Queue' sheet (see sheets/override_queue_template.csv).",
+      "If zero issues found for 5 consecutive days: sign off on full autonomous operation.",
+      "After sign-off: reduce send delay to 0 in config/settings.json → reply.send_delay_minutes."
+    ],
+    "sign_off": {
+      "required_approver": "Supervisor",
+      "condition": "Zero reply quality issues found across all 5 QA days",
+      "action_after_sign_off": [
+        "Update config/settings.json → reply.send_delay_minutes to 0 (or agreed reduced delay)",
+        "Update all inbox_status entries to 'active' in this file",
+        "Notify the team that the system is fully autonomous"
+      ]
+    }
+  }
+}

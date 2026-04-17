@@ -1,0 +1,161 @@
+{
+  "_README": "Confidence & Fallback Policy — Talent Inbox Automation",
+  "_purpose": "Defines explicit thresholds and routing rules for every ambiguous or edge-case scenario the system may encounter. Make module logic and the AI prompts should be consistent with these rules. When in doubt, this file is the authority.",
+  "_version": "1.0",
+
+  "global_score_routing": {
+    "score_1": {
+      "label": "trash",
+      "action": "Archive email in Gmail (move to Trash label). Write log entry. No reply. No human notification.",
+      "recovery": "Score 1 emails are archived — NOT permanently deleted. Recoverable from Gmail Trash for 30 days. If supervisor suspects a misclassification, search Gmail Trash for the sender domain."
+    },
+    "score_2": {
+      "label": "uncertain",
+      "action": "Log as 'flagged for review'. Include in next morning's daily digest. No reply sent. No auto-archive.",
+      "recovery": "Supervisor reviews flagged emails in the morning digest and acts manually."
+    },
+    "score_3": {
+      "label": "respond",
+      "action": "Proceed to Phase 2 reply engine. Fetch SOP. Draft reply. Save as Gmail Draft for supervisor review (DRAFT MODE active — nothing is sent automatically until Marco approves full autonomous operation).",
+      "recovery": "If reply engine fails, email remains as 'queued for reply' in log. Phase 2 will retry on next run."
+    }
+  },
+
+  "fallback_routing": {
+    "_comment": "When the AI returns unexpected output or a downstream step fails, these rules determine what happens next. All fallbacks default to Score 2 behavior (human review) — never auto-send when uncertain.",
+
+    "openai_api_error": {
+      "trigger": "OpenAI API call fails (timeout, rate limit, 500 error)",
+      "action": "Log email as 'pending — api error'. Include in next morning's digest with note: 'OpenAI API unavailable — manual triage required'. Do NOT archive or discard the email.",
+      "make_implementation": "Add an Error Handler module to the OpenAI step. On error: write log row with action='pending — api error', notes='OpenAI error: {{error.message}}'. Continue execution (do not halt scenario)."
+    },
+
+    "openai_json_parse_error": {
+      "trigger": "OpenAI returns output that cannot be parsed as valid JSON",
+      "action": "Route to Score 2 behavior. Log note: 'AI returned non-JSON output — flagged for human'. Do NOT attempt to infer a score from malformed output.",
+      "make_implementation": "Wrap the JSON:ParseJSON module in an error handler. On parse error: route to Score 2 log path."
+    },
+
+    "openai_score_out_of_range": {
+      "trigger": "Parsed JSON contains a score value that is not 1, 2, or 3",
+      "action": "Route to Score 2 behavior. Log note: 'AI returned invalid score value: [VALUE] — flagged for human'.",
+      "make_implementation": "After JSON parsing, add a filter: if score is not 1, 2, or 3, route to the Score 2 path."
+    },
+
+    "sop_tab_not_found": {
+      "trigger": "Phase 2: Google Sheets cannot find a tab matching the talent name from the log",
+      "action": "Route to Score 2 behavior. Update log row: action='escalated to human', notes='SOP tab not found for talent [NAME] — check Google Sheet tab names'. Include in next digest.",
+      "make_implementation": "Wrap the GetValues module in an error handler. On 404/tab-not-found error: update log row, halt reply path."
+    },
+
+    "sop_offer_type_no_match": {
+      "trigger": "Phase 2: The offer type from triage does not match any row in the talent's SOP tab",
+      "action": "Fall back to the 'Other' row in the SOP tab. If no 'Other' row exists, route to Score 2 behavior.",
+      "make_implementation": "In the SetVariable module that finds the SOP row: if primary filter returns empty, run a second filter for offer_type='Other'. If still empty, route to escalation path."
+    },
+
+    "auto_respond_flag_missing_or_blank": {
+      "trigger": "Phase 2: The Auto-Respond Flag column value is empty, null, or any value other than YES/NO/ESCALATE",
+      "action": "Treat as ESCALATE. Route to Score 2 behavior. Log note: 'Auto-Respond Flag blank or unrecognized — defaulting to human review'.",
+      "make_implementation": "The router filter should check: if flag != 'YES', route to the escalation path. This naturally catches blank/null/unknown values."
+    },
+
+    "reply_prompt_returns_escalate": {
+      "trigger": "Phase 2: GPT returns output starting with 'ESCALATE:' even though Auto-Respond Flag was YES",
+      "action": "Do NOT send the reply. Update log row: action='escalated to human', notes='GPT escalated: [REASON]'. Include in next digest.",
+      "make_implementation": "Router after GPT reply call: if output matches ^ESCALATE:, route to escalation update path."
+    },
+
+    "gmail_draft_failure": {
+      "trigger": "Phase 2: Gmail CreateDraftReply module fails (OAuth expired, thread not found, draft creation error)",
+      "action": "Do NOT mark Reply Sent = TRUE. Log error in Notes column. Include in next digest as failed draft. Trigger immediate error alert email.",
+      "make_implementation": "Add Error Handler to the Gmail CreateDraftReply module. On error: update log row with error details. Trigger error alert webhook."
+    },
+
+    "gmail_oauth_expired": {
+      "trigger": "Any phase: Gmail OAuth token for a talent inbox has expired and Make cannot access the inbox",
+      "action": "Make scenario will fail. The error alert scenario fires immediately. Supervisor reconnects OAuth within Make. All emails received during the outage are NOT lost — Gmail holds them. Once OAuth is reconnected, the scenario resumes processing from where it left off.",
+      "make_implementation": "See make/phase4_error_alert_scenario.json. Make's built-in scenario error handler triggers the alert webhook. See docs/failure_playbooks.md for manual reconnection steps."
+    },
+
+    "google_sheets_write_failure": {
+      "trigger": "Any phase: Cannot write to the master log Google Sheet (quota exceeded, permissions error, sheet not found)",
+      "action": "The scenario pauses. Make retries up to 3 times. If all retries fail, the scenario is marked as failed and the error alert fires. The email in question is NOT replied to until logging succeeds.",
+      "make_implementation": "Set Make scenario maxErrors=3 with autoCommit=true. Wrap Sheets write steps in error handlers. Error alert fires on scenario failure."
+    },
+
+    "draft_review_window": {
+      "trigger": "Phase 2 (DRAFT MODE): A draft has been saved to the talent's Gmail Drafts folder and needs supervisor review",
+      "action": "Marco opens Gmail Drafts for the talent inbox and reviews the AI-drafted reply. If acceptable: send it manually. If not acceptable: delete or edit the draft. Update the master log row manually: change 'Action Taken' from 'draft saved' to 'sent manually' or 'draft discarded'.",
+      "make_implementation": "No automation needed during draft mode — the draft sits in Gmail until Marco acts on it. After Marco approves autonomous operation (approximately 1 month), replace gmail:CreateDraftReply with gmail:ReplyToThread in Phase 2 and restore the 15-minute sleep delay before the send step.",
+      "_note": "DRAFT MODE replaces the previous 'send_delay_window_supervisor_cancel' mechanism. Since nothing is sent automatically, there is nothing to cancel — the entire review happens in Gmail Drafts."
+    }
+  },
+
+  "special_talent_routing": {
+    "_comment": "Per-talent logic that overrides global rules. These must be implemented in the Special Rules column of each talent's SOP tab AND in the reply prompt for the AI to handle correctly.",
+
+    "Katrina": {
+      "rule": "Dual manager escalation",
+      "condition_a": "If proposed_rate_usd > 650",
+      "action_a": "Route to ESCALATE with note: 'Offer above $650 threshold — CC Cara per Katrina's SOP'",
+      "condition_b": "If proposed_rate_usd <= 650 AND score == 3",
+      "action_b": "Route to ESCALATE with note: 'Standard offer — CC Chenni per Katrina's SOP'",
+      "make_implementation": "Set Auto-Respond Flag = ESCALATE for all Sponsored Post rows in Katrina's SOP tab. The escalation note in Special Rules will guide the human reviewer."
+    },
+
+    "Michaela": {
+      "rule": "Dual manager escalation + floor threshold",
+      "condition_a": "If proposed_rate_usd < 1000",
+      "action_a": "Route to Score 1 behavior (archive, no reply). The offer is below even the 'Revisit' threshold.",
+      "condition_b": "If proposed_rate_usd >= 1000 AND proposed_rate_usd <= 4000",
+      "action_b": "Route to ESCALATE with note: 'Offer at/below $4,000 — CC Chenni per Michaela's SOP'",
+      "condition_c": "If proposed_rate_usd > 4000",
+      "action_c": "Route to ESCALATE with note: 'High-value offer above $4,000 — CC Cara per Michaela's SOP'",
+      "make_implementation": "Set Auto-Respond Flag = ESCALATE for all rows in Michaela's SOP tab. Add a pre-check in Phase 1: if talent == Michaela AND proposed_rate_usd < 1000, route to Score 1 even if GPT returned Score 3. This check runs AFTER the GPT score is received.",
+      "_override_note": "The '$1,000 floor = Score 1' rule for Michaela overrides the standard GPT score. It is applied as a post-GPT routing step, not as a prompt instruction."
+    },
+
+    "KatrinaD": {
+      "rule": "Hourly rate interpretation",
+      "condition": "All offers for KatrinaD must be interpreted as hourly rates",
+      "action": "If a flat fee is quoted without hours: route to Score 2. If hourly rate can be calculated and is >= $150/hr: proceed with Score 3. If hourly rate < $150/hr: Score 1.",
+      "make_implementation": "In the Phase 1 scenario for KatrinaD, add a post-GPT module: if proposed_rate_usd > 0, calculate hourly_rate = proposed_rate_usd / estimated_hours (default estimate: 2 hours if not stated). Route based on hourly_rate vs minimum ($150).",
+      "_implementation_note": "Estimated hours parsing requires an additional GPT call or a regex to extract hours from the email body. Simpler alternative: set KatrinaD's triage minimum_rate to her hourly minimum ($150) and add a Special Rule note to the triage prompt: 'KatrinaD's rate is per hour. The minimum rate listed is per hour. Interpret all offers accordingly.'"
+    },
+
+    "Trin": {
+      "rule": "Commission-only offers are immediately Score 1",
+      "condition": "If offer_type == 'Affiliate' AND proposed_rate_usd == 0",
+      "action": "Override to Score 1 regardless of brand name. Archive. No reply.",
+      "make_implementation": "Post-GPT router for Trin's scenario: if offer_type contains 'Affiliate' and proposed_rate_usd == 0, route to Score 1 path."
+    }
+  },
+
+  "global_hard_floor": {
+    "_comment": "A global minimum below which all offers are Score 1 regardless of brand. Set to 0 to disable (per-talent minimums only). Adjust after confirming with supervisor.",
+    "enabled": false,
+    "amount_usd": 0,
+    "_recommendation": "Consider setting a global floor of $25-50 to eliminate test/spam emails that happen to mention a recognizable brand with a trivially low offer (e.g. $5 from amazon.com). This is separate from per-talent minimums."
+  },
+
+  "affiliate_default_policy": {
+    "_comment": "Controls whether affiliate offers default to ESCALATE across all talents unless the talent's SOP tab explicitly sets a different flag.",
+    "default_flag_if_not_in_sop": "ESCALATE",
+    "rationale": "Affiliate deals require human judgment on commission rates, product fit, and exclusivity clauses. Auto-replying to affiliate offers without review creates legal and brand risk.",
+    "_override": "Any talent whose SOP tab has a row for 'Affiliate' with Auto-Respond Flag = YES will auto-respond regardless of this global default. This global default only applies when no Affiliate row exists in the talent's SOP tab."
+  },
+
+  "pii_in_replies": {
+    "_comment": "Physical addresses, phone numbers, and personal identifiers must never appear in AI-generated replies.",
+    "blocked_patterns": [
+      "Physical mailing address (street number + street name)",
+      "Personal phone numbers",
+      "Personal email addresses of talent",
+      "Social Security or tax ID numbers",
+      "Bank or payment details"
+    ],
+    "action": "If the SOP template contains any of these patterns, the make_implementation should redact them before passing the template to the AI reply prompt.",
+    "make_implementation": "Add a regex-based redaction step before the reply GPT call. Replace address patterns with [ADDRESS REDACTED — handled by team]. See docs/compliance_guardrails.md for the full PII policy."
+  }
+}

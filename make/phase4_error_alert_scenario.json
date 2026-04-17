@@ -1,0 +1,147 @@
+{
+  "_README": "Make Scenario Blueprint — Phase 4: Real-Time Error Alerting. This is a standalone scenario triggered by a webhook. Each Phase 1 scenario's error handler calls this webhook when a failure occurs. Import this BEFORE activating any Phase 1 scenarios.",
+  "_import_instructions": [
+    "1. Import this blueprint into Make as a new scenario.",
+    "2. After import, note the generated webhook URL in the 'Custom Webhook' trigger module.",
+    "3. Go back into each Phase 1 scenario (make/scenarios/phase1_*.json).",
+    "4. Add a Make 'Error Handler' route to the scenario — on error, add an HTTP module that POSTs to this webhook URL with the error payload.",
+    "5. Repeat for Phase 2 and Phase 3 scenarios.",
+    "6. Fill in [ERROR_ALERT_EMAIL] with the address from config/settings.json → make.error_alert_email.",
+    "7. Test by intentionally failing a scenario (e.g., use an invalid Sheet ID temporarily).",
+    "8. This scenario does NOT need to be cloned — one instance handles errors from all other scenarios."
+  ],
+  "_architecture_note": "Error alerting is intentionally decoupled from the daily digest. The digest is a summary of normal operations. This scenario fires immediately on failure so the supervisor can act before an inbox accumulates unprocessed emails.",
+
+  "name": "Phase 4 — Error Alert — Inbox Failure Notification",
+
+  "flow": [
+    {
+      "id": 1,
+      "module": "gateway:CustomWebhook",
+      "version": 1,
+      "parameters": {
+        "hook": "Error Alert Webhook — Talent Automation",
+        "_hook_comment": "After import, copy the generated webhook URL and paste it into the error handler HTTP module in every Phase 1/2/3 scenario."
+      },
+      "metadata": {
+        "designer": { "x": 0, "y": 0 },
+        "expect": [
+          { "name": "scenario_name", "type": "text", "label": "Scenario Name" },
+          { "name": "talent_name", "type": "text", "label": "Talent Name" },
+          { "name": "error_type", "type": "text", "label": "Error Type" },
+          { "name": "error_message", "type": "text", "label": "Error Message" },
+          { "name": "error_timestamp", "type": "text", "label": "Error Timestamp" },
+          { "name": "email_subject", "type": "text", "label": "Email Subject (if available)" },
+          { "name": "email_sender", "type": "text", "label": "Email Sender (if available)" },
+          { "name": "make_scenario_url", "type": "text", "label": "Make Scenario URL" }
+        ]
+      }
+    },
+
+    {
+      "id": 2,
+      "module": "tools:SetVariable",
+      "version": 1,
+      "parameters": {
+        "name": "alert_html",
+        "value": "<!DOCTYPE html><html><body style='font-family: Arial, sans-serif; max-width: 600px; margin: auto;'>\n<div style='background: #d32f2f; color: white; padding: 16px; border-radius: 4px 4px 0 0;'>\n  <h2 style='margin:0;'>⚠️ AUTOMATION ALERT — Action Required</h2>\n</div>\n<div style='border: 1px solid #d32f2f; padding: 16px; border-radius: 0 0 4px 4px;'>\n  <p><strong>Time:</strong> {{1.error_timestamp}}</p>\n  <p><strong>Affected Talent:</strong> {{1.talent_name}}</p>\n  <p><strong>Scenario:</strong> {{1.scenario_name}}</p>\n  <p><strong>Error Type:</strong> {{1.error_type}}</p>\n  <p><strong>Error Message:</strong> {{1.error_message}}</p>\n  {{if(1.email_subject, '<p><strong>Email Subject:</strong> ' + 1.email_subject + '</p>', '')}}\n  {{if(1.email_sender, '<p><strong>Email Sender:</strong> ' + 1.email_sender + '</p>', '')}}\n  <hr style='margin: 16px 0;'>\n  <p><strong>What to do:</strong></p>\n  <ol>\n    <li>Check the talent's Gmail inbox — no emails will have been lost, but new emails are not being processed while the scenario is down.</li>\n    <li>Go to Make → Scenarios and find the failed scenario for {{1.talent_name}}.</li>\n    <li>Review the error in the scenario execution history.</li>\n    <li>If the error is OAuth expiry: re-authorize the Gmail connection in Make → Connections.</li>\n    <li>If the error is an OpenAI or Google Sheets error: check those services for downtime.</li>\n    <li>Reactivate the scenario once the issue is resolved.</li>\n  </ol>\n  {{if(1.make_scenario_url, '<p><a href=\"' + 1.make_scenario_url + '\">Open failed scenario in Make →</a></p>', '')}}\n  <hr style='margin: 16px 0;'>\n  <p style='font-size: 12px; color: #666;'>This is an automated alert from the Talent Inbox Automation system. See docs/failure_playbooks.md for detailed recovery steps.</p>\n</div>\n</body></html>"
+      },
+      "metadata": { "designer": { "x": 300, "y": 0 } }
+    },
+
+    {
+      "id": 3,
+      "module": "gmail:SendAnEmail",
+      "version": 1,
+      "parameters": {
+        "connection": "Gmail - Supervisor",
+        "_connection_comment": "TODO: Set this to the supervisor's Gmail connection in Make.",
+        "to": "[ERROR_ALERT_EMAIL]",
+        "_to_comment": "TODO: Fill in the error alert recipient email from config/settings.json → make.error_alert_email. This should be the same person who receives the daily digest, or a dedicated ops address.",
+        "subject": "ALERT: {{1.talent_name}} inbox automation failed — {{1.error_type}}",
+        "html": "{{2.alert_html}}",
+        "contentType": "html"
+      },
+      "metadata": { "designer": { "x": 600, "y": 0 } }
+    },
+
+    {
+      "id": 4,
+      "module": "google-sheets:AddRow",
+      "version": 1,
+      "parameters": {
+        "connection": "Google Sheets - Talent Automation",
+        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+        "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID.",
+        "sheetName": "Error Log",
+        "_sheetName_comment": "Create an 'Error Log' tab in the master log Google Sheet. Columns: Timestamp, Talent Name, Scenario Name, Error Type, Error Message, Email Subject, Email Sender, Resolved (blank by default — supervisor fills in when fixed).",
+        "values": {
+          "Timestamp": "{{1.error_timestamp}}",
+          "Talent Name": "{{1.talent_name}}",
+          "Scenario Name": "{{1.scenario_name}}",
+          "Error Type": "{{1.error_type}}",
+          "Error Message": "{{1.error_message}}",
+          "Email Subject": "{{1.email_subject}}",
+          "Email Sender": "{{1.email_sender}}",
+          "Resolved": ""
+        }
+      },
+      "metadata": { "designer": { "x": 900, "y": 0 } }
+    }
+  ],
+
+  "metadata": {
+    "instant": true,
+    "_instant_comment": "true = this scenario fires immediately when the webhook is called. Required for real-time alerting.",
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 1,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": false
+    },
+    "zone": "us1.make.com",
+    "_zone_comment": "TODO: Update to your Make workspace zone."
+  },
+
+  "_error_payload_template": {
+    "_comment": "This is the JSON payload that each Phase 1/2/3 scenario's error handler should POST to this webhook. Paste the Make HTTP module body as follows:",
+    "payload": {
+      "scenario_name": "Phase 1 — Email Triage — [TALENT_NAME]",
+      "talent_name": "[TALENT_NAME]",
+      "error_type": "{{error.type}}",
+      "error_message": "{{error.message}}",
+      "error_timestamp": "{{now}}",
+      "email_subject": "{{1.subject}}",
+      "email_sender": "{{1.from}}",
+      "make_scenario_url": "https://[WORKSPACE_ZONE]/scenarios/[SCENARIO_ID]"
+    }
+  },
+
+  "_error_log_tab_setup": {
+    "_comment": "Before activating this scenario, manually create an 'Error Log' tab in the master log Google Sheet with these headers:",
+    "columns": [
+      "Timestamp",
+      "Talent Name",
+      "Scenario Name",
+      "Error Type",
+      "Error Message",
+      "Email Subject",
+      "Email Sender",
+      "Resolved"
+    ]
+  },
+
+  "_TODO_checklist": [
+    "Import this scenario first — before activating any Phase 1 scenarios",
+    "Copy the generated webhook URL from the CustomWebhook trigger module",
+    "Add an Error Handler route to every Phase 1 scenario: on error, POST the error payload JSON to this webhook URL",
+    "Repeat for Phase 2 and Phase 3 scenarios",
+    "Replace [ERROR_ALERT_EMAIL] with the address from config/settings.json → make.error_alert_email",
+    "Replace [MASTER_LOG_SHEET_ID] with the master log Sheet ID",
+    "Create the 'Error Log' tab in the master log Google Sheet with the columns listed in _error_log_tab_setup",
+    "Test by temporarily breaking a scenario (e.g. remove a connection) and confirm the alert email arrives",
+    "Confirm the alert email arrives within 1-2 minutes of the failure"
+  ]
+}
