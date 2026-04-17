@@ -27,24 +27,11 @@ Create the following named connections in Make → **Connections**:
 |---|---|---|
 | `OpenAI - Talent Automation` | OpenAI | Your OpenAI API key |
 | `Google Sheets - Talent Automation` | Google Sheets | Agency Google account with sheet access |
-| `Gmail - Sylvia` | Gmail | Sylvia's inbox |
-| `Gmail - Trin` | Gmail | Trinity's inbox |
-| `Gmail - Sam` | Gmail | Sam's inbox |
-| `Gmail - Britt` | Gmail | Britt's inbox |
-| `Gmail - Allee` | Gmail | Allee's inbox |
-| `Gmail - Lizz` | Gmail | Lizz's inbox |
-| `Gmail - Katrina` | Gmail | Katrina's inbox |
-| `Gmail - Jenn` | Gmail | Jenn's inbox |
-| `Gmail - Angela` | Gmail | Angela's inbox |
-| `Gmail - Colleen` | Gmail | Colleen's inbox |
-| `Gmail - Alana` | Gmail | Alana's inbox |
-| `Gmail - Grayson` | Gmail | Grayson's inbox |
-| `Gmail - Kylika` | Gmail | Kylika's inbox |
-| `Gmail - Anastasiya` | Gmail | Anastasiya's inbox |
-| `Gmail - KatrinaD` | Gmail | Katrina D's inbox |
-| `Gmail - Michaela` | Gmail | Michaela's inbox |
+| `Gmail - Katrina` | Gmail | **katrina@taboost.me** ← active test inbox |
 
-> ⚠️ Connection names must match exactly — the Phase 2 reply scenario dynamically routes Gmail sends using the talent name from the log.
+> All other talent Gmail connections are **not needed yet**. Add them after Katrina's pilot is confirmed stable and Marco approves expanding to additional inboxes.
+
+> ⚠️ Connection names must match exactly — the Phase 2 reply scenario dynamically routes Gmail operations using the talent name from the log.
 
 ---
 
@@ -92,29 +79,30 @@ Repeat for all 16 scenarios:
 
 ## Step 5 — Testing Phase 1 (before activating any inbox)
 
-- [ ] Pick 2–3 inboxes to test first (recommend: Trin, Sam, Colleen)
-- [ ] Activate those 3 scenarios only
-- [ ] Send 3–5 test emails to each inbox (mix of obvious spam, legit brand inquiries, and edge cases)
+- [ ] **Activate Katrina's scenario only** (`make/scenarios/phase1_Katrina.json`)
+- [ ] Send 3–5 test emails to `katrina@taboost.me` (mix of obvious spam, legit brand inquiries, and edge cases)
 - [ ] Check the Master Log — verify scores, labels, and actions look correct
 - [ ] Confirm Score 1 emails land in Gmail Trash (not permanently deleted)
 - [ ] Confirm Score 3 emails are logged as `queued for reply`
 - [ ] Tune `prompts/triage.md` if misclassifications appear
-- [ ] After 48h clean run → activate remaining 13 inboxes
+- [ ] After 48h clean run → activate remaining 15 inboxes (after Marco approves expansion)
 
 ---
 
-## Step 6 — Phase 2 Activation (Auto-Reply)
+## Step 6 — Phase 2 Activation (Draft-Reply)
 
 > **Prerequisite:** All SOP tabs in the SOP Matrix sheet must be complete before this step.
+
+> **DRAFT MODE:** Phase 2 saves AI-drafted replies as **Gmail Drafts** — nothing is sent automatically. Marco reviews each draft in the talent's Gmail Drafts folder and decides whether to send, edit, or discard it. This mode runs for approximately 1 month until Marco approves full autonomous operation.
 
 - [ ] Confirm SOP sheet tabs are finalized and match the tab names in Step 1
 - [ ] Import `make/phase2_reply_scenario.json`
 - [ ] Fill in `[MASTER_LOG_SHEET_ID]` and `[SOP_MATRIX_SHEET_ID]`
-- [ ] Set all connections (Google Sheets, OpenAI, Gmail — all 16 talent Gmail connections)
+- [ ] Set all connections (Google Sheets, OpenAI, and `Gmail - Katrina` for the test inbox)
 - [ ] **Add a `gmail:GetEmail` module before step 6** to fetch original email body using the thread ID from the log — inject the body into the GPT reply prompt (this is the one step that requires manual wiring in Make)
-- [ ] Keep `send_delay_enabled: true` and `send_delay_minutes: 15` during all testing
-- [ ] Activate. Monitor outbound replies daily for 5 days minimum
-- [ ] After QA sign-off → reduce or remove send delay at supervisor's discretion
+- [ ] Activate. Check that Score 3 emails produce a **Draft** in Katrina's Gmail Drafts (not Sent)
+- [ ] Marco reviews drafts daily — check draft quality and reply accuracy
+- [ ] After ~1 month and Marco's approval: switch to live send by replacing `gmail:CreateDraftReply` with `gmail:ReplyToThread`, restoring the 15-minute sleep delay, and updating `config/settings.json → reply.draft_mode` to `false`
 
 ---
 

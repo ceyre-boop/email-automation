@@ -1,15 +1,15 @@
 {
-  "_README": "Make Scenario Blueprint — Phase 2: Auto-Reply Engine. Import AFTER Phase 1 is stable and the SOP sheet audit with Britney is complete. This scenario is triggered by a webhook from Phase 1 (or can run on a schedule polling Score 3 rows in the master log). One scenario handles all talents — it dynamically looks up the correct SOP tab.",
+  "_README": "Make Scenario Blueprint — Phase 2: Draft-Reply Engine. Import AFTER Phase 1 is stable and the SOP sheet audit with Britney is complete. This scenario is triggered by a webhook from Phase 1 (or can run on a schedule polling Score 3 rows in the master log). One scenario handles all talents — it dynamically looks up the correct SOP tab. DRAFT MODE ACTIVE: replies are saved as Gmail Drafts for supervisor review — nothing is sent automatically until Marco approves full autonomous operation (~1 month trial).",
   "_import_instructions": [
     "1. Complete the SOP sheet audit with Britney FIRST. All talent tabs must match sheets/sop_matrix_template.csv.",
     "2. Import this blueprint into Make.",
     "3. Fill in all TODO values below.",
-    "4. Keep send_delay_minutes at 15 during all testing.",
-    "5. Test on 2-3 inboxes and manually review every outbound reply before approving broader rollout."
+    "4. DRAFT MODE: replies are saved as Gmail Drafts, not sent. Marco reviews drafts in Gmail before approving autonomous send.",
+    "5. To enable auto-send after trial: replace gmail:CreateDraftReply (step 10) with gmail:ReplyToThread and restore the sleep delay (step 9). Update config/settings.json → reply.draft_mode to false."
   ],
-  "_architecture_note": "This scenario reads 'queued for reply' rows from the master log (Score 3, Reply Sent = FALSE), processes them, sends the reply, then updates the log row. Running on a schedule (every 5 minutes) is the recommended approach during Phase 2 to keep it simple.",
+  "_architecture_note": "This scenario reads 'queued for reply' rows from the master log (Score 3, Reply Sent = FALSE), processes them, saves a Gmail Draft reply, then updates the log row. Running on a schedule (every 5 minutes) is the recommended approach during Phase 2 to keep it simple. DRAFT MODE: no emails are sent automatically — all replies land in the talent's Gmail Drafts folder for Marco to review.",
 
-  "name": "Phase 2 — Auto-Reply Engine",
+  "name": "Phase 2 — Draft-Reply Engine",
 
   "flow": [
     {
@@ -163,22 +163,11 @@
                 },
 
                 {
-                  "_label": "Reply drafted — apply send delay then send",
+                  "_label": "Reply drafted — save as Gmail Draft for supervisor review",
                   "flow": [
                     {
-                      "id": 9,
-                      "module": "sleep",
-                      "version": 1,
-                      "parameters": {
-                        "delay": 900,
-                        "_comment": "900 seconds = 15 minutes. This is the supervisor review window. Change to 0 to disable delay after QA sign-off. Value in seconds."
-                      },
-                      "metadata": { "designer": { "x": 1200, "y": 150 } }
-                    },
-
-                    {
                       "id": 10,
-                      "module": "gmail:ReplyToThread",
+                      "module": "gmail:CreateDraftReply",
                       "version": 1,
                       "parameters": {
                         "connection": "Gmail - {{1.`Talent Name`}}",
@@ -188,9 +177,10 @@
                         "to": "{{1.`Sender Email`}}",
                         "body": "{{6.result.choices[].message.content}}",
                         "bodyType": "text",
-                        "_bodyType_comment": "Send as plain text. Change to 'html' only if SOP templates contain HTML formatting."
+                        "_bodyType_comment": "Send as plain text. Change to 'html' only if SOP templates contain HTML formatting.",
+                        "_draft_mode_note": "DRAFT MODE: saves as a Gmail Draft reply — nothing is sent. Marco reviews drafts in Gmail. To switch to live send: replace this module with gmail:ReplyToThread (same parameters) and update config/settings.json → reply.draft_mode to false."
                       },
-                      "metadata": { "designer": { "x": 1500, "y": 150 } }
+                      "metadata": { "designer": { "x": 1200, "y": 150 } }
                     },
 
                     {
@@ -203,12 +193,12 @@
                         "sheetName": "Master Log",
                         "rowNumber": "{{1.rowNumber}}",
                         "values": {
-                          "Action Taken": "replied",
-                          "Reply Sent": "TRUE",
-                          "Notes": "Auto-replied at {{now}}"
+                          "Action Taken": "draft saved",
+                          "Reply Sent": "FALSE",
+                          "Notes": "Draft saved at {{now}} — awaiting Marco review before send"
                         }
                       },
-                      "metadata": { "designer": { "x": 1800, "y": 150 } }
+                      "metadata": { "designer": { "x": 1500, "y": 150 } }
                     }
                   ],
                   "filter": {
@@ -257,8 +247,8 @@
     "Replace [SOP_MATRIX_SHEET_ID] with Britney's SOP matrix Sheet ID",
     "Set Gmail connection names in Make to exactly 'Gmail - [TalentFirstName]' format",
     "Add a gmail:GetEmail module before step 6 to inject the original email body into the GPT reply prompt (see TODO note in step 6)",
-    "Keep send delay at 900 seconds (15 minutes) during all Phase 2 testing",
-    "After QA sign-off (5 days), reduce or remove send delay at supervisor's discretion",
-    "Test on 2-3 inboxes first — manually review every outbound reply before approving broader rollout"
+    "DRAFT MODE is active — replies are saved as Gmail Drafts, NOT sent. Marco reviews drafts in the talent Gmail inbox.",
+    "After ~1 month trial and Marco's approval: replace gmail:CreateDraftReply (step 10) with gmail:ReplyToThread, restore the sleep delay (step 9, 900 seconds), and update config/settings.json → reply.draft_mode to false.",
+    "Test on Katrina's inbox (katrina@taboost.me) first — manually review every saved draft before approving broader rollout"
   ]
 }

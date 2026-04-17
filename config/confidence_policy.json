@@ -16,7 +16,7 @@
     },
     "score_3": {
       "label": "respond",
-      "action": "Proceed to Phase 2 reply engine. Fetch SOP. Draft reply. Apply send delay. Send from talent Gmail.",
+      "action": "Proceed to Phase 2 reply engine. Fetch SOP. Draft reply. Save as Gmail Draft for supervisor review (DRAFT MODE active — nothing is sent automatically until Marco approves full autonomous operation).",
       "recovery": "If reply engine fails, email remains as 'queued for reply' in log. Phase 2 will retry on next run."
     }
   },
@@ -66,10 +66,10 @@
       "make_implementation": "Router after GPT reply call: if output matches ^ESCALATE:, route to escalation update path."
     },
 
-    "gmail_send_failure": {
-      "trigger": "Phase 2: Gmail ReplyToThread module fails (OAuth expired, thread not found, send error)",
-      "action": "Do NOT mark Reply Sent = TRUE. Log error in Notes column. Include in next digest as failed send. Trigger immediate error alert email.",
-      "make_implementation": "Add Error Handler to the Gmail send module. On error: update log row with error details. Trigger error alert webhook."
+    "gmail_draft_failure": {
+      "trigger": "Phase 2: Gmail CreateDraftReply module fails (OAuth expired, thread not found, draft creation error)",
+      "action": "Do NOT mark Reply Sent = TRUE. Log error in Notes column. Include in next digest as failed draft. Trigger immediate error alert email.",
+      "make_implementation": "Add Error Handler to the Gmail CreateDraftReply module. On error: update log row with error details. Trigger error alert webhook."
     },
 
     "gmail_oauth_expired": {
@@ -84,11 +84,11 @@
       "make_implementation": "Set Make scenario maxErrors=3 with autoCommit=true. Wrap Sheets write steps in error handlers. Error alert fires on scenario failure."
     },
 
-    "send_delay_window_supervisor_cancel": {
-      "trigger": "Phase 2: During the 15-minute send delay, supervisor decides to cancel a reply",
-      "action": "Supervisor updates the master log row: change 'Action Taken' from 'queued for reply' to 'cancelled — human review'. The Make scenario checks the log row before sending. If Action Taken != 'queued for reply' at send time, the send is aborted.",
-      "make_implementation": "Before the Gmail send module, add a Google Sheets GetRow step to re-read the log row. Add a router: if Action Taken == 'queued for reply', proceed with send. Otherwise, halt and log 'reply cancelled by supervisor'.",
-      "_implementation_note": "This is the recommended cancel mechanism. It does NOT require stopping a running Make execution — the supervisor edits the sheet directly, and the scenario checks before sending."
+    "draft_review_window": {
+      "trigger": "Phase 2 (DRAFT MODE): A draft has been saved to the talent's Gmail Drafts folder and needs supervisor review",
+      "action": "Marco opens Gmail Drafts for the talent inbox and reviews the AI-drafted reply. If acceptable: send it manually. If not acceptable: delete or edit the draft. Update the master log row manually: change 'Action Taken' from 'draft saved' to 'sent manually' or 'draft discarded'.",
+      "make_implementation": "No automation needed during draft mode — the draft sits in Gmail until Marco acts on it. After Marco approves autonomous operation (approximately 1 month), replace gmail:CreateDraftReply with gmail:ReplyToThread in Phase 2 and restore the 15-minute sleep delay before the send step.",
+      "_note": "DRAFT MODE replaces the previous 'send_delay_window_supervisor_cancel' mechanism. Since nothing is sent automatically, there is nothing to cancel — the entire review happens in Gmail Drafts."
     }
   },
 

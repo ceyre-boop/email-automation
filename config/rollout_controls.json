@@ -5,21 +5,20 @@
   "_update_instructions": "Update the 'status' field for each talent as you activate their scenarios. Do not activate a phase for a talent until the previous phase is confirmed stable.",
 
   "pilot_cohort": {
-    "_comment": "These 3 inboxes activate first in Phase 1. They were selected because they have mid-range minimum rates (not the highest or lowest), diverse managers, and represent different content categories. Test on this cohort for 48 hours before activating the rest.",
-    "inboxes": ["Trin", "Sam", "Colleen"],
+    "_comment": "Katrina's inbox (katrina@taboost.me) is the sole active test inbox for the initial trial. All other inboxes remain inactive until Katrina's pilot is confirmed stable.",
+    "inboxes": ["Katrina"],
     "rationale": {
-      "Trin": "High-value talent (Chenni, Lifestyle, $2k min). Tests high-stakes triage accuracy.",
-      "Sam": "Mid-range (Cara, Home/Living, $700 min). High email volume expected — good stress test.",
-      "Colleen": "Beauty category (Cara, $800 min). Good baseline for beauty-focused brand emails."
+      "Katrina": "Only real email address available for testing right now (katrina@taboost.me). Dual escalation logic makes it a good stress-test for routing rules."
     },
     "pilot_duration_hours": 48,
     "success_criteria": [
-      "All 3 inboxes fire the scenario for at least 5 real emails each",
+      "Katrina's inbox fires the scenario for at least 5 real emails",
       "Triage scores visible in master log — no blank rows",
       "Score 1 emails appear in Gmail Trash (not inbox)",
       "Score 2 and 3 emails logged with correct labels",
+      "Score 3 emails produce a Gmail Draft in Katrina's inbox (not sent — Draft only)",
       "No error alert emails received during the 48-hour pilot",
-      "Supervisor reviews log and confirms triage accuracy is acceptable"
+      "Marco reviews drafts and confirms triage + draft quality is acceptable"
     ]
   },
 
@@ -58,15 +57,15 @@
     },
 
     "Sylvia":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
-    "Trin":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Pilot cohort — activate first" },
-    "Sam":         { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Pilot cohort — activate first" },
+    "Trin":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate after Katrina pilot is confirmed stable" },
+    "Sam":         { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate after Katrina pilot is confirmed stable" },
     "Britt":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Allee":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Multi-account complexity — review confidence_policy.json before Phase 2" },
     "Lizz":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
-    "Katrina":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Dual manager escalation — set Auto-Respond Flag = ESCALATE for all rows until logic confirmed" },
+    "Katrina":     { "phase1_triage": "pilot", "phase2_reply": "pilot", "notes": "ACTIVE TEST INBOX — katrina@taboost.me. Phase 2 in DRAFT MODE (saves drafts, does not send). Dual manager escalation — set Auto-Respond Flag = ESCALATE for all rows until routing confirmed" },
     "Jenn":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Angela":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
-    "Colleen":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Pilot cohort — activate first" },
+    "Colleen":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate after Katrina pilot is confirmed stable" },
     "Alana":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Grayson":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Kylika":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
@@ -122,7 +121,7 @@
       "Update the log rows to reflect the manual action taken.",
       "Investigate and fix the root cause.",
       "Run tests/reply_test_cases.json to validate the fix.",
-      "Reactivate Phase 2 starting with the pilot cohort (Trin, Sam, Colleen).",
+      "Reactivate Phase 2 starting with the pilot inbox (Katrina).",
       "Keep 15-minute send delay active after rollback — do not disable until 5 clean days pass."
     ],
     "rollback_phase1_completely": [
@@ -132,7 +131,7 @@
       "Investigate the failure using the Error Log tab in the master log sheet.",
       "Fix the root cause (see docs/failure_playbooks.md).",
       "Run node scripts/preflight_validator.js and confirm all checks pass.",
-      "Reactivate pilot cohort scenarios only.",
+      "Reactivate pilot inbox (Katrina) scenario only.",
       "Run tests/triage_test_cases.json to validate triage quality.",
       "Monitor for 24 hours before reactivating all inboxes."
     ]
