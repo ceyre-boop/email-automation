@@ -75,7 +75,7 @@ def test_processed_email_unique_message_id(db_session):
     from sqlalchemy.exc import IntegrityError
     db_session.add(ProcessedEmail(
         talent_key="Sylvia", gmail_message_id="dup-msg-001",
-        access_token="a", status=EmailStatus.archived,
+        status=EmailStatus.archived,
     ))
     db_session.commit()
     db_session.add(ProcessedEmail(

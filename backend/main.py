@@ -3,13 +3,13 @@ FastAPI application entry point.
 """
 from __future__ import annotations
 
+import html as html_lib
 import logging
-
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
+from fastapi.responses import HTMLResponse
 
 from backend.core.config import get_settings
 from backend.models.db import create_tables
@@ -42,9 +42,22 @@ app.include_router(auth.router)
 app.include_router(drafts.router)
 app.include_router(cron.router)
 
-# Serve the talent onboarding page at /connect?talent=<key>
-_static_dir = Path(__file__).parent / "static"
-app.mount("/connect", StaticFiles(directory=str(_static_dir), html=True), name="connect")
+
+# ── Onboarding page at /connect?talent=<key> ─────────────────────────────────
+_connect_html_path = Path(__file__).parent / "static" / "connect.html"
+
+
+@app.get("/connect", response_class=HTMLResponse, include_in_schema=False)
+def onboarding_page(talent: str = Query(..., description="Talent key from settings.json")):
+    """
+    Serve the one-time Gmail onboarding page for a talent.
+    Returns 404 if the talent_key is not defined in settings.json.
+    """
+    talent_map = {t["key"]: t for t in get_settings().app_config.get("talents", [])}
+    if talent not in talent_map:
+        raise HTTPException(status_code=404, detail=f"Unknown talent: {talent}")
+    return HTMLResponse(content=_connect_html_path.read_text(encoding="utf-8"))
+
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 

@@ -16,25 +16,25 @@ from backend.tests.conftest import make_token
 
 def test_connect_redirects_to_google(client):
     """Should 307-redirect to accounts.google.com."""
-    resp = client.get("/auth/connect?talent_key=Sylvia", allow_redirects=False)
+    resp = client.get("/auth/connect?talent_key=Sylvia", follow_redirects=False)
     assert resp.status_code in (307, 302)
     location = resp.headers.get("location", "")
     assert "accounts.google.com" in location or "google.com" in location
 
 
 def test_connect_encodes_talent_key_in_state(client):
-    resp = client.get("/auth/connect?talent_key=Sylvia", allow_redirects=False)
+    resp = client.get("/auth/connect?talent_key=Sylvia", follow_redirects=False)
     location = resp.headers.get("location", "")
     assert "Sylvia" in location or "state=" in location
 
 
 def test_connect_unknown_talent_returns_404(client):
-    resp = client.get("/auth/connect?talent_key=notatalent", allow_redirects=False)
+    resp = client.get("/auth/connect?talent_key=notatalent", follow_redirects=False)
     assert resp.status_code == 404
 
 
 def test_connect_missing_talent_key_returns_422(client):
-    resp = client.get("/auth/connect", allow_redirects=False)
+    resp = client.get("/auth/connect", follow_redirects=False)
     assert resp.status_code == 422
 
 

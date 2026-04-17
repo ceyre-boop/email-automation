@@ -11,6 +11,8 @@ import logging
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
+from google.oauth2.credentials import Credentials
+from googleapiclient.discovery import build
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -61,10 +63,6 @@ def oauth_callback(
     except Exception as exc:  # noqa: BLE001
         logger.error("Token exchange failed for %s: %s", talent_key, exc)
         raise HTTPException(status_code=500, detail="Token exchange failed") from exc
-
-    # Fetch the Gmail email address from Google's userinfo endpoint
-    from google.oauth2.credentials import Credentials
-    from googleapiclient.discovery import build
 
     creds = Credentials(
         token=token_data["access_token"],

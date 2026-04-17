@@ -22,6 +22,6 @@ def test_connect_page_unknown_talent_returns_404(client):
     assert resp.status_code == 404
 
 
-def test_connect_page_missing_talent_returns_404_or_422(client):
+def test_connect_page_missing_talent_returns_422(client):
     resp = client.get("/connect")
-    assert resp.status_code in (404, 422)
+    assert resp.status_code == 422

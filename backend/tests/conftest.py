@@ -15,6 +15,7 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # ── Set required env vars BEFORE any backend module is imported ──────────────
 os.environ.setdefault("GOOGLE_CLIENT_ID", "test-client-id")
@@ -37,7 +38,11 @@ from backend.routers.deps import get_db
 
 @pytest.fixture(scope="function")
 def db_engine():
-    engine = create_engine("sqlite:///:memory:", connect_args={"check_same_thread": False})
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
     Base.metadata.create_all(engine)
     yield engine
     engine.dispose()
