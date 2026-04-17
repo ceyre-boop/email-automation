@@ -1,4 +1,4 @@
-Timestamp,Talent Name,Sender Email,Sender Domain,Subject,AI Score,AI Score Label,Offer Type,Proposed Rate (USD),Action Taken,Reply Sent,Gmail Thread Link,Notes
-2026-04-16T08:00:00Z,Katrina,brand@example.com,example.com,Collab opportunity for Katrina,3,respond,Sponsored Post,500,draft saved,FALSE,https://mail.google.com/mail/u/0/#inbox/thread123,Draft saved — awaiting Marco review before send
-2026-04-16T09:15:00Z,Katrina,noreply@spamsite.net,spamsite.net,You have won a prize!,1,trash,,0,archived,FALSE,,Spam signals detected
-2026-04-16T10:30:00Z,Katrina,collab@newbrand.co,newbrand.co,Partnership inquiry,2,uncertain,Other,,flagged for review,FALSE,https://mail.google.com/mail/u/0/#inbox/thread456,No company name found in body
+Timestamp,Talent Name,Sender Email,Sender Domain,Subject,AI Score,AI Score Label,Offer Type,Brand Name,Proposed Rate (USD),Action Taken,Reply Sent,Gmail Thread Link,Notes
+2026-04-16T08:00:00Z,Katrina,brand@example.com,example.com,Collab opportunity for Katrina,3,respond,Sponsored Post,GlowBrand,500,draft saved,FALSE,https://mail.google.com/mail/u/0/#inbox/thread123,Draft saved — awaiting Marco review before send
+2026-04-16T09:15:00Z,Katrina,noreply@spamsite.net,spamsite.net,You have won a prize!,1,trash,,,,0,archived,FALSE,,Spam signals detected
+2026-04-16T10:30:00Z,Katrina,collab@newbrand.co,newbrand.co,Partnership inquiry,2,uncertain,Other,,0,flagged for review,FALSE,https://mail.google.com/mail/u/0/#inbox/thread456,No company name found in body

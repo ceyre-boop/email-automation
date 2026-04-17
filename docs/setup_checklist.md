@@ -8,14 +8,15 @@ Complete these steps **in order** before activating any scenario in Make.
 
 - [ ] Create a new Google Sheet for the **Master Activity Log**
   - Name the first tab: `Master Log`
-  - Copy the headers from `sheets/master_log_template.csv`
+  - Copy the headers from `sheets/master_log_template.csv` (includes the `Brand Name` column added between `Offer Type` and `Proposed Rate (USD)`)
   - Paste the Sheet ID into `config/settings.json` → `google_sheets.master_log_sheet_id`
 
-- [ ] Create a new Google Sheet for the **SOP Matrix** (or reuse the uploaded XLSX converted to Sheets)
-  - One tab per talent — tab names must match exactly (case-sensitive):
-    `Sylvia`, `Trin`, `Sam J`, `Britt`, `Allee`, `Lizz`, `Katrina`, `Jenn`, `Angela`, `Colleen`, `Alana`, `Grayson`, `Kylika`, `Anastasiya`, `Katrina D`, `Michaela`
-  - All SOP content is already extracted — see `sheets/sop_data.json` and `sheets/talent_sops/`
-  - Paste the Sheet ID into `config/settings.json` → `google_sheets.sop_matrix_sheet_id`
+- [ ] The **SOP Matrix** sheet already exists: `Talent Email SOP (1).xlsx` / Google Sheet ID `1NCH4BClugnuGwvDX3NR0cyw5kP1XElyvpjmvEjEnAyQ`
+  - Sheet already has the correct 2-column format: `Trigger / Scenario` (col A) and `Response / Action` (col B)
+  - Per-talent CSV extracts are in `sheets/talent_sops/` for reference
+  - Tab names match exactly: `Sylvia`, `Trin`, `Sam J`, `Britt`, `Allee`, `Lizz`, `Katrina`, `Jenn`, `Angela`, `Colleen`, `Alana`, `Grayson`, `Kylika`, `Anastasiya`, `Katrina D`, `Michaela`
+  - The SOP Matrix Sheet ID is already in `config/settings.json` → `google_sheets.sop_matrix_sheet_id`
+  - **For the Katrina test**: no SOP sheet access is needed — `make/scenarios/phase2_Katrina.json` has all rules embedded
 
 ---
 
@@ -91,18 +92,32 @@ Repeat for all 16 scenarios:
 
 ## Step 6 — Phase 2 Activation (Draft-Reply)
 
-> **Prerequisite:** All SOP tabs in the SOP Matrix sheet must be complete before this step.
+> **DRAFT MODE:** Phase 2 saves AI-drafted replies as **Gmail Drafts** — nothing is sent automatically. Supervisor reviews each draft in the talent's Gmail Drafts folder and decides whether to send, edit, or discard it. This mode runs for approximately 1 month until Marco approves full autonomous operation.
 
-> **DRAFT MODE:** Phase 2 saves AI-drafted replies as **Gmail Drafts** — nothing is sent automatically. Marco reviews each draft in the talent's Gmail Drafts folder and decides whether to send, edit, or discard it. This mode runs for approximately 1 month until Marco approves full autonomous operation.
+### For the Katrina functionality test (do this first):
 
-- [ ] Confirm SOP sheet tabs are finalized and match the tab names in Step 1
-- [ ] Import `make/phase2_reply_scenario.json`
-- [ ] Fill in `[MASTER_LOG_SHEET_ID]` and `[SOP_MATRIX_SHEET_ID]`
-- [ ] Set all connections (Google Sheets, OpenAI, and `Gmail - Katrina` for the test inbox)
-- [ ] **Add a `gmail:GetEmail` module before step 6** to fetch original email body using the thread ID from the log — inject the body into the GPT reply prompt (this is the one step that requires manual wiring in Make)
-- [ ] Activate. Check that Score 3 emails produce a **Draft** in Katrina's Gmail Drafts (not Sent)
-- [ ] Marco reviews drafts daily — check draft quality and reply accuracy
-- [ ] After ~1 month and Marco's approval: switch to live send by replacing `gmail:CreateDraftReply` with `gmail:ReplyToThread`, restoring the 15-minute sleep delay, and updating `config/settings.json → reply.draft_mode` to `false`
+- [ ] Import **`make/scenarios/phase2_Katrina.json`** into Make
+  - This file has all of Katrina's SOP rules embedded directly in the GPT prompt — no SOP sheet lookup needed
+  - Fill in `[MASTER_LOG_SHEET_ID]` (appears 3 times in the file)
+  - Set the 3 connections: `Google Sheets - Talent Automation`, `OpenAI - Talent Automation`, `Gmail - Katrina`
+  - Set the schedule to run every 5 minutes
+- [ ] Activate both Katrina scenarios (Phase 1 + Phase 2)
+- [ ] Send 3 test emails to `katrina@taboost.me`:
+  - **Good email**: real brand name, offer > $600 → should Score 3, save a draft that says "Looping in management..."
+  - **Low offer email**: real brand, offer < $300 → should Score 3, save a draft with the counter-rate response
+  - **Trash email**: obvious spam, prize win, or personal Gmail domain → should Score 1, archived immediately
+- [ ] After each email, check the Master Log — verify scores, actions, and Brand Name are logged
+- [ ] Check Gmail Drafts in katrina@taboost.me — confirm the AI draft matches the correct SOP template
+- [ ] To run a sample of 30 real inbox emails: temporarily change Phase 1 Gmail trigger `labelIds` to `["INBOX"]` and manually trigger runs
+
+### For full rollout (after Katrina test passes):
+
+- [ ] Confirm all SOP sheet tabs use the 2-column format: `Trigger / Scenario` (col A) and `Response / Action` (col B)
+  - All content is already extracted — see `sheets/talent_sops/` for per-talent CSVs matching this format
+- [ ] Import `make/phase2_reply_scenario.json` (the multi-talent version)
+- [ ] Fill in `[MASTER_LOG_SHEET_ID]` and `[SOP_MATRIX_SHEET_ID]` (SOP matrix ID: `1NCH4BClugnuGwvDX3NR0cyw5kP1XElyvpjmvEjEnAyQ`)
+- [ ] Set all connections (Google Sheets, OpenAI, and Gmail connections for each active talent)
+- [ ] After ~1 month and Marco's approval: switch to live send by replacing `gmail:CreateDraftReply` with `gmail:ReplyToThread` and updating `config/settings.json → reply.draft_mode` to `false`
 
 ---
 

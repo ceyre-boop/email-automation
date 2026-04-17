@@ -1,13 +1,13 @@
 {
-  "_README": "Make Scenario Blueprint — Phase 2: Draft-Reply Engine. Import AFTER Phase 1 is stable and the SOP sheet audit with Britney is complete. This scenario is triggered by a webhook from Phase 1 (or can run on a schedule polling Score 3 rows in the master log). One scenario handles all talents — it dynamically looks up the correct SOP tab. DRAFT MODE ACTIVE: replies are saved as Gmail Drafts for supervisor review — nothing is sent automatically until Marco approves full autonomous operation (~1 month trial).",
+  "_README": "Make Scenario Blueprint — Phase 2: Draft-Reply Engine. Import AFTER Phase 1 is stable. This scenario polls the master log every 5 minutes for emails queued for reply, reads the talent's SOP rules from the real 2-column SOP sheet (Trigger / Scenario → Response / Action), passes all rules to GPT to pick the right response, and saves a Gmail Draft for supervisor review. DRAFT MODE: nothing is sent automatically.",
   "_import_instructions": [
-    "1. Complete the SOP sheet audit with Britney FIRST. All talent tabs must match sheets/sop_matrix_template.csv.",
-    "2. Import this blueprint into Make.",
-    "3. Fill in all TODO values below.",
-    "4. DRAFT MODE: replies are saved as Gmail Drafts, not sent. Marco reviews drafts in Gmail before approving autonomous send.",
-    "5. To enable auto-send after trial: replace gmail:CreateDraftReply (step 10) with gmail:ReplyToThread and restore the sleep delay (step 9). Update config/settings.json → reply.draft_mode to false."
+    "1. Import this blueprint into Make.",
+    "2. Fill in all TODO values below.",
+    "3. Confirm all SOP sheet tabs use the 2-column format: 'Trigger / Scenario' (col A) and 'Response / Action' (col B).",
+    "4. DRAFT MODE: replies are saved as Gmail Drafts, not sent. Supervisor reviews drafts in Gmail before approving autonomous send.",
+    "5. To enable auto-send after trial: replace gmail:CreateDraftReply (step 8) with gmail:ReplyToThread and update config/settings.json → reply.draft_mode to false."
   ],
-  "_architecture_note": "This scenario reads 'queued for reply' rows from the master log (Score 3, Reply Sent = FALSE), processes them, saves a Gmail Draft reply, then updates the log row. Running on a schedule (every 5 minutes) is the recommended approach during Phase 2 to keep it simple. DRAFT MODE: no emails are sent automatically — all replies land in the talent's Gmail Drafts folder for Marco to review.",
+  "_architecture_note": "Reads 'queued for reply' rows from master log, fetches the talent's full SOP rule list from the SOP sheet (2 columns), passes all rules + email context to GPT-4o, which picks the correct response template OR returns ESCALATE. Running on a 5-minute schedule during Phase 2.",
 
   "name": "Phase 2 — Draft-Reply Engine",
 
@@ -30,7 +30,7 @@
           ]
         },
         "limit": 10,
-        "_limit_comment": "Process up to 10 queued emails per run. Adjust as needed."
+        "_limit_comment": "Process up to 10 queued emails per run."
       },
       "metadata": { "designer": { "x": 0, "y": 0 } }
     },
@@ -42,11 +42,11 @@
       "parameters": {
         "connection": "Google Sheets - Talent Automation",
         "spreadsheetId": "[SOP_MATRIX_SHEET_ID]",
-        "_spreadsheetId_comment": "TODO: Fill in Britney's SOP matrix Google Sheet ID.",
+        "_spreadsheetId_comment": "TODO: Fill in the SOP matrix Google Sheet ID (1NCH4BClugnuGwvDX3NR0cyw5kP1XElyvpjmvEjEnAyQ or your copy).",
         "sheetName": "{{1.`Talent Name`}}",
-        "_sheetName_comment": "Dynamically reads the tab named after the talent. Tab names must exactly match the Talent Name column in the master log.",
-        "range": "A:F",
-        "_range_comment": "Reads columns A through F: Offer Type, Minimum Rate, Response Template, Auto-Respond Flag, Brand Blacklist, Special Rules."
+        "_sheetName_comment": "Dynamically reads the tab named after the talent. Tab names must exactly match the Talent Name in the master log (case-sensitive).",
+        "range": "A:B",
+        "_range_comment": "Reads both SOP columns: A = Trigger / Scenario, B = Response / Action."
       },
       "metadata": { "designer": { "x": 300, "y": 0 } }
     },
@@ -56,25 +56,48 @@
       "module": "tools:SetVariable",
       "version": 1,
       "parameters": {
-        "name": "sop_row",
-        "value": "{{first(filter(2.values, row => row[0] == 1.`Offer Type`))}}",
-        "_comment": "Finds the row in the SOP sheet where column A (Offer Type) matches the email's offer type detected during triage. If no match, falls back to 'Other' row.",
-        "_fallback_comment": "TODO: Add a fallback filter for 'Other' offer type if the primary match returns empty."
+        "name": "sop_rules_text",
+        "value": "{{join(map(slice(2.values, 1), row => \"TRIGGER: \" + row[0] + \"\\nRESPONSE: \" + row[1]), \"\\n\\n\")}}",
+        "_comment": "Formats all SOP rows (skipping header row at index 0) into a readable TRIGGER/RESPONSE block for the GPT prompt. Each rule is separated by a blank line."
       },
       "metadata": { "designer": { "x": 600, "y": 0 } }
     },
 
     {
       "id": 4,
+      "module": "openai-gpt-3:CreateChatCompletion",
+      "version": 1,
+      "parameters": {
+        "connection": "OpenAI - Talent Automation",
+        "model": "gpt-4o",
+        "_model_comment": "Always use gpt-4o for reply drafting. Do NOT substitute gpt-4o-mini here.",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a professional talent management assistant drafting email replies on behalf of talent.\n\nThe talent's SOP (Standard Operating Procedure) is a list of trigger/response rules. Each rule describes a scenario (trigger) and either:\n- An email template to send as the reply, or\n- An action instruction (e.g. 'Move to folder', 'CC manager', 'Delete') that requires human action\n\nYour job:\n1. Read the email context provided.\n2. Match it to the BEST trigger rule in the SOP.\n3. If the matching rule has an email template: output ONLY that email text, ready to send. Do NOT add anything outside the template.\n4. If the matching rule is an action instruction: output exactly 'ESCALATE: ' followed by one sentence describing the action the human should take.\n\nRules:\n- Output ONLY the finished reply text OR 'ESCALATE: <reason>'. Nothing else.\n- Do NOT add subject lines, preambles, AI disclaimers, or extra commentary.\n- Do NOT invent specifics (dates, URLs, deliverable counts) not present in the SOP template.\n- Do NOT include internal routing instructions inside a reply email.\n- If no rule clearly matches, output: ESCALATE: No matching SOP rule — flag for human review."
+          },
+          {
+            "role": "user",
+            "content": "Talent name: {{1.`Talent Name`}}\nEmail subject: {{1.`Subject`}}\nEmail sender: {{1.`Sender Email`}}\nOffer type (detected by AI triage): {{1.`Offer Type`}}\nBrand name: {{1.`Brand Name`}}\nProposed rate (USD): {{1.`Proposed Rate (USD)`}}\nAI triage summary: {{1.`Notes`}}\n\nSOP rules for this talent (trigger → response):\n---\n{{3.sop_rules_text}}\n---\n\nBased on the email context and SOP rules above, what is the correct response? Output only the reply text or ESCALATE."
+          }
+        ],
+        "max_tokens": 800,
+        "temperature": 0.4
+      },
+      "metadata": { "designer": { "x": 900, "y": 0 } }
+    },
+
+    {
+      "id": 5,
       "module": "builtin:BasicRouter",
       "version": 1,
       "parameters": {},
       "routes": [
         {
-          "_label": "Auto-Respond Flag = ESCALATE or NO — route to Score 2 behavior",
+          "_label": "GPT returned ESCALATE — route to human",
           "flow": [
             {
-              "id": 5,
+              "id": 6,
               "module": "google-sheets:UpdateRow",
               "version": 1,
               "parameters": {
@@ -84,149 +107,73 @@
                 "rowNumber": "{{1.rowNumber}}",
                 "values": {
                   "Action Taken": "escalated to human",
-                  "Notes": "Auto-Respond Flag = {{3.sop_row[3]}} — routed to human review"
+                  "Notes": "{{4.result.choices[].message.content}}"
                 }
               },
-              "metadata": { "designer": { "x": 900, "y": -100 } }
+              "metadata": { "designer": { "x": 1200, "y": -100 } }
             }
           ],
           "filter": {
-            "name": "ESCALATE or NO",
+            "name": "GPT said ESCALATE",
             "conditions": [
-              [
-                { "a": "{{3.sop_row[3]}}", "b": "YES", "o": "text:notEqual" }
-              ]
+              [{ "a": "{{4.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:matchRegexp" }]
             ]
           }
         },
 
         {
-          "_label": "Auto-Respond Flag = YES — proceed to draft and send reply",
+          "_label": "Reply drafted — save as Gmail Draft for supervisor review",
           "flow": [
             {
-              "id": 6,
-              "module": "openai-gpt-3:CreateChatCompletion",
+              "id": 7,
+              "module": "gmail:CreateDraftReply",
               "version": 1,
               "parameters": {
-                "connection": "OpenAI - Talent Automation",
-                "model": "gpt-4o",
-                "_model_comment": "Always use gpt-4o for reply drafting. Do NOT substitute gpt-4o-mini here.",
-                "messages": [
-                  {
-                    "role": "system",
-                    "content": "You are a professional talent management assistant drafting email replies on behalf of talent.\n\nYour job is to fill in the provided SOP response template using details from the original email.\nWrite as if you are the talent's team — professional, warm, and concise.\n\nRules:\n- Replace ALL placeholders: [BRAND_NAME], [TALENT_NAME], [OFFER_TYPE], [PROPOSED_RATE], [MINIMUM_RATE]\n- If a placeholder value is unknown, replace it with a natural phrase\n- Do NOT add commentary, disclaimers, or AI-related text outside the email\n- Do NOT invent specifics not present in the original email\n- Output ONLY the finished email reply text, ready to send. No subject line. No preamble.\n\nIf the SOP template or talent rules indicate ESCALATE for this offer type, output exactly:\nESCALATE: <one-sentence reason>"
-                  },
-                  {
-                    "role": "user",
-                    "content": "Talent name: {{1.`Talent Name`}}\nTalent minimum rate for this offer type (USD): {{3.sop_row[1]}}\nOffer type: {{1.`Offer Type`}}\nBrand name: {{1.`Notes`}}\nProposed rate from email (USD): {{1.`Proposed Rate (USD)`}}\n\nSOP response template:\n---\n{{3.sop_row[2]}}\n---\n\nSpecial rules for this talent:\n---\n{{3.sop_row[5]}}\n---\n\nAuto-respond flag: {{3.sop_row[3]}}\n\nOriginal email body is not stored in log — retrieve from Gmail thread below and include in this call if possible.\n\nGmail Thread Link: {{1.`Gmail Thread Link`}}\n\nDraft the reply now. Output only the finished email text."
-                  }
-                ],
-                "max_tokens": 800,
-                "temperature": 0.4,
-                "_note": "TODO: In production, fetch the original email body from Gmail using the thread ID and inject it into the user message above. The log stores the thread link but not the full body. Add a gmail:GetEmail module before this step and pass the body text into this prompt."
+                "connection": "Gmail - {{1.`Talent Name`}}",
+                "_connection_comment": "Make connection names must be in format 'Gmail - [TalentFirstName]' and match exactly the Talent Name in the log.",
+                "threadId": "{{last(split(1.`Gmail Thread Link`, \"/\"))}}",
+                "_threadId_comment": "Extracts the thread ID from the Gmail link stored in the log.",
+                "to": "{{1.`Sender Email`}}",
+                "body": "{{4.result.choices[].message.content}}",
+                "bodyType": "text",
+                "_draft_mode_note": "DRAFT MODE: saves as a Gmail Draft reply — nothing is sent. Supervisor reviews drafts in Gmail. To switch to live send: replace this module with gmail:ReplyToThread and update config/settings.json → reply.draft_mode to false."
               },
-              "metadata": { "designer": { "x": 900, "y": 100 } }
+              "metadata": { "designer": { "x": 1200, "y": 100 } }
             },
 
             {
-              "id": 7,
-              "module": "builtin:BasicRouter",
+              "id": 8,
+              "module": "google-sheets:UpdateRow",
               "version": 1,
-              "parameters": {},
-              "routes": [
-                {
-                  "_label": "GPT returned ESCALATE — route to human",
-                  "flow": [
-                    {
-                      "id": 8,
-                      "module": "google-sheets:UpdateRow",
-                      "version": 1,
-                      "parameters": {
-                        "connection": "Google Sheets - Talent Automation",
-                        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
-                        "sheetName": "Master Log",
-                        "rowNumber": "{{1.rowNumber}}",
-                        "values": {
-                          "Action Taken": "escalated to human",
-                          "Notes": "GPT returned ESCALATE: {{6.result.choices[].message.content}}"
-                        }
-                      },
-                      "metadata": { "designer": { "x": 1200, "y": 50 } }
-                    }
-                  ],
-                  "filter": {
-                    "name": "GPT said ESCALATE",
-                    "conditions": [
-                      [{ "a": "{{6.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:matchRegexp" }]
-                    ]
-                  }
-                },
-
-                {
-                  "_label": "Reply drafted — save as Gmail Draft for supervisor review",
-                  "flow": [
-                    {
-                      "id": 10,
-                      "module": "gmail:CreateDraftReply",
-                      "version": 1,
-                      "parameters": {
-                        "connection": "Gmail - {{1.`Talent Name`}}",
-                        "_connection_comment": "TODO: Make connection names for each talent Gmail must be in format 'Gmail - [TalentFirstName]' and match exactly the Talent Name in the log. This dynamic lookup requires all connections to be consistently named.",
-                        "threadId": "{{last(split(1.`Gmail Thread Link`, \"/\"))}}",
-                        "_threadId_comment": "Extracts the thread ID from the Gmail link stored in the log.",
-                        "to": "{{1.`Sender Email`}}",
-                        "body": "{{6.result.choices[].message.content}}",
-                        "bodyType": "text",
-                        "_bodyType_comment": "Send as plain text. Change to 'html' only if SOP templates contain HTML formatting.",
-                        "_draft_mode_note": "DRAFT MODE: saves as a Gmail Draft reply — nothing is sent. Marco reviews drafts in Gmail. To switch to live send: replace this module with gmail:ReplyToThread (same parameters) and update config/settings.json → reply.draft_mode to false."
-                      },
-                      "metadata": { "designer": { "x": 1200, "y": 150 } }
-                    },
-
-                    {
-                      "id": 11,
-                      "module": "google-sheets:UpdateRow",
-                      "version": 1,
-                      "parameters": {
-                        "connection": "Google Sheets - Talent Automation",
-                        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
-                        "sheetName": "Master Log",
-                        "rowNumber": "{{1.rowNumber}}",
-                        "values": {
-                          "Action Taken": "draft saved",
-                          "Reply Sent": "FALSE",
-                          "Notes": "Draft saved at {{now}} — awaiting Marco review before send"
-                        }
-                      },
-                      "metadata": { "designer": { "x": 1500, "y": 150 } }
-                    }
-                  ],
-                  "filter": {
-                    "name": "Normal reply",
-                    "conditions": [
-                      [{ "a": "{{6.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:notMatchRegexp" }]
-                    ]
-                  }
+              "parameters": {
+                "connection": "Google Sheets - Talent Automation",
+                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "sheetName": "Master Log",
+                "rowNumber": "{{1.rowNumber}}",
+                "values": {
+                  "Action Taken": "draft saved",
+                  "Reply Sent": "FALSE",
+                  "Notes": "Draft saved at {{now}} — awaiting supervisor review before send"
                 }
-              ],
-              "metadata": { "designer": { "x": 1200, "y": 100 } }
+              },
+              "metadata": { "designer": { "x": 1500, "y": 100 } }
             }
           ],
           "filter": {
-            "name": "Auto-respond YES",
+            "name": "Normal reply",
             "conditions": [
-              [{ "a": "{{3.sop_row[3]}}", "b": "YES", "o": "text:equal" }]
+              [{ "a": "{{4.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:notMatchRegexp" }]
             ]
           }
         }
       ],
-      "metadata": { "designer": { "x": 900, "y": 0 } }
+      "metadata": { "designer": { "x": 1200, "y": 0 } }
     }
   ],
 
   "metadata": {
     "instant": false,
-    "_instant_comment": "false = runs on a schedule (every 5 minutes recommended during Phase 2). Not webhook-based.",
+    "_instant_comment": "false = runs on a schedule (every 5 minutes recommended during Phase 2).",
     "version": 1,
     "scenario": {
       "roundtrips": 1,
@@ -241,14 +188,13 @@
   },
 
   "_TODO_checklist": [
-    "Complete SOP sheet audit with Britney BEFORE activating this scenario",
-    "All SOP tab names must exactly match talent names in the master log (case-sensitive)",
     "Replace [MASTER_LOG_SHEET_ID] with the master log Sheet ID",
-    "Replace [SOP_MATRIX_SHEET_ID] with Britney's SOP matrix Sheet ID",
+    "Replace [SOP_MATRIX_SHEET_ID] with the SOP matrix Sheet ID (1NCH4BClugnuGwvDX3NR0cyw5kP1XElyvpjmvEjEnAyQ or your copy)",
+    "Confirm all SOP sheet tabs use 2-column format: 'Trigger / Scenario' (col A) and 'Response / Action' (col B)",
+    "Confirm all SOP tab names exactly match Talent Name values in the master log (case-sensitive)",
     "Set Gmail connection names in Make to exactly 'Gmail - [TalentFirstName]' format",
-    "Add a gmail:GetEmail module before step 6 to inject the original email body into the GPT reply prompt (see TODO note in step 6)",
-    "DRAFT MODE is active — replies are saved as Gmail Drafts, NOT sent. Marco reviews drafts in the talent Gmail inbox.",
-    "After ~1 month trial and Marco's approval: replace gmail:CreateDraftReply (step 10) with gmail:ReplyToThread, restore the sleep delay (step 9, 900 seconds), and update config/settings.json → reply.draft_mode to false.",
-    "Test on Katrina's inbox (katrina@taboost.me) first — manually review every saved draft before approving broader rollout"
+    "DRAFT MODE is active — replies are saved as Gmail Drafts, NOT sent. Supervisor reviews drafts.",
+    "For Katrina's test: use make/scenarios/phase2_Katrina.json instead — it has SOP rules embedded and requires no sheet lookup"
   ]
 }
+

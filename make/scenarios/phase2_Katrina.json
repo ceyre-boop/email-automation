@@ -1,0 +1,178 @@
+{
+  "_README": "Make Scenario Blueprint — Phase 2: Draft-Reply Engine — Katrina (katrina@taboost.me). Import this into Make for the functionality test. Requires: (1) Master Log Google Sheet ID, (2) Google Sheets connection, (3) OpenAI connection, (4) Gmail - Katrina connection. No SOP sheet lookup needed — all of Katrina's SOP rules are embedded directly in the GPT prompt.",
+  "_import_instructions": [
+    "1. In Make, go to Scenarios > Create a new scenario.",
+    "2. Click the three-dot menu > Import Blueprint.",
+    "3. Paste this JSON.",
+    "4. Set the 3 connections: 'Google Sheets - Talent Automation', 'OpenAI - Talent Automation', 'Gmail - Katrina'.",
+    "5. Replace all [MASTER_LOG_SHEET_ID] with your Master Log Google Sheet ID.",
+    "6. Set the schedule to run every 5 minutes.",
+    "7. DRAFT MODE: replies are saved as Gmail Drafts in katrina@taboost.me — nothing is sent automatically."
+  ],
+
+  "name": "Phase 2 — Draft-Reply Engine — Katrina",
+
+  "flow": [
+    {
+      "id": 1,
+      "module": "google-sheets:SearchRows",
+      "version": 1,
+      "parameters": {
+        "connection": "Google Sheets - Talent Automation",
+        "_connection_comment": "TODO: Set this to your Google Sheets Make connection named 'Google Sheets - Talent Automation'.",
+        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+        "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID from config/settings.json → google_sheets.master_log_sheet_id.",
+        "sheetName": "Master Log",
+        "filter": {
+          "conditions": [
+            [
+              { "a": "Talent Name", "b": "Katrina", "o": "text:equal" },
+              { "a": "Action Taken", "b": "queued for reply", "o": "text:equal" },
+              { "a": "Reply Sent", "b": "FALSE", "o": "text:equal" }
+            ]
+          ]
+        },
+        "limit": 10,
+        "_limit_comment": "Process up to 10 queued Katrina emails per run."
+      },
+      "metadata": { "designer": { "x": 0, "y": 0 } }
+    },
+
+    {
+      "id": 2,
+      "module": "openai-gpt-3:CreateChatCompletion",
+      "version": 1,
+      "parameters": {
+        "connection": "OpenAI - Talent Automation",
+        "_connection_comment": "TODO: Set this to your OpenAI Make connection named 'OpenAI - Talent Automation'.",
+        "model": "gpt-4o",
+        "_model_comment": "Always use gpt-4o for reply drafting. Do NOT substitute gpt-4o-mini here.",
+        "messages": [
+          {
+            "role": "system",
+            "content": "You are a professional talent management assistant for Katrina's inbox (katrina@taboost.me).\n\nKatrina is a fashion TikTok creator managed by TABOOST agency.\n- Minimum rate: $300/video\n- Standard rates:\n  • 1 TikTok: $500\n  • Cross-posting to IG Reels: +$150\n  • 1 UGC Video: $400 (usage rights to be negotiated)\n- Monthly GMV: $450k+\n- Manager for offers at or below $650: Chenni\n- Manager for offers above $650: Cara\n- PR shipping address: 12002 Bradenton Ct, Fredericksburg, VA, 22407\n\nBelow are Katrina's SOP rules. Each rule has a trigger (the situation) and a response (either an email template to send, or an action the human must take).\n\nRULE 1 — Brand is asking for Katrina's rates OR making an initial collab inquiry with no specific rate offered:\n→ SEND THIS EMAIL:\n\"Thank you so much for reaching out about a potential partnership with Katrina!! I'm happy to share her rates below:\n• 1 TikTok: $500\n• Cross posting to IG Reels: + $150\n• 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!\"\n\nRULE 2 — Brand initially offered a rate BELOW $300 (her minimum):\n→ SEND THIS EMAIL:\n\"Thank you for reaching out to Katrina to collab!! However her rates are higher than your offer. I'm happy to share her rates below:\n• 1 TikTok: $500\n• Cross posting to IG Reels: + $150\n• 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We'd love to explore working together!\"\n\nRULE 3 — Brand initially offered a rate BETWEEN $300 and $600 (above minimum but below the good-deal threshold):\n→ SEND THIS EMAIL (same as Rule 2 — counter with rates):\n\"Thank you for reaching out to Katrina to collab!! However her rates are higher than your offer. I'm happy to share her rates below:\n• 1 TikTok: $500\n• Cross posting to IG Reels: + $150\n• 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We'd love to explore working together!\"\n\nRULE 4 — Brand initially offered a rate OVER $600 for one post (strong offer):\n→ SEND THIS EMAIL:\n\"Hi,\n\nThank you for the offer! I think this collab could be a good fit for Katrina. Looping her in management team who can move forward with this convo!\"\n\nRULE 5 — Brand is asking for bundle rates (multiple videos):\n→ SEND THIS EMAIL:\n\"Katrina's standard rate is $500 per video! Below is her bundle pricing:\n\n3 videos (90%) → $1,350\n5 videos (85%) → $2,100\n10 videos (75%) → $3,750\n\nWe've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!\"\n\nRULE 6 — PR gifting request from a notable brand (brand wants to send product, no posting required):\n→ SEND THIS EMAIL:\n\"Hi,\n\nKatrina would LOVE to get some PR. Her address is:\n12002 Bradenton Ct, Fredericksburg, VA, 22407\n\nLet me know when it's sent & the tracking number is available so I can pass her way\"\n\nRULE 7 — Commission-only offer OR any scenario requiring human action (ongoing conversation, rate negotiation in progress, offer needs manager routing, special event/panel invite, or no clear match):\n→ Output: ESCALATE: [one sentence describing the specific action needed, e.g. 'Commission-only fashion offer from [Brand] — move to Commission Offers folder if product quality is good, or delete if spammy']\n\nINSTRUCTIONS:\n- Choose the ONE rule that best matches the email situation described below.\n- If the rule says SEND THIS EMAIL: output ONLY that email text, ready to send. No subject line. No preamble. No extra commentary.\n- If the rule says ESCALATE: output exactly 'ESCALATE: ' followed by one sentence describing the action needed.\n- Do NOT invent rates, dates, URLs, or addresses not in the rules above.\n- Do NOT add AI disclaimers or system messages.\n- Do NOT include internal routing instructions ('Move to', 'CC', 'Delete') inside a reply email."
+          },
+          {
+            "role": "user",
+            "content": "Email from: {{1.`Sender Email`}}\nSubject: {{1.`Subject`}}\nOffer type detected by AI triage: {{1.`Offer Type`}}\nProposed rate (USD): {{1.`Proposed Rate (USD)`}}\nBrand name: {{1.`Brand Name`}}\nAI triage summary: {{1.`Notes`}}\n\nBased on the SOP rules and this email context, what is the correct response?"
+          }
+        ],
+        "max_tokens": 800,
+        "temperature": 0.4
+      },
+      "metadata": { "designer": { "x": 300, "y": 0 } }
+    },
+
+    {
+      "id": 3,
+      "module": "builtin:BasicRouter",
+      "version": 1,
+      "parameters": {},
+      "routes": [
+        {
+          "_label": "GPT returned ESCALATE — log and flag for human action",
+          "flow": [
+            {
+              "id": 4,
+              "module": "google-sheets:UpdateRow",
+              "version": 1,
+              "parameters": {
+                "connection": "Google Sheets - Talent Automation",
+                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "sheetName": "Master Log",
+                "rowNumber": "{{1.rowNumber}}",
+                "values": {
+                  "Action Taken": "escalated to human",
+                  "Notes": "{{2.result.choices[].message.content}}"
+                }
+              },
+              "metadata": { "designer": { "x": 600, "y": -100 } }
+            }
+          ],
+          "filter": {
+            "name": "GPT said ESCALATE",
+            "conditions": [
+              [{ "a": "{{2.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:matchRegexp" }]
+            ]
+          }
+        },
+
+        {
+          "_label": "Reply drafted — save as Gmail Draft for supervisor review",
+          "flow": [
+            {
+              "id": 5,
+              "module": "gmail:CreateDraftReply",
+              "version": 1,
+              "parameters": {
+                "connection": "Gmail - Katrina",
+                "_connection_comment": "TODO: Set this to the Make Gmail OAuth connection for katrina@taboost.me, named exactly 'Gmail - Katrina'.",
+                "threadId": "{{last(split(1.`Gmail Thread Link`, \"/\"))}}",
+                "_threadId_comment": "Extracts the Gmail thread ID from the link stored in the master log.",
+                "to": "{{1.`Sender Email`}}",
+                "body": "{{2.result.choices[].message.content}}",
+                "bodyType": "text",
+                "_draft_mode_note": "DRAFT MODE: saves as a Gmail Draft reply in katrina@taboost.me — nothing is sent automatically. Review drafts in Gmail Drafts folder before sending."
+              },
+              "metadata": { "designer": { "x": 600, "y": 100 } }
+            },
+
+            {
+              "id": 6,
+              "module": "google-sheets:UpdateRow",
+              "version": 1,
+              "parameters": {
+                "connection": "Google Sheets - Talent Automation",
+                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "sheetName": "Master Log",
+                "rowNumber": "{{1.rowNumber}}",
+                "values": {
+                  "Action Taken": "draft saved",
+                  "Reply Sent": "FALSE",
+                  "Notes": "Draft saved at {{now}} — awaiting supervisor review before send"
+                }
+              },
+              "metadata": { "designer": { "x": 900, "y": 100 } }
+            }
+          ],
+          "filter": {
+            "name": "Normal reply",
+            "conditions": [
+              [{ "a": "{{2.result.choices[].message.content}}", "b": "^ESCALATE:", "o": "text:notMatchRegexp" }]
+            ]
+          }
+        }
+      ],
+      "metadata": { "designer": { "x": 600, "y": 0 } }
+    }
+  ],
+
+  "metadata": {
+    "instant": false,
+    "_instant_comment": "false = runs on a schedule. Set to every 5 minutes in Make scheduler settings.",
+    "version": 1,
+    "scenario": {
+      "roundtrips": 1,
+      "maxErrors": 3,
+      "autoCommit": true,
+      "autoCommitTriggerLast": true,
+      "sequential": true,
+      "_sequential_comment": "true = emails processed one at a time to avoid race conditions on log row updates."
+    },
+    "zone": "us1.make.com",
+    "_zone_comment": "TODO: Update to your Make workspace zone if not us1."
+  },
+
+  "_TODO_checklist": [
+    "Replace all [MASTER_LOG_SHEET_ID] (3 places) with the master log Google Sheet ID",
+    "Set 'Google Sheets - Talent Automation' connection in Make for modules 1, 4, and 6",
+    "Set 'OpenAI - Talent Automation' connection in Make for module 2",
+    "Set 'Gmail - Katrina' connection in Make for module 5 (must be OAuth for katrina@taboost.me)",
+    "Set scenario schedule to every 5 minutes in Make",
+    "DRAFT MODE is active — all replies land in katrina@taboost.me Gmail Drafts folder, NOT Sent",
+    "Test by sending 3 emails to katrina@taboost.me: 1 good brand offer (>$600), 1 rate inquiry (no offer), 1 low offer (<$300)",
+    "Check master log after each email: Score 1 = archived, Score 2 = flagged, Score 3 = queued for reply, then draft saved",
+    "Review drafts in Gmail Drafts — confirm they match the correct SOP template",
+    "After test passes: run sample of 30 real inbox emails or expand to full inbox"
+  ]
+}
