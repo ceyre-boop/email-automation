@@ -1,0 +1,232 @@
+{
+  "_README": "Triage Prompt QA Test Cases — Talent Inbox Automation",
+  "_purpose": "Use these test cases to validate that the triage prompt in prompts/triage.md produces correct scores before and after any prompt changes. Run manually by pasting the USER PROMPT into the OpenAI Playground with the SYSTEM PROMPT from prompts/triage.md at temperature 0.1.",
+  "_how_to_run": [
+    "1. Open https://platform.openai.com/playground",
+    "2. Set model to gpt-4o-mini, temperature to 0.1, max tokens to 200.",
+    "3. Paste the SYSTEM PROMPT from prompts/triage.md into the System field.",
+    "4. For each test case below, paste the user_prompt into the User field and run.",
+    "5. Compare the 'score' field in the JSON response to expected_score.",
+    "6. If any test fails, adjust the triage prompt and re-run the full suite.",
+    "7. Document failures in the Notes column of the master log for tracking."
+  ],
+  "_pass_threshold": "18 of 20 tests must pass before deploying a prompt change to production.",
+
+  "test_cases": [
+    {
+      "id": "T-01",
+      "label": "Obvious spam — prize win",
+      "talent": "Sylvia",
+      "minimum_rate_usd": 1000,
+      "user_prompt": "Talent name: Sylvia\nTalent minimum rate (USD): 1000\n\nEmail subject: Congratulations! You've won a $500 Amazon gift card\nEmail sender: noreply@promo-rewards-center.net\nEmail sender domain: promo-rewards-center.net\nEmail body:\n---\nDear influencer,\n\nYou have been selected as our lucky winner! Click the link below to claim your $500 Amazon gift card. This offer expires in 24 hours.\n\nClaim now: http://claimgift.promo-rewards-center.net/claim\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Unknown",
+      "notes": "Classic spam. No brand. Prize win. Should be hard Score 1."
+    },
+    {
+      "id": "T-02",
+      "label": "Non-English email",
+      "talent": "Trin",
+      "minimum_rate_usd": 2000,
+      "user_prompt": "Talent name: Trin\nTalent minimum rate (USD): 2000\n\nEmail subject: Collaboration invitation\nEmail sender: info@beautybrands.cn\nEmail sender domain: beautybrands.cn\nEmail body:\n---\n亲爱的Trinity，\n\n我们是一家知名化妆品品牌，希望与您合作。我们的预算为1000美元。请回复确认合作意向。\n\n谢谢\nBeauty Brands China\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Unknown",
+      "notes": "Non-English body. Should be Score 1 regardless of whether it looks like a real brand."
+    },
+    {
+      "id": "T-03",
+      "label": "No company name, personal email domain",
+      "talent": "Sam",
+      "minimum_rate_usd": 700,
+      "user_prompt": "Talent name: Sam\nTalent minimum rate (USD): 700\n\nEmail subject: Hi! Want to collab?\nEmail sender: sarah.marketing123@gmail.com\nEmail sender domain: gmail.com\nEmail body:\n---\nHey! I saw your TikTok and I think you'd be great for our product. We're a small startup and can pay $50. Let me know!\n\nSarah\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Sponsored Post",
+      "notes": "Personal Gmail domain. No company name. Very low offer. Hard Score 1."
+    },
+    {
+      "id": "T-04",
+      "label": "Unsubscribe confirmation",
+      "talent": "Britt",
+      "minimum_rate_usd": 900,
+      "user_prompt": "Talent name: Britt\nTalent minimum rate (USD): 900\n\nEmail subject: You've been successfully unsubscribed\nEmail sender: noreply@newsletter.somesite.com\nEmail sender domain: somesite.com\nEmail body:\n---\nYou have been successfully removed from our mailing list. You will no longer receive emails from us. If this was a mistake, click here to resubscribe.\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Unknown",
+      "notes": "System/transactional email. Not a business opportunity. Hard Score 1."
+    },
+    {
+      "id": "T-05",
+      "label": "Below minimum rate, unknown small brand",
+      "talent": "Colleen",
+      "minimum_rate_usd": 800,
+      "user_prompt": "Talent name: Colleen\nTalent minimum rate (USD): 800\n\nEmail subject: Partnership opportunity with Glow Beauty\nEmail sender: partnerships@glowbeautyco.com\nEmail sender domain: glowbeautyco.com\nEmail body:\n---\nHi Colleen,\n\nWe're Glow Beauty Co., a small skincare brand launching next month. We'd love to partner with you for a sponsored post. Our budget is $75. Let me know if you're interested!\n\nBest,\nAlex\nGlow Beauty Co.\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 75,
+      "notes": "Unknown small brand, offer ($75) far below minimum ($800). Score 1."
+    },
+    {
+      "id": "T-06",
+      "label": "Grammar/spelling quality indicates bot or scam",
+      "talent": "Allee",
+      "minimum_rate_usd": 650,
+      "user_prompt": "Talent name: Allee\nTalent minimum rate (USD): 650\n\nEmail subject: URGENT collab offer for you!!!\nEmail sender: info@fashionpartners-intl.biz\nEmail sender domain: fashionpartners-intl.biz\nEmail body:\n---\nHello dear influencer!!! We are the big fashion company need you for promotion!! Pay you $1000!!! Very urgent deal pleas respond ASAP!!! Send personal information to confirm deal today!!!\n\nFashion Partners International\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Sponsored Post",
+      "notes": "Clear bot/scam grammar despite mentioning $1,000. Score 1."
+    },
+    {
+      "id": "T-07",
+      "label": "Auto-reply / out of office",
+      "talent": "Angela",
+      "minimum_rate_usd": 600,
+      "user_prompt": "Talent name: Angela\nTalent minimum rate (USD): 600\n\nEmail subject: Re: Partnership inquiry — Out of Office\nEmail sender: john.smith@brandco.com\nEmail sender domain: brandco.com\nEmail body:\n---\nI am currently out of the office until Monday, April 21. I will respond to your email upon my return. For urgent matters, please contact my colleague at assistant@brandco.com.\n\nThank you.\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Unknown",
+      "notes": "Out-of-office auto-reply. Not a new inquiry. Score 1."
+    },
+    {
+      "id": "T-08",
+      "label": "Score 2 — real company, no rate, missing details",
+      "talent": "Lizz",
+      "minimum_rate_usd": 600,
+      "user_prompt": "Talent name: Lizz\nTalent minimum rate (USD): 600\n\nEmail subject: Collaboration Opportunity\nEmail sender: partnerships@revolve.com\nEmail sender domain: revolve.com\nEmail body:\n---\nHi,\n\nWe're reaching out from Revolve's influencer partnerships team. We think Lizz would be a great fit for an upcoming campaign. Could you share her rates and availability?\n\nBest,\nRevolve Partnerships Team\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "Sponsored Post",
+      "notes": "Revolve is a recognizable mid-tier brand. No rate mentioned, but brand-name override rule applies. Acceptable if system returns 3. Would also accept 2 (rate/details missing) — primary intent is to ensure it does NOT score 1.",
+      "_acceptable_scores": [2, 3]
+    },
+    {
+      "id": "T-09",
+      "label": "Score 2 — professional but unfamiliar brand, no rate",
+      "talent": "Kylika",
+      "minimum_rate_usd": 400,
+      "user_prompt": "Talent name: Kylika\nTalent minimum rate (USD): 400\n\nEmail subject: Brand Ambassador Opportunity — NovaSkin Cosmetics\nEmail sender: influencer@novaskincosmetics.com\nEmail sender domain: novaskincosmetics.com\nEmail body:\n---\nDear Kylika's team,\n\nI'm reaching out from NovaSkin Cosmetics. We're a premium skincare brand and we're building our ambassador program for Q3. We'd love to discuss a potential partnership — could you share more about her rates and collaboration process?\n\nWarm regards,\nMarketing Director\nNovaSkin Cosmetics\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 2,
+      "expected_offer_type": "Sponsored Post",
+      "notes": "Professional quality, real-looking brand, no rate mentioned, brand not recognizable. Score 2."
+    },
+    {
+      "id": "T-10",
+      "label": "Score 2 — below minimum but could be real brand worth negotiating",
+      "talent": "Michaela",
+      "minimum_rate_usd": 3500,
+      "user_prompt": "Talent name: Michaela\nTalent minimum rate (USD): 3500\n\nEmail subject: Collab Proposal — $800 Sponsored Post\nEmail sender: collabs@stylebythread.com\nEmail sender domain: stylebythread.com\nEmail body:\n---\nHi Michaela's team,\n\nI'm the partnerships lead at Style by Thread, a fast-growing fashion brand. We'd love to do a sponsored post with Michaela. Our current budget is $800. We know this may be below her standard rate — we're open to discussing if there's flexibility.\n\nBest,\nStyle by Thread Partnerships\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 2,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 800,
+      "notes": "Professional email, real-looking brand, offer ($800) far below Michaela's minimum ($3,500). Brand acknowledges the gap. Score 2 — worth a human look."
+    },
+    {
+      "id": "T-11",
+      "label": "Score 3 — recognizable major brand, rate at minimum",
+      "talent": "Sylvia",
+      "minimum_rate_usd": 1000,
+      "user_prompt": "Talent name: Sylvia\nTalent minimum rate (USD): 1000\n\nEmail subject: Sephora x Sylvia Collaboration\nEmail sender: influencer.partnerships@sephora.com\nEmail sender domain: sephora.com\nEmail body:\n---\nHi Sylvia's team,\n\nI'm reaching out from Sephora's influencer marketing department. We're interested in partnering with Sylvia for a sponsored TikTok post for our spring beauty collection. Our budget for this collaboration is $1,000. Please let us know if you'd like to move forward and we can share the full brief.\n\nBest,\nSephora Influencer Partnerships\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 1000,
+      "notes": "Sephora is a major recognizable brand. Rate exactly meets minimum. Clear Score 3."
+    },
+    {
+      "id": "T-12",
+      "label": "Score 3 — recognizable brand, rate BELOW minimum (brand override rule)",
+      "talent": "Trin",
+      "minimum_rate_usd": 2000,
+      "user_prompt": "Talent name: Trin\nTalent minimum rate (USD): 2000\n\nEmail subject: Amazon x Trinity Blair — Collaboration Opportunity\nEmail sender: influencer.marketing@amazon.com\nEmail sender domain: amazon.com\nEmail body:\n---\nHi,\n\nWe're Amazon's influencer team and we'd love to work with Trinity for a sponsored post. Our standard rate for this campaign is $500. Please let us know if Trinity is interested.\n\nAmazon Influencer Programs\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 500,
+      "notes": "Amazon is a globally recognized brand. Offer ($500) is below minimum ($2,000) BUT brand override rule applies — always score recognized major brands as 3 regardless of rate."
+    },
+    {
+      "id": "T-13",
+      "label": "Score 3 — strong offer, mid-tier brand, clear deliverables",
+      "talent": "Britt",
+      "minimum_rate_usd": 900,
+      "user_prompt": "Talent name: Britt\nTalent minimum rate (USD): 900\n\nEmail subject: Paid Partnership Opportunity — HomeGoods Brand\nEmail sender: collabs@homeessentials-brand.com\nEmail sender domain: homeessentials-brand.com\nEmail body:\n---\nHi Brittanie's team,\n\nI'm the brand partnerships manager at HomeEssentials, a home décor and organization brand with 2M+ social followers. We'd love to work with Britt on a sponsored TikTok post featuring our new kitchen collection. Our budget for this campaign is $1,500 for one TikTok video. We can provide the product free of charge and we're flexible on deliverables. Looking forward to connecting!\n\nBest,\nHomeEssentials Brand Team\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 1500,
+      "notes": "Clear branded email, 2M+ follower brand, rate ($1,500) above minimum ($900). Clear Score 3."
+    },
+    {
+      "id": "T-14",
+      "label": "Score 3 — UGC offer above minimum",
+      "talent": "Sam",
+      "minimum_rate_usd": 700,
+      "user_prompt": "Talent name: Sam\nTalent minimum rate (USD): 700\n\nEmail subject: UGC Content Creation Request\nEmail sender: ugc@cleanlivingco.com\nEmail sender domain: cleanlivingco.com\nEmail body:\n---\nHi Sam's team,\n\nWe're Clean Living Co., a wellness and home products brand. We're looking for UGC creators to produce 3 short-form videos for our ad campaigns. Our budget is $2,000 for the three videos. Usage rights for 6 months included. Please let us know if Sam is available!\n\nClean Living Co. Brand Team\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "UGC",
+      "expected_proposed_rate_usd": 2000,
+      "notes": "Clear UGC request, professional brand, rate above minimum. Score 3."
+    },
+    {
+      "id": "T-15",
+      "label": "Score 3 — event appearance inquiry",
+      "talent": "Allee",
+      "minimum_rate_usd": 650,
+      "user_prompt": "Talent name: Allee\nTalent minimum rate (USD): 650\n\nEmail subject: Style Summit 2026 — Appearance Invitation\nEmail sender: events@fashionweek-summit.com\nEmail sender domain: fashionweek-summit.com\nEmail body:\n---\nDear Allee's management,\n\nWe're organizing the Style Summit 2026 in Los Angeles, a premium fashion event with 5,000 attendees and major media coverage. We'd love to invite Allee as a featured creator. Appearance fee is $2,500 plus travel and accommodation covered. The event is June 14th. Please let us know if she's available.\n\nBest regards,\nStyle Summit Events Team\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "Event Appearance",
+      "expected_proposed_rate_usd": 2500,
+      "notes": "Clear event appearance with professional details, offer above minimum. Score 3. Offer type should be Event Appearance."
+    },
+    {
+      "id": "T-16",
+      "label": "Affiliate-only offer",
+      "talent": "Angela",
+      "minimum_rate_usd": 600,
+      "user_prompt": "Talent name: Angela\nTalent minimum rate (USD): 600\n\nEmail subject: Affiliate Partnership Opportunity\nEmail sender: affiliate@trendingfashionstore.com\nEmail sender domain: trendingfashionstore.com\nEmail body:\n---\nHi Angela,\n\nWe're Trending Fashion Store and we'd love to add Angela to our affiliate program! Earn 15% commission on every sale she drives. No upfront fee — just post her unique link and start earning! Let us know if she's interested.\n\nTrending Fashion Store Affiliate Team\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 2,
+      "expected_offer_type": "Affiliate",
+      "expected_proposed_rate_usd": 0,
+      "notes": "Affiliate-only, no upfront fee, commission-only. Real brand but no paid rate. Should be Score 2 for human review (not Score 1 — brand exists, commission rate is stated). Acceptable if system returns 1 for small/unknown brand.",
+      "_acceptable_scores": [1, 2]
+    },
+    {
+      "id": "T-17",
+      "label": "KatrinaD — hourly livestream offer above minimum",
+      "talent": "KatrinaD",
+      "minimum_rate_usd": 150,
+      "user_prompt": "Talent name: KatrinaD\nTalent minimum rate (USD): 150\n\nEmail subject: TikTok Livestream Partnership — $600 for 2 hours\nEmail sender: partnerships@liveshop-brands.com\nEmail sender domain: liveshop-brands.com\nEmail body:\n---\nHi Katrina's team,\n\nWe're LiveShop Brands, a TikTok Shop partner agency. We'd love to book Katrina for a 2-hour TikTok Live shopping event. We can offer $600 total for the 2-hour session. She would feature our skincare products live. Please let us know her availability!\n\nBest,\nLiveShop Brands\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 600,
+      "notes": "$600 for 2 hours = $300/hr which is above the minimum $150/hr. Clear Score 3. Offer type may vary — Sponsored Post or Other are acceptable."
+    },
+    {
+      "id": "T-18",
+      "label": "KatrinaD — hourly livestream offer below minimum",
+      "talent": "KatrinaD",
+      "minimum_rate_usd": 150,
+      "user_prompt": "Talent name: KatrinaD\nTalent minimum rate (USD): 150\n\nEmail subject: TikTok Live Collaboration\nEmail sender: info@shopnow-daily.com\nEmail sender domain: shopnow-daily.com\nEmail body:\n---\nHi,\n\nCan Katrina do a 4-hour TikTok Live for us? We can pay $200 total. Let us know!\n\nShopNow Daily\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 1,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 200,
+      "notes": "$200 for 4 hours = $50/hr, far below $150/hr minimum. Small/unknown brand. Score 1. System may return 2 if it can't calculate hourly rate — acceptable.",
+      "_acceptable_scores": [1, 2]
+    },
+    {
+      "id": "T-19",
+      "label": "PR request from notable brand",
+      "talent": "Sylvia",
+      "minimum_rate_usd": 1000,
+      "user_prompt": "Talent name: Sylvia\nTalent minimum rate (USD): 1000\n\nEmail subject: Charlotte Tilbury PR Gifting — Sylvia\nEmail sender: pr@charlottetilbury.com\nEmail sender domain: charlottetilbury.com\nEmail body:\n---\nHi Sylvia's team,\n\nWe're reaching out from Charlotte Tilbury's PR team. We'd love to send Sylvia our new Hollywood Flawless Filter collection for consideration. No posting commitment required — just gifting for her to try. If she loves the products and would like to post, we'd be happy to discuss a paid partnership. Please share her PR address!\n\nWarm regards,\nCharlotte Tilbury PR\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 2,
+      "expected_offer_type": "Other",
+      "notes": "Charlotte Tilbury is a recognizable brand. PR request, no paid offer. Score 2 is ideal — human decides whether to share address. System may return 3 due to brand name — acceptable.",
+      "_acceptable_scores": [2, 3]
+    },
+    {
+      "id": "T-20",
+      "label": "High-value offer from Nike (global brand override)",
+      "talent": "Grayson",
+      "minimum_rate_usd": 300,
+      "user_prompt": "Talent name: Grayson\nTalent minimum rate (USD): 300\n\nEmail subject: Nike Creator Campaign — Grayson Finks\nEmail sender: creatorpartnerships@nike.com\nEmail sender domain: nike.com\nEmail body:\n---\nHi Grayson's management team,\n\nNike is building a creator roster for our upcoming Fall/Winter 2026 lifestyle campaign and Grayson's content style is a perfect match. We're offering $5,000 for a TikTok post and IG Reel combo. Please let us know if he's available and interested in discussing the campaign brief.\n\nNike Creator Partnerships\n---\n\nScore this email. Return only the JSON object.",
+      "expected_score": 3,
+      "expected_offer_type": "Sponsored Post",
+      "expected_proposed_rate_usd": 5000,
+      "notes": "Nike is a global brand. Well above minimum. Perfect Score 3."
+    }
+  ]
+}

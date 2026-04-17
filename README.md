@@ -4,6 +4,8 @@
 
 This repository contains all the assets needed to deploy the Talent Inbox Automation system:
 
+### Core Assets
+
 | Asset | Location | Purpose |
 |---|---|---|
 | Global config | `config/settings.json` | Talent list, thresholds, timing |
@@ -11,9 +13,38 @@ This repository contains all the assets needed to deploy the Talent Inbox Automa
 | AI reply prompt | `prompts/reply.md` | GPT-4o prompt for drafting replies |
 | SOP sheet template | `sheets/sop_matrix_template.csv` | Column structure for Britney's SOP sheet |
 | Master log template | `sheets/master_log_template.csv` | Column structure for activity log |
-| Phase 1 Make blueprint | `make/phase1_triage_scenario.json` | Import into Make: triage engine |
+| Phase 1 Make blueprint | `make/phase1_triage_scenario.json` | Import into Make: triage engine (template) |
 | Phase 2 Make blueprint | `make/phase2_reply_scenario.json` | Import into Make: auto-reply |
 | Phase 3 Make blueprint | `make/phase3_digest_scenario.json` | Import into Make: daily digest |
+| Per-talent Phase 1 blueprints | `make/scenarios/phase1_*.json` | Pre-filled triage scenarios — one per talent inbox |
+
+### Advanced Assets
+
+| Asset | Location | Purpose |
+|---|---|---|
+| Preflight validator | `scripts/preflight_validator.js` | Validates all config, tab names, connections before go-live |
+| Confidence & fallback policy | `config/confidence_policy.json` | Explicit routing rules for every edge case and failure mode |
+| Rollout controls | `config/rollout_controls.json` | Pilot cohort, staged activation order, per-inbox kill switches |
+| Phase 4 error alert scenario | `make/phase4_error_alert_scenario.json` | Real-time failure alerts via webhook |
+| Phase 5 weekly dashboard scenario | `make/phase5_weekly_digest_scenario.json` | Weekly ops metrics by talent |
+| Override queue template | `sheets/override_queue_template.csv` | Manual review queue with pending/approved/rejected/retried states |
+| SOP audit report | `docs/sop_audit_report.md` | Per-talent SOP issues to resolve before Phase 2 |
+| Failure playbooks | `docs/failure_playbooks.md` | Step-by-step recovery for 7 failure types |
+| Compliance guardrails | `docs/compliance_guardrails.md` | PII, retention, reply safety rules, audit trail |
+| Triage QA test cases | `tests/triage_test_cases.json` | 20 test cases with expected scores — run after prompt changes |
+| Reply QA test cases | `tests/reply_test_cases.json` | 12 test cases with expected output criteria — run after prompt changes |
+
+---
+
+## Pre-Launch Validation
+
+Before activating any scenario in Make, run the preflight validator:
+
+```bash
+node scripts/preflight_validator.js
+```
+
+This checks every required config value, tab name, connection name, scenario file, and template column — and exits with a clear pass/fail result. Resolve all failures before proceeding.
 
 ---
 
@@ -51,9 +82,44 @@ Before deploying anything, complete these one-time setup steps:
 - Fill in the supervisor's email address.
 - Run a 5-day supervised QA period. After sign-off, the system goes fully autonomous.
 
+### Phase 4 — Error Alerting (activate before Phase 1)
+- Import `make/phase4_error_alert_scenario.json` into Make.
+- This scenario fires immediately when any other scenario fails.
+- Copy the generated webhook URL and add it to the error handler of every Phase 1/2/3 scenario.
+- Fill in `[ERROR_ALERT_EMAIL]` and `[MASTER_LOG_SHEET_ID]`.
+- Create the "Error Log" tab in the master log sheet.
+
+### Phase 5 — Weekly Ops Dashboard (activate after 7 days of data)
+- Import `make/phase5_weekly_digest_scenario.json` into Make.
+- Set schedule: Monday 8:30 AM.
+- Fill in `[MASTER_LOG_SHEET_ID]` and `[SUPERVISOR_EMAIL]`.
+
 ---
 
-## Cost Estimate
+## Rollout Strategy
+
+Use `config/rollout_controls.json` to control which inboxes are active at any time.
+
+**Pilot cohort (activate first):** Trin, Sam, Colleen — monitor for 48 hours before rolling out to remaining inboxes in batches.
+
+**Activate last:** Michaela and KatrinaD require special routing logic (dual manager escalation / hourly rates). Confirm `config/confidence_policy.json` rules are working before enabling them.
+
+---
+
+## Testing Prompt Changes
+
+After any change to `prompts/triage.md` or `prompts/reply.md`, run the QA test suites manually in the OpenAI Playground before deploying to production. See `tests/triage_test_cases.json` (20 cases, 18/20 pass threshold) and `tests/reply_test_cases.json` (12 cases, all must pass).
+
+---
+
+## Reference Documents
+
+- `docs/sop_audit_report.md` — complete SOP review with per-talent issues to fix before Phase 2
+- `docs/failure_playbooks.md` — step-by-step recovery for every known failure type
+- `docs/compliance_guardrails.md` — PII rules, data retention, reply safety, audit trail requirements
+- `docs/setup_checklist.md` — step-by-step go-live checklist
+
+---
 
 | Tool | Monthly Cost |
 |---|---|

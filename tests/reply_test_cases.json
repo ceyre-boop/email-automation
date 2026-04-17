@@ -1,0 +1,165 @@
+{
+  "_README": "Reply Prompt QA Test Cases — Talent Inbox Automation",
+  "_purpose": "Use these test cases to validate that the reply prompt in prompts/reply.md produces correct, on-brand, placeholder-free replies before and after any prompt changes. Run manually in the OpenAI Playground using the system prompt from prompts/reply.md at temperature 0.4.",
+  "_how_to_run": [
+    "1. Open https://platform.openai.com/playground",
+    "2. Set model to gpt-4o, temperature to 0.4, max tokens to 800.",
+    "3. Paste the SYSTEM PROMPT from prompts/reply.md into the System field.",
+    "4. For each test case, paste the user_prompt into the User field and run.",
+    "5. Compare the output against the expected_output_criteria checklist.",
+    "6. Log any test that fails — note the test ID and failure reason.",
+    "7. If more than 2 tests fail, do not deploy the prompt change."
+  ],
+  "_pass_threshold": "All 12 tests must pass all expected_output_criteria before deploying a reply prompt change.",
+
+  "test_cases": [
+    {
+      "id": "R-01",
+      "label": "Sponsored Post — rate at minimum, known brand",
+      "user_prompt": "Talent name: Sylvia\nTalent minimum rate for this offer type (USD): 1000\nOffer type: Sponsored Post\nBrand name: Sephora\nProposed rate from email (USD): 1000\n\nSOP response template for this offer type:\n---\nThank you for reaching out about a potential partnership with Sylvia!! I'm happy to share her media kit HERE + rates below:\n• 1 TikTok (beauty): $2,000\n• 1 TikTok (fashion): $1,000\n• 1 IG Reel: $850\n• 1 UGC Video: $1,500 (usage to be negotiated)\n\nSylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers!\n\nPlease let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We'd love to explore working together!\n---\n\nSpecial rules for this talent:\n---\nOffers at or above $1,500 for one post: CC Cara. Offers below $1,000: move to Revisit.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nHi Sylvia's team, I'm reaching out from Sephora's influencer marketing department. We're interested in partnering with Sylvia for a sponsored TikTok post for our spring beauty collection. Our budget for this collaboration is $1,000. Please let us know if you'd like to move forward.\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "No unreplaced placeholders (no [BRAND_NAME], [TALENT_NAME], etc.)",
+        "Addresses brand as 'Sephora' at least once",
+        "Mentions 'Sylvia' by name",
+        "Includes rate information from the SOP template",
+        "Does not contain internal routing notes ('CC Cara', 'Move to Revisit')",
+        "Professional, warm tone",
+        "No AI disclaimer or system message",
+        "Does not output 'ESCALATE:'"
+      ]
+    },
+    {
+      "id": "R-02",
+      "label": "Sponsored Post — rate BELOW minimum, counter-offer",
+      "user_prompt": "Talent name: Trin\nTalent minimum rate for this offer type (USD): 2000\nOffer type: Sponsored Post\nBrand name: FashionNova\nProposed rate from email (USD): 500\n\nSOP response template for this offer type:\n---\nThank you for reaching out to Trinity to collab!! However her rates are higher than your offer. I'm happy to share her media kit HERE + rates below:\n• 1 TikTok: $4,000\n• 1 IG Reel: $2,000\n• Podcast Feature: $1,500\n• 1 UGC Video: $1,500 (usage to be negotiated)\n\nTrinity's pricing reflects her 3.3M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any room to expand your budget. We'd love to explore working together!\n---\n\nSpecial rules for this talent:\n---\nDelete commission-only offers. Fan mail goes to Fan Mail folder.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nHi Trinity's team! We're Fashion Nova and we'd love to work with Trinity. Our budget is $500. Let us know if she's interested!\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "No unreplaced placeholders",
+        "Addresses brand as 'Fashion Nova' or 'FashionNova'",
+        "Mentions Trinity's rates clearly",
+        "Does not apologize excessively",
+        "Politely communicates the rate gap",
+        "Invites further discussion",
+        "No internal routing language",
+        "Does not output 'ESCALATE:'"
+      ]
+    },
+    {
+      "id": "R-03",
+      "label": "UGC offer — rate above minimum",
+      "user_prompt": "Talent name: Sam\nTalent minimum rate for this offer type (USD): 1500\nOffer type: UGC\nBrand name: Clean Living Co\nProposed rate from email (USD): 2000\n\nSOP response template for this offer type:\n---\nSam's UGC rate is around $1,500 per video! HERE is her media kit for review.\n\nIf you have this budget I can loop in her team to go through the rest of the details :)\n---\n\nSpecial rules for this talent:\n---\nUGC rate is $1,500 per video. Usage rights can be added for additional cost.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nHi Sam's team, we're Clean Living Co. and we're looking for UGC creators. We'd like 3 videos for $2,000 total. Can Sam create these?\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "No unreplaced placeholders",
+        "Mentions Sam's UGC rate",
+        "Addresses the $2,000 offer appropriately (it's below per-video rate if 3 videos)",
+        "Professional tone",
+        "No internal routing language",
+        "Does not output 'ESCALATE:'"
+      ]
+    },
+    {
+      "id": "R-04",
+      "label": "Affiliate offer — ESCALATE flag triggers correctly",
+      "user_prompt": "Talent name: Angela\nTalent minimum rate for this offer type (USD): 0\nOffer type: Affiliate\nBrand name: TrendingFashionStore\nProposed rate from email (USD): 0\n\nSOP response template for this offer type:\n---\nHi [BRAND_NAME],\n\nThank you for the affiliate opportunity!\n\n[TALENT_NAME] does consider affiliate partnerships on a case-by-case basis. Could you share the commission structure, product details, and average conversion rates?\n\nWe'll review and get back to you shortly.\n\n[TALENT_NAME]'s Team\n---\n\nSpecial rules for this talent:\n---\nOnly accept affiliate deals with commission >= 15%.\n---\n\nAuto-respond flag: ESCALATE\n\nOriginal email from brand:\n---\nHi Angela, we'd like to add you to our affiliate program! 10% commission on all sales. Join today!\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "Output begins with exactly 'ESCALATE:'",
+        "One-sentence reason for escalation provided",
+        "No full reply drafted"
+      ]
+    },
+    {
+      "id": "R-05",
+      "label": "Event Appearance — ESCALATE flag triggers correctly",
+      "user_prompt": "Talent name: Allee\nTalent minimum rate for this offer type (USD): 2000\nOffer type: Event Appearance\nBrand name: Style Summit Events\nProposed rate from email (USD): 2500\n\nSOP response template for this offer type:\n---\nHi [BRAND_NAME],\n\nThanks for the invitation for [TALENT_NAME] to appear at your event!\n\nFor [OFFER_TYPE], [TALENT_NAME]'s rate starts at $[MINIMUM_RATE]. Your current offer of $[PROPOSED_RATE] — let's connect to discuss the event details, expectations, and whether we can align on terms.\n\nPlease share the event date, location, and requirements and we'll follow up promptly.\n\nBest,\n[TALENT_NAME]'s Team\n---\n\nSpecial rules for this talent:\n---\nAll event appearances require manager review regardless of rate.\n---\n\nAuto-respond flag: ESCALATE\n\nOriginal email from brand:\n---\nDear Allee's management, we'd love to invite Allee to the Style Summit 2026 in LA. Appearance fee is $2,500 plus travel covered. Event is June 14th.\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "Output begins with exactly 'ESCALATE:'",
+        "One-sentence reason mentions manager review or event appearance policy",
+        "No full reply drafted"
+      ]
+    },
+    {
+      "id": "R-06",
+      "label": "PR request — no proposed rate, brand sends product",
+      "user_prompt": "Talent name: Colleen\nTalent minimum rate for this offer type (USD): 0\nOffer type: Other\nBrand name: Charlotte Tilbury\nProposed rate from email (USD): 0\n\nSOP response template for this offer type:\n---\nHi [BRAND_NAME],\n\nThank you for reaching out about a potential collaboration with [TALENT_NAME]!\n\nCould you share more details about what you have in mind — including deliverables, timeline, usage rights, and your proposed budget? This will help us give you a proper response.\n\nLooking forward to learning more!\n\n[TALENT_NAME]'s Team\n---\n\nSpecial rules for this talent:\n---\nPR gifting: respond with shipping address. Address is managed separately — do not include address in this reply. Ask brand to confirm shipping timeline.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nHi Colleen's team, we're Charlotte Tilbury's PR team and we'd love to gift Colleen our new collection. No posting commitment needed. Please share her shipping address!\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "No unreplaced placeholders",
+        "Does NOT include a physical mailing address in the reply",
+        "Acknowledges the PR gifting request",
+        "Requests confirmation of shipping timeline or additional details",
+        "Professional tone",
+        "Mentions Charlotte Tilbury",
+        "Does not output 'ESCALATE:'"
+      ]
+    },
+    {
+      "id": "R-07",
+      "label": "No rate mentioned in email — reply handles gracefully",
+      "user_prompt": "Talent name: Kylika\nTalent minimum rate for this offer type (USD): 400\nOffer type: Sponsored Post\nBrand name: NovaSkin Cosmetics\nProposed rate from email (USD): 0\n\nSOP response template for this offer type:\n---\nThank you for reaching out! I'm happy to share Kylika's rates below:\n• 1 TikTok: $500\n• 1 IG Reel: $450\n• 1 UGC Video: $600\n\nKylika's content drives strong conversion for beauty brands. Please let us know what type of collab you're looking for and if you have any questions. We'd love to explore working together!\n---\n\nSpecial rules for this talent:\n---\nNo special rules.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nDear Kylika's management, we're NovaSkin Cosmetics and we'd love to partner with Kylika. Could you share her rates and availability for a campaign this summer?\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "No unreplaced placeholders",
+        "Includes Kylika's rate information",
+        "Does not reference '[PROPOSED_RATE]' or '0' as a rate in the text",
+        "Handles the 'no rate mentioned' case naturally",
+        "Professional and warm tone"
+      ]
+    },
+    {
+      "id": "R-08",
+      "label": "Bundle inquiry — includes bundle pricing in reply",
+      "user_prompt": "Talent name: Britt\nTalent minimum rate for this offer type (USD): 900\nOffer type: Sponsored Post\nBrand name: HomeEssentials\nProposed rate from email (USD): 0\n\nSOP response template for this offer type:\n---\nBritt's standard rate is $1,250 per video! Below is her bundle pricing:\n\n3 videos (90%) → $3,350\n5 videos (85%) → $5,300\n10 videos (75%) → $9,350\n\nWe've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!\n---\n\nSpecial rules for this talent:\n---\nBundle: if brand agrees to at least $700/video, CC Chenni. If brand cannot budge, move to Revisit.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nHi Britt's team! We love Britt's content and we'd love to explore a multi-video partnership with her. We have budget for 3-5 videos. Can you share bundle pricing?\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "No unreplaced placeholders",
+        "Includes bundle pricing table from the SOP template",
+        "Mentions Britt's standard per-video rate",
+        "Does not include internal routing ('CC Chenni', 'Move to Revisit')",
+        "Warm, inviting tone",
+        "Does not output 'ESCALATE:'"
+      ]
+    },
+    {
+      "id": "R-09",
+      "label": "Auto-respond flag is NO — system should have escalated, not called reply prompt",
+      "user_prompt": "Talent name: Trin\nTalent minimum rate for this offer type (USD): 0\nOffer type: Affiliate\nBrand name: AffiliateNet\nProposed rate from email (USD): 0\n\nSOP response template for this offer type:\n---\nCommission-only offers are not accepted by Trinity. No reply needed.\n---\n\nSpecial rules for this talent:\n---\nDelete commission-only offers immediately. Do not reply.\n---\n\nAuto-respond flag: NO\n\nOriginal email from brand:\n---\nHi Trinity, join our affiliate program and earn commissions!\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "If this prompt is somehow called with NO flag, the AI should output 'ESCALATE:' or decline to draft",
+        "Should NOT draft a full reply",
+        "Note: In production, the Make router should prevent this call when flag = NO. This test validates the AI as a secondary safety net."
+      ],
+      "_note": "This case should never reach the reply prompt in production — the Make router filters NO flags before calling the AI. This test confirms the AI handles it gracefully as a backup."
+    },
+    {
+      "id": "R-10",
+      "label": "Michaela — offer above $4,000 (high-value escalation)",
+      "user_prompt": "Talent name: Michaela\nTalent minimum rate for this offer type (USD): 3500\nOffer type: Sponsored Post\nBrand name: Louis Vuitton\nProposed rate from email (USD): 8000\n\nSOP response template for this offer type:\n---\nHi,\n\nThank you for the offer! I think this collab could be a good fit for Michaela. Looping her in management team who can move forward with this convo!\n---\n\nSpecial rules for this talent:\n---\nOffers above $4,000: CC Cara. Offers at or below $4,000: CC Chenni. Offers below $1,000: move to Revisit.\n---\n\nAuto-respond flag: ESCALATE\n\nOriginal email from brand:\n---\nDear Michaela's management, Louis Vuitton is interested in partnering with Michaela for our SS26 campaign. Our budget is $8,000 for a TikTok and Instagram Reel. Please advise on next steps.\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "Output begins with 'ESCALATE:'",
+        "Reason mentions high-value offer or manager routing",
+        "Does NOT draft a full reply without manager involvement",
+        "No internal 'CC Cara' language in any drafted text"
+      ]
+    },
+    {
+      "id": "R-11",
+      "label": "Story offer — short format, brief reply",
+      "user_prompt": "Talent name: Lizz\nTalent minimum rate for this offer type (USD): 600\nOffer type: Story\nBrand name: Zara\nProposed rate from email (USD): 700\n\nSOP response template for this offer type:\n---\nHi [BRAND_NAME],\n\nThanks for thinking of [TALENT_NAME]! We're always open to Story collaborations.\n\nFor a [OFFER_TYPE], [TALENT_NAME]'s rate is $[MINIMUM_RATE]. Your offer of $[PROPOSED_RATE] — let's talk and see if we can make the numbers work.\n\nPlease share campaign details and timeline and we'll get back to you quickly.\n\nBest,\n[TALENT_NAME]'s Team\n---\n\nSpecial rules for this talent:\n---\nNo special rules.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nHi Lizz's team, Zara here! We'd love to do an Instagram Story collaboration with Lizz. We can offer $700 for one Story set. Interested?\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "All four placeholders replaced: BRAND_NAME=Zara, TALENT_NAME=Lizz, OFFER_TYPE=Story, MINIMUM_RATE=600, PROPOSED_RATE=700",
+        "No unreplaced bracket placeholders remaining",
+        "Warm, brief tone appropriate for a Story collab",
+        "Does not output 'ESCALATE:'"
+      ]
+    },
+    {
+      "id": "R-12",
+      "label": "GPT returns invented specifics — must NOT happen",
+      "user_prompt": "Talent name: Anastasiya\nTalent minimum rate for this offer type (USD): 600\nOffer type: Sponsored Post\nBrand name: H&M\nProposed rate from email (USD): 900\n\nSOP response template for this offer type:\n---\nThank you for reaching out about a potential partnership with Anastasiya!! I'm happy to share her rates below:\n• 1 TikTok: $800\n• 1 IG Reel: $700\n• 1 UGC Video: $1,000 (usage to be negotiated)\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions. We'd love to explore working together!\n---\n\nSpecial rules for this talent:\n---\nNo special rules.\n---\n\nAuto-respond flag: YES\n\nOriginal email from brand:\n---\nHi Anastasiya's team, H&M here! We'd love to do a sponsored TikTok post with her for our spring collection. Budget is $900. Can she post by April 30?\n---\n\nDraft the reply now. Output only the finished email text.",
+      "expected_output_criteria": [
+        "No unreplaced placeholders",
+        "Does NOT invent specific dates not explicitly agreed to (e.g., does not say 'Yes she can post by April 30')",
+        "Does NOT commit to specific deliverables beyond what the template covers",
+        "Does NOT add follower counts or statistics not in the template",
+        "Professional, warm, appropriately non-committal on timeline",
+        "Does not output 'ESCALATE:'"
+      ]
+    }
+  ]
+}
