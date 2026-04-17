@@ -62,6 +62,21 @@ def test_triage_returns_two_messages():
     assert msgs[1]["role"] == "user"
 
 
+def test_triage_rate_note_injected_when_provided():
+    """A non-empty rate_note should appear in the user message."""
+    msgs = _build_triage_messages(
+        "Katrina D", 150, "Subj", "a@b.com", "b.com", "body",
+        rate_note="This talent's rate is per hour.",
+    )
+    assert "per hour" in msgs[1]["content"]
+
+
+def test_triage_no_rate_note_by_default():
+    """No SPECIAL RATE NOTE section when rate_note is omitted."""
+    msgs = _build_triage_messages("Sam", 700, "Subj", "a@b.com", "b.com", "body")
+    assert "SPECIAL RATE NOTE" not in msgs[1]["content"]
+
+
 # ── Special routing ────────────────────────────────────────────────────────────
 
 def test_trin_commission_only_overrides_to_score1():
@@ -98,6 +113,41 @@ def test_michaela_zero_rate_not_overridden_by_floor():
 def test_other_talent_not_affected():
     policy = {"special_talent_routing": {}}
     result = _apply_special_routing("Colleen", 3, "Sponsored Post", 100.0, policy)
+    assert result == 3
+
+
+def test_katrina_score3_high_rate_unchanged():
+    """Katrina: rate > $650 — score stays 3 (reply engine will escalate to Cara)."""
+    policy = {"special_talent_routing": {}}
+    result = _apply_special_routing("Katrina", 3, "Sponsored Post", 700.0, policy)
+    assert result == 3
+
+
+def test_katrina_score3_low_rate_unchanged():
+    """Katrina: rate ≤ $650 — score stays 3 (reply engine will escalate to Chenni)."""
+    policy = {"special_talent_routing": {}}
+    result = _apply_special_routing("Katrina", 3, "Sponsored Post", 400.0, policy)
+    assert result == 3
+
+
+def test_katrina_score3_unknown_rate_unchanged():
+    """Katrina: unknown rate (0) — score stays 3."""
+    policy = {"special_talent_routing": {}}
+    result = _apply_special_routing("Katrina", 3, "Sponsored Post", 0.0, policy)
+    assert result == 3
+
+
+def test_katrina_score1_not_affected():
+    """Katrina: score-1 offers are not upgraded."""
+    policy = {"special_talent_routing": {}}
+    result = _apply_special_routing("Katrina", 1, "Sponsored Post", 800.0, policy)
+    assert result == 1
+
+
+def test_katrinad_score_unchanged():
+    """KatrinaD: no hard score override — enriched prompt handles hourly logic."""
+    policy = {"special_talent_routing": {}}
+    result = _apply_special_routing("KatrinaD", 3, "Sponsored Post", 500.0, policy)
     assert result == 3
 
 
@@ -194,3 +244,46 @@ def test_triage_trin_commission_override(mock_openai_cls):
     )
     result = triage_email("Trin", "Trinity", 2000, "Subj", "a@b.com", "b.com", "body")
     assert result["score"] == 1
+
+
+@patch("backend.services.triage.OpenAI")
+def test_triage_katrina_score3_preserved(mock_openai_cls):
+    """Katrina Score-3 offers are NOT overridden — reply engine handles escalation."""
+    mock_client = MagicMock()
+    mock_openai_cls.return_value = mock_client
+    mock_client.chat.completions.create.return_value = _mock_openai_response(
+        3, proposed_rate=800.0
+    )
+    result = triage_email("Katrina", "Katrina", 300, "Collab", "brand@nike.com", "nike.com", "body")
+    assert result["score"] == 3
+
+
+@patch("backend.services.triage.OpenAI")
+def test_triage_katrinad_rate_note_in_prompt(mock_openai_cls):
+    """KatrinaD triage call includes a SPECIAL RATE NOTE about per-hour pricing."""
+    mock_client = MagicMock()
+    mock_openai_cls.return_value = mock_client
+    mock_client.chat.completions.create.return_value = _mock_openai_response(3, proposed_rate=200.0)
+
+    triage_email("KatrinaD", "Katrina D", 150, "Livestream collab", "brand@sephora.com", "sephora.com", "body")
+
+    call_args = mock_client.chat.completions.create.call_args
+    messages = call_args.kwargs.get("messages") or call_args.args[0] if call_args.args else call_args.kwargs["messages"]
+    user_msg = next(m["content"] for m in messages if m["role"] == "user")
+    assert "per hour" in user_msg.lower()
+    assert "SPECIAL RATE NOTE" in user_msg
+
+
+@patch("backend.services.triage.OpenAI")
+def test_triage_standard_talent_no_rate_note(mock_openai_cls):
+    """Standard per-video talent prompt does not contain a SPECIAL RATE NOTE."""
+    mock_client = MagicMock()
+    mock_openai_cls.return_value = mock_client
+    mock_client.chat.completions.create.return_value = _mock_openai_response(3)
+
+    triage_email("Sylvia", "Sylvia", 1000, "Partnership", "brand@nike.com", "nike.com", "body")
+
+    call_args = mock_client.chat.completions.create.call_args
+    messages = call_args.kwargs.get("messages") or call_args.args[0] if call_args.args else call_args.kwargs["messages"]
+    user_msg = next(m["content"] for m in messages if m["role"] == "user")
+    assert "SPECIAL RATE NOTE" not in user_msg

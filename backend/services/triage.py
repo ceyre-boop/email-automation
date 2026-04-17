@@ -46,8 +46,13 @@ def _build_triage_messages(
     sender: str,
     sender_domain: str,
     body: str,
+    rate_note: str = "",
 ) -> list[dict]:
-    """Parse the triage.md prompt and fill in template variables."""
+    """Parse the triage.md prompt and fill in template variables.
+
+    rate_note: Optional extra instruction appended to the user message for
+    talents whose rate unit differs from the default (e.g. per-hour vs per-video).
+    """
     raw = get_settings().triage_prompt
     system_text, user_template = _parse_prompt_sections(raw)
 
@@ -60,6 +65,9 @@ def _build_triage_messages(
         .replace("{{SENDER_DOMAIN}}", sender_domain)
         .replace("{{EMAIL_BODY}}", body[:4000])  # Guard against massive emails
     )
+
+    if rate_note:
+        user_text += f"\n\nSPECIAL RATE NOTE: {rate_note}"
 
     return [
         {"role": "system", "content": system_text},
@@ -77,16 +85,41 @@ def _apply_special_routing(
     policy: dict,
 ) -> int:
     """Apply per-talent overrides from confidence_policy.json special_talent_routing."""
-    special = policy.get("special_talent_routing", {})
 
     if talent_key == "Trin":
-        rule = special.get("Trin", {})
-        if (
-            "affiliate" in offer_type.lower()
-            and proposed_rate == 0
-        ):
+        if "affiliate" in offer_type.lower() and proposed_rate == 0:
             logger.info("Trin commission-only override → Score 1")
             return 1
+
+    if talent_key == "Katrina":
+        # Dual-manager escalation: all Score-3 offers are escalated at the reply stage.
+        # Rate > $650 → CC Cara; rate ≤ $650 (or unknown) → CC Chenni.
+        # No score change here — score-3 proceeds to the reply engine which applies
+        # the SOP escalation. Logged so the routing intent is visible in server logs.
+        if score == 3:
+            if proposed_rate > 650:
+                logger.info(
+                    "Katrina dual-manager rule: rate $%s > $650 threshold → "
+                    "reply engine will escalate to Cara",
+                    proposed_rate,
+                )
+            else:
+                logger.info(
+                    "Katrina dual-manager rule: rate $%s ≤ $650 (or unknown) → "
+                    "reply engine will escalate to Chenni",
+                    proposed_rate,
+                )
+
+    if talent_key == "KatrinaD":
+        # Hourly-rate interpretation: all KatrinaD offers are priced per hour.
+        # The minimum_rate in settings is already set to the hourly floor ($150/hr).
+        # GPT receives a SPECIAL RATE NOTE (injected by triage_email) instructing it
+        # to interpret rates as per-hour. If GPT cannot determine the hourly rate
+        # from the email (flat fee with no hours mentioned), it should return Score 2.
+        # No hard score override here — we trust the enriched prompt; log for visibility.
+        logger.debug(
+            "KatrinaD hourly-rate triage: proposed_rate=%s (per hour)", proposed_rate
+        )
 
     if talent_key == "Michaela":
         if proposed_rate > 0 and proposed_rate < 1000:
@@ -124,6 +157,22 @@ def triage_email(
     cfg = settings.app_config.get("openai", {})
     policy = settings.confidence_policy
 
+    # Build a per-hour rate note for talents whose rate unit is not "per video".
+    # This is critical for KatrinaD (per hour) so GPT interprets offered amounts correctly.
+    talent_cfg = next(
+        (t for t in settings.app_config.get("talents", []) if t.get("key") == talent_key),
+        {},
+    )
+    rate_unit = talent_cfg.get("rate_unit", "per video")
+    rate_note = (
+        f"This talent's rate is {rate_unit}. The minimum rate listed above is "
+        f"{rate_unit}. Interpret all offered amounts accordingly. "
+        "If an offer quotes a flat fee without specifying hours, respond with Score 2 "
+        "because the effective hourly rate cannot be determined."
+        if rate_unit != "per video"
+        else ""
+    )
+
     messages = _build_triage_messages(
         talent_name=talent_name,
         minimum_rate=minimum_rate,
@@ -131,6 +180,7 @@ def triage_email(
         sender=sender,
         sender_domain=sender_domain,
         body=body,
+        rate_note=rate_note,
     )
 
     client = OpenAI(api_key=settings.openai_api_key)
