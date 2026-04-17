@@ -1,0 +1,41 @@
+# Environment secrets — NEVER commit these
+.env
+*.env
+secrets/
+backend/secrets/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+.tox/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# Node (scripts/preflight_validator.js)
+node_modules/
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Railway / Render build artifacts
+.nixpacks/
