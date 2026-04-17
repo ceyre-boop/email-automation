@@ -94,25 +94,22 @@ Someone modified the structure of the master log or SOP matrix Google Sheet — 
 
 1. Open the master log Google Sheet.
 2. Compare the headers in row 1 to `sheets/master_log_template.csv`.
-3. Required headers in exact order: `Timestamp, Talent Name, Sender Email, Sender Domain, Subject, AI Score, AI Score Label, Offer Type, Proposed Rate (USD), Action Taken, Reply Sent, Gmail Thread Link, Notes`.
+3. Required headers in exact order: `Timestamp, Talent Name, Sender Email, Sender Domain, Subject, AI Score, AI Score Label, Offer Type, Brand Name, Proposed Rate (USD), Action Taken, Reply Sent, Gmail Thread Link, Notes`.
 4. If any header was renamed or deleted: restore it to the exact name from the template.
 5. If a column was moved: the Make module maps by column name, so order doesn't matter — as long as names are exact.
 6. After fixing: go to Make → Scenarios → run the affected scenario once to confirm writes succeed.
 
 ### Recovery Steps — SOP Matrix Schema Drift
 
-1. Open Britney's SOP matrix Google Sheet.
+1. Open the SOP matrix Google Sheet.
 2. For the affected talent's tab, compare column headers to `sheets/sop_matrix_template.csv`.
-3. Required headers: `Offer Type, Minimum Rate, Response Template, Auto-Respond Flag, Brand Blacklist, Special Rules`.
-4. The Make automation reads columns A–F positionally (not by name). If columns were inserted or reordered:
-   - **Column A must be Offer Type**
-   - **Column B must be Minimum Rate**
-   - **Column C must be Response Template**
-   - **Column D must be Auto-Respond Flag**
-   - **Column E must be Brand Blacklist**
-   - **Column F must be Special Rules**
-5. Restore the column order if any columns were moved.
-6. After fixing: trigger a test in Make to confirm the SOP data is being read correctly.
+3. Required headers: `Trigger / Scenario` (col A) and `Response / Action` (col B).
+4. The Make automation reads all rows in columns A:B and passes them to GPT as context. If columns were renamed, reordered, or split into more columns:
+   - **Column A must be `Trigger / Scenario`**
+   - **Column B must be `Response / Action`**
+5. Restore the column names and order if any columns were modified.
+6. Also check that response cells do not mix email templates with internal action instructions in the same cell — action instructions should be the entire cell content (e.g. "Move to Revisit") not appended to reply text.
+7. After fixing: trigger a test in Make (Phase 2 — Draft-Reply Engine) to confirm the SOP data is being read and passed to GPT correctly.
 
 ### Prevention
 - Protect the header rows in both Google Sheets (right-click row → Protect range → set permissions to "Only you").

@@ -27,7 +27,7 @@
     "batch_1_post_pilot": {
       "inboxes": ["Sylvia", "Britt", "Allee"],
       "description": "High-GMV fashion and beauty creators. Activate after pilot is confirmed stable.",
-      "prerequisite": "Pilot cohort (Trin, Sam, Colleen) confirmed stable for 48 hours"
+      "prerequisite": "Pilot inbox (Katrina) confirmed stable for 48 hours"
     },
     "batch_2": {
       "inboxes": ["Lizz", "Katrina", "Jenn", "Angela"],
@@ -57,15 +57,15 @@
     },
 
     "Sylvia":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
-    "Trin":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate after Katrina pilot is confirmed stable" },
-    "Sam":         { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate after Katrina pilot is confirmed stable" },
+    "Trin":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate in Batch 1 after Katrina pilot is confirmed stable" },
+    "Sam":         { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate in Batch 1 after Katrina pilot is confirmed stable" },
     "Britt":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Allee":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Multi-account complexity — review confidence_policy.json before Phase 2" },
     "Lizz":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Katrina":     { "phase1_triage": "pilot", "phase2_reply": "pilot", "notes": "ACTIVE TEST INBOX — katrina@taboost.me. Phase 2 in DRAFT MODE (saves drafts, does not send). Dual manager escalation — set Auto-Respond Flag = ESCALATE for all rows until routing confirmed" },
     "Jenn":        { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Angela":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
-    "Colleen":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate after Katrina pilot is confirmed stable" },
+    "Colleen":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "Not in pilot — activate in Batch 1 after Katrina pilot is confirmed stable" },
     "Alana":       { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Grayson":     { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },
     "Kylika":      { "phase1_triage": "inactive", "phase2_reply": "inactive", "notes": "" },

@@ -479,22 +479,13 @@ if (!fs.existsSync(SOP_TEMPLATE_PATH)) {
   const csv = fs.readFileSync(SOP_TEMPLATE_PATH, "utf8");
   const headerRow = csv.split("\n")[0];
   const REQUIRED_COLUMNS = [
-    "Offer Type", "Minimum Rate", "Response Template",
-    "Auto-Respond Flag", "Brand Blacklist", "Special Rules",
+    "Trigger / Scenario", "Response / Action",
   ];
   for (const col of REQUIRED_COLUMNS) {
     if (!headerRow.includes(col)) {
       fail(`SOP template has column "${col}"`, `Column missing from sheets/sop_matrix_template.csv header.`);
     } else {
       ok(`SOP template column "${col}" present`);
-    }
-  }
-  for (const offerType of VALID_OFFER_TYPES) {
-    if (!csv.includes(offerType)) {
-      warn(
-        `SOP template has a row for offer type "${offerType}"`,
-        "Add a row for this offer type or the system will fall back to 'Other'."
-      );
     }
   }
 }
@@ -511,7 +502,7 @@ if (!fs.existsSync(LOG_TEMPLATE_PATH)) {
   const headerRow = csv.split("\n")[0];
   const REQUIRED_COLUMNS = [
     "Timestamp", "Talent Name", "Sender Email", "Sender Domain", "Subject",
-    "AI Score", "AI Score Label", "Offer Type", "Proposed Rate (USD)",
+    "AI Score", "AI Score Label", "Offer Type", "Brand Name", "Proposed Rate (USD)",
     "Action Taken", "Reply Sent", "Gmail Thread Link", "Notes",
   ];
   for (const col of REQUIRED_COLUMNS) {
