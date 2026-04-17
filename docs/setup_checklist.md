@@ -80,7 +80,8 @@ Repeat for all 16 scenarios:
 
 ## Step 5 — Testing Phase 1 (before activating any inbox)
 
-- [ ] **Activate Katrina's scenario only** (`make/scenarios/phase1_Katrina.json`)
+- [ ] **Activate Katrina's Phase 1 scenario** (`make/scenarios/phase1_Katrina.json`)
+- [ ] **Activate Katrina's Phase 2 scenario** (`make/scenarios/phase2_Katrina.json`) — both phases must be active for the full test to work
 - [ ] Send 3–5 test emails to `katrina@taboost.me` (mix of obvious spam, legit brand inquiries, and edge cases)
 - [ ] Check the Master Log — verify scores, labels, and actions look correct
 - [ ] Confirm Score 1 emails land in Gmail Trash (not permanently deleted)

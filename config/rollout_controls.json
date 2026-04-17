@@ -30,7 +30,7 @@
       "prerequisite": "Pilot inbox (Katrina) confirmed stable for 48 hours"
     },
     "batch_2": {
-      "inboxes": ["Lizz", "Katrina", "Jenn", "Angela"],
+      "inboxes": ["Lizz", "Jenn", "Angela"],
       "description": "Fashion-focused mid-range creators.",
       "prerequisite": "Batch 1 confirmed stable for 24 hours"
     },

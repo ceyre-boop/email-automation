@@ -164,7 +164,7 @@
   },
 
   "_TODO_checklist": [
-    "Replace all [MASTER_LOG_SHEET_ID] (3 places) with the master log Google Sheet ID",
+    "Replace all [MASTER_LOG_SHEET_ID] (4 places) with the master log Google Sheet ID",
     "Set 'Google Sheets - Talent Automation' connection in Make for modules 1, 4, and 6",
     "Set 'OpenAI - Talent Automation' connection in Make for module 2",
     "Set 'Gmail - Katrina' connection in Make for module 5 (must be OAuth for katrina@taboost.me)",
