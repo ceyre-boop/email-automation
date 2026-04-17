@@ -78,38 +78,51 @@ Repeat for all 16 scenarios:
 
 ---
 
-## Step 5 — Testing Phase 1 (before activating any inbox)
+## Step 5 — Activate Katrina's Phase 1 and Phase 2 Scenarios
 
-- [ ] **Activate Katrina's Phase 1 scenario** (`make/scenarios/phase1_Katrina.json`)
-- [ ] **Activate Katrina's Phase 2 scenario** (`make/scenarios/phase2_Katrina.json`) — both phases must be active for the full test to work
-- [ ] Send 3–5 test emails to `katrina@taboost.me` (mix of obvious spam, legit brand inquiries, and edge cases)
-- [ ] Check the Master Log — verify scores, labels, and actions look correct
-- [ ] Confirm Score 1 emails land in Gmail Trash (not permanently deleted)
-- [ ] Confirm Score 3 emails are logged as `queued for reply`
-- [ ] Tune `prompts/triage.md` if misclassifications appear
-- [ ] After 48h clean run → activate remaining 15 inboxes (after Marco approves expansion)
+- [ ] **Activate Katrina's Phase 1 scenario** (`make/scenarios/phase1_Katrina.json`) in Make
+- [ ] **Activate Katrina's Phase 2 scenario** (`make/scenarios/phase2_Katrina.json`) in Make — both phases must be active for the full pipeline to work
+
+**How the flow works:**
+1. A brand sends an email TO `katrina@taboost.me`
+2. Phase 1 fires instantly — scores it (1 = trash, 2 = uncertain, 3 = respond) and logs it to the Master Log
+3. Score 1 → moved to Gmail Trash (not permanently deleted). Score 2 → logged, flagged for human review. Score 3 → logged as "queued for reply"
+4. Phase 2 runs on its 5-minute schedule — finds "queued for reply" rows, generates a draft reply, and saves it as a Gmail Draft **FROM katrina@taboost.me back to the original brand sender**
+5. Nothing is ever sent automatically — drafts sit in `katrina@taboost.me` Gmail Drafts folder until a supervisor reviews and sends manually
+
+- [ ] After activating both scenarios: check the Master Log after the next brand email arrives — confirm Score, Brand Name, Offer Type, and Action Taken are logged correctly
+- [ ] Check `katrina@taboost.me` Gmail Drafts folder — confirm AI drafts appear there (not in Sent) addressed to the original brand
+- [ ] Check `katrina@taboost.me` Gmail Trash — confirm Score 1 emails land there
+
+> **To run a sample of 30 existing inbox emails:** In Make, on Phase 1, go to Run Once → it will process existing unread INBOX emails. Or manually trigger Phase 1 against existing threads by setting `labelIds` to `["INBOX"]` temporarily.
 
 ---
 
-## Step 6 — Phase 2 Activation (Draft-Reply)
+## Step 6 — Phase 2 Import and Functionality Test
 
-> **DRAFT MODE:** Phase 2 saves AI-drafted replies as **Gmail Drafts** — nothing is sent automatically. Supervisor reviews each draft in the talent's Gmail Drafts folder and decides whether to send, edit, or discard it. This mode runs for approximately 1 month until Marco approves full autonomous operation.
+> **DRAFT MODE:** Phase 2 saves AI-drafted replies as **Gmail Drafts in katrina@taboost.me** — nothing is sent automatically. The drafts are addressed FROM Katrina back to the brand that emailed her. Supervisor reviews each draft in the Drafts folder and decides whether to send, edit, or discard.
 
-### For the Katrina functionality test (do this first):
+### Import Phase 2 for Katrina:
 
 - [ ] Import **`make/scenarios/phase2_Katrina.json`** into Make
-  - This file has all of Katrina's SOP rules embedded directly in the GPT prompt — no SOP sheet lookup needed
-  - Fill in `[MASTER_LOG_SHEET_ID]` (appears 3 times in the file)
+  - Master Log Sheet ID is already filled in — no replacements needed
   - Set the 3 connections: `Google Sheets - Talent Automation`, `OpenAI - Talent Automation`, `Gmail - Katrina`
-  - Set the schedule to run every 5 minutes
-- [ ] Activate both Katrina scenarios (Phase 1 + Phase 2)
-- [ ] Send 3 test emails to `katrina@taboost.me`:
-  - **Good email**: real brand name, offer > $600 → should Score 3, save a draft that says "Looping in management..."
-  - **Low offer email**: real brand, offer < $300 → should Score 3, save a draft with the counter-rate response
-  - **Trash email**: obvious spam, prize win, or personal Gmail domain → should Score 1, archived immediately
-- [ ] After each email, check the Master Log — verify scores, actions, and Brand Name are logged
-- [ ] Check Gmail Drafts in katrina@taboost.me — confirm the AI draft matches the correct SOP template
-- [ ] To run a sample of 30 real inbox emails: temporarily change Phase 1 Gmail trigger `labelIds` to `["INBOX"]` and manually trigger runs
+  - Set the schedule to every 5 minutes
+- [ ] Activate the Phase 2 scenario
+
+### What to verify after activation:
+
+- [ ] A brand email arrives in `katrina@taboost.me` inbox → Phase 1 scores it → appears in Master Log
+- [ ] If Score 3: within 5 minutes → Phase 2 runs → a draft reply appears in `katrina@taboost.me` **Gmail Drafts** (NOT Sent) addressed to the brand
+- [ ] Open the draft — confirm it uses the correct SOP response template for that scenario (rates counter, bundle pricing, high-value escalation, etc.)
+- [ ] If Score 1: email should be in Gmail Trash — confirm it is NOT in the inbox
+- [ ] The `Brand Name` column in the Master Log is populated from the AI triage
+
+### To run the 30-email sample:
+
+- [ ] In Make, open Phase 1 — click **Run Once**. Make will process emails currently in the inbox and trigger the full pipeline for each one
+- [ ] Review Master Log rows for all processed emails
+- [ ] Review Gmail Drafts folder — there should be one draft per Score 3 email
 
 ### For full rollout (after Katrina test passes):
 

@@ -1,13 +1,13 @@
 {
-  "_README": "Make Scenario Blueprint — Phase 2: Draft-Reply Engine — Katrina (katrina@taboost.me). Import this into Make for the functionality test. Requires: (1) Master Log Google Sheet ID, (2) Google Sheets connection, (3) OpenAI connection, (4) Gmail - Katrina connection. No SOP sheet lookup needed — all of Katrina's SOP rules are embedded directly in the GPT prompt.",
+  "_README": "Make Scenario Blueprint — Phase 2: Draft-Reply Engine — Katrina (katrina@taboost.me). Import this into Make for the functionality test. Requires: (1) Google Sheets connection, (2) OpenAI connection, (3) Gmail - Katrina connection. Master Log Sheet ID is already filled in. No SOP sheet lookup needed — all of Katrina's SOP rules are embedded directly in the GPT prompt.",
   "_import_instructions": [
     "1. In Make, go to Scenarios > Create a new scenario.",
     "2. Click the three-dot menu > Import Blueprint.",
     "3. Paste this JSON.",
     "4. Set the 3 connections: 'Google Sheets - Talent Automation', 'OpenAI - Talent Automation', 'Gmail - Katrina'.",
-    "5. Replace all [MASTER_LOG_SHEET_ID] with your Master Log Google Sheet ID.",
+    "5. Master Log Sheet ID is already filled in (14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8) — no replacements needed.",
     "6. Set the schedule to run every 5 minutes.",
-    "7. DRAFT MODE: replies are saved as Gmail Drafts in katrina@taboost.me — nothing is sent automatically."
+    "7. DRAFT MODE: Phase 2 reads emails FROM brands in katrina@taboost.me's inbox and saves draft replies FROM katrina@taboost.me back to those senders. Nothing is sent automatically."
   ],
 
   "name": "Phase 2 — Draft-Reply Engine — Katrina",
@@ -20,7 +20,7 @@
       "parameters": {
         "connection": "Google Sheets - Talent Automation",
         "_connection_comment": "TODO: Set this to your Google Sheets Make connection named 'Google Sheets - Talent Automation'.",
-        "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+        "spreadsheetId": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
         "_spreadsheetId_comment": "TODO: Fill in the master log Google Sheet ID from config/settings.json → google_sheets.master_log_sheet_id.",
         "sheetName": "Master Log",
         "filter": {
@@ -78,7 +78,7 @@
               "version": 1,
               "parameters": {
                 "connection": "Google Sheets - Talent Automation",
-                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "spreadsheetId": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
                 "sheetName": "Master Log",
                 "rowNumber": "{{1.rowNumber}}",
                 "values": {
@@ -123,7 +123,7 @@
               "version": 1,
               "parameters": {
                 "connection": "Google Sheets - Talent Automation",
-                "spreadsheetId": "[MASTER_LOG_SHEET_ID]",
+                "spreadsheetId": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
                 "sheetName": "Master Log",
                 "rowNumber": "{{1.rowNumber}}",
                 "values": {
@@ -164,14 +164,14 @@
   },
 
   "_TODO_checklist": [
-    "Replace all [MASTER_LOG_SHEET_ID] (4 places) with the master log Google Sheet ID",
+    "Master Log Sheet ID already filled in (14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8) — no replacements needed",
     "Set 'Google Sheets - Talent Automation' connection in Make for modules 1, 4, and 6",
     "Set 'OpenAI - Talent Automation' connection in Make for module 2",
     "Set 'Gmail - Katrina' connection in Make for module 5 (must be OAuth for katrina@taboost.me)",
     "Set scenario schedule to every 5 minutes in Make",
+    "HOW IT WORKS: Phase 1 watches katrina@taboost.me inbox for new emails FROM brands. Phase 2 runs on a schedule, finds Score 3 emails logged as 'queued for reply', and saves a draft reply FROM katrina@taboost.me back to the original sender. Nothing is sent — drafts land in Gmail Drafts folder.",
     "DRAFT MODE is active — all replies land in katrina@taboost.me Gmail Drafts folder, NOT Sent",
-    "Test by sending 3 emails to katrina@taboost.me: 1 good brand offer (>$600), 1 rate inquiry (no offer), 1 low offer (<$300)",
-    "Check master log after each email: Score 1 = archived, Score 2 = flagged, Score 3 = queued for reply, then draft saved",
+    "After activation: check master log after incoming brand emails arrive — Score 1 = archived, Score 2 = flagged, Score 3 = queued for reply, then draft saved",
     "Review drafts in Gmail Drafts — confirm they match the correct SOP template",
     "After test passes: run sample of 30 real inbox emails or expand to full inbox"
   ]

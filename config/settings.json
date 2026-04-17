@@ -40,8 +40,8 @@
   },
 
   "google_sheets": {
-    "master_log_sheet_id": "",
-    "_master_log_sheet_id_comment": "TODO: Paste the Google Sheet ID for the master activity log (from the URL: docs.google.com/spreadsheets/d/SHEET_ID/edit).",
+    "master_log_sheet_id": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
+    "_master_log_sheet_id_comment": "Master Activity Log Google Sheet (provided 2026-04-17). Tab name: 'Master Log'.",
     "master_log_tab_name": "Master Log",
     "sop_matrix_sheet_id": "1NCH4BClugnuGwvDX3NR0cyw5kP1XElyvpjmvEjEnAyQ",
     "_sop_matrix_sheet_id_comment": "TODO: Paste the Google Sheet ID for the SOP matrix. See sheets/sop_data.json for the full SOP data already extracted from the uploaded XLSX."
