@@ -18,10 +18,10 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.models.db import Draft, DraftStatus, TalentToken
-from backend.routers.deps import get_db
+from backend.routers.deps import get_db, verify_api_key
 from backend.services import gmail as gmail_svc
 
-router = APIRouter(prefix="/api/drafts", tags=["drafts"])
+router = APIRouter(prefix="/api/drafts", tags=["drafts"], dependencies=[Depends(verify_api_key)])
 logger = logging.getLogger(__name__)
 
 

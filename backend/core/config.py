@@ -39,6 +39,8 @@ class Settings(BaseSettings):
     app_base_url: str = "https://yourapp.com"
     agency_secret_key: str = "change_me"
     allowed_origins: str = "http://localhost:3000"
+    # API key required in x-api-key header for protected endpoints (drafts, status)
+    api_key: str = ""
 
     # Polling
     poll_interval_minutes: int = 5
