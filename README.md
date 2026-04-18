@@ -36,6 +36,51 @@ This repository contains all the assets needed to deploy the Talent Inbox Automa
 
 ---
 
+## Deployment — GitHub Actions (no server required)
+
+The backend poller runs as a **scheduled GitHub Actions job** (`poll.yml`). It starts once a day, processes every connected talent inbox end-to-end (triage → draft/archive/flag → log to Sheets), then exits. No server or Railway account is needed.
+
+### One-time setup
+
+1. **Add GitHub Secrets** — go to your repo → *Settings → Secrets and variables → Actions → New repository secret* and add:
+
+   | Secret | Where to get it |
+   |---|---|
+   | `GOOGLE_CLIENT_ID` | Google Cloud Console → OAuth 2.0 Client ID |
+   | `GOOGLE_CLIENT_SECRET` | Same OAuth client |
+   | `OPENAI_API_KEY` | https://platform.openai.com/api-keys |
+   | `DATABASE_URL` | Supabase → Project Settings → Database → Connection string (URI) |
+   | `GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON` | Google Cloud Console → Service Accounts → JSON key (paste entire file as one line) |
+   | `GOOGLE_REDIRECT_URI` *(optional)* | Only needed for the one-time OAuth onboarding flow (e.g. `https://yourapp.com/auth/callback`) |
+
+2. **Connect each talent's Gmail account** — visit `GET /auth/start?talent=<key>` once per talent to complete the OAuth handshake and store the token in Supabase. (This still requires a temporary web server; use `uvicorn backend.main:app` locally and tunnel with `ngrok` if needed.)
+
+3. **Adjust the run time** — the workflow fires daily at **09:00 UTC** by default. Edit the `cron` line in `.github/workflows/poll.yml` to suit your timezone.
+
+### Running manually
+
+Trigger a run any time from the *Actions* tab → *Poll Inboxes* → *Run workflow*.
+
+Or run locally:
+
+```bash
+# install deps
+pip install -r backend/requirements.txt
+
+# set env vars (copy backend/.env.example → .env, fill in values)
+
+# run the poller once
+python -m scripts.run_poller
+```
+
+### Reviewing drafts
+
+Drafts (score-3 emails) are saved directly in the talent's Gmail Drafts folder and also recorded in the `drafts` table in Supabase. Review them in:
+- **Gmail** — open the talent's Drafts folder, edit/send/delete as needed.
+- **Supabase dashboard** — Table Editor → `drafts` for a full list with status, brand name, proposed rate, and the draft text.
+
+---
+
 ## Pre-Launch Validation
 
 Before activating any scenario in Make, run the preflight validator:
