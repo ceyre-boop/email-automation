@@ -6,7 +6,8 @@
 #   GOOGLE_CLIENT_SECRET
 #   OPENAI_API_KEY
 #   DATABASE_URL            — Supabase Postgres connection string
-#   GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON  — service account JSON (one line)
+#   GOOGLE_SHEETS_REFRESH_TOKEN  — run scripts/generate_google_refresh_token.py once
+#                                  (Desktop App OAuth client, Sheets scope)
 #
 # Optional secrets (sensible defaults are used if omitted):
 #   GOOGLE_REDIRECT_URI     — only needed for the OAuth onboarding flow
@@ -48,7 +49,7 @@ jobs:
           GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON }}
+          GOOGLE_SHEETS_REFRESH_TOKEN: ${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}
           APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
           AGENCY_SECRET_KEY: ${{ secrets.AGENCY_SECRET_KEY }}
         run: python -m scripts.run_poller

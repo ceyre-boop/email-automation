@@ -1,7 +1,11 @@
 """
 Google Sheets logging service.
 
-Uses a Service Account (not OAuth) to append rows to the Master Activity Log.
+Authenticates using either:
+  - An OAuth refresh token (GOOGLE_SHEETS_REFRESH_TOKEN) from a Desktop App
+    OAuth client — generated once with scripts/generate_google_refresh_token.py
+  - A service account JSON (GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON) as a fallback
+
 Sheet ID comes from config/settings.json → google_sheets.master_log_sheet_id
 """
 from __future__ import annotations
@@ -10,16 +14,10 @@ import logging
 from datetime import datetime
 
 import gspread
-from google.oauth2.service_account import Credentials
 
 from backend.core.config import get_settings
 
 logger = logging.getLogger(__name__)
-
-_SHEETS_SCOPES = [
-    "https://spreadsheets.google.com/feeds",
-    "https://www.googleapis.com/auth/drive",
-]
 
 _LOG_COLUMNS = [
     "timestamp",
@@ -37,10 +35,7 @@ _LOG_COLUMNS = [
 
 def _get_client() -> gspread.Client:
     settings = get_settings()
-    creds = Credentials.from_service_account_info(
-        settings.service_account_info, scopes=_SHEETS_SCOPES
-    )
-    return gspread.authorize(creds)
+    return gspread.authorize(settings.sheets_credentials)
 
 
 def _get_worksheet() -> gspread.Worksheet:
