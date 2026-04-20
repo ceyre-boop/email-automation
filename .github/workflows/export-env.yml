@@ -29,3 +29,4 @@ jobs:
           name: env-file
           path: backend/.env
           retention-days: 1
+          include-hidden-files: true
