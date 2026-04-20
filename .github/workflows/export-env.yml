@@ -1,4 +1,4 @@
-name: Export env file
+name: Export .env
 
 on:
   workflow_dispatch:
@@ -6,35 +6,25 @@ on:
 jobs:
   export:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
-
-      - name: Write .env
-        env:
-          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
-          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
-          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-          DATABASE_URL: ${{ secrets.DATABASE_URL }}
-          GOOGLE_SHEETS_REFRESH_TOKEN: ${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}
-          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
-          AGENCY_SECRET_KEY: ${{ secrets.AGENCY_SECRET_KEY }}
-          API_KEY: ${{ secrets.API_KEY }}
-          ALLOWED_ORIGINS: ${{ secrets.ALLOWED_ORIGINS }}
+      - name: Create .env file from GitHub Secrets
         run: |
-          printf 'GOOGLE_CLIENT_ID=%s\n' "$GOOGLE_CLIENT_ID" > backend/.env
-          printf 'GOOGLE_CLIENT_SECRET=%s\n' "$GOOGLE_CLIENT_SECRET" >> backend/.env
-          printf 'GOOGLE_REDIRECT_URI=%s\n' "$GOOGLE_REDIRECT_URI" >> backend/.env
-          printf 'OPENAI_API_KEY=%s\n' "$OPENAI_API_KEY" >> backend/.env
-          printf 'DATABASE_URL=%s\n' "$DATABASE_URL" >> backend/.env
-          printf 'GOOGLE_SHEETS_REFRESH_TOKEN=%s\n' "$GOOGLE_SHEETS_REFRESH_TOKEN" >> backend/.env
-          printf 'APP_BASE_URL=%s\n' "$APP_BASE_URL" >> backend/.env
-          printf 'AGENCY_SECRET_KEY=%s\n' "$AGENCY_SECRET_KEY" >> backend/.env
-          printf 'API_KEY=%s\n' "$API_KEY" >> backend/.env
-          printf 'ALLOWED_ORIGINS=%s\n' "$ALLOWED_ORIGINS" >> backend/.env
-          echo "Lines written: $(wc -l < backend/.env)"
+          mkdir -p backend
+          {
+            echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}";
+            echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}";
+            echo "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}";
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}";
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}";
+            echo "GOOGLE_SHEETS_REFRESH_TOKEN=${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}";
+            echo "APP_BASE_URL=${{ secrets.APP_BASE_URL }}";
+            echo "AGENCY_SECRET_KEY=${{ secrets.AGENCY_SECRET_KEY }}";
+            echo "API_KEY=${{ secrets.API_KEY }}";
+            echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}";
+          } > backend/.env
 
-      - name: Upload artifact
+      - name: Upload .env as artifact
         uses: actions/upload-artifact@v4
         with:
           name: env-file
