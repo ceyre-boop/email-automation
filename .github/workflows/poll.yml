@@ -1,0 +1,55 @@
+# Poll all talent inboxes once a day via GitHub Actions.
+# No server required — the script connects directly to Supabase + Gmail + OpenAI.
+#
+# Required GitHub Secrets (Settings → Secrets → Actions):
+#   GOOGLE_CLIENT_ID
+#   GOOGLE_CLIENT_SECRET
+#   OPENAI_API_KEY
+#   DATABASE_URL            — Supabase Postgres connection string
+#   GOOGLE_SHEETS_REFRESH_TOKEN  — run scripts/generate_google_refresh_token.py once
+#                                  (Desktop App OAuth client, Sheets scope)
+#
+# Optional secrets (sensible defaults are used if omitted):
+#   GOOGLE_REDIRECT_URI     — only needed for the OAuth onboarding flow
+#   APP_BASE_URL
+#   AGENCY_SECRET_KEY
+
+name: Poll Inboxes
+
+on:
+  schedule:
+    # Runs once a day at 09:00 UTC — adjust to suit your timezone.
+    - cron: "0 9 * * *"
+  workflow_dispatch: # allow manual trigger from the Actions tab
+
+jobs:
+  poll:
+    name: Poll all talent inboxes
+    runs-on: ubuntu-latest
+    timeout-minutes: 30   # safety cap — kills the job if it hangs
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Run inbox poller
+        env:
+          GOOGLE_CLIENT_ID: ${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET: ${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI: ${{ secrets.GOOGLE_REDIRECT_URI }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          GOOGLE_SHEETS_REFRESH_TOKEN: ${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}
+          APP_BASE_URL: ${{ secrets.APP_BASE_URL }}
+          AGENCY_SECRET_KEY: ${{ secrets.AGENCY_SECRET_KEY }}
+        run: python -m scripts.run_poller
