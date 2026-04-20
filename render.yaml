@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: email-automation
+    env: python
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    plan: free
+    envVars:
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: GOOGLE_REDIRECT_URI
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON
+        sync: false
+      - key: APP_BASE_URL
+        sync: false
+      - key: AGENCY_SECRET_KEY
+        generateValue: true
+      - key: API_KEY
+        generateValue: true
+      - key: ALLOWED_ORIGINS
+        value: "*"
