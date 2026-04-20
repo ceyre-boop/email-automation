@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
 from backend.models.db import Draft, DraftStatus, TalentToken
-from backend.routers.deps import get_db
+from backend.routers.deps import get_db, verify_api_key
 from backend.services.poller import poll_all_inboxes
 
 router = APIRouter(tags=["internal"])
@@ -41,7 +41,7 @@ def cron_poll(db: Session = Depends(get_db)):
         return {"ok": False, "error": "Polling failed — check server logs for details."}
 
 
-@router.get("/api/status")
+@router.get("/api/status", dependencies=[Depends(verify_api_key)])
 def get_status(db: Session = Depends(get_db)):
     """
     Return connection status for every talent defined in settings.json.

@@ -10,6 +10,7 @@ jobs:
     steps:
       - name: Create .env file from GitHub Secrets
         run: |
+          mkdir -p backend
           {
             echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}";
             echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}";
@@ -17,10 +18,15 @@ jobs:
             echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}";
             echo "DATABASE_URL=${{ secrets.DATABASE_URL }}";
             echo "GOOGLE_SHEETS_REFRESH_TOKEN=${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}";
-          } > .env
+            echo "APP_BASE_URL=${{ secrets.APP_BASE_URL }}";
+            echo "AGENCY_SECRET_KEY=${{ secrets.AGENCY_SECRET_KEY }}";
+            echo "API_KEY=${{ secrets.API_KEY }}";
+            echo "ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}";
+          } > backend/.env
 
       - name: Upload .env as artifact
         uses: actions/upload-artifact@v4
         with:
           name: env-file
-          path: .env
+          path: backend/.env
+          retention-days: 1
