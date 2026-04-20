@@ -1,0 +1,26 @@
+name: Export .env
+
+on:
+  workflow_dispatch:
+
+jobs:
+  export:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Create .env file from GitHub Secrets
+        run: |
+          {
+            echo "GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}";
+            echo "GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}";
+            echo "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}";
+            echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}";
+            echo "DATABASE_URL=${{ secrets.DATABASE_URL }}";
+            echo "GOOGLE_SHEETS_REFRESH_TOKEN=${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}";
+          } > .env
+
+      - name: Upload .env as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: env-file
+          path: .env
