@@ -9,7 +9,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, JSONResponse
 
 from backend.core.config import get_settings
 from backend.models.db import create_tables
@@ -47,6 +47,20 @@ app.include_router(cron.router)
 _connect_html_path = Path(__file__).parent / "static" / "connect.html"
 
 
+@app.get("/api/status", include_in_schema=False)
+def api_status():
+    """
+    Public status endpoint.
+    Returns the list of configured talents (key + display name only) so the
+    onboarding page (/connect) can resolve a talent_key to a full name.
+    """
+    talents = [
+        {"key": t["key"], "full_name": t.get("full_name", t["key"])}
+        for t in get_settings().app_config.get("talents", [])
+    ]
+    return JSONResponse({"status": "ok", "talents": talents})
+
+
 @app.get("/connect", response_class=HTMLResponse, include_in_schema=False)
 def onboarding_page(talent: str = Query(..., description="Talent key from settings.json")):
     """
@@ -64,5 +78,9 @@ def onboarding_page(talent: str = Query(..., description="Talent key from settin
 @app.on_event("startup")
 def on_startup():
     logger.info("Creating database tables if they don't exist…")
-    create_tables()
+    try:
+        create_tables()
+    except Exception:
+        logger.exception("FATAL: could not create/verify database tables — check DATABASE_URL")
+        raise
     logger.info("Startup complete.")
