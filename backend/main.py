@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html as html_lib
 import logging
+import sys
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
@@ -28,9 +29,18 @@ app = FastAPI(
 )
 
 # ── CORS ─────────────────────────────────────────────────────────────────────
+try:
+    settings = get_settings()
+except Exception as _exc:  # pydantic ValidationError or similar
+    print(
+        f"FATAL: could not load settings — check required env vars: {_exc}",
+        file=sys.stderr,
+        flush=True,
+    )
+    sys.exit(1)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=get_settings().allowed_origins_list,
+    allow_origins=settings.allowed_origins_list,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
