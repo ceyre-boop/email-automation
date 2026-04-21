@@ -77,6 +77,7 @@ def api_status():
 
 @app.get("/", include_in_schema=False)
 def root():
+    """Base service endpoint for quick uptime/onboarding discovery."""
     return JSONResponse(
         {
             "status": "ok",
