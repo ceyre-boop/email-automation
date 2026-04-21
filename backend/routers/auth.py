@@ -43,14 +43,20 @@ def connect_gmail(talent_key: str = Query(..., description="Talent identifier fr
 
 @router.get("/callback")
 def oauth_callback(
-    code: str = Query(...),
-    state: str = Query(...),
+    code: str = Query(None),
+    state: str = Query(None),
+    error: str = Query(None),
     db: Session = Depends(get_db),
 ):
+    if error:
+        return HTMLResponse(content=_error_page(error))
     """
     Step 2 — Google redirects here after the talent consents.
     Exchange the authorization code for tokens and store them.
     """
+    if not code or not state:
+        return HTMLResponse(content=_error_page("missing_params"))
+
     talent_key = state  # We encoded talent_key as the state param
     settings = get_settings()
     talent_map = {t["key"]: t for t in settings.app_config.get("talents", [])}
@@ -203,6 +209,47 @@ def _success_page(talent_name: str) -> str:
       Your Gmail is now connected.<br/>
       Drafts will appear automatically —<br/>you don't need to do anything else.
     </p>
+    <p class="powered-by">Powered by TABOOST</p>
+  </main>
+</body>
+</html>"""
+
+
+def _error_page(error: str) -> str:
+    messages = {
+        "access_denied": ("Permission declined", "You cancelled the sign-in or your account isn't approved yet. Ask your manager to add your Gmail to the authorised list, then try again."),
+        "missing_params": ("Something went wrong", "The sign-in response was incomplete. Please close this tab and try again from the start."),
+    }
+    title, body = messages.get(error, ("Sign-in failed", f"Google returned an error: {html_lib.escape(error)}. Please try again."))
+    return f"""<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>{title} — TABOOST</title>
+  <style>
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{ min-height: 100vh; background: #080b14; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; overflow: hidden; color: #e2e8f0; }}
+    .bg-orbs {{ position: fixed; inset: 0; pointer-events: none; z-index: 0; }}
+    .orb {{ position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.28; }}
+    .orb-1 {{ width: 520px; height: 520px; background: #7c3aed; top: -140px; left: -120px; }}
+    .orb-2 {{ width: 420px; height: 420px; background: #1d4ed8; bottom: -100px; right: -100px; }}
+    .glass-card {{ position: relative; z-index: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px); border-radius: 28px; padding: 52px 44px 44px; max-width: 420px; width: calc(100% - 32px); text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,0.65); }}
+    .icon {{ font-size: 52px; margin-bottom: 24px; }}
+    h1 {{ font-size: 26px; font-weight: 700; color: #f8fafc; margin-bottom: 14px; letter-spacing: -0.02em; }}
+    p {{ font-size: 15px; color: rgba(255,255,255,0.45); line-height: 1.65; margin-bottom: 28px; }}
+    a.btn {{ display: inline-flex; align-items: center; justify-content: center; background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.35); color: #a78bfa; border-radius: 12px; padding: 13px 28px; font-size: 14px; font-weight: 600; text-decoration: none; transition: background 0.15s; }}
+    a.btn:hover {{ background: rgba(167,139,250,0.25); }}
+    .powered-by {{ font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: rgba(167,139,250,0.35); margin-top: 24px; }}
+  </style>
+</head>
+<body>
+  <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
+  <main class="glass-card">
+    <div class="icon">⚠️</div>
+    <h1>{html_lib.escape(title)}</h1>
+    <p>{html_lib.escape(body)}</p>
+    <a class="btn" href="/">← Try again</a>
     <p class="powered-by">Powered by TABOOST</p>
   </main>
 </body>
