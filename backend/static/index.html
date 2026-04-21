@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TABOOST — AI Email Assistant</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --gold:          #f5c842;
+      --gold-dim:      #d4a017;
+      --purple:        #8b5cf6;
+      --purple-light:  #a78bfa;
+      --text:          #ffffff;
+      --text-muted:    rgba(255,255,255,0.55);
+      --text-faint:    rgba(255,255,255,0.28);
+      --glass-bg:      rgba(255,255,255,0.04);
+      --glass-border:  rgba(255,255,255,0.09);
+    }
+
+    html, body { height: 100%; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background-color: #07070f;
+      background-image:
+        radial-gradient(ellipse at 18% 25%, rgba(124,58,237,.22) 0%, transparent 55%),
+        radial-gradient(ellipse at 82% 78%, rgba(245,200,66,.10) 0%, transparent 55%),
+        radial-gradient(ellipse at 50% 110%, rgba(59,130,246,.12) 0%, transparent 50%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: var(--text);
+    }
+
+    /* ── Card ── */
+    .card {
+      background: var(--glass-bg);
+      border: 1px solid var(--glass-border);
+      border-radius: 28px;
+      padding: 52px 48px;
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04) inset,
+        0 40px 80px -16px rgba(0,0,0,.75),
+        0 0 100px rgba(124,58,237,.12);
+      animation: fadeUp .55s cubic-bezier(.22,.68,0,1.2) both;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(28px) scale(.97); }
+      to   { opacity: 1; transform: translateY(0)    scale(1);   }
+    }
+
+    /* ── Genie ── */
+    .genie-wrap {
+      position: relative;
+      display: inline-block;
+      margin-bottom: 14px;
+    }
+    .genie-wrap img {
+      width: 84px;
+      height: auto;
+      filter:
+        drop-shadow(0 0 18px rgba(168,85,247,.65))
+        drop-shadow(0 0 40px rgba(245,200,66,.28));
+      animation: float 4s ease-in-out infinite;
+    }
+    @keyframes float {
+      0%,100% { transform: translateY(0); }
+      50%      { transform: translateY(-9px); }
+    }
+    .genie-shadow {
+      position: absolute;
+      bottom: -6px;
+      left: 50%;
+      transform: translateX(-50%);
+      width: 52px;
+      height: 10px;
+      background: radial-gradient(ellipse, rgba(124,58,237,.55) 0%, transparent 70%);
+      border-radius: 50%;
+      filter: blur(6px);
+      animation: shadowPulse 4s ease-in-out infinite;
+    }
+    @keyframes shadowPulse {
+      0%,100% { opacity: .9; transform: translateX(-50%) scaleX(1);   }
+      50%      { opacity: .4; transform: translateX(-50%) scaleX(.75); }
+    }
+
+    /* ── Brand ── */
+    .brand {
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: var(--gold);
+      margin-bottom: 12px;
+    }
+    h1 {
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 1.2;
+      letter-spacing: -.02em;
+      margin-bottom: 12px;
+    }
+    .tagline {
+      font-size: 15px;
+      color: var(--text-muted);
+      line-height: 1.65;
+      margin-bottom: 36px;
+    }
+
+    /* ── Talent box ── */
+    .talent-box {
+      background: rgba(255,255,255,0.03);
+      border: 1px solid rgba(255,255,255,0.07);
+      border-radius: 16px;
+      padding: 18px 22px;
+      margin-bottom: 28px;
+      text-align: left;
+    }
+    .talent-box .label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .1em;
+      text-transform: uppercase;
+      color: var(--text-faint);
+      margin-bottom: 5px;
+    }
+    .talent-box .name {
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    /* ── Google button ── */
+    .btn-google {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 12px;
+      width: 100%;
+      padding: 16px 28px;
+      background: linear-gradient(135deg, #4285f4 0%, #1a6ef5 100%);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 600;
+      letter-spacing: -.01em;
+      border: none;
+      border-radius: 14px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: opacity .15s, transform .12s, box-shadow .15s;
+      box-shadow: 0 4px 22px rgba(66,133,244,.38);
+    }
+    .btn-google:hover  { opacity: .9; transform: translateY(-2px); box-shadow: 0 8px 30px rgba(66,133,244,.48); }
+    .btn-google:active { transform: translateY(0); opacity: 1; }
+    .btn-google svg    { flex-shrink: 0; }
+
+    /* ── Feature pills ── */
+    .pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      justify-content: center;
+      margin-bottom: 28px;
+    }
+    .pill {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 100px;
+      padding: 6px 14px;
+      font-size: 12px;
+      color: var(--text-muted);
+    }
+
+    /* ── No-talent info box ── */
+    .info-box {
+      background: rgba(245,200,66,.05);
+      border: 1px solid rgba(245,200,66,.18);
+      border-radius: 16px;
+      padding: 22px 24px;
+      color: var(--text-muted);
+      font-size: 14px;
+      line-height: 1.65;
+      text-align: left;
+    }
+    .info-box .info-title {
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+    .info-box code {
+      font-size: 12px;
+      color: var(--gold);
+      background: rgba(245,200,66,.1);
+      border-radius: 6px;
+      padding: 2px 6px;
+      font-family: 'SF Mono', 'Fira Code', monospace;
+    }
+
+    /* ── Privacy note ── */
+    .note {
+      margin-top: 18px;
+      font-size: 12px;
+      color: var(--text-faint);
+      line-height: 1.65;
+    }
+
+    @media (max-width: 520px) {
+      .card { padding: 36px 24px; border-radius: 22px; }
+      h1    { font-size: 24px; }
+    }
+  </style>
+</head>
+<body>
+<div class="card">
+
+  <div class="genie-wrap">
+    <img
+      src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMDAgMTMwIj4KICA8ZGVmcz4KICAgIDxsaW5lYXJHcmFkaWVudCBpZD0ibGciIHgxPSIwJSIgeTE9IjAlIiB4Mj0iMTAwJSIgeTI9IjEwMCUiPgogICAgICA8c3RvcCBvZmZzZXQ9IjAlIiBzdG9wLWNvbG9yPSIjZmJiZjI0Ii8+CiAgICAgIDxzdG9wIG9mZnNldD0iMTAwJSIgc3RvcC1jb2xvcj0iI2Q5NzcwNiIvPgogICAgPC9saW5lYXJHcmFkaWVudD4KICA8L2RlZnM+CiAgPGVsbGlwc2UgY3g9IjUwIiBjeT0iNTIiIHJ4PSIzNiIgcnk9IjM2IiBmaWxsPSIjN2MzYWVkIiBvcGFjaXR5PSIwLjE4Ii8+CiAgPHBhdGggZD0iTTUwIDg0IEM0NCA3MCA0MCA1NCA1MCA0MiBDNjAgMzAgNzAgNDAgNjAgNTQgQzUwIDY4IDU4IDc0IDY1IDU4IEM3MiA0MiA2OCAyOCA3NiAyMCIKICAgICAgICBzdHJva2U9IiNhODU1ZjciIHN0cm9rZS13aWR0aD0iMy41IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJNNTAgODQgQzU2IDcwIDYyIDU2IDUyIDQ2IEM0MiAzNiAzNCA0NiA0NCA1NiIKICAgICAgICBzdHJva2U9IiNjMDg0ZmMiIHN0cm9rZS13aWR0aD0iMi41IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8Y2lyY2xlIGN4PSIxNiIgY3k9IjIyIiByPSIyLjUiIGZpbGw9IiNmYmJmMjQiLz4KICA8Y2lyY2xlIGN4PSI4NiIgY3k9IjE0IiByPSIyIiAgIGZpbGw9IiNmYmJmMjQiLz4KICA8Y2lyY2xlIGN4PSI5MyIgY3k9IjQ0IiByPSIzIiAgIGZpbGw9IiNmYmJmMjQiLz4KICA8Y2lyY2xlIGN4PSI4IiAgY3k9IjUyIiByPSIxLjUiIGZpbGw9IiNmYmJmMjQiLz4KICA8Y2lyY2xlIGN4PSI4NCIgY3k9IjYyIiByPSIyIiAgIGZpbGw9IiNmYmJmMjQiLz4KICA8cGF0aCBkPSJNMTggMTE2IEMxNiAxMDAgMjggOTAgNTAgOTIgQzcyIDkwIDg0IDEwMCA4MiAxMTYgWiIgZmlsbD0idXJsKCNsZykiLz4KICA8ZWxsaXBzZSBjeD0iNTAiIGN5PSIxMTYiIHJ4PSIzMiIgcnk9IjkiIGZpbGw9IiM5MjQwMGUiLz4KICA8cGF0aCBkPSJNMzcgOTIgQzMzIDc5IDM3IDcwIDUwIDY4IEM2MyA3MCA2NyA3OSA2MyA5MiBaIiBmaWxsPSJ1cmwoI2xnKSIvPgogIDxlbGxpcHNlIGN4PSI1MCIgY3k9IjY4IiByeD0iMTQiIHJ5PSI1IiBmaWxsPSIjZDk3NzA2Ii8+CiAgPGNpcmNsZSBjeD0iNTAiIGN5PSI2NSIgcj0iNSIgZmlsbD0iI2ZiYmYyNCIvPgogIDxwYXRoIGQ9Ik04MSAxMDggQzk3IDk4IDEwMCA4MiA4OSA3NSIgIHN0cm9rZT0iI2ZiYmYyNCIgc3Ryb2tlLXdpZHRoPSI1IiBmaWxsPSJub25lIiBzdHJva2UtbGluZWNhcD0icm91bmQiLz4KICA8cGF0aCBkPSJNMTkgMTA4IEM3ICA5OCA0ICA4MiAxNCA3NSIgICBzdHJva2U9IiNmYmJmMjQiIHN0cm9rZS13aWR0aD0iNCIgZmlsbD0ibm9uZSIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIi8+CiAgPGVsbGlwc2UgY3g9IjUwIiBjeT0iODgiIHJ4PSIyMCIgcnk9IjciIGZpbGw9IiNmYmJmMjQiIG9wYWNpdHk9IjAuMiIvPgo8L3N2Zz4="
+      alt="TABOOST Genie"
+      width="84"
+    />
+    <div class="genie-shadow"></div>
+  </div>
+
+  <div class="brand">TABOOST</div>
+  <h1>Your AI Email Assistant</h1>
+  <p class="tagline">
+    Connect your Gmail once — your team handles brand deals,
+    replies, and scheduling automatically.
+  </p>
+
+  <!-- Shown when ?talent=<key> is in the URL -->
+  <div id="connect-section" style="display:none">
+    <div class="talent-box">
+      <div class="label">Connecting for</div>
+      <div id="talent-name" class="name">Loading…</div>
+    </div>
+
+    <a id="connect-btn" class="btn-google" href="#">
+      <svg width="20" height="20" viewBox="0 0 48 48" aria-hidden="true">
+        <path fill="#EA4335" d="M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z"/>
+        <path fill="#4285F4" d="M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z"/>
+        <path fill="#FBBC05" d="M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z"/>
+        <path fill="#34A853" d="M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.18 1.48-4.97 2.36-8.16 2.36-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z"/>
+      </svg>
+      Sign in with Google
+    </a>
+
+    <p class="note">
+      Google handles your password and 2FA — we never see your credentials.<br />
+      We only request access to read your inbox and save draft replies.
+    </p>
+  </div>
+
+  <!-- Shown when no ?talent= param is present -->
+  <div id="landing-section" style="display:none">
+    <div class="pills">
+      <span class="pill">✦ AI triage</span>
+      <span class="pill">✦ Draft replies</span>
+      <span class="pill">✦ Brand deals</span>
+      <span class="pill">✦ Zero inbox stress</span>
+    </div>
+    <div class="info-box">
+      <div class="info-title">Ready to connect?</div>
+      Use the personalised link your manager sent you. It looks like:<br />
+      <code style="display:inline-block;margin-top:8px">/connect?talent=YourName</code>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const params    = new URLSearchParams(window.location.search);
+  const talentKey = params.get('talent');
+
+  if (talentKey) {
+    document.getElementById('connect-section').style.display = 'block';
+
+    // Resolve display name from the status endpoint
+    fetch('/api/status')
+      .then(r  => r.json())
+      .then(data => {
+        const t = (data.talents || []).find(t => t.key === talentKey);
+        document.getElementById('talent-name').textContent =
+          t ? (t.full_name || talentKey) : talentKey;
+      })
+      .catch(() => {
+        document.getElementById('talent-name').textContent = talentKey;
+      });
+
+    document.getElementById('connect-btn').href =
+      '/auth/connect?talent_key=' + encodeURIComponent(talentKey);
+
+  } else {
+    document.getElementById('landing-section').style.display = 'block';
+  }
+</script>
+</body>
+</html>

@@ -118,21 +118,121 @@ def _success_page(talent_name: str) -> str:
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gmail Connected</title>
+  <title>Gmail Connected — TABOOST</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            display: flex; align-items: center; justify-content: center;
-            min-height: 100vh; margin: 0; background: #f0fdf4; }}
-    .card {{ background: white; border-radius: 16px; padding: 48px 40px;
-             box-shadow: 0 4px 24px rgba(0,0,0,.08); max-width: 420px; text-align: center; }}
-    .icon {{ font-size: 56px; margin-bottom: 16px; }}
-    h1 {{ color: #15803d; font-size: 24px; margin: 0 0 12px; }}
-    p {{ color: #555; line-height: 1.6; margin: 0; }}
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+
+    html, body {{ height: 100%; }}
+
+    body {{
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      background-color: #07070f;
+      background-image:
+        radial-gradient(ellipse at 18% 25%, rgba(34,197,94,.15)  0%, transparent 55%),
+        radial-gradient(ellipse at 82% 78%, rgba(245,200,66,.08) 0%, transparent 55%);
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      color: #ffffff;
+    }}
+
+    .card {{
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      border-radius: 28px;
+      padding: 52px 48px;
+      max-width: 460px;
+      width: 100%;
+      text-align: center;
+      backdrop-filter: blur(28px);
+      -webkit-backdrop-filter: blur(28px);
+      box-shadow:
+        0 0 0 1px rgba(255,255,255,0.04) inset,
+        0 40px 80px -16px rgba(0,0,0,.75),
+        0 0 100px rgba(34,197,94,.10);
+      animation: fadeUp .55s cubic-bezier(.22,.68,0,1.2) both;
+    }}
+
+    @keyframes fadeUp {{
+      from {{ opacity: 0; transform: translateY(28px) scale(.97); }}
+      to   {{ opacity: 1; transform: translateY(0)    scale(1);   }}
+    }}
+
+    /* ── Animated checkmark ── */
+    .checkmark-wrap {{
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 20px;
+    }}
+    .checkmark {{
+      width: 72px;
+      height: 72px;
+      filter: drop-shadow(0 0 16px rgba(34,197,94,.55));
+    }}
+    .check-circle {{
+      stroke: #22c55e;
+      stroke-width: 2;
+      stroke-dasharray: 163;
+      stroke-dashoffset: 163;
+      animation: drawCircle .6s ease-out .15s forwards;
+      transform-origin: center;
+      fill: none;
+    }}
+    .check-path {{
+      stroke: #22c55e;
+      stroke-width: 3;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+      stroke-dasharray: 50;
+      stroke-dashoffset: 50;
+      animation: drawCheck .4s ease-out .7s forwards;
+      fill: none;
+    }}
+    @keyframes drawCircle {{ to {{ stroke-dashoffset: 0; }} }}
+    @keyframes drawCheck  {{ to {{ stroke-dashoffset: 0; }} }}
+
+    .brand {{
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: .18em;
+      text-transform: uppercase;
+      color: #f5c842;
+      margin-bottom: 14px;
+    }}
+
+    h1 {{
+      font-size: 26px;
+      font-weight: 700;
+      letter-spacing: -.02em;
+      margin-bottom: 12px;
+    }}
+
+    p {{
+      font-size: 15px;
+      color: rgba(255,255,255,.6);
+      line-height: 1.65;
+    }}
+
+    strong {{ color: #ffffff; }}
+
+    @media (max-width: 520px) {{
+      .card {{ padding: 36px 24px; border-radius: 22px; }}
+      h1    {{ font-size: 22px; }}
+    }}
   </style>
 </head>
 <body>
   <div class="card">
-    <div class="icon">✅</div>
+    <div class="checkmark-wrap">
+      <svg class="checkmark" viewBox="0 0 52 52" aria-hidden="true">
+        <circle class="check-circle" cx="26" cy="26" r="25"/>
+        <path   class="check-path"   d="M14 27l8 8 16-16"/>
+      </svg>
+    </div>
+    <div class="brand">TABOOST</div>
     <h1>You're connected!</h1>
     <p>
       <strong>{talent_name}</strong>'s Gmail is now linked.<br />

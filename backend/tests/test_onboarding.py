@@ -6,14 +6,21 @@ from __future__ import annotations
 import pytest
 
 
-def test_root_returns_service_payload(client):
+def test_root_returns_html_landing_page(client):
     resp = client.get("/")
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["status"] == "ok"
-    assert data["service"] == "email-automation"
-    assert data["connect_path"] == "/connect?talent=<talent_key>"
-    assert data["health_path"] == "/health"
+    assert "text/html" in resp.headers.get("content-type", "")
+    assert "TABOOST" in resp.text
+
+
+def test_root_contains_genie_image(client):
+    resp = client.get("/")
+    assert "data:image/svg+xml;base64," in resp.text
+
+
+def test_root_contains_onboarding_script(client):
+    resp = client.get("/")
+    assert "talent_key" in resp.text or "talentKey" in resp.text
 
 
 def test_connect_page_loads(client):

@@ -57,7 +57,8 @@ app.include_router(drafts.router)
 app.include_router(cron.router)
 
 
-# ── Onboarding page at /connect?talent=<key> ─────────────────────────────────
+# ── Static page paths ────────────────────────────────────────────────────────
+_index_html_path   = Path(__file__).parent / "static" / "index.html"
 _connect_html_path = Path(__file__).parent / "static" / "connect.html"
 
 
@@ -75,17 +76,10 @@ def api_status():
     return JSONResponse({"status": "ok", "talents": talents})
 
 
-@app.get("/", include_in_schema=False)
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
 def root():
-    """Base service endpoint for quick uptime/onboarding discovery."""
-    return JSONResponse(
-        {
-            "status": "ok",
-            "service": "email-automation",
-            "connect_path": "/connect?talent=<talent_key>",
-            "health_path": "/health",
-        }
-    )
+    """Serve the TABOOST premium landing / talent onboarding page."""
+    return HTMLResponse(content=_index_html_path.read_text(encoding="utf-8"))
 
 
 @app.get("/connect", response_class=HTMLResponse, include_in_schema=False)
