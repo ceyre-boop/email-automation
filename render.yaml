@@ -3,7 +3,7 @@ services:
     name: email-automation
     env: python
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: PYTHONUNBUFFERED=1 uvicorn backend.main:app --host 0.0.0.0 --port $PORT
+    startCommand: bash start.sh
     plan: free
     envVars:
       - key: GOOGLE_CLIENT_ID
