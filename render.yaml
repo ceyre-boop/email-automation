@@ -3,7 +3,7 @@ services:
     name: email-automation
     env: python
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: bash start.sh
+    startCommand: python run.py
     plan: free
     envVars:
       - key: GOOGLE_CLIENT_ID
