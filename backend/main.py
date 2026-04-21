@@ -14,7 +14,12 @@ from fastapi.responses import HTMLResponse, JSONResponse
 
 from backend.core.config import get_settings
 from backend.models.db import create_tables
-from backend.routers import auth, cron, drafts
+try:
+    from backend.routers import auth, cron, drafts
+except Exception as _import_exc:
+    print(f"FATAL: router import failed — {_import_exc}", file=sys.stderr, flush=True)
+    import traceback; traceback.print_exc(file=sys.stderr)
+    sys.exit(1)
 
 logging.basicConfig(
     level=logging.INFO,
