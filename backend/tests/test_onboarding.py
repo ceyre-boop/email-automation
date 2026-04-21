@@ -6,6 +6,16 @@ from __future__ import annotations
 import pytest
 
 
+def test_root_returns_service_payload(client):
+    resp = client.get("/")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["service"] == "email-automation"
+    assert data["connect_path"] == "/connect?talent=<talent_key>"
+    assert data["health_path"] == "/health"
+
+
 def test_connect_page_loads(client):
     resp = client.get("/connect?talent=Sylvia")
     assert resp.status_code == 200

@@ -75,6 +75,18 @@ def api_status():
     return JSONResponse({"status": "ok", "talents": talents})
 
 
+@app.get("/", include_in_schema=False)
+def root():
+    return JSONResponse(
+        {
+            "status": "ok",
+            "service": "email-automation",
+            "connect_path": "/connect?talent=<talent_key>",
+            "health_path": "/health",
+        }
+    )
+
+
 @app.get("/connect", response_class=HTMLResponse, include_in_schema=False)
 def onboarding_page(talent: str = Query(..., description="Talent key from settings.json")):
     """
