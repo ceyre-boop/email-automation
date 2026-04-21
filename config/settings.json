@@ -34,7 +34,7 @@
     "_send_time_comment": "TODO: Confirm exact time with supervisor.",
     "timezone": "America/New_York",
     "_timezone_comment": "TODO: Confirm supervisor timezone.",
-    "recipient_email": "",
+    "recipient_email": "talent@taboost.me",
     "_recipient_email_comment": "TODO: Fill in supervisor email address (or comma-separated list for multiple recipients).",
     "subject_template": "Daily Inbox Report — {{DATE}} — {{TOTAL}} emails processed, {{NEEDS_REVIEW}} need review"
   },
@@ -218,7 +218,7 @@
   "make": {
     "workspace_zone": "us1.make.com",
     "_workspace_zone_comment": "TODO: Confirm your Make workspace zone (us1, eu1, etc.).",
-    "error_alert_email": "",
+    "error_alert_email": "colineyre222@gmail.com",
     "_error_alert_email_comment": "TODO: Email address to receive immediate error alerts when a Make scenario fails or OAuth expires."
   }
 }
