@@ -78,5 +78,9 @@ def onboarding_page(talent: str = Query(..., description="Talent key from settin
 @app.on_event("startup")
 def on_startup():
     logger.info("Creating database tables if they don't exist…")
-    create_tables()
+    try:
+        create_tables()
+    except Exception:
+        logger.exception("FATAL: could not create/verify database tables — check DATABASE_URL")
+        raise
     logger.info("Startup complete.")

@@ -121,7 +121,10 @@ class Draft(Base):
 
 def _make_engine():
     settings = get_settings()
-    return create_engine(settings.database_url, pool_pre_ping=True)
+    # SQLAlchemy 2.x dropped the legacy "postgres://" scheme; Render/Supabase
+    # still emit it, so normalise here before creating the engine.
+    db_url = settings.database_url.replace("postgres://", "postgresql://", 1)
+    return create_engine(db_url, pool_pre_ping=True)
 
 
 def get_engine():
