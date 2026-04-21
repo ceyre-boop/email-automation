@@ -32,12 +32,12 @@ def connect_gmail(talent_key: str = Query(..., description="Talent identifier fr
     which talent's tokens to store when Google redirects back.
     """
     settings = get_settings()
-    # Verify talent exists in config
-    talent_map = {t["key"]: t for t in settings.app_config.get("talents", [])}
-    if talent_key not in talent_map:
+    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent = talent_map.get(talent_key.lower())
+    if not talent:
         raise HTTPException(status_code=404, detail=f"Unknown talent_key: {talent_key}")
 
-    auth_url = build_authorization_url(talent_key)
+    auth_url = build_authorization_url(talent["key"])
     return RedirectResponse(url=auth_url)
 
 
@@ -57,7 +57,7 @@ def oauth_callback(
     if not code or not state:
         return HTMLResponse(content=_error_page("missing_params"))
 
-    talent_key = state  # We encoded talent_key as the state param
+    talent_key = state
     settings = get_settings()
     talent_map = {t["key"]: t for t in settings.app_config.get("talents", [])}
 

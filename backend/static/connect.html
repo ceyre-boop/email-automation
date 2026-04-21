@@ -126,7 +126,7 @@
     btnEl.outerHTML = '<div class="error-box">No talent specified. Please use the link sent to you by your manager.</div>';
   } else {
     // Fetch the talent display name from the status endpoint
-    fetch('/api/status')
+    fetch('/api/talents')
       .then(r => r.json())
       .then(data => {
         const talent = (data.talents || []).find(t => t.key === talentKey);

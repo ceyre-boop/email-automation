@@ -62,13 +62,9 @@ _connect_html_path = Path(__file__).parent / "static" / "connect.html"
 _index_html_path = Path(__file__).parent / "static" / "index.html"
 
 
-@app.get("/api/status", include_in_schema=False)
-def api_status():
-    """
-    Public status endpoint.
-    Returns the list of configured talents (key + display name only) so the
-    onboarding page (/connect) can resolve a talent_key to a full name.
-    """
+@app.get("/api/talents", include_in_schema=False)
+def api_talents():
+    """Public endpoint — returns talent list for the onboarding page."""
     talents = [
         {"key": t["key"], "full_name": t.get("full_name", t["key"])}
         for t in get_settings().app_config.get("talents", [])
