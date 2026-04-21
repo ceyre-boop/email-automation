@@ -59,6 +59,7 @@ app.include_router(cron.router)
 
 # ── Onboarding page at /connect?talent=<key> ─────────────────────────────────
 _connect_html_path = Path(__file__).parent / "static" / "connect.html"
+_index_html_path = Path(__file__).parent / "static" / "index.html"
 
 
 @app.get("/api/status", include_in_schema=False)
@@ -73,6 +74,11 @@ def api_status():
         for t in get_settings().app_config.get("talents", [])
     ]
     return JSONResponse({"status": "ok", "talents": talents})
+
+
+@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+def landing_page():
+    return HTMLResponse(content=_index_html_path.read_text(encoding="utf-8"))
 
 
 @app.get("/connect", response_class=HTMLResponse, include_in_schema=False)

@@ -118,26 +118,92 @@ def _success_page(talent_name: str) -> str:
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Gmail Connected</title>
+  <title>Gmail Connected — TABOOST</title>
   <style>
-    body {{ font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-            display: flex; align-items: center; justify-content: center;
-            min-height: 100vh; margin: 0; background: #f0fdf4; }}
-    .card {{ background: white; border-radius: 16px; padding: 48px 40px;
-             box-shadow: 0 4px 24px rgba(0,0,0,.08); max-width: 420px; text-align: center; }}
-    .icon {{ font-size: 56px; margin-bottom: 16px; }}
-    h1 {{ color: #15803d; font-size: 24px; margin: 0 0 12px; }}
-    p {{ color: #555; line-height: 1.6; margin: 0; }}
+    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
+    body {{
+      min-height: 100vh;
+      background: #080b14;
+      display: flex; align-items: center; justify-content: center;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      overflow: hidden; color: #e2e8f0;
+    }}
+    .bg-orbs {{ position: fixed; inset: 0; pointer-events: none; z-index: 0; }}
+    .orb {{
+      position: absolute; border-radius: 50%;
+      filter: blur(90px); opacity: 0.28;
+    }}
+    .orb-1 {{ width: 520px; height: 520px; background: #7c3aed; top: -140px; left: -120px; }}
+    .orb-2 {{ width: 420px; height: 420px; background: #1d4ed8; bottom: -100px; right: -100px; }}
+    .orb-3 {{ width: 320px; height: 320px; background: #be185d; top: 45%; left: 58%; }}
+    .glass-card {{
+      position: relative; z-index: 1;
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.10);
+      backdrop-filter: blur(28px) saturate(180%);
+      -webkit-backdrop-filter: blur(28px) saturate(180%);
+      border-radius: 28px;
+      padding: 56px 44px 48px;
+      max-width: 420px; width: calc(100% - 32px); text-align: center;
+      box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset, 0 40px 80px rgba(0,0,0,0.65);
+    }}
+    .check-wrapper {{
+      position: relative; width: 92px; height: 92px;
+      margin: 0 auto 32px;
+    }}
+    .check-glow {{
+      position: absolute; inset: -18px; border-radius: 50%;
+      background: radial-gradient(circle, rgba(34,197,94,0.45) 0%, transparent 68%);
+      animation: pulse-glow 3s ease-in-out infinite; z-index: 1;
+    }}
+    .check-circle {{
+      width: 92px; height: 92px; border-radius: 50%;
+      background: rgba(34,197,94,0.12);
+      border: 2px solid rgba(34,197,94,0.45);
+      display: flex; align-items: center; justify-content: center;
+      font-size: 40px; color: #4ade80; position: relative; z-index: 2;
+      animation: check-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    }}
+    @keyframes pulse-glow {{
+      0%, 100% {{ opacity: 0.55; transform: scale(1); }}
+      50%       {{ opacity: 0.9;  transform: scale(1.14); }}
+    }}
+    @keyframes check-pop {{
+      from {{ transform: scale(0.4); opacity: 0; }}
+      to   {{ transform: scale(1);   opacity: 1; }}
+    }}
+    h1 {{
+      font-size: 30px; font-weight: 700; color: #f8fafc;
+      line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 12px;
+    }}
+    .name-accent {{ color: #a78bfa; }}
+    .body-text {{
+      font-size: 15px; color: rgba(255,255,255,0.45);
+      line-height: 1.65; margin-bottom: 0;
+    }}
+    .powered-by {{
+      font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase;
+      color: rgba(167,139,250,0.4); margin-top: 32px;
+    }}
   </style>
 </head>
 <body>
-  <div class="card">
-    <div class="icon">✅</div>
-    <h1>You're connected!</h1>
-    <p>
-      <strong>{talent_name}</strong>'s Gmail is now linked.<br />
-      Drafts will appear automatically — you don't need to do anything else.
-    </p>
+  <div class="bg-orbs">
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    <div class="orb orb-3"></div>
   </div>
+  <main class="glass-card">
+    <div class="check-wrapper">
+      <div class="check-glow"></div>
+      <div class="check-circle">✓</div>
+    </div>
+    <h1>You're all set,<br/><span class="name-accent">{talent_name}</span></h1>
+    <p class="body-text">
+      Your Gmail is now connected.<br/>
+      Drafts will appear automatically —<br/>you don't need to do anything else.
+    </p>
+    <p class="powered-by">Powered by TABOOST</p>
+  </main>
 </body>
 </html>"""
