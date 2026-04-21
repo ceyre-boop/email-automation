@@ -15,17 +15,17 @@ jobs:
         run: |
           mkdir -p backend
           cat > backend/.env << 'EOF'
-GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
-GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
-GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
-OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
-DATABASE_URL=${{ secrets.DATABASE_URL }}
-GOOGLE_SHEETS_REFRESH_TOKEN=${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}
-APP_BASE_URL=${{ secrets.APP_BASE_URL }}
-AGENCY_SECRET_KEY=${{ secrets.AGENCY_SECRET_KEY }}
-API_KEY=${{ secrets.API_KEY }}
-ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
-EOF
+          GOOGLE_CLIENT_ID=${{ secrets.GOOGLE_CLIENT_ID }}
+          GOOGLE_CLIENT_SECRET=${{ secrets.GOOGLE_CLIENT_SECRET }}
+          GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}
+          OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          GOOGLE_SHEETS_REFRESH_TOKEN=${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}
+          APP_BASE_URL=${{ secrets.APP_BASE_URL }}
+          AGENCY_SECRET_KEY=${{ secrets.AGENCY_SECRET_KEY }}
+          API_KEY=${{ secrets.API_KEY }}
+          ALLOWED_ORIGINS=${{ secrets.ALLOWED_ORIGINS }}
+          EOF
 
       - name: Upload .env as artifact
         uses: actions/upload-artifact@v4
