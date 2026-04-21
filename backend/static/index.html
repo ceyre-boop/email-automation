@@ -290,16 +290,7 @@
 
       if (talentKey) {
         stateKnown.classList.remove('hidden');
-        fetch('/api/status')
-          .then(function(r){ return r.json(); })
-          .then(function(data){
-            var match = (data.talents || []).find(function(t){ return t.key === talentKey; });
-            document.getElementById('talent-display').textContent =
-              match ? (match.full_name || talentKey) : talentKey;
-          })
-          .catch(function(){
-            document.getElementById('talent-display').textContent = talentKey;
-          });
+        document.getElementById('talent-display').textContent = talentKey;
         document.getElementById('btn-known').href =
           '/auth/connect?talent_key=' + encodeURIComponent(talentKey);
 
@@ -307,22 +298,9 @@
         stateUnknown.classList.remove('hidden');
         document.getElementById('code-form').addEventListener('submit', function(e) {
           e.preventDefault();
-          var code  = document.getElementById('access-code').value.trim();
-          var errEl = document.getElementById('code-error');
-          errEl.classList.add('hidden');
+          var code = document.getElementById('access-code').value.trim();
           if (!code) return;
-
-          fetch('/api/status')
-            .then(function(r){ return r.json(); })
-            .then(function(data){
-              var match = (data.talents || []).find(function(t){ return t.key === code; });
-              if (!match) { errEl.classList.remove('hidden'); return; }
-              window.location.href = '/auth/connect?talent_key=' + encodeURIComponent(code);
-            })
-            .catch(function(){
-              // API unavailable — let /auth/connect handle the error
-              window.location.href = '/auth/connect?talent_key=' + encodeURIComponent(code);
-            });
+          window.location.href = '/auth/connect?talent_key=' + encodeURIComponent(code);
         });
       }
     })();
