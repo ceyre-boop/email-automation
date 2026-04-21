@@ -86,10 +86,18 @@ def onboarding_page(talent: str = Query(..., description="Talent key from settin
 
 @app.on_event("startup")
 def on_startup():
-    logger.info("Creating database tables if they don't exist…")
-    try:
-        create_tables()
-    except Exception:
-        logger.exception("FATAL: could not create/verify database tables — check DATABASE_URL")
-        raise
-    logger.info("Startup complete.")
+    settings = get_settings()
+    missing = [k for k in ("google_client_id", "google_client_secret", "openai_api_key", "database_url")
+               if not getattr(settings, k)]
+    if missing:
+        logger.warning("Missing required env vars: %s — set these in Render dashboard → Environment", missing)
+
+    if settings.database_url:
+        logger.info("Creating database tables if they don't exist…")
+        try:
+            create_tables()
+            logger.info("Startup complete.")
+        except Exception:
+            logger.exception("Could not create/verify database tables — check DATABASE_URL")
+    else:
+        logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")

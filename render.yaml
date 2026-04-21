@@ -26,3 +26,5 @@ services:
         generateValue: true
       - key: ALLOWED_ORIGINS
         value: "*"
+      - key: PYTHONUNBUFFERED
+        value: "1"
