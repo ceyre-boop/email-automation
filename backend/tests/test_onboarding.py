@@ -14,8 +14,15 @@ def test_root_returns_html_landing_page(client):
 
 
 def test_root_contains_genie_image(client):
+    import base64
     resp = client.get("/")
     assert "data:image/svg+xml;base64," in resp.text
+    # Extract the base64 payload and confirm it decodes to a valid SVG
+    marker = 'data:image/svg+xml;base64,'
+    start  = resp.text.index(marker) + len(marker)
+    end    = resp.text.index('"', start)
+    svg_bytes = base64.b64decode(resp.text[start:end])
+    assert svg_bytes.strip().startswith(b'<svg')
 
 
 def test_root_contains_onboarding_script(client):
