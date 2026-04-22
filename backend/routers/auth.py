@@ -1,18 +1,20 @@
 """
-Auth router — Google OAuth flow for talent Gmail onboarding.
+Auth router — Google OAuth flow. Open to any user, no pre-registration needed.
 
-GET  /auth/connect?talent_key=katrina  → redirect to Google consent screen
-GET  /auth/callback                    → receive code, store tokens, show success
+GET  /auth/connect   → redirect to Google consent screen
+GET  /auth/callback  → receive code, auto-create or update user, show success
 """
 from __future__ import annotations
 
 import html as html_lib
 import logging
+import re
+import secrets
+import unicodedata
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+import requests
+from fastapi import APIRouter, Depends, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
-from google.oauth2.credentials import Credentials
-from googleapiclient.discovery import build
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -23,21 +25,34 @@ from backend.services.oauth import build_authorization_url, exchange_code
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
+# In-memory CSRF state store {state_token: True}
+# Fine for a single-process server; tokens expire naturally after use.
+_pending_states: dict[str, bool] = {}
+
+
+def _generate_talent_key(name: str, email: str, db: Session) -> str:
+    """Derive a unique talent_key from the user's name or email."""
+    # Normalise: strip accents, lowercase, keep only letters/digits
+    base = unicodedata.normalize("NFKD", name or email.split("@")[0])
+    base = base.encode("ascii", "ignore").decode()
+    base = re.sub(r"[^a-z0-9]", "", base.lower()) or "user"
+    base = base[:24]
+
+    # Make unique — append a number if key already exists
+    key = base
+    n = 2
+    while db.query(TalentToken).filter(TalentToken.talent_key == key).first():
+        key = f"{base}{n}"
+        n += 1
+    return key
+
 
 @router.get("/connect")
-def connect_gmail(talent_key: str = Query(..., description="Talent identifier from settings.json")):
-    """
-    Step 1 — Redirect the talent to Google's consent screen.
-    The talent_key is encoded in the OAuth `state` parameter so we can identify
-    which talent's tokens to store when Google redirects back.
-    """
-    settings = get_settings()
-    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
-    talent = talent_map.get(talent_key.lower())
-    if not talent:
-        raise HTTPException(status_code=404, detail=f"Unknown talent_key: {talent_key}")
-
-    auth_url = build_authorization_url(talent["key"])
+def connect_gmail():
+    """Redirect any user to the Google consent screen. No account needed in advance."""
+    state = secrets.token_urlsafe(32)
+    _pending_states[state] = True
+    auth_url = build_authorization_url(state)
     return RedirectResponse(url=auth_url)
 
 
@@ -48,47 +63,63 @@ def oauth_callback(
     error: str = Query(None),
     db: Session = Depends(get_db),
 ):
+    try:
+        return _oauth_callback_inner(code=code, state=state, error=error, db=db)
+    except Exception as exc:
+        logger.exception("Unhandled error in oauth_callback: %s", exc)
+        return HTMLResponse(content=_error_page("token_exchange_failed"), status_code=200)
+
+
+def _oauth_callback_inner(
+    code: str | None,
+    state: str | None,
+    error: str | None,
+    db,
+):
     if error:
         return HTMLResponse(content=_error_page(error))
-    """
-    Step 2 — Google redirects here after the talent consents.
-    Exchange the authorization code for tokens and store them.
-    """
+
     if not code or not state:
         return HTMLResponse(content=_error_page("missing_params"))
 
-    talent_key = state
-    settings = get_settings()
-    talent_map = {t["key"]: t for t in settings.app_config.get("talents", [])}
+    # Validate CSRF state
+    if state not in _pending_states:
+        return HTMLResponse(content=_error_page("invalid_state"))
+    del _pending_states[state]
 
-    if talent_key not in talent_map:
-        raise HTTPException(status_code=400, detail=f"Unknown talent_key in state: {talent_key}")
+    settings = get_settings()
 
     try:
         token_data = exchange_code(code)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Token exchange failed for %s: %s", talent_key, exc)
-        raise HTTPException(status_code=500, detail="Token exchange failed") from exc
+    except Exception as exc:
+        logger.error("Token exchange failed: %s", exc)
+        return HTMLResponse(content=_error_page("token_exchange_failed"))
 
-    creds = Credentials(
-        token=token_data["access_token"],
-        refresh_token=token_data.get("refresh_token"),
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=settings.google_client_id,
-        client_secret=settings.google_client_secret,
-    )
+    # Fetch Google profile via userinfo endpoint (simpler than googleapiclient.discovery)
     try:
-        oauth2_service = build("oauth2", "v2", credentials=creds, cache_discovery=False)
-        userinfo = oauth2_service.userinfo().get().execute()
+        resp = requests.get(
+            "https://www.googleapis.com/oauth2/v3/userinfo",
+            headers={"Authorization": f"Bearer {token_data['access_token']}"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        userinfo = resp.json()
         email = userinfo.get("email", "")
-        google_user_id = userinfo.get("id", "")
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("Could not fetch userinfo for %s: %s", talent_key, exc)
+        google_user_id = userinfo.get("sub", "")
+        full_name = userinfo.get("name", "") or email.split("@")[0] or "there"
+    except Exception as exc:
+        logger.warning("Could not fetch userinfo: %s", exc)
         email = ""
         google_user_id = ""
+        full_name = "there"
 
-    # Upsert the token row
-    existing = db.query(TalentToken).filter(TalentToken.talent_key == talent_key).first()
+    # Upsert: find by google_user_id first, then email, else create new
+    existing = None
+    if google_user_id:
+        existing = db.query(TalentToken).filter(TalentToken.google_user_id == google_user_id).first()
+    if not existing and email:
+        existing = db.query(TalentToken).filter(TalentToken.email == email).first()
+
     if existing:
         existing.access_token = token_data["access_token"]
         existing.refresh_token = token_data.get("refresh_token") or existing.refresh_token
@@ -97,7 +128,9 @@ def oauth_callback(
         existing.google_user_id = google_user_id or existing.google_user_id
         existing.active = True
         db.add(existing)
+        talent_key = existing.talent_key
     else:
+        talent_key = _generate_talent_key(full_name, email, db)
         row = TalentToken(
             talent_key=talent_key,
             email=email,
@@ -110,15 +143,12 @@ def oauth_callback(
         db.add(row)
 
     db.commit()
-    logger.info("Token stored for talent_key=%s email=%s", talent_key, email)
+    logger.info("User connected: talent_key=%s email=%s", talent_key, email)
 
-    talent_name = talent_map[talent_key].get("full_name", talent_key)
-    # HTML-escape before interpolating into the success page
-    talent_name_escaped = html_lib.escape(talent_name)
-    return HTMLResponse(content=_success_page(talent_name_escaped))
+    return HTMLResponse(content=_success_page(html_lib.escape(full_name)))
 
 
-def _success_page(talent_name: str) -> str:
+def _success_page(name: str) -> str:
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
@@ -128,88 +158,55 @@ def _success_page(talent_name: str) -> str:
   <style>
     *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
     body {{
-      min-height: 100vh;
-      background: #080b14;
+      min-height: 100vh; background: #080b14;
       display: flex; align-items: center; justify-content: center;
-      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
       overflow: hidden; color: #e2e8f0;
     }}
-    .bg-orbs {{ position: fixed; inset: 0; pointer-events: none; z-index: 0; }}
-    .orb {{
-      position: absolute; border-radius: 50%;
-      filter: blur(90px); opacity: 0.28;
-    }}
-    .orb-1 {{ width: 520px; height: 520px; background: #7c3aed; top: -140px; left: -120px; }}
-    .orb-2 {{ width: 420px; height: 420px; background: #1d4ed8; bottom: -100px; right: -100px; }}
-    .orb-3 {{ width: 320px; height: 320px; background: #be185d; top: 45%; left: 58%; }}
-    .glass-card {{
+    .bg {{ position: fixed; inset: 0; pointer-events: none; z-index: 0; }}
+    .orb {{ position: absolute; border-radius: 50%; filter: blur(100px); opacity: 0.22; }}
+    .orb-1 {{ width: 600px; height: 600px; background: #e91e8c; top: -200px; left: -150px; }}
+    .orb-2 {{ width: 500px; height: 500px; background: #6d28d9; bottom: -150px; right: -100px; }}
+    .card {{
       position: relative; z-index: 1;
-      background: rgba(255,255,255,0.05);
-      border: 1px solid rgba(255,255,255,0.10);
-      backdrop-filter: blur(28px) saturate(180%);
-      -webkit-backdrop-filter: blur(28px) saturate(180%);
-      border-radius: 28px;
-      padding: 56px 44px 48px;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.09);
+      backdrop-filter: blur(32px); -webkit-backdrop-filter: blur(32px);
+      border-radius: 28px; padding: 56px 44px 48px;
       max-width: 420px; width: calc(100% - 32px); text-align: center;
-      box-shadow: 0 0 0 1px rgba(255,255,255,0.05) inset, 0 40px 80px rgba(0,0,0,0.65);
+      box-shadow: 0 40px 80px rgba(0,0,0,0.6);
     }}
-    .check-wrapper {{
-      position: relative; width: 92px; height: 92px;
-      margin: 0 auto 32px;
-    }}
+    .check-wrap {{ position: relative; width: 92px; height: 92px; margin: 0 auto 32px; }}
     .check-glow {{
       position: absolute; inset: -18px; border-radius: 50%;
-      background: radial-gradient(circle, rgba(34,197,94,0.45) 0%, transparent 68%);
-      animation: pulse-glow 3s ease-in-out infinite; z-index: 1;
+      background: radial-gradient(circle, rgba(34,197,94,0.4) 0%, transparent 68%);
+      animation: pulse 3s ease-in-out infinite;
     }}
     .check-circle {{
       width: 92px; height: 92px; border-radius: 50%;
-      background: rgba(34,197,94,0.12);
-      border: 2px solid rgba(34,197,94,0.45);
+      background: rgba(34,197,94,0.1); border: 2px solid rgba(34,197,94,0.4);
       display: flex; align-items: center; justify-content: center;
       font-size: 40px; color: #4ade80; position: relative; z-index: 2;
-      animation: check-pop 0.45s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+      animation: pop 0.45s cubic-bezier(0.34,1.56,0.64,1) both;
     }}
-    @keyframes pulse-glow {{
-      0%, 100% {{ opacity: 0.55; transform: scale(1); }}
-      50%       {{ opacity: 0.9;  transform: scale(1.14); }}
-    }}
-    @keyframes check-pop {{
-      from {{ transform: scale(0.4); opacity: 0; }}
-      to   {{ transform: scale(1);   opacity: 1; }}
-    }}
-    h1 {{
-      font-size: 30px; font-weight: 700; color: #f8fafc;
-      line-height: 1.2; letter-spacing: -0.02em; margin-bottom: 12px;
-    }}
-    .name-accent {{ color: #a78bfa; }}
-    .body-text {{
-      font-size: 15px; color: rgba(255,255,255,0.45);
-      line-height: 1.65; margin-bottom: 0;
-    }}
-    .powered-by {{
-      font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase;
-      color: rgba(167,139,250,0.4); margin-top: 32px;
-    }}
+    @keyframes pulse {{ 0%,100% {{ opacity:0.5; transform:scale(1); }} 50% {{ opacity:0.9; transform:scale(1.14); }} }}
+    @keyframes pop {{ from {{ transform:scale(0.4); opacity:0; }} to {{ transform:scale(1); opacity:1; }} }}
+    h1 {{ font-size: 28px; font-weight: 700; color: #f8fafc; letter-spacing: -0.02em; margin-bottom: 12px; line-height: 1.2; }}
+    .accent {{ color: #f472b6; }}
+    p {{ font-size: 15px; color: rgba(255,255,255,0.42); line-height: 1.7; }}
+    .footer {{ font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: rgba(233,30,140,0.3); margin-top: 32px; }}
   </style>
 </head>
 <body>
-  <div class="bg-orbs">
-    <div class="orb orb-1"></div>
-    <div class="orb orb-2"></div>
-    <div class="orb orb-3"></div>
-  </div>
-  <main class="glass-card">
-    <div class="check-wrapper">
+  <div class="bg"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
+  <main class="card">
+    <div class="check-wrap">
       <div class="check-glow"></div>
       <div class="check-circle">✓</div>
     </div>
-    <h1>You're all set,<br/><span class="name-accent">{talent_name}</span></h1>
-    <p class="body-text">
-      Your Gmail is now connected.<br/>
-      Drafts will appear automatically —<br/>you don't need to do anything else.
-    </p>
-    <p class="powered-by">Powered by TABOOST</p>
+    <h1>You're all set,<br/><span class="accent">{name}!</span></h1>
+    <p>Your Gmail is connected to TABOOST.<br/>Brand deal emails will be handled automatically.<br/>You don't need to do anything else.</p>
+    <div class="footer">Powered by TABOOST</div>
   </main>
 </body>
 </html>"""
@@ -217,40 +214,41 @@ def _success_page(talent_name: str) -> str:
 
 def _error_page(error: str) -> str:
     messages = {
-        "access_denied": ("Permission declined", "You cancelled the sign-in or your account isn't approved yet. Ask your manager to add your Gmail to the authorised list, then try again."),
-        "missing_params": ("Something went wrong", "The sign-in response was incomplete. Please close this tab and try again from the start."),
+        "access_denied": ("Permission Declined", "You cancelled the sign-in. Close this tab and try again."),
+        "missing_params": ("Something went wrong", "The sign-in response was incomplete. Please try again."),
+        "invalid_state": ("Session expired", "Your sign-in session expired. Please try again."),
+        "token_exchange_failed": ("Connection failed", "Could not connect to Google. Please try again in a moment."),
     }
-    title, body = messages.get(error, ("Sign-in failed", f"Google returned an error: {html_lib.escape(error)}. Please try again."))
+    title, body = messages.get(error, ("Sign-in failed", f"Google returned an error: {html_lib.escape(error)}."))
     return f"""<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>{title} — TABOOST</title>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>{html_lib.escape(title)} — TABOOST</title>
   <style>
-    *, *::before, *::after {{ box-sizing: border-box; margin: 0; padding: 0; }}
-    body {{ min-height: 100vh; background: #080b14; display: flex; align-items: center; justify-content: center; font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif; overflow: hidden; color: #e2e8f0; }}
-    .bg-orbs {{ position: fixed; inset: 0; pointer-events: none; z-index: 0; }}
-    .orb {{ position: absolute; border-radius: 50%; filter: blur(90px); opacity: 0.28; }}
-    .orb-1 {{ width: 520px; height: 520px; background: #7c3aed; top: -140px; left: -120px; }}
-    .orb-2 {{ width: 420px; height: 420px; background: #1d4ed8; bottom: -100px; right: -100px; }}
-    .glass-card {{ position: relative; z-index: 1; background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.10); backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px); border-radius: 28px; padding: 52px 44px 44px; max-width: 420px; width: calc(100% - 32px); text-align: center; box-shadow: 0 40px 80px rgba(0,0,0,0.65); }}
-    .icon {{ font-size: 52px; margin-bottom: 24px; }}
-    h1 {{ font-size: 26px; font-weight: 700; color: #f8fafc; margin-bottom: 14px; letter-spacing: -0.02em; }}
-    p {{ font-size: 15px; color: rgba(255,255,255,0.45); line-height: 1.65; margin-bottom: 28px; }}
-    a.btn {{ display: inline-flex; align-items: center; justify-content: center; background: rgba(167,139,250,0.15); border: 1px solid rgba(167,139,250,0.35); color: #a78bfa; border-radius: 12px; padding: 13px 28px; font-size: 14px; font-weight: 600; text-decoration: none; transition: background 0.15s; }}
-    a.btn:hover {{ background: rgba(167,139,250,0.25); }}
-    .powered-by {{ font-size: 11px; letter-spacing: 0.13em; text-transform: uppercase; color: rgba(167,139,250,0.35); margin-top: 24px; }}
+    *,*::before,*::after{{box-sizing:border-box;margin:0;padding:0}}
+    body{{min-height:100vh;background:#080b14;display:flex;align-items:center;justify-content:center;
+      font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display',sans-serif;padding:24px;color:#e2e8f0}}
+    .card{{background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);
+      backdrop-filter:blur(32px);border-radius:28px;padding:52px 44px 44px;
+      max-width:420px;width:100%;text-align:center;box-shadow:0 40px 80px rgba(0,0,0,0.6)}}
+    .icon{{font-size:48px;margin-bottom:24px}}
+    h1{{font-size:24px;font-weight:700;color:#f8fafc;margin-bottom:12px;letter-spacing:-0.02em}}
+    p{{font-size:14px;color:rgba(255,255,255,0.42);line-height:1.7;margin-bottom:28px}}
+    a{{display:inline-flex;align-items:center;justify-content:center;
+      background:linear-gradient(135deg,#e91e8c,#c2185b);color:#fff;
+      border-radius:12px;padding:13px 28px;font-size:14px;font-weight:600;text-decoration:none}}
+    .footer{{font-size:11px;letter-spacing:0.12em;text-transform:uppercase;color:rgba(233,30,140,0.3);margin-top:28px}}
   </style>
 </head>
 <body>
-  <div class="bg-orbs"><div class="orb orb-1"></div><div class="orb orb-2"></div></div>
-  <main class="glass-card">
+  <div class="card">
     <div class="icon">⚠️</div>
     <h1>{html_lib.escape(title)}</h1>
     <p>{html_lib.escape(body)}</p>
-    <a class="btn" href="/">← Try again</a>
-    <p class="powered-by">Powered by TABOOST</p>
-  </main>
+    <a href="/">Try again</a>
+    <div class="footer">Powered by TABOOST</div>
+  </div>
 </body>
 </html>"""
