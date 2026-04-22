@@ -41,6 +41,17 @@ def cron_poll(db: Session = Depends(get_db)):
         return {"ok": False, "error": "Polling failed — check server logs for details."}
 
 
+@router.get("/api/db-check", dependencies=[Depends(verify_api_key)])
+def db_check(db: Session = Depends(get_db)):
+    """Quick DB connectivity check — returns row counts or the error."""
+    try:
+        talent_count = db.query(TalentToken).count()
+        draft_count = db.query(Draft).count()
+        return {"ok": True, "talent_rows": talent_count, "draft_rows": draft_count}
+    except Exception as exc:
+        return {"ok": False, "error": str(exc)}
+
+
 @router.get("/api/status", dependencies=[Depends(verify_api_key)])
 def get_status(db: Session = Depends(get_db)):
     """
