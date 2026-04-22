@@ -78,11 +78,12 @@ In Render → **Dashboard → email-automation → Environment**, add:
 
 In **APIs & Services → OAuth consent screen → App information**, set:
 
-- **Application home page**: `https://<your-public-domain>/`
-- **Privacy policy**: `https://<your-public-domain>/privacy`
+- **Application home page**: `https://{your-public-domain}/`
+- **Privacy policy**: `https://{your-public-domain}/privacy`
+- Example (Render): `https://email-automation.onrender.com/` and `https://email-automation.onrender.com/privacy`
 
 Important:
-- Do **not** use `/auth/callback` as your privacy policy URL.
+- Do **not** use `/auth/callback` as your privacy policy URL (it is a technical OAuth endpoint, not a human-readable policy page, and verification checks can reject it).
 - The home page must be publicly accessible without login.
 - Use a domain you control/own (custom domain is recommended for verification).
 
