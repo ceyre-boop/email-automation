@@ -74,6 +74,18 @@ In Render → **Dashboard → email-automation → Environment**, add:
    `https://email-automation.onrender.com/auth/callback`
 3. Save
 
+#### Step 3.1 — OAuth consent screen URLs (required for verification)
+
+In **APIs & Services → OAuth consent screen → App information**, set:
+
+- **Application home page**: `https://<your-public-domain>/`
+- **Privacy policy**: `https://<your-public-domain>/privacy`
+
+Important:
+- Do **not** use `/auth/callback` as your privacy policy URL.
+- The home page must be publicly accessible without login.
+- Use a domain you control/own (custom domain is recommended for verification).
+
 #### Step 4 — Add GitHub Secrets for the daily poller
 
 Go to your repo → *Settings → Secrets and variables → Actions → New repository secret* and add the same credentials:
