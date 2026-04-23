@@ -15,6 +15,7 @@ from sqlalchemy import (
     create_engine,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from backend.core.config import get_settings
 
@@ -133,10 +134,10 @@ class ManagerContext(Base):
 
 def _make_engine():
     settings = get_settings()
-    # SQLAlchemy 2.x dropped the legacy "postgres://" scheme; Render/Supabase
-    # still emit it, so normalise here before creating the engine.
     db_url = settings.database_url.replace("postgres://", "postgresql://", 1)
-    return create_engine(db_url, pool_pre_ping=True)
+    # NullPool: open/close a connection per request — prevents exhausting
+    # Supabase Session Pooler's limited free-tier connection slots.
+    return create_engine(db_url, poolclass=NullPool)
 
 
 def get_engine():

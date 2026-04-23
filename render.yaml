@@ -2,9 +2,10 @@ services:
   - type: web
     name: email-automation
     env: python
-    buildCommand: pip install -r backend/requirements.txt
-    startCommand: python run.py
+    region: oregon
     plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: GOOGLE_CLIENT_ID
         sync: false
@@ -16,14 +17,14 @@ services:
         sync: false
       - key: DATABASE_URL
         sync: false
-      - key: GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON
+      - key: GOOGLE_SHEETS_REFRESH_TOKEN
         sync: false
       - key: APP_BASE_URL
         sync: false
       - key: AGENCY_SECRET_KEY
-        generateValue: true
+        sync: false
       - key: API_KEY
-        generateValue: true
+        sync: false
       - key: ALLOWED_ORIGINS
         value: "*"
       - key: PYTHONUNBUFFERED
