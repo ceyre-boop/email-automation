@@ -115,6 +115,18 @@ class Draft(Base):
     reviewed_by: Mapped[str | None] = mapped_column(String(128))
 
 
+class ManagerContext(Base):
+    """Manager instructions injected into every GPT-4o reply system prompt."""
+
+    __tablename__ = "manager_context"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    text: Mapped[str] = mapped_column(Text, nullable=False)
+    added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    added_by: Mapped[str | None] = mapped_column(String(128))
+    active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+
+
 # ── Engine / session factory ─────────────────────────────────────────────────
 # These are created lazily so tests can override DATABASE_URL before import.
 

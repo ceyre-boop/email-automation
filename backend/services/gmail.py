@@ -35,7 +35,7 @@ def _gmail_service(token_row):
 # ── Reading ──────────────────────────────────────────────────────────────────
 
 
-def list_unread_inbox_messages(token_row, max_results: int = 20) -> list[dict]:
+def list_unread_inbox_messages(token_row, max_results: int = 30) -> list[dict]:
     """
     Return a list of unread INBOX messages for the talent.
     Each item: {"id": <gmail_message_id>, "threadId": <thread_id>}

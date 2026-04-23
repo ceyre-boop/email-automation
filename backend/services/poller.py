@@ -29,9 +29,7 @@ logger = logging.getLogger(__name__)
 def _talent_config_map(settings) -> dict[str, dict]:
     """Return a dict of talent_key → talent config dict from settings.json.
 
-    Keys are normalised to lowercase so that auto-generated keys from the
-    OAuth flow (always lowercase) match capitalised keys in settings.json
-    (e.g. DB stores 'katrina', settings has 'Katrina').
+    Keys are normalised to lowercase so DB keys ('katrina') match config keys ('Katrina').
     """
     return {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
 
@@ -193,6 +191,7 @@ def _process_one_message(
             brand_name=brand_name,
             proposed_rate=proposed_rate,
             triage_reason=reason,
+            db=db,
         )
         draft_text = reply_result["draft_text"]
         is_escalate = reply_result["is_escalate"]

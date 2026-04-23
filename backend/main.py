@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from backend.core.config import get_settings
 from backend.models.db import create_tables
 try:
-    from backend.routers import auth, cron, drafts
+    from backend.routers import auth, cron, drafts, dashboard
 except Exception as _import_exc:
     print(f"FATAL: router import failed — {_import_exc}", file=sys.stderr, flush=True)
     import traceback; traceback.print_exc(file=sys.stderr)
@@ -55,6 +55,17 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(drafts.router)
 app.include_router(cron.router)
+app.include_router(dashboard.router)
+
+
+# ── Manager Dashboard ─────────────────────────────────────────────────────────
+_dashboard_html_path = Path(__file__).parent / "static" / "dashboard.html"
+
+
+@app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
+def dashboard_page():
+    """Serve the manager dashboard SPA."""
+    return HTMLResponse(content=_dashboard_html_path.read_text(encoding="utf-8"))
 
 
 # ── Onboarding page at /connect?talent=<key> ─────────────────────────────────
