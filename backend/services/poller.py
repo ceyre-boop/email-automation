@@ -188,6 +188,7 @@ def _process_one_message(
             brand_name=brand_name,
             proposed_rate=proposed_rate,
             triage_reason=reason,
+            db=db,
         )
         draft_text = reply_result["draft_text"]
         is_escalate = reply_result["is_escalate"]

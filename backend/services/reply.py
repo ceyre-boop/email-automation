@@ -17,6 +17,24 @@ logger = logging.getLogger(__name__)
 
 _ESCALATE_PREFIX = "ESCALATE:"
 
+
+def _load_active_manager_context(db) -> str:
+    """Load active manager context entries from DB and join as bullet list."""
+    if db is None:
+        return ""
+    try:
+        from backend.models.db import ManagerContext  # local import avoids circular
+        rows = (
+            db.query(ManagerContext)
+            .filter(ManagerContext.active == True)  # noqa: E712
+            .order_by(ManagerContext.added_at.asc())
+            .all()
+        )
+        return "\n".join(f"- {r.text}" for r in rows) if rows else ""
+    except Exception as exc:
+        logger.warning("Could not load manager_context: %s", exc)
+        return ""
+
 # PII patterns that must never appear in AI-generated replies
 _PII_PATTERNS = [
     # Street addresses
@@ -78,10 +96,19 @@ def _build_reply_messages(
     brand_name: str,
     proposed_rate: float,
     triage_reason: str,
+    manager_context_text: str = "",
 ) -> list[dict]:
     """Fill reply.md template variables and return chat messages."""
     raw = get_settings().reply_prompt
     system_text, user_template = _parse_prompt_sections(raw)
+
+    if manager_context_text.strip():
+        system_text += (
+            "\n\n## MANAGER INSTRUCTIONS\n"
+            "The manager has added the following real-time instructions. "
+            "Apply these with higher priority than default SOP rules:\n"
+            + manager_context_text
+        )
 
     sop_rules = _build_sop_rules_text(talent_key)
 
@@ -114,6 +141,7 @@ def draft_reply(
     brand_name: str,
     proposed_rate: float,
     triage_reason: str,
+    db=None,
 ) -> dict:
     """
     Generate a reply draft using GPT-4o.
@@ -130,6 +158,8 @@ def draft_reply(
     cfg = settings.app_config.get("openai", {})
     client = OpenAI(api_key=settings.openai_api_key)
 
+    manager_context_text = _load_active_manager_context(db)
+
     messages = _build_reply_messages(
         talent_key=talent_key,
         talent_name=talent_name,
@@ -140,6 +170,7 @@ def draft_reply(
         brand_name=brand_name,
         proposed_rate=proposed_rate,
         triage_reason=triage_reason,
+        manager_context_text=manager_context_text,
     )
 
     try:

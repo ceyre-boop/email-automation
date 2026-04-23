@@ -1,0 +1,1546 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Inbox Manager</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Google+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+/* ── Design tokens ────────────────────────────────────────────────────────── */
+:root {
+  --bg:        #1a1a1a;
+  --bg2:       #1e2030;
+  --bg3:       #252840;
+  --border:    #2d3154;
+  --accent:    #00d4aa;
+  --accent-d:  #00a884;
+  --text:      #e2e8f0;
+  --text2:     #94a3b8;
+  --text3:     #64748b;
+  --good:      #22c55e;
+  --uncert:    #f59e0b;
+  --trash:     #ef4444;
+  --mono:      'JetBrains Mono', 'Cascadia Code', monospace;
+  --sans:      'Google Sans', system-ui, sans-serif;
+  --sidebar-w: 220px;
+}
+
+/* ── Reset ────────────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+button { cursor: pointer; border: none; background: none; font: inherit; }
+ul { list-style: none; }
+a { text-decoration: none; }
+textarea { resize: vertical; }
+
+/* ── Shell ────────────────────────────────────────────────────────────────── */
+body {
+  font-family: var(--mono);
+  background: var(--bg);
+  color: var(--text);
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+#sidebar {
+  width: var(--sidebar-w);
+  min-width: var(--sidebar-w);
+  background: var(--bg2);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.sidebar-header {
+  padding: 20px 16px 12px;
+  border-bottom: 1px solid var(--border);
+}
+.sidebar-logo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.sidebar-logo svg { flex-shrink: 0; }
+.nav-section { padding: 8px 0; border-bottom: 1px solid var(--border); }
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 16px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  border-radius: 0;
+}
+.nav-item:hover { background: var(--bg3); color: var(--text); }
+.nav-item.active { color: var(--accent); background: rgba(0,212,170,0.08); }
+.sidebar-section-label {
+  padding: 12px 16px 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+#talent-list { overflow-y: auto; flex: 1; padding: 4px 0; }
+.talent-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 16px;
+  font-size: 12px;
+  color: var(--text2);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.talent-item:hover { background: var(--bg3); color: var(--text); }
+.talent-item.active { color: var(--accent); background: rgba(0,212,170,0.08); }
+.status-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.status-dot.on  { background: var(--accent); }
+.status-dot.off { background: var(--text3); }
+.talent-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge {
+  background: var(--accent);
+  color: #000;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 1px 6px;
+  min-width: 18px;
+  text-align: center;
+  flex-shrink: 0;
+}
+.sidebar-footer {
+  padding: 10px 16px;
+  border-top: 1px solid var(--border);
+}
+.btn-refresh {
+  width: 100%;
+  padding: 6px 10px;
+  font-size: 11px;
+  font-family: var(--mono);
+  color: var(--text2);
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  transition: color 0.15s, border-color 0.15s;
+}
+.btn-refresh:hover { color: var(--accent); border-color: var(--accent); }
+
+/* ── Main content area ────────────────────────────────────────────────────── */
+#main {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Overview view ────────────────────────────────────────────────────────── */
+#view-overview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px 40px;
+}
+.overview-header {
+  display: flex;
+  align-items: baseline;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.overview-header h1 {
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--text);
+}
+.overview-header .date-chip {
+  font-size: 12px;
+  color: var(--text3);
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+.summary-bar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+.stat-pill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 16px 24px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--bg2);
+  min-width: 120px;
+}
+.stat-pill .num {
+  font-size: 32px;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 6px;
+}
+.stat-pill label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
+.stat-pill.good   .num { color: var(--good); }
+.stat-pill.uncert .num { color: var(--uncert); }
+.stat-pill.trash  .num { color: var(--trash); }
+.stat-pill.total  .num { color: var(--accent); }
+
+#talent-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+  margin-bottom: 36px;
+}
+.talent-card {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px 18px;
+  cursor: pointer;
+  transition: border-color 0.2s, transform 0.15s, background 0.15s;
+}
+.talent-card:hover {
+  border-color: var(--accent);
+  background: var(--bg3);
+  transform: translateY(-1px);
+}
+.card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
+.card-name { font-size: 13px; font-weight: 600; color: var(--text); }
+.card-manager { font-size: 10px; color: var(--text3); }
+.card-counts { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+.count-chip {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-weight: 500;
+}
+.count-chip.good   { background: rgba(34,197,94,0.12);  color: var(--good); }
+.count-chip.uncert { background: rgba(245,158,11,0.12); color: var(--uncert); }
+.count-chip.trash  { background: rgba(239,68,68,0.12);  color: var(--trash); }
+.card-best-deal { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
+.card-best-deal strong { color: var(--accent); }
+.card-footer { display: flex; justify-content: flex-end; }
+.draft-badge {
+  font-size: 10px;
+  background: rgba(0,212,170,0.12);
+  color: var(--accent);
+  border: 1px solid rgba(0,212,170,0.3);
+  border-radius: 20px;
+  padding: 2px 8px;
+}
+
+/* ── Context panel ────────────────────────────────────────────────────────── */
+#context-panel {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+}
+#context-panel h3 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
+.muted-text { font-size: 11px; color: var(--text3); margin-bottom: 14px; }
+#context-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
+.context-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  background: var(--bg3);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 10px 12px;
+}
+.context-entry-text { flex: 1; font-size: 12px; color: var(--text); line-height: 1.5; }
+.context-entry-meta { font-size: 10px; color: var(--text3); margin-top: 3px; }
+.btn-del {
+  font-size: 14px;
+  color: var(--text3);
+  padding: 0 4px;
+  transition: color 0.15s;
+  flex-shrink: 0;
+}
+.btn-del:hover { color: var(--trash); }
+.context-add { display: flex; flex-direction: column; gap: 8px; }
+.context-add textarea {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.context-add textarea:focus { outline: none; border-color: var(--accent); }
+.btn-add-context {
+  align-self: flex-start;
+  padding: 7px 16px;
+  background: var(--accent);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.btn-add-context:hover { background: var(--accent-d); }
+
+/* ── Gmail view ───────────────────────────────────────────────────────────── */
+#view-gmail {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #fff;
+  font-family: var(--sans);
+}
+
+/* Gmail top bar */
+.gmail-topbar {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 8px 16px;
+  background: #fff;
+  border-bottom: 1px solid #e0e0e0;
+  flex-shrink: 0;
+  z-index: 10;
+}
+.gmail-back-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: #5f6368;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  cursor: pointer;
+  font-family: var(--mono);
+  transition: background 0.15s;
+  flex-shrink: 0;
+}
+.gmail-back-btn:hover { background: #f1f3f4; border-color: #dadce0; }
+.gmail-brand {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+.gmail-m {
+  width: 32px;
+  height: 32px;
+  background: linear-gradient(135deg, #4285f4 0%, #ea4335 50%, #fbbc04 75%, #34a853 100%);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 700;
+  font-size: 15px;
+  font-family: var(--sans);
+}
+.gmail-brand-label {
+  font-size: 20px;
+  color: #5f6368;
+  font-family: var(--sans);
+  font-weight: 400;
+  letter-spacing: -0.5px;
+}
+.gmail-search-wrap {
+  flex: 1;
+  max-width: 720px;
+  margin: 0 16px;
+}
+.gmail-search-wrap input {
+  width: 100%;
+  padding: 8px 16px;
+  background: #eaf1fb;
+  border: none;
+  border-radius: 24px;
+  font-size: 14px;
+  font-family: var(--sans);
+  color: #202124;
+  outline: none;
+  transition: background 0.2s;
+}
+.gmail-search-wrap input:focus { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+.gmail-talent-pill {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 12px;
+  background: #f1f3f4;
+  border-radius: 20px;
+  font-size: 12px;
+  color: #5f6368;
+  flex-shrink: 0;
+}
+.gmail-talent-avatar {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: #4285f4;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: var(--sans);
+}
+
+/* Gmail body layout */
+.gmail-body {
+  display: flex;
+  flex: 1;
+  overflow: hidden;
+}
+
+/* Gmail left nav */
+.gmail-nav-panel {
+  width: 200px;
+  flex-shrink: 0;
+  padding: 8px 0;
+  overflow-y: auto;
+  border-right: 1px solid #f0f0f0;
+}
+.gmail-nav-panel .compose-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 8px 12px;
+  padding: 14px 20px;
+  background: #fff;
+  border: none;
+  border-radius: 24px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1);
+  font-size: 14px;
+  font-family: var(--sans);
+  color: #202124;
+  cursor: default;
+  pointer-events: none;
+}
+.gmail-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 6px 14px 6px 18px;
+  font-size: 14px;
+  color: #202124;
+  border-radius: 0 20px 20px 0;
+  cursor: pointer;
+  font-family: var(--sans);
+}
+.gmail-nav-item.active { background: #fce8e6; font-weight: 600; color: #202124; }
+.gmail-nav-item:not(.active):hover { background: #f1f3f4; }
+.gmail-nav-item .nav-icon { font-size: 18px; width: 20px; text-align: center; }
+.gmail-nav-count { margin-left: auto; font-size: 12px; font-weight: 400; color: #202124; }
+
+/* Gmail main email area */
+.gmail-main {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Email list pane */
+#gmail-email-list {
+  width: 380px;
+  min-width: 280px;
+  border-right: 1px solid #e0e0e0;
+  overflow-y: auto;
+  flex-shrink: 0;
+  background: #fff;
+}
+.gmail-list-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 16px;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.gmail-tab-pill {
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-family: var(--sans);
+  color: #5f6368;
+  background: none;
+  transition: background 0.15s;
+}
+.gmail-tab-pill.active { background: #e8f0fe; color: #1a73e8; font-weight: 500; }
+.gmail-tab-pill:not(.active):hover { background: #f1f3f4; }
+.email-row {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 10px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  cursor: pointer;
+  transition: background 0.1s;
+  position: relative;
+}
+.email-row:hover { background: #f5f5f5; }
+.email-row.selected { background: #e8f0fe; }
+.email-row.unread .email-sender-col { font-weight: 600; }
+.email-row.unread .email-subject-col { font-weight: 600; }
+.score-stripe {
+  width: 4px;
+  border-radius: 2px;
+  align-self: stretch;
+  margin-right: 10px;
+  flex-shrink: 0;
+}
+.score-stripe.good   { background: #22c55e; }
+.score-stripe.uncert { background: #f59e0b; }
+.score-stripe.trash  { background: #ef4444; }
+.email-meta-col { flex: 1; overflow: hidden; }
+.email-sender-col {
+  font-size: 14px;
+  color: #202124;
+  font-family: var(--sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.email-subject-col {
+  font-size: 13px;
+  color: #444;
+  font-family: var(--sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-bottom: 2px;
+}
+.email-snippet-col {
+  font-size: 12px;
+  color: #5f6368;
+  font-family: var(--sans);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.email-right-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 8px;
+}
+.email-date {
+  font-size: 11px;
+  color: #5f6368;
+  font-family: var(--sans);
+  white-space: nowrap;
+}
+.score-label {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 10px;
+  font-family: var(--mono);
+  font-weight: 600;
+}
+.score-label.good   { background: rgba(34,197,94,0.12);  color: #16a34a; }
+.score-label.uncert { background: rgba(245,158,11,0.12); color: #b45309; }
+.score-label.trash  { background: rgba(239,68,68,0.12);  color: #b91c1c; }
+.gmail-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 200px;
+  color: #5f6368;
+  font-size: 14px;
+  font-family: var(--sans);
+  gap: 8px;
+}
+
+/* Email reading pane */
+#gmail-reading-pane {
+  flex: 1;
+  overflow-y: auto;
+  background: #fff;
+}
+.reading-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  border-bottom: 1px solid #e0e0e0;
+  position: sticky;
+  top: 0;
+  background: #fff;
+  z-index: 1;
+}
+.reading-toolbar .tool-btn {
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  color: #5f6368;
+  background: none;
+  transition: background 0.15s;
+  font-family: var(--sans);
+}
+.reading-toolbar .tool-btn:hover { background: #f1f3f4; }
+.email-thread {
+  padding: 24px 32px;
+}
+.email-thread-subject {
+  font-size: 22px;
+  color: #202124;
+  font-family: var(--sans);
+  font-weight: 400;
+  margin-bottom: 16px;
+}
+.email-thread-msg {
+  background: #fff;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  margin-bottom: 16px;
+  overflow: hidden;
+}
+.msg-header {
+  display: flex;
+  align-items: flex-start;
+  padding: 16px 20px;
+  border-bottom: 1px solid #f0f0f0;
+  gap: 12px;
+}
+.msg-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #5f6368;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 600;
+  font-family: var(--sans);
+  flex-shrink: 0;
+}
+.msg-from { font-size: 14px; font-weight: 600; color: #202124; font-family: var(--sans); }
+.msg-from-email { font-size: 13px; color: #5f6368; font-family: var(--sans); font-weight: 400; }
+.msg-date { font-size: 12px; color: #5f6368; font-family: var(--sans); margin-left: auto; flex-shrink: 0; }
+.msg-body {
+  padding: 16px 20px;
+  font-size: 14px;
+  color: #202124;
+  font-family: var(--sans);
+  line-height: 1.6;
+}
+.msg-meta-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f0f0f0; }
+.meta-chip {
+  font-size: 11px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  font-family: var(--mono);
+  background: #f1f3f4;
+  color: #5f6368;
+}
+.meta-chip.rate { background: #e8f5e9; color: #1b5e20; }
+.meta-chip.brand { background: #e8eaf6; color: #1a237e; }
+.meta-chip.type { background: #fff3e0; color: #e65100; }
+.meta-chip.score-good   { background: rgba(34,197,94,0.12);  color: #16a34a; }
+.meta-chip.score-uncert { background: rgba(245,158,11,0.12); color: #b45309; }
+.meta-chip.score-trash  { background: rgba(239,68,68,0.12);  color: #b91c1c; }
+
+/* AI Draft compose area */
+.draft-compose-wrap {
+  margin: 0 32px 32px;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+}
+.draft-compose-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 16px;
+  background: #f8f9fa;
+  border-bottom: 1px solid #e0e0e0;
+}
+.draft-compose-title { font-size: 13px; font-weight: 500; color: #202124; font-family: var(--sans); }
+.draft-compose-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: #e3f2fd;
+  color: #1565c0;
+  font-family: var(--mono);
+}
+.draft-compose-badge.escalate { background: #fce4ec; color: #880e4f; }
+.draft-field {
+  display: flex;
+  align-items: center;
+  padding: 8px 16px;
+  border-bottom: 1px solid #f0f0f0;
+  gap: 6px;
+}
+.draft-field-label { font-size: 12px; color: #5f6368; font-family: var(--sans); min-width: 50px; }
+.draft-field-value { font-size: 13px; color: #202124; font-family: var(--sans); flex: 1; }
+.draft-body-area {
+  padding: 0;
+}
+.draft-body-area textarea {
+  width: 100%;
+  padding: 16px;
+  border: none;
+  outline: none;
+  font-size: 14px;
+  font-family: var(--sans);
+  color: #202124;
+  line-height: 1.6;
+  min-height: 180px;
+  background: #fff;
+}
+.draft-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px;
+  background: #f8f9fa;
+  border-top: 1px solid #e0e0e0;
+}
+.btn-send {
+  padding: 8px 20px;
+  background: #1a73e8;
+  color: #fff;
+  font-size: 13px;
+  font-family: var(--sans);
+  font-weight: 500;
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.btn-send:hover:not(:disabled) { background: #1557b0; }
+.btn-send:disabled { background: #ccc; cursor: not-allowed; }
+.btn-save-draft {
+  padding: 8px 16px;
+  color: #5f6368;
+  font-size: 13px;
+  font-family: var(--sans);
+  border-radius: 4px;
+  transition: background 0.15s;
+}
+.btn-save-draft:hover { background: #f1f3f4; }
+.btn-discard {
+  padding: 8px 16px;
+  color: #d93025;
+  font-size: 13px;
+  font-family: var(--sans);
+  border-radius: 4px;
+  margin-left: auto;
+  transition: background 0.15s;
+}
+.btn-discard:hover { background: #fce8e6; }
+.reading-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #5f6368;
+  font-family: var(--sans);
+  font-size: 15px;
+  gap: 8px;
+}
+.reading-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
+
+/* ── Toast ────────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  background: #323232;
+  color: #fff;
+  padding: 10px 18px;
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: var(--mono);
+  z-index: 9999;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.3s;
+  max-width: 320px;
+}
+#toast.show { opacity: 1; pointer-events: auto; }
+
+/* ── Loading spinner ──────────────────────────────────────────────────────── */
+.spinner {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border: 2px solid var(--border);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ── API key overlay ──────────────────────────────────────────────────────── */
+#api-key-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+.api-key-box {
+  background: var(--bg2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 32px 36px;
+  width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.api-key-box h2 { font-size: 15px; font-weight: 600; color: var(--text); }
+.api-key-box p { font-size: 12px; color: var(--text2); line-height: 1.5; }
+.api-key-box input {
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+}
+.api-key-box input:focus { border-color: var(--accent); }
+.btn-api-submit {
+  padding: 10px;
+  background: var(--accent);
+  color: #000;
+  font-family: var(--mono);
+  font-size: 13px;
+  font-weight: 600;
+  border-radius: 6px;
+  transition: background 0.15s;
+}
+.btn-api-submit:hover { background: var(--accent-d); }
+
+/* ── Scrollbar ────────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<!-- API key overlay -->
+<div id="api-key-overlay" style="display:none">
+  <div class="api-key-box">
+    <h2>◉ Inbox Manager</h2>
+    <p>Enter your API key to access the dashboard.</p>
+    <input type="password" id="api-key-input" placeholder="x-api-key value" autocomplete="off">
+    <button class="btn-api-submit" id="btn-api-submit">Enter Dashboard</button>
+  </div>
+</div>
+
+<!-- Sidebar -->
+<aside id="sidebar">
+  <div class="sidebar-header">
+    <div class="sidebar-logo">
+      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+        <circle cx="8" cy="8" r="7" stroke="#00d4aa" stroke-width="1.5"/>
+        <circle cx="8" cy="8" r="3" fill="#00d4aa"/>
+      </svg>
+      Inbox Manager
+    </div>
+  </div>
+  <div class="nav-section">
+    <div class="nav-item active" id="nav-overview">
+      <span>📊</span> Daily Report
+    </div>
+  </div>
+  <div class="sidebar-section-label">Talent Inboxes</div>
+  <ul id="talent-list">
+    <li style="padding:12px 16px;font-size:11px;color:var(--text3)"><span class="spinner"></span></li>
+  </ul>
+  <div class="sidebar-footer">
+    <button class="btn-refresh" id="btn-refresh">↻ Refresh Data</button>
+  </div>
+</aside>
+
+<!-- Main -->
+<main id="main">
+
+  <!-- Overview view -->
+  <div id="view-overview" style="display:none">
+    <div style="flex:1;overflow-y:auto;padding:28px 32px 40px">
+      <div class="overview-header">
+        <h1>Daily Report</h1>
+        <span class="date-chip" id="report-date">—</span>
+      </div>
+      <div class="summary-bar">
+        <div class="stat-pill good">
+          <span class="num" id="total-good">—</span>
+          <label>Good Deals</label>
+        </div>
+        <div class="stat-pill uncert">
+          <span class="num" id="total-uncert">—</span>
+          <label>Uncertain</label>
+        </div>
+        <div class="stat-pill trash">
+          <span class="num" id="total-trash">—</span>
+          <label>Trash</label>
+        </div>
+        <div class="stat-pill total">
+          <span class="num" id="total-all">—</span>
+          <label>Total Emails</label>
+        </div>
+      </div>
+      <div id="talent-cards-grid"></div>
+      <section id="context-panel">
+        <h3>Manager Instructions</h3>
+        <p class="muted-text">These are injected into every GPT reply draft. Add them here and they take effect on the next poll.</p>
+        <div id="context-list"></div>
+        <div class="context-add">
+          <textarea id="context-input" placeholder="E.g. Do not accept affiliate-only deals this week. Always ask for $500 minimum upfront." rows="3"></textarea>
+          <button class="btn-add-context" id="btn-add-context">Add Instruction</button>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- Gmail replica view -->
+  <div id="view-gmail" style="display:none;flex:1;flex-direction:column;overflow:hidden;background:#fff">
+
+    <!-- Top bar -->
+    <div class="gmail-topbar">
+      <button class="gmail-back-btn" id="gmail-back">
+        ← Overview
+      </button>
+      <div class="gmail-brand">
+        <div class="gmail-m">M</div>
+        <span class="gmail-brand-label">ail</span>
+      </div>
+      <div class="gmail-search-wrap">
+        <input type="text" placeholder="Search in mail" id="gmail-search">
+      </div>
+      <div class="gmail-talent-pill">
+        <div class="gmail-talent-avatar" id="gmail-avatar">?</div>
+        <span id="gmail-talent-label">—</span>
+      </div>
+    </div>
+
+    <!-- Gmail body -->
+    <div class="gmail-body" style="flex:1;overflow:hidden">
+
+      <!-- Left nav -->
+      <div class="gmail-nav-panel">
+        <button class="compose-btn">✏️ Compose</button>
+        <div class="gmail-nav-item active">
+          <span class="nav-icon">📥</span>
+          Inbox
+          <span class="gmail-nav-count" id="gmail-inbox-count"></span>
+        </div>
+        <div class="gmail-nav-item">
+          <span class="nav-icon">⭐</span>
+          Starred
+        </div>
+        <div class="gmail-nav-item">
+          <span class="nav-icon">🕐</span>
+          Snoozed
+        </div>
+        <div class="gmail-nav-item">
+          <span class="nav-icon">📤</span>
+          Sent
+        </div>
+        <div class="gmail-nav-item">
+          <span class="nav-icon">📝</span>
+          Drafts
+          <span class="gmail-nav-count" id="gmail-draft-count"></span>
+        </div>
+        <div class="gmail-nav-item">
+          <span class="nav-icon">🏷️</span>
+          All Mail
+        </div>
+        <div class="gmail-nav-item">
+          <span class="nav-icon">🗑️</span>
+          Trash
+        </div>
+      </div>
+
+      <!-- Email list + reading pane -->
+      <div class="gmail-main" style="flex:1;overflow:hidden">
+
+        <!-- Email list -->
+        <div id="gmail-email-list">
+          <div class="gmail-list-toolbar">
+            <button class="gmail-tab-pill active">Primary</button>
+            <button class="gmail-tab-pill">Promotions</button>
+            <button class="gmail-tab-pill">Updates</button>
+          </div>
+          <div id="email-rows"></div>
+        </div>
+
+        <!-- Reading pane -->
+        <div id="gmail-reading-pane">
+          <div class="reading-placeholder">
+            <div class="icon">📧</div>
+            Select an email to read it
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+</main>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let API_KEY = localStorage.getItem('inbox_api_key') || '';
+
+const state = {
+  view: 'overview',       // 'overview' | 'gmail'
+  selectedTalent: null,   // TalentOut
+  selectedEmail: null,    // EmailOut
+  selectedDraft: null,    // DraftOut
+  report: null,
+  talents: [],
+  emails: [],
+  drafts: [],
+  context: [],
+};
+
+// ── API helper ─────────────────────────────────────────────────────────────
+async function api(method, path, body = null) {
+  const opts = {
+    method,
+    headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' },
+  };
+  if (body) opts.body = JSON.stringify(body);
+  let res;
+  try { res = await fetch(path, opts); }
+  catch (e) { showToast('Network error: ' + e.message); throw e; }
+  if (res.status === 403) {
+    localStorage.removeItem('inbox_api_key');
+    API_KEY = '';
+    showApiKeyOverlay();
+    throw new Error('Invalid API key');
+  }
+  if (!res.ok) {
+    const msg = await res.text().catch(() => res.statusText);
+    showToast('Error ' + res.status + ': ' + msg.slice(0, 120));
+    throw new Error(msg);
+  }
+  return res.json();
+}
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+function esc(s) {
+  if (s == null) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  if (isToday) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+}
+function shortSender(sender) {
+  if (!sender) return 'Unknown';
+  const nameMatch = sender.match(/^"?([^"<]+)"?\s*</);
+  if (nameMatch) return nameMatch[1].trim();
+  return sender.split('@')[0];
+}
+function scoreClass(score) {
+  return score === 3 ? 'good' : score === 1 ? 'trash' : 'uncert';
+}
+function scoreName(score) {
+  return score === 3 ? 'Good' : score === 1 ? 'Trash' : 'Uncertain';
+}
+function initial(name) {
+  if (!name) return '?';
+  return name.trim()[0].toUpperCase();
+}
+function formatRate(r) {
+  if (r == null) return '—';
+  return '$' + Number(r).toLocaleString('en-US', { maximumFractionDigits: 0 });
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ── API key overlay ────────────────────────────────────────────────────────
+function showApiKeyOverlay() {
+  document.getElementById('api-key-overlay').style.display = 'flex';
+}
+function hideApiKeyOverlay() {
+  document.getElementById('api-key-overlay').style.display = 'none';
+}
+document.getElementById('btn-api-submit').addEventListener('click', () => {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) return;
+  API_KEY = val;
+  localStorage.setItem('inbox_api_key', val);
+  hideApiKeyOverlay();
+  bootstrap();
+});
+document.getElementById('api-key-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') document.getElementById('btn-api-submit').click();
+});
+
+// ── Bootstrap ──────────────────────────────────────────────────────────────
+async function bootstrap() {
+  if (!API_KEY) { showApiKeyOverlay(); return; }
+  await loadOverview();
+  setInterval(() => {
+    if (state.view === 'overview') loadOverview();
+  }, 60000);
+}
+
+// ── Overview ───────────────────────────────────────────────────────────────
+async function loadOverview() {
+  try {
+    const [report, talents, context] = await Promise.all([
+      api('GET', '/api/dashboard/report'),
+      api('GET', '/api/dashboard/talents'),
+      api('GET', '/api/dashboard/context'),
+    ]);
+    state.report = report;
+    state.talents = talents;
+    state.context = context;
+    renderSidebar();
+    renderSummaryBar();
+    renderTalentCards();
+    renderContextPanel();
+    showView('overview');
+  } catch (e) {
+    // Already handled by api()
+  }
+}
+
+function showView(name) {
+  state.view = name;
+  document.getElementById('view-overview').style.display = name === 'overview' ? '' : 'none';
+  const gmailEl = document.getElementById('view-gmail');
+  if (name === 'gmail') {
+    gmailEl.style.display = 'flex';
+  } else {
+    gmailEl.style.display = 'none';
+  }
+  // Update nav highlight
+  document.getElementById('nav-overview').classList.toggle('active', name === 'overview');
+  document.querySelectorAll('.talent-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.key === state.selectedTalent?.key && name === 'gmail');
+  });
+}
+
+// ── Sidebar ────────────────────────────────────────────────────────────────
+function renderSidebar() {
+  const ul = document.getElementById('talent-list');
+  ul.innerHTML = '';
+  const pendingMap = {};
+  if (state.report) {
+    state.report.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_drafts; });
+  }
+  state.talents.forEach(t => {
+    const pending = pendingMap[t.key] || 0;
+    const li = document.createElement('li');
+    li.className = 'talent-item';
+    li.dataset.key = t.key;
+    li.innerHTML = `
+      <span class="status-dot ${t.connected ? 'on' : 'off'}"></span>
+      <span class="talent-name">${esc(t.full_name)}</span>
+      ${pending > 0 ? `<span class="badge">${pending}</span>` : ''}
+    `;
+    li.addEventListener('click', () => openTalentView(t));
+    ul.appendChild(li);
+  });
+}
+
+// ── Summary bar ────────────────────────────────────────────────────────────
+function renderSummaryBar() {
+  const r = state.report;
+  if (!r) return;
+  document.getElementById('total-good').textContent  = r.total_good;
+  document.getElementById('total-uncert').textContent = r.total_uncertain;
+  document.getElementById('total-trash').textContent  = r.total_trash;
+  document.getElementById('total-all').textContent   = r.total_emails;
+  document.getElementById('report-date').textContent  = r.report_date;
+}
+
+// ── Talent cards ───────────────────────────────────────────────────────────
+function renderTalentCards() {
+  const grid = document.getElementById('talent-cards-grid');
+  grid.innerHTML = '';
+  if (!state.report) return;
+  state.report.talents.forEach(card => {
+    const div = document.createElement('div');
+    div.className = 'talent-card';
+    const bestDeal = card.best_deal_brand
+      ? `<strong>${esc(card.best_deal_brand)}</strong> — ${formatRate(card.best_deal_rate)}`
+      : '<span style="color:var(--text3)">No deals today</span>';
+    div.innerHTML = `
+      <div class="card-top">
+        <span class="card-name">${esc(card.full_name)}</span>
+        <span class="card-manager">${esc(card.manager || '')}</span>
+      </div>
+      <div class="card-counts">
+        <span class="count-chip good">${card.count_good} Good</span>
+        <span class="count-chip uncert">${card.count_uncertain} Uncertain</span>
+        <span class="count-chip trash">${card.count_trash} Trash</span>
+      </div>
+      <div class="card-best-deal">Best deal: ${bestDeal}</div>
+      <div class="card-footer">
+        ${card.pending_drafts > 0
+          ? `<span class="draft-badge">${card.pending_drafts} pending draft${card.pending_drafts > 1 ? 's' : ''}</span>`
+          : '<span style="font-size:10px;color:var(--text3)">No pending drafts</span>'}
+      </div>
+    `;
+    // Find talent object
+    const talentObj = state.talents.find(t => t.key === card.talent_key);
+    div.addEventListener('click', () => { if (talentObj) openTalentView(talentObj); });
+    grid.appendChild(div);
+  });
+}
+
+// ── Context panel ──────────────────────────────────────────────────────────
+function renderContextPanel() {
+  const list = document.getElementById('context-list');
+  list.innerHTML = '';
+  if (state.context.length === 0) {
+    list.innerHTML = '<p class="muted-text" style="font-style:italic">No instructions yet.</p>';
+    return;
+  }
+  state.context.forEach(entry => {
+    const div = document.createElement('div');
+    div.className = 'context-entry';
+    div.innerHTML = `
+      <div style="flex:1">
+        <div class="context-entry-text">${esc(entry.text)}</div>
+        <div class="context-entry-meta">Added by ${esc(entry.added_by || 'unknown')} · ${fmtDate(entry.added_at)}</div>
+      </div>
+      <button class="btn-del" data-id="${entry.id}" title="Remove">×</button>
+    `;
+    div.querySelector('.btn-del').addEventListener('click', () => removeContext(entry.id));
+    list.appendChild(div);
+  });
+}
+
+document.getElementById('btn-add-context').addEventListener('click', addContext);
+document.getElementById('context-input').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.metaKey) addContext();
+});
+
+async function addContext() {
+  const input = document.getElementById('context-input');
+  const text = input.value.trim();
+  if (!text) return;
+  try {
+    await api('POST', '/api/dashboard/context', { text, added_by: 'manager' });
+    input.value = '';
+    state.context = await api('GET', '/api/dashboard/context');
+    renderContextPanel();
+    showToast('Instruction added — takes effect on next poll.');
+  } catch (e) {}
+}
+
+async function removeContext(id) {
+  try {
+    await api('DELETE', `/api/dashboard/context/${id}`);
+    state.context = await api('GET', '/api/dashboard/context');
+    renderContextPanel();
+    showToast('Instruction removed.');
+  } catch (e) {}
+}
+
+// ── Nav ────────────────────────────────────────────────────────────────────
+document.getElementById('nav-overview').addEventListener('click', async () => {
+  state.selectedTalent = null;
+  await loadOverview();
+});
+document.getElementById('btn-refresh').addEventListener('click', async () => {
+  if (state.view === 'gmail' && state.selectedTalent) {
+    await loadTalentData(state.selectedTalent);
+  } else {
+    await loadOverview();
+  }
+  showToast('Refreshed.');
+});
+document.getElementById('gmail-back').addEventListener('click', async () => {
+  state.selectedTalent = null;
+  await loadOverview();
+});
+
+// ── Talent Gmail view ──────────────────────────────────────────────────────
+async function openTalentView(talent) {
+  state.selectedTalent = talent;
+  state.selectedEmail = null;
+  state.selectedDraft = null;
+
+  // Update header
+  document.getElementById('gmail-avatar').textContent = initial(talent.full_name);
+  document.getElementById('gmail-talent-label').textContent = talent.email || talent.full_name;
+
+  showView('gmail');
+  // Mark sidebar item
+  document.querySelectorAll('.talent-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.key === talent.key);
+  });
+
+  await loadTalentData(talent);
+}
+
+async function loadTalentData(talent) {
+  try {
+    const [emails, drafts] = await Promise.all([
+      api('GET', `/api/dashboard/talents/${talent.key}/emails`),
+      api('GET', `/api/dashboard/talents/${talent.key}/drafts`),
+    ]);
+    state.emails = emails;
+    state.drafts = drafts;
+    renderEmailList();
+    resetReadingPane();
+  } catch (e) {}
+}
+
+// ── Email list ─────────────────────────────────────────────────────────────
+function renderEmailList() {
+  const rows = document.getElementById('email-rows');
+  rows.innerHTML = '';
+
+  // Count stats for Gmail nav
+  const good = state.emails.filter(e => e.score === 3).length;
+  const pending = state.drafts.length;
+  const elInbox = document.getElementById('gmail-inbox-count');
+  const elDraft = document.getElementById('gmail-draft-count');
+  if (elInbox) elInbox.textContent = state.emails.length > 0 ? state.emails.length : '';
+  if (elDraft) elDraft.textContent = pending > 0 ? pending : '';
+
+  if (state.emails.length === 0) {
+    rows.innerHTML = '<div class="gmail-empty-state"><div style="font-size:32px">📭</div>No emails processed yet</div>';
+    return;
+  }
+
+  state.emails.forEach(email => {
+    const sc = scoreClass(email.score);
+    const sn = scoreName(email.score);
+    const hasDraft = state.drafts.some(d => d.gmail_message_id === email.gmail_message_id);
+    const isUnread = email.score === 3; // treat score-3 as "important" (bold)
+    const row = document.createElement('div');
+    row.className = `email-row${isUnread ? ' unread' : ''}`;
+    row.dataset.msgId = email.gmail_message_id;
+    row.innerHTML = `
+      <div class="score-stripe ${sc}"></div>
+      <div class="email-meta-col">
+        <div class="email-sender-col">${esc(shortSender(email.sender))}</div>
+        <div class="email-subject-col">${esc(email.subject || '(no subject)')}</div>
+        <div class="email-snippet-col">${esc(email.offer_type || email.triage_reason || '')} ${email.brand_name ? '· ' + email.brand_name : ''}</div>
+      </div>
+      <div class="email-right-col">
+        <span class="email-date">${fmtDate(email.processed_at)}</span>
+        <span class="score-label ${sc}">${sn}</span>
+        ${hasDraft ? '<span style="font-size:10px;color:#1a73e8">Draft</span>' : ''}
+      </div>
+    `;
+    row.addEventListener('click', () => selectEmail(email));
+    rows.appendChild(row);
+  });
+}
+
+function selectEmail(email) {
+  state.selectedEmail = email;
+  state.selectedDraft = state.drafts.find(d => d.gmail_message_id === email.gmail_message_id) || null;
+
+  // Highlight row
+  document.querySelectorAll('.email-row').forEach(r => {
+    r.classList.toggle('selected', r.dataset.msgId === email.gmail_message_id);
+  });
+
+  renderReadingPane(email, state.selectedDraft);
+}
+
+// ── Reading pane ───────────────────────────────────────────────────────────
+function resetReadingPane() {
+  const pane = document.getElementById('gmail-reading-pane');
+  pane.innerHTML = '<div class="reading-placeholder"><div class="icon">📧</div>Select an email to read it</div>';
+}
+
+function renderReadingPane(email, draft) {
+  const pane = document.getElementById('gmail-reading-pane');
+  const sc = scoreClass(email.score);
+  const senderShort = shortSender(email.sender);
+  const senderAvColor = { good: '#1b5e20', uncert: '#e65100', trash: '#b71c1c' }[sc] || '#5f6368';
+
+  pane.innerHTML = `
+    <div class="reading-toolbar">
+      <button class="tool-btn" onclick="resetReadingPane();document.querySelectorAll('.email-row').forEach(r=>r.classList.remove('selected'))">← Back</button>
+      <button class="tool-btn">🗄️ Archive</button>
+      <button class="tool-btn">🗑️ Delete</button>
+      <button class="tool-btn">📁 Move to</button>
+    </div>
+    <div class="email-thread">
+      <div class="email-thread-subject">${esc(email.subject || '(no subject)')}</div>
+      <div class="email-thread-msg">
+        <div class="msg-header">
+          <div class="msg-avatar" style="background:${senderAvColor}">${initial(senderShort)}</div>
+          <div style="flex:1;min-width:0">
+            <div class="msg-from">${esc(senderShort)} <span class="msg-from-email">&lt;${esc(email.sender || '')}&gt;</span></div>
+            <div style="font-size:12px;color:#5f6368;font-family:var(--sans)">to ${esc(state.selectedTalent?.email || state.selectedTalent?.full_name || 'talent')}</div>
+          </div>
+          <div class="msg-date">${fmtDate(email.processed_at)}</div>
+        </div>
+        <div class="msg-body">
+          <p style="color:#5f6368;font-style:italic;font-size:13px">[Email body stored in Gmail inbox — view in Gmail for full content]</p>
+          ${email.triage_reason ? `<p style="margin-top:10px">${esc(email.triage_reason)}</p>` : ''}
+        </div>
+        <div class="msg-meta-chips">
+          <span class="meta-chip score-${sc}">${esc(scoreName(email.score))}</span>
+          ${email.brand_name ? `<span class="meta-chip brand">🏷️ ${esc(email.brand_name)}</span>` : ''}
+          ${email.proposed_rate ? `<span class="meta-chip rate">💰 ${formatRate(email.proposed_rate)}</span>` : ''}
+          ${email.offer_type ? `<span class="meta-chip type">${esc(email.offer_type)}</span>` : ''}
+        </div>
+      </div>
+    </div>
+    <div id="draft-compose-area"></div>
+  `;
+
+  if (draft) {
+    renderDraftCompose(draft, email);
+  } else if (email.score === 3) {
+    document.getElementById('draft-compose-area').innerHTML = `
+      <div style="margin:0 32px 32px;padding:20px;background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;font-family:var(--sans);font-size:14px;color:#5f6368;text-align:center">
+        No AI draft for this email yet.<br>
+        <span style="font-size:12px">The draft will appear here after the next poll runs.</span>
+      </div>
+    `;
+  }
+}
+
+function renderDraftCompose(draft, email) {
+  const area = document.getElementById('draft-compose-area');
+  if (!area) return;
+  const isEscalate = draft.is_escalate;
+  const replySubject = 'Re: ' + (email.subject || '');
+
+  area.innerHTML = `
+    <div class="draft-compose-wrap" id="compose-${draft.id}">
+      <div class="draft-compose-header">
+        <span class="draft-compose-title">✨ AI Draft Reply</span>
+        <span class="draft-compose-badge ${isEscalate ? 'escalate' : ''}">
+          ${isEscalate ? '⚠️ ESCALATE' : '🤖 GPT-4o'}
+        </span>
+      </div>
+      ${isEscalate ? `
+        <div style="padding:12px 16px;background:#fce4ec;font-size:13px;color:#880e4f;font-family:var(--sans);border-bottom:1px solid #f8bbd0">
+          ⚠️ ${esc(draft.escalate_reason || 'This email requires manager attention.')}
+        </div>
+      ` : ''}
+      <div class="draft-field">
+        <span class="draft-field-label">To</span>
+        <span class="draft-field-value">${esc(draft.sender || email.sender || '')}</span>
+      </div>
+      <div class="draft-field">
+        <span class="draft-field-label">Subject</span>
+        <span class="draft-field-value">${esc(replySubject)}</span>
+      </div>
+      <div class="draft-body-area">
+        <textarea id="draft-text-${draft.id}">${esc(draft.draft_text)}</textarea>
+      </div>
+      <div class="draft-actions">
+        <button class="btn-send" id="btn-send-${draft.id}" ${isEscalate ? 'disabled title="Cannot send — escalation required"' : ''}>
+          Send ✉️
+        </button>
+        <button class="btn-save-draft" id="btn-save-${draft.id}">Save Edits</button>
+        <button class="btn-discard" id="btn-discard-${draft.id}">Discard</button>
+      </div>
+    </div>
+  `;
+
+  document.getElementById(`btn-send-${draft.id}`)?.addEventListener('click', () => sendDraft(draft.id));
+  document.getElementById(`btn-save-${draft.id}`)?.addEventListener('click', () => saveDraft(draft.id));
+  document.getElementById(`btn-discard-${draft.id}`)?.addEventListener('click', () => discardDraft(draft.id));
+}
+
+// ── Draft actions ──────────────────────────────────────────────────────────
+async function sendDraft(draftId) {
+  if (!confirm('Send this reply from the talent\'s Gmail now?')) return;
+  try {
+    await api('POST', `/api/drafts/${draftId}/approve`, { reviewed_by: 'manager-dashboard' });
+    showToast('Reply sent.');
+    await loadTalentData(state.selectedTalent);
+  } catch (e) {}
+}
+
+async function saveDraft(draftId) {
+  const ta = document.getElementById(`draft-text-${draftId}`);
+  if (!ta) return;
+  try {
+    await api('POST', `/api/drafts/${draftId}/edit`, {
+      draft_text: ta.value,
+      reviewed_by: 'manager-dashboard',
+    });
+    showToast('Draft saved — changes reflected in Gmail drafts folder.');
+    await loadTalentData(state.selectedTalent);
+  } catch (e) {}
+}
+
+async function discardDraft(draftId) {
+  if (!confirm('Permanently discard this draft?')) return;
+  try {
+    await api('POST', `/api/drafts/${draftId}/discard`, { reviewed_by: 'manager-dashboard' });
+    showToast('Draft discarded.');
+    await loadTalentData(state.selectedTalent);
+  } catch (e) {}
+}
+
+// Gmail search filter (client-side)
+document.getElementById('gmail-search').addEventListener('input', (e) => {
+  const q = e.target.value.toLowerCase();
+  document.querySelectorAll('.email-row').forEach(row => {
+    const text = row.textContent.toLowerCase();
+    row.style.display = text.includes(q) ? '' : 'none';
+  });
+});
+
+// ── Init ───────────────────────────────────────────────────────────────────
+bootstrap();
+</script>
+</body>
+</html>
