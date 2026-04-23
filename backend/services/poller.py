@@ -27,8 +27,8 @@ logger = logging.getLogger(__name__)
 
 
 def _talent_config_map(settings) -> dict[str, dict]:
-    """Return a dict of talent_key → talent config dict from settings.json."""
-    return {t["key"]: t for t in settings.app_config.get("talents", [])}
+    """Return a dict of talent_key → talent config dict from settings.json (case-insensitive keys)."""
+    return {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
 
 
 def _already_processed(db: Session, message_id: str) -> bool:
@@ -56,7 +56,7 @@ def poll_all_inboxes(db: Session) -> dict:
 
     for token_row in active_tokens:
         talent_key = token_row.talent_key
-        talent_cfg = talent_map.get(talent_key)
+        talent_cfg = talent_map.get(talent_key.lower())
         if not talent_cfg:
             logger.warning("No config for talent_key=%s — skipping", talent_key)
             continue

@@ -228,8 +228,8 @@ def list_talents(db: Session = Depends(get_db)):
 
 
 def _validate_talent(talent_key: str) -> None:
-    talent_keys = {t["key"] for t in get_settings().app_config.get("talents", [])}
-    if talent_key not in talent_keys:
+    talent_keys = {t["key"].lower() for t in get_settings().app_config.get("talents", [])}
+    if talent_key.lower() not in talent_keys:
         raise HTTPException(status_code=404, detail=f"Unknown talent: {talent_key}")
 
 

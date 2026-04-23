@@ -88,7 +88,7 @@ def credentials_from_token_row(row) -> Credentials:
         scopes=SCOPES,
     )
     if row.token_expiry:
-        creds.expiry = row.token_expiry.replace(tzinfo=timezone.utc)
+        creds.expiry = row.token_expiry  # stored as naive UTC; google-auth compares with utcnow()
     return creds
 
 
