@@ -147,8 +147,10 @@
     const areaEl    = document.getElementById('action-area');
 
     if (!talentKey) {
-      nameEl.textContent = '—';
-      areaEl.innerHTML = '<div class="error-box">No talent account specified.<br/>Please use the link your manager sent you &mdash; it should look like<br/><strong style="color:#fca5a5">/connect?talent=yourname</strong></div>';
+      // Generic open link — anyone can connect, backend auto-registers them from their Google profile
+      nameEl.textContent = 'your account';
+      avatarEl.textContent = '✦';
+      btnEl.href = '/auth/connect';
     } else {
       fetch('/api/talents')
         .then(r => r.json())
@@ -163,7 +165,7 @@
           avatarEl.textContent = talentKey.charAt(0).toUpperCase();
         });
 
-      btnEl.href = '/auth/connect?talent_key=' + encodeURIComponent(talentKey);
+      btnEl.href = '/auth/connect';
     }
   </script>
 </body>
