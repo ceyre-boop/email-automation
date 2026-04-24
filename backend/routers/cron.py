@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -26,19 +26,28 @@ def health():
     return {"status": "ok"}
 
 
-@router.get("/cron/poll-inboxes")
-def cron_poll(db: Session = Depends(get_db)):
-    """
-    Poll all connected talent inboxes.
-    Called by Railway cron every POLL_INTERVAL_MINUTES.
-    Returns a summary JSON — errors are logged but never raise (keeps cron stable).
-    """
+def _run_poll():
+    """Run the poll in a background thread with its own DB session."""
+    from backend.models.db import get_session_factory
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
     try:
         summary = poll_all_inboxes(db)
-        return {"ok": True, "summary": summary}
+        logger.info("Background poll complete: %s", summary)
     except Exception as exc:  # noqa: BLE001
-        logger.error("Poll failed: %s", exc)
-        return {"ok": False, "error": "Polling failed — check server logs for details."}
+        logger.error("Background poll failed: %s", exc)
+    finally:
+        db.close()
+
+
+@router.get("/cron/poll-inboxes")
+def cron_poll(background_tasks: BackgroundTasks):
+    """
+    Poll all connected talent inboxes in the background.
+    Returns immediately — poll result appears in logs and DB.
+    """
+    background_tasks.add_task(_run_poll)
+    return {"ok": True, "status": "poll started in background"}
 
 
 @router.get("/api/db-check", dependencies=[Depends(verify_api_key)])
