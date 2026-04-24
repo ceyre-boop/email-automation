@@ -132,26 +132,23 @@ class ContextIn(BaseModel):
 
 @router.get("/report", response_model=DailyReportOut)
 def daily_report(db: Session = Depends(get_db)):
-    """Daily email processing report — counts and best deals per talent for today."""
+    """Report — shows last 7 days so data is always visible regardless of time zone."""
     settings = get_settings()
     talent_configs = settings.app_config.get("talents", [])
 
     today_utc = datetime.utcnow().date()
-    today_start = datetime.combine(today_utc, datetime.min.time())
-    today_end = today_start + timedelta(days=1)
+    window_start = datetime.combine(today_utc, datetime.min.time()) - timedelta(days=7)
 
     rows = (
         db.query(ProcessedEmail)
-        .filter(
-            ProcessedEmail.processed_at >= today_start,
-            ProcessedEmail.processed_at < today_end,
-        )
+        .filter(ProcessedEmail.processed_at >= window_start)
         .all()
     )
 
+    # group by lowercase key so 'katrina' matches config key 'Katrina'
     talent_emails: dict[str, list] = defaultdict(list)
     for row in rows:
-        talent_emails[row.talent_key].append(row)
+        talent_emails[row.talent_key.lower()].append(row)
 
     pending_query = (
         db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
@@ -159,14 +156,14 @@ def daily_report(db: Session = Depends(get_db)):
         .group_by(Draft.talent_key)
         .all()
     )
-    pending_map: dict[str, int] = {r.talent_key: r.cnt for r in pending_query}
+    pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in pending_query}
 
     total_good = total_uncertain = total_trash = 0
     cards: list[TalentReportCard] = []
 
     for t_cfg in talent_configs:
         key = t_cfg["key"]
-        emails = talent_emails.get(key, [])
+        emails = talent_emails.get(key.lower(), [])
 
         count_good = sum(1 for e in emails if e.score == 3)
         count_uncertain = sum(1 for e in emails if e.score == 2)
@@ -188,7 +185,7 @@ def daily_report(db: Session = Depends(get_db)):
             total=len(emails),
             best_deal_brand=best.brand_name if best else None,
             best_deal_rate=best.proposed_rate if best else None,
-            pending_drafts=pending_map.get(key, 0),
+            pending_drafts=pending_map.get(key.lower(), 0),
         ))
 
     return DailyReportOut(
@@ -239,7 +236,7 @@ def talent_emails(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(ProcessedEmail)
-        .filter(ProcessedEmail.talent_key == talent_key)
+        .filter(ProcessedEmail.talent_key == talent_key.lower())
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(50)
         .all()
@@ -252,7 +249,7 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(Draft)
-        .filter(Draft.talent_key == talent_key, Draft.status == DraftStatus.pending)
+        .filter(Draft.talent_key == talent_key.lower(), Draft.status == DraftStatus.pending)
         .order_by(Draft.created_at.desc())
         .all()
     )
