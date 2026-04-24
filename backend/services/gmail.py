@@ -35,6 +35,31 @@ def _gmail_service(token_row):
 # ── Reading ──────────────────────────────────────────────────────────────────
 
 
+def list_all_messages_since(token_row, days_back: int = 30) -> list[dict]:
+    """
+    Return ALL message stubs (id + threadId) from the last N days, paginating
+    through the full history. Can return thousands of messages for active inboxes.
+    """
+    import datetime as dt
+    since = (dt.datetime.utcnow() - dt.timedelta(days=days_back)).strftime("%Y/%m/%d")
+    service = _gmail_service(token_row)
+    messages: list[dict] = []
+    page_token = None
+    try:
+        while True:
+            kwargs: dict = {"userId": "me", "q": f"after:{since}", "maxResults": 500}
+            if page_token:
+                kwargs["pageToken"] = page_token
+            result = service.users().messages().list(**kwargs).execute()
+            messages.extend(result.get("messages", []))
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
+    except HttpError as exc:
+        logger.error("Gmail history list error: %s", exc)
+    return messages
+
+
 def list_unread_inbox_messages(token_row, max_results: int = 30) -> list[dict]:
     """
     Return a list of unread INBOX messages for the talent.

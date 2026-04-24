@@ -952,6 +952,9 @@ body {
         <div class="gmail-talent-avatar" id="gmail-avatar">?</div>
         <span id="gmail-talent-label">—</span>
       </div>
+      <button id="btn-backfill" style="margin-left:12px;padding:6px 14px;background:#1a73e8;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;" title="Load last 30 days of email history from Gmail">
+        ↓ Load 30-day history
+      </button>
     </div>
 
     <!-- Gmail body -->
@@ -1308,6 +1311,20 @@ document.getElementById('gmail-back').addEventListener('click', async () => {
   await loadOverview();
 });
 
+document.getElementById('btn-backfill').addEventListener('click', async () => {
+  if (!state.selectedTalent) return;
+  const btn = document.getElementById('btn-backfill');
+  btn.textContent = '⏳ Loading history...';
+  btn.disabled = true;
+  try {
+    await api('POST', `/api/dashboard/talents/${state.selectedTalent.key}/backfill?days=30`);
+    showToast('30-day history loading in background — refresh inbox in ~2 minutes to see all emails.');
+  } catch (e) {
+    showToast('Backfill failed: ' + e.message);
+  }
+  setTimeout(() => { btn.textContent = '↓ Load 30-day history'; btn.disabled = false; }, 5000);
+});
+
 // ── Talent Gmail view ──────────────────────────────────────────────────────
 async function openTalentView(talent) {
   state.selectedTalent = talent;
@@ -1371,7 +1388,7 @@ function renderEmailList() {
       <div class="email-meta-col">
         <div class="email-sender-col">${esc(shortSender(email.sender))}</div>
         <div class="email-subject-col">${esc(email.subject || '(no subject)')}</div>
-        <div class="email-snippet-col">${esc(email.offer_type || email.triage_reason || '')} ${email.brand_name ? '· ' + email.brand_name : ''}</div>
+        <div class="email-snippet-col">${esc(email.offer_type || '')} ${email.brand_name ? '· ' + email.brand_name : ''}</div>
       </div>
       <div class="email-right-col">
         <span class="email-date">${fmtDate(email.processed_at)}</span>
@@ -1394,6 +1411,30 @@ function selectEmail(email) {
   });
 
   renderReadingPane(email, state.selectedDraft);
+  // Fetch real body — use stored body_text first, fall back to live Gmail fetch
+  fetchEmailBody(email);
+}
+
+async function fetchEmailBody(email) {
+  const bodyEl = document.getElementById(`msg-body-${email.gmail_message_id}`);
+  if (!bodyEl) return;
+  // Use stored body_text if available
+  if (email.body_text && email.body_text.trim()) {
+    bodyEl.innerHTML = `<pre style="white-space:pre-wrap;font-family:var(--sans);font-size:14px;color:#202124;line-height:1.6">${esc(email.body_text)}</pre>`;
+    return;
+  }
+  // Live fetch from Gmail
+  try {
+    const r = await api('GET', `/api/dashboard/talents/${state.selectedTalent.key}/emails/${email.gmail_message_id}/body`);
+    const body = r.body || '';
+    if (body.trim()) {
+      bodyEl.innerHTML = `<pre style="white-space:pre-wrap;font-family:var(--sans);font-size:14px;color:#202124;line-height:1.6">${esc(body)}</pre>`;
+    } else {
+      bodyEl.innerHTML = `<p style="color:#9aa0a6;font-size:13px;font-style:italic">No readable body content found.</p>`;
+    }
+  } catch (e) {
+    bodyEl.innerHTML = `<p style="color:#9aa0a6;font-size:13px;font-style:italic">Could not load email body.</p>`;
+  }
 }
 
 // ── Reading pane ───────────────────────────────────────────────────────────
@@ -1426,9 +1467,8 @@ function renderReadingPane(email, draft) {
           </div>
           <div class="msg-date">${fmtDate(email.processed_at)}</div>
         </div>
-        <div class="msg-body">
-          <p style="color:#5f6368;font-style:italic;font-size:13px">[Email body stored in Gmail inbox — view in Gmail for full content]</p>
-          ${email.triage_reason ? `<p style="margin-top:10px">${esc(email.triage_reason)}</p>` : ''}
+        <div class="msg-body" id="msg-body-${email.gmail_message_id}">
+          <p style="color:#9aa0a6;font-size:13px">Loading email content...</p>
         </div>
         <div class="msg-meta-chips">
           <span class="meta-chip score-${sc}">${esc(scoreName(email.score))}</span>

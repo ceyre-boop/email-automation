@@ -16,7 +16,7 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -85,6 +85,7 @@ class EmailOut(BaseModel):
     proposed_rate: Optional[float] = None
     offer_type: Optional[str] = None
     triage_reason: Optional[str] = None
+    body_text: Optional[str] = None
     processed_at: datetime
     status: str
 
@@ -238,7 +239,7 @@ def talent_emails(talent_key: str, db: Session = Depends(get_db)):
         db.query(ProcessedEmail)
         .filter(ProcessedEmail.talent_key == talent_key.lower())
         .order_by(ProcessedEmail.processed_at.desc())
-        .limit(50)
+        .limit(200)
         .all()
     )
 
@@ -289,3 +290,107 @@ def delete_context(context_id: int, db: Session = Depends(get_db)):
     db.commit()
     logger.info("Manager context %d deactivated.", context_id)
     return {"ok": True}
+
+
+# ── Email body (live fetch from Gmail) ────────────────────────────────────────
+
+@router.get("/talents/{talent_key}/emails/{gmail_message_id}/body")
+def email_body(talent_key: str, gmail_message_id: str, db: Session = Depends(get_db)):
+    """Fetch the full email body live from Gmail for the reading pane."""
+    from backend.services import gmail as gmail_svc
+    token = (
+        db.query(TalentToken)
+        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .first()
+    )
+    if not token:
+        raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
+    detail = gmail_svc.get_message_detail(token, gmail_message_id)
+    return {"body": detail.get("body_text", "") or ""}
+
+
+# ── 30-day backfill ───────────────────────────────────────────────────────────
+
+def _run_backfill(talent_key: str, days: int):
+    """Background task: read all Gmail messages from the last N days and store them."""
+    from backend.models.db import get_session_factory, ProcessedEmail, TalentToken, EmailStatus
+    from backend.services import gmail as gmail_svc
+    from datetime import datetime
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    stored = skipped = errors = 0
+    try:
+        token = db.query(TalentToken).filter(
+            TalentToken.talent_key == talent_key.lower(),
+            TalentToken.active == True,  # noqa: E712
+        ).first()
+        if not token:
+            logger.error("Backfill: no connected token for %s", talent_key)
+            return
+
+        logger.info("Backfill started for %s — fetching last %d days", talent_key, days)
+        message_stubs = gmail_svc.list_all_messages_since(token, days_back=days)
+        logger.info("Backfill: %d messages found for %s", len(message_stubs), talent_key)
+
+        for stub in message_stubs:
+            msg_id = stub["id"]
+            exists = db.query(ProcessedEmail).filter(
+                ProcessedEmail.gmail_message_id == msg_id
+            ).first()
+            if exists:
+                skipped += 1
+                continue
+            try:
+                detail = gmail_svc.get_message_detail(token, msg_id)
+                if not detail:
+                    errors += 1
+                    continue
+                row = ProcessedEmail(
+                    talent_key=talent_key.lower(),
+                    gmail_message_id=msg_id,
+                    thread_id=detail.get("thread_id", ""),
+                    sender=detail.get("sender", ""),
+                    subject=detail.get("subject", ""),
+                    score=None,
+                    brand_name=None,
+                    proposed_rate=None,
+                    offer_type=None,
+                    triage_reason=None,
+                    body_text=detail.get("body_text", "") or None,
+                    processed_at=datetime.utcnow(),
+                    status=EmailStatus.flagged,
+                )
+                db.add(row)
+                db.commit()
+                stored += 1
+                if stored % 50 == 0:
+                    logger.info("Backfill %s: %d stored so far", talent_key, stored)
+            except Exception as exc:
+                logger.warning("Backfill error on msg %s: %s", msg_id, exc)
+                errors += 1
+                db.rollback()
+
+        logger.info("Backfill complete for %s: %d stored, %d skipped, %d errors",
+                    talent_key, stored, skipped, errors)
+    finally:
+        db.close()
+
+
+@router.post("/talents/{talent_key}/backfill")
+def start_backfill(
+    talent_key: str,
+    background_tasks: BackgroundTasks,
+    days: int = 30,
+    db: Session = Depends(get_db),
+):
+    """Start a background backfill of the last N days of Gmail history."""
+    _validate_talent(talent_key)
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key == talent_key.lower(),
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
+    background_tasks.add_task(_run_backfill, talent_key, days)
+    return {"ok": True, "message": f"Backfill started — fetching last {days} days for {talent_key}"}

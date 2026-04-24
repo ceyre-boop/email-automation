@@ -268,3 +268,14 @@ def on_startup():
             logger.exception("Could not create/verify database tables — check DATABASE_URL")
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
+
+    # Auto-poll every 5 minutes so new emails appear in real time
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from backend.routers.cron import _run_poll
+        scheduler = BackgroundScheduler(daemon=True)
+        scheduler.add_job(_run_poll, "interval", minutes=5, id="auto_poll", replace_existing=True)
+        scheduler.start()
+        logger.info("Auto-poll scheduler started — polling every 5 minutes.")
+    except Exception:
+        logger.warning("Could not start auto-poll scheduler — polls must be triggered manually.")

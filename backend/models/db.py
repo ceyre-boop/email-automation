@@ -13,6 +13,7 @@ from sqlalchemy import (
     String,
     Text,
     create_engine,
+    text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 from sqlalchemy.pool import NullPool
@@ -79,6 +80,7 @@ class ProcessedEmail(Base):
     proposed_rate: Mapped[float | None] = mapped_column(Float)
     offer_type: Mapped[str | None] = mapped_column(String(128))
     triage_reason: Mapped[str | None] = mapped_column(Text)
+    body_text: Mapped[str | None] = mapped_column(Text)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
@@ -150,6 +152,15 @@ def get_session_factory():
 
 
 def create_tables():
-    """Create all tables (idempotent — safe to call on startup)."""
+    """Create all tables and run additive column migrations (idempotent)."""
     engine = _make_engine()
     Base.metadata.create_all(engine)
+    # Add body_text column to existing tables that predate it
+    with engine.connect() as conn:
+        try:
+            conn.execute(text(
+                "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS body_text TEXT"
+            ))
+            conn.commit()
+        except Exception:
+            pass  # Column already exists or DB doesn't support IF NOT EXISTS

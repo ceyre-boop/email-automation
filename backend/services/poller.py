@@ -160,7 +160,8 @@ def _process_one_message(
         gmail_svc.archive_message(token_row, message_id)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
-            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived
+            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
+            body_text=body,
         )
         sheets_svc.log_email(
             talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason
@@ -172,7 +173,8 @@ def _process_one_message(
         gmail_svc.mark_as_read(token_row, message_id)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
-            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged
+            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
+            body_text=body,
         )
         sheets_svc.log_email(
             talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason
@@ -229,7 +231,8 @@ def _process_one_message(
         status_label = "escalated" if is_escalate else "draft_saved"
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
-            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved
+            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved,
+            body_text=body,
         )
         sheets_svc.log_email(
             talent_key, sender, subject, score, brand_name, proposed_rate,
@@ -255,6 +258,7 @@ def _record_processed(
     offer_type: str,
     reason: str,
     status: EmailStatus,
+    body_text: str = "",
 ):
     row = ProcessedEmail(
         talent_key=talent_key,
@@ -267,6 +271,7 @@ def _record_processed(
         proposed_rate=proposed_rate,
         offer_type=offer_type,
         triage_reason=reason,
+        body_text=body_text or None,
         processed_at=datetime.utcnow(),
         status=status,
     )
