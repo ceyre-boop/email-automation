@@ -61,7 +61,7 @@ def get_status(db: Session = Depends(get_db)):
     settings = get_settings()
     talents = settings.app_config.get("talents", [])
     connected = {
-        row.talent_key: {
+        row.talent_key.lower(): {
             "email": row.email,
             "connected_at": row.connected_at.isoformat(),
             "active": row.active,
@@ -76,8 +76,8 @@ def get_status(db: Session = Depends(get_db)):
                 "key": t["key"],
                 "full_name": t.get("full_name", t["key"]),
                 "manager": t.get("manager"),
-                "connected": t["key"] in connected,
-                **connected.get(t["key"], {}),
+                "connected": t["key"].lower() in connected,
+                **connected.get(t["key"].lower(), {}),
             }
             for t in talents
         ],

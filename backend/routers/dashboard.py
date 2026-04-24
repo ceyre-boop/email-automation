@@ -208,7 +208,7 @@ def list_talents(db: Session = Depends(get_db)):
     talent_configs = settings.app_config.get("talents", [])
 
     connected = {
-        row.talent_key: row
+        row.talent_key.lower(): row
         for row in db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
     }
 
@@ -219,9 +219,9 @@ def list_talents(db: Session = Depends(get_db)):
             manager=t.get("manager"),
             category=t.get("category"),
             minimum_rate_usd=t.get("minimum_rate_usd"),
-            connected=t["key"] in connected,
-            email=connected[t["key"]].email if t["key"] in connected else None,
-            connected_at=connected[t["key"]].connected_at.isoformat() if t["key"] in connected else None,
+            connected=t["key"].lower() in connected,
+            email=connected[t["key"].lower()].email if t["key"].lower() in connected else None,
+            connected_at=connected[t["key"].lower()].connected_at.isoformat() if t["key"].lower() in connected else None,
         )
         for t in talent_configs
     ]
