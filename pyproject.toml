@@ -3,6 +3,7 @@ name = "email-automation"
 version = "1.0.0"
 description = "Talent Inbox Automation — multi-inbox polling, GPT drafting, unified review queue"
 readme = "README.md"
+package-mode = false
 
 [tool.poetry.dependencies]
 python = "^3.11"
