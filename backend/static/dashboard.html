@@ -877,6 +877,7 @@ body {
       </svg>
       Inbox Manager
     </div>
+    <div id="deploy-pill" style="font-size:10px;color:#5f6368;margin-top:4px;letter-spacing:0.3px">Loading...</div>
   </div>
   <div class="nav-section">
     <div class="nav-item active" id="nav-overview">
@@ -1802,6 +1803,31 @@ document.getElementById('gmail-search').addEventListener('input', (e) => {
     row.style.display = !searchQuery || row.textContent.toLowerCase().includes(searchQuery) ? '' : 'none';
   });
 });
+
+// ── Deploy watcher ─────────────────────────────────────────────────────────
+let _knownDeployTime = null;
+async function checkDeploy() {
+  try {
+    const r = await fetch('/health');
+    const data = await r.json();
+    const t = data.deployed_at;
+    const pill = document.getElementById('deploy-pill');
+    if (!_knownDeployTime) {
+      _knownDeployTime = t;
+      if (pill) pill.textContent = 'v ' + t.replace('T', ' ').replace('Z', '') + ' UTC';
+    } else if (t !== _knownDeployTime) {
+      _knownDeployTime = t;
+      if (pill) {
+        pill.textContent = 'v ' + t.replace('T', ' ').replace('Z', '') + ' UTC';
+        pill.style.color = '#00d4aa';
+        setTimeout(() => { pill.style.color = '#5f6368'; }, 5000);
+      }
+      showToast('🚀 New version deployed — reload to get the latest.');
+    }
+  } catch (_) {}
+}
+checkDeploy();
+setInterval(checkDeploy, 30000);
 
 // ── Init ───────────────────────────────────────────────────────────────────
 bootstrap();

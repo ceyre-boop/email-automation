@@ -21,9 +21,12 @@ router = APIRouter(tags=["internal"])
 logger = logging.getLogger(__name__)
 
 
+from datetime import datetime as _dt
+_DEPLOY_TIME = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
+
 @router.get("/health")
 def health():
-    return {"status": "ok"}
+    return {"status": "ok", "deployed_at": _DEPLOY_TIME}
 
 
 def _run_poll():
