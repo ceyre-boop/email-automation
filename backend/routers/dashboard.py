@@ -72,6 +72,7 @@ class TalentOut(BaseModel):
     minimum_rate_usd: Optional[float] = None
     connected: bool
     email: Optional[str] = None
+    inbox_email: Optional[str] = None
     connected_at: Optional[str] = None
 
 
@@ -220,6 +221,7 @@ def list_talents(db: Session = Depends(get_db)):
             minimum_rate_usd=t.get("minimum_rate_usd"),
             connected=t["key"].lower() in connected,
             email=connected[t["key"].lower()].email if t["key"].lower() in connected else None,
+            inbox_email=t.get("inbox_email"),
             connected_at=connected[t["key"].lower()].connected_at.isoformat() if t["key"].lower() in connected else None,
         )
         for t in talent_configs

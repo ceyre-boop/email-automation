@@ -953,7 +953,11 @@ body {
         <div class="gmail-talent-avatar" id="gmail-avatar">?</div>
         <span id="gmail-talent-label">—</span>
       </div>
-      <button id="btn-backfill" style="margin-left:12px;padding:6px 14px;background:#1a73e8;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;" title="Load last 30 days of email history from Gmail">
+      <button id="btn-open-gmail" onclick="openRealGmail()" style="margin-left:8px;padding:6px 14px;background:#fff;color:#1a73e8;font-size:12px;font-family:var(--sans);border-radius:4px;border:1px solid #dadce0;cursor:pointer;display:flex;align-items:center;gap:6px;" title="Open this account in real Gmail">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="#EA4335"/></svg>
+        Open in Gmail
+      </button>
+      <button id="btn-backfill" style="margin-left:8px;padding:6px 14px;background:#1a73e8;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;" title="Load last 30 days of email history from Gmail">
         ↓ Load 30-day history
       </button>
     </div>
@@ -1803,6 +1807,15 @@ document.getElementById('gmail-search').addEventListener('input', (e) => {
     row.style.display = !searchQuery || row.textContent.toLowerCase().includes(searchQuery) ? '' : 'none';
   });
 });
+
+// ── Open real Gmail ────────────────────────────────────────────────────────
+function openRealGmail() {
+  const email = state.selectedTalent?.email || state.selectedTalent?.inbox_email;
+  const url = email
+    ? `https://mail.google.com/mail/u/${encodeURIComponent(email)}/#inbox`
+    : 'https://mail.google.com/';
+  window.open(url, '_blank');
+}
 
 // ── Deploy watcher ─────────────────────────────────────────────────────────
 let _knownDeployTime = null;
