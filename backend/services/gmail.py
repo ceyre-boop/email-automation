@@ -49,7 +49,7 @@ def list_all_messages_since(token_row, days_back: int = 30) -> list[dict]:
     page_token = None
     try:
         while True:
-            kwargs: dict = {"userId": "me", "q": f"after:{since}", "maxResults": 500}
+            kwargs: dict = {"userId": "me", "q": f"in:inbox after:{since}", "maxResults": 500}
             if page_token:
                 kwargs["pageToken"] = page_token
             result = service.users().messages().list(**kwargs).execute()
