@@ -367,6 +367,59 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     return results
 
 
+# ── Live Gmail drafts ──────────────────────────────────────────────────────────
+
+@router.get("/talents/{talent_key}/drafts/live")
+def live_drafts(talent_key: str, db: Session = Depends(get_db)):
+    """
+    Fetch the talent's real Gmail drafts folder, cross-referenced with our DB
+    so the dashboard shows the actual draft text and the DB draft ID for approve/discard.
+    """
+    from backend.services import gmail as gmail_svc
+    _validate_talent(talent_key)
+    token = (
+        db.query(TalentToken)
+        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .first()
+    )
+    if not token:
+        raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
+
+    gmail_drafts = gmail_svc.list_gmail_drafts(token, max_results=25)
+    db.add(token)
+    db.commit()
+
+    # Build lookup: gmail_draft_id → DB Draft row
+    gmail_draft_ids = [d["gmail_draft_id"] for d in gmail_drafts]
+    db_drafts = (
+        db.query(Draft)
+        .filter(Draft.gmail_draft_id.in_(gmail_draft_ids))
+        .all()
+    ) if gmail_draft_ids else []
+    db_map = {row.gmail_draft_id: row for row in db_drafts}
+
+    results = []
+    for gd in gmail_drafts:
+        db_row = db_map.get(gd["gmail_draft_id"])
+        results.append({
+            "gmail_draft_id": gd["gmail_draft_id"],
+            "db_draft_id": db_row.id if db_row else None,
+            "thread_id": gd["thread_id"],
+            "to": gd["to"],
+            "subject": gd["subject"],
+            "body_text": db_row.draft_text if db_row else gd["body_text"],
+            "snippet": gd["snippet"],
+            "is_escalate": db_row.is_escalate if db_row else False,
+            "escalate_reason": db_row.escalate_reason if db_row else None,
+            "brand_name": db_row.brand_name if db_row else None,
+            "proposed_rate": db_row.proposed_rate if db_row else None,
+            "offer_type": db_row.offer_type if db_row else None,
+            "status": db_row.status if db_row else "gmail_only",
+            "sender": db_row.sender if db_row else None,
+        })
+    return results
+
+
 # ── Archive email ─────────────────────────────────────────────────────────────
 
 @router.post("/talents/{talent_key}/emails/{gmail_message_id}/archive")

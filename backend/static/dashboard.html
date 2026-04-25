@@ -1412,20 +1412,29 @@ async function openTalentView(talent) {
 }
 
 async function loadTalentData(talent, silent = false) {
-  const isInbox = state.gmailNav === 'inbox';
+  const nav = state.gmailNav;
+  const isDrafts = nav === 'drafts';
+  const isInbox = nav === 'inbox';
   if (!silent) {
     document.getElementById('email-rows').innerHTML =
-      '<div class="gmail-empty-state"><span class="spinner"></span>&nbsp; Loading inbox...</div>';
+      `<div class="gmail-empty-state"><span class="spinner"></span>&nbsp; Loading ${isDrafts ? 'drafts' : 'inbox'}...</div>`;
   }
   try {
-    const [emails, drafts] = await Promise.all([
-      api('GET', isInbox
-        ? `/api/dashboard/talents/${talent.key}/inbox/live`
-        : `/api/dashboard/talents/${talent.key}/emails`),
-      api('GET', `/api/dashboard/talents/${talent.key}/drafts`),
-    ]);
-    state.emails = emails;
-    state.drafts = drafts;
+    if (isDrafts) {
+      // Live Gmail drafts — fetch real drafts folder directly
+      const liveDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts/live`);
+      state.emails = [];
+      state.drafts = liveDrafts;
+    } else {
+      const [emails, drafts] = await Promise.all([
+        api('GET', isInbox
+          ? `/api/dashboard/talents/${talent.key}/inbox/live`
+          : `/api/dashboard/talents/${talent.key}/emails`),
+        api('GET', `/api/dashboard/talents/${talent.key}/drafts`),
+      ]);
+      state.emails = emails;
+      state.drafts = drafts;
+    }
     renderEmailList();
     if (!silent) resetReadingPane();
   } catch (e) {
@@ -1437,24 +1446,17 @@ async function loadTalentData(talent, silent = false) {
 // ── Email list ─────────────────────────────────────────────────────────────
 function getVisibleEmails() {
   const nav = state.gmailNav;
-  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id));
-
   let visible = state.emails;
-  if (nav === 'drafts') {
-    visible = visible.filter(e => draftsIds.has(e.gmail_message_id));
-  } else if (nav === 'trash') {
+  if (nav === 'trash') {
     visible = visible.filter(e => e.status === 'archived');
   } else if (nav === 'sent') {
     visible = visible.filter(e => e.status === 'sent');
   } else if (nav === 'starred') {
     visible = visible.filter(e => e.score === 3);
   }
-  // inbox / all: show everything (all mail)
-
   if (state.scoreFilter != null) {
     visible = visible.filter(e => e.score === state.scoreFilter);
   }
-
   return visible;
 }
 
@@ -1462,18 +1464,45 @@ function renderEmailList() {
   const rows = document.getElementById('email-rows');
   rows.innerHTML = '';
 
-  // Update nav counts
-  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id));
   const elInbox = document.getElementById('gmail-inbox-count');
   const elDraft = document.getElementById('gmail-draft-count');
   if (elInbox) elInbox.textContent = state.emails.length > 0 ? state.emails.length : '';
   if (elDraft) elDraft.textContent = state.drafts.length > 0 ? state.drafts.length : '';
 
+  // Drafts nav: render live Gmail drafts directly
+  if (state.gmailNav === 'drafts') {
+    if (state.drafts.length === 0) {
+      rows.innerHTML = `<div class="gmail-empty-state"><div style="font-size:32px">✏️</div>No drafts in Gmail</div>`;
+      return;
+    }
+    state.drafts.forEach(draft => {
+      const isEscalate = draft.is_escalate;
+      const row = document.createElement('div');
+      row.className = 'email-row unread';
+      row.dataset.draftGmailId = draft.gmail_draft_id;
+      row.innerHTML = `
+        <div class="score-stripe ${isEscalate ? 'trash' : 'good'}"></div>
+        <div class="email-meta-col">
+          <div class="email-sender-col">To: ${esc(shortSender(draft.to || draft.sender || ''))}</div>
+          <div class="email-subject-col">${esc(draft.subject || '(no subject)')}</div>
+          <div class="email-snippet-col">${esc(draft.snippet || draft.brand_name || '')}</div>
+        </div>
+        <div class="email-right-col">
+          <span class="score-label ${isEscalate ? 'trash' : 'good'}">${isEscalate ? '⚠️ Escalate' : '✨ AI Draft'}</span>
+        </div>
+      `;
+      row.addEventListener('click', () => selectDraft(draft));
+      rows.appendChild(row);
+    });
+    return;
+  }
+
   const visible = getVisibleEmails();
+  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
 
   if (visible.length === 0) {
-    const labels = { inbox: 'No emails processed yet', drafts: 'No pending drafts',
-      trash: 'No archived emails', sent: 'No sent replies', starred: 'No good deals yet', all: 'No emails yet' };
+    const labels = { inbox: 'No emails processed yet', trash: 'No archived emails',
+      sent: 'No sent replies', starred: 'No good deals yet', all: 'No emails yet' };
     rows.innerHTML = `<div class="gmail-empty-state"><div style="font-size:32px">📭</div>${labels[state.gmailNav] || 'No emails'}</div>`;
     return;
   }
@@ -1504,6 +1533,83 @@ function renderEmailList() {
     row.addEventListener('click', () => selectEmail(email));
     rows.appendChild(row);
   });
+}
+
+function selectDraft(draft) {
+  state.selectedDraft = draft;
+  state.selectedEmail = null;
+  document.querySelectorAll('.email-row').forEach(r => {
+    r.classList.toggle('selected', r.dataset.draftGmailId === draft.gmail_draft_id);
+  });
+  renderDraftOnlyPane(draft);
+}
+
+function renderDraftOnlyPane(draft) {
+  const pane = document.getElementById('gmail-reading-pane');
+  const isEscalate = draft.is_escalate;
+  const dbId = draft.db_draft_id;
+  const textareaId = `draft-text-gmail-${draft.gmail_draft_id}`;
+
+  pane.innerHTML = `
+    <div class="reading-toolbar">
+      <button class="tool-btn" onclick="resetReadingPane();document.querySelectorAll('.email-row').forEach(r=>r.classList.remove('selected'))">← Back</button>
+    </div>
+    <div class="email-thread">
+      <div class="email-thread-subject">${esc(draft.subject || '(no subject)')}</div>
+    </div>
+    <div class="draft-compose-wrap">
+      <div class="draft-compose-header">
+        <span class="draft-compose-title">✨ AI Draft Reply</span>
+        <span class="draft-compose-badge ${isEscalate ? 'escalate' : ''}">
+          ${isEscalate ? '⚠️ ESCALATE' : '🤖 GPT-4o'}
+        </span>
+      </div>
+      ${isEscalate ? `
+        <div style="padding:12px 16px;background:#fce4ec;font-size:13px;color:#880e4f;font-family:var(--sans);border-bottom:1px solid #f8bbd0">
+          ⚠️ ${esc(draft.escalate_reason || 'This email requires manager attention.')}
+        </div>
+      ` : ''}
+      <div class="draft-field">
+        <span class="draft-field-label">To</span>
+        <span class="draft-field-value">${esc(draft.to || draft.sender || '')}</span>
+      </div>
+      <div class="draft-field">
+        <span class="draft-field-label">Subject</span>
+        <span class="draft-field-value">${esc(draft.subject || '')}</span>
+      </div>
+      ${draft.brand_name || draft.proposed_rate ? `
+        <div style="padding:8px 16px;display:flex;gap:8px;flex-wrap:wrap">
+          ${draft.brand_name ? `<span class="meta-chip brand">🏷️ ${esc(draft.brand_name)}</span>` : ''}
+          ${draft.proposed_rate ? `<span class="meta-chip rate">💰 ${formatRate(draft.proposed_rate)}</span>` : ''}
+        </div>
+      ` : ''}
+      <div class="draft-body-area">
+        <textarea id="${textareaId}">${esc(draft.body_text || '')}</textarea>
+      </div>
+      <div class="draft-actions">
+        <button class="btn-send" id="btn-send-draft-${draft.gmail_draft_id}"
+          ${isEscalate || !dbId ? 'disabled title="' + (isEscalate ? 'Escalation required' : 'Draft not yet in system') + '"' : ''}>
+          Send ✉️
+        </button>
+        ${dbId ? `<button class="btn-save-draft" id="btn-save-draft-${draft.gmail_draft_id}">Save Edits</button>
+        <button class="btn-discard" id="btn-discard-draft-${draft.gmail_draft_id}">Discard</button>` : ''}
+      </div>
+    </div>
+  `;
+
+  if (dbId) {
+    document.getElementById(`btn-send-draft-${draft.gmail_draft_id}`)?.addEventListener('click', () => sendDraft(dbId));
+    document.getElementById(`btn-save-draft-${draft.gmail_draft_id}`)?.addEventListener('click', async () => {
+      const ta = document.getElementById(textareaId);
+      if (!ta) return;
+      try {
+        await api('POST', `/api/drafts/${dbId}/edit`, { draft_text: ta.value, reviewed_by: 'manager-dashboard' });
+        showToast('Draft saved — changes reflected in Gmail drafts folder.');
+        await loadTalentData(state.selectedTalent);
+      } catch (e) { showToast('Save failed: ' + e.message); }
+    });
+    document.getElementById(`btn-discard-draft-${draft.gmail_draft_id}`)?.addEventListener('click', () => discardDraft(dbId));
+  }
 }
 
 function selectEmail(email) {

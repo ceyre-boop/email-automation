@@ -304,4 +304,58 @@ def delete_gmail_draft(token_row, gmail_draft_id: str) -> bool:
         return True
     except HttpError as exc:
         logger.error("Draft delete failed for %s / %s: %s", token_row.talent_key, gmail_draft_id, exc)
+
+
+def list_gmail_drafts(token_row, max_results: int = 25) -> list[dict]:
+    """
+    Fetch the talent's actual Gmail drafts folder, newest first.
+    Returns a list of dicts with draft content parsed out.
+    """
+    service = _gmail_service(token_row)
+    try:
+        result = service.users().drafts().list(userId="me", maxResults=max_results).execute()
+    except HttpError as exc:
+        logger.error("Gmail drafts list error for %s: %s", token_row.talent_key, exc)
+        return []
+
+    stubs = result.get("drafts", [])
+    if not stubs:
+        return []
+
+    drafts = []
+    for stub in stubs:
+        draft_id = stub.get("id")
+        try:
+            full = service.users().drafts().get(userId="me", id=draft_id, format="full").execute()
+        except HttpError as exc:
+            logger.warning("Could not fetch Gmail draft %s: %s", draft_id, exc)
+            continue
+
+        msg = full.get("message", {})
+        payload = msg.get("payload", {})
+        headers = {h["name"].lower(): h["value"] for h in payload.get("headers", [])}
+        body_text = _extract_body(payload)
+
+        drafts.append({
+            "gmail_draft_id": draft_id,
+            "message_id": msg.get("id", ""),
+            "thread_id": msg.get("threadId", ""),
+            "to": headers.get("to", ""),
+            "subject": headers.get("subject", ""),
+            "snippet": msg.get("snippet", ""),
+            "body_text": body_text,
+        })
+
+    return drafts
+
+
+def send_gmail_draft(token_row, gmail_draft_id: str) -> bool:
+    """Send an existing Gmail draft by its draft ID."""
+    service = _gmail_service(token_row)
+    try:
+        service.users().drafts().send(userId="me", body={"id": gmail_draft_id}).execute()
+        return True
+    except HttpError as exc:
+        logger.error("Draft send failed for %s / %s: %s", token_row.talent_key, gmail_draft_id, exc)
+        return False
         return False
