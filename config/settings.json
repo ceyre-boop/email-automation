@@ -212,6 +212,16 @@
       "minimum_rate_usd": 3500,
       "rate_unit": "per video",
       "_note": "Dual manager escalation: offers above $4,000 go to Cara; at or below $4,000 go to Chenni. Offers below $1,000 go straight to Revisit."
+    },
+    {
+      "key": "Colin",
+      "full_name": "Colin Eyre",
+      "inbox_email": "colineyre222@gmail.com",
+      "manager": "Colin",
+      "category": "Test",
+      "minimum_rate_usd": 0,
+      "rate_unit": "per video",
+      "_note": "Owner test account — used to verify GPT triage and draft flow before rolling out to talent accounts."
     }
   ],
 
