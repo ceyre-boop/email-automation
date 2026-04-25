@@ -231,6 +231,6 @@ Some response texts contain internal instructions ("Move to A Initial Response",
 - [ ] Katrina dual-manager routing handled in response text
 - [ ] Michaela dual-manager routing handled in response text
 - [ ] KatrinaD hourly rate triggers worded clearly with rate math
-- [ ] Sheet shared with the Make service account (read access only)
+- [ ] Sheet shared with the Google account used for `GOOGLE_SHEETS_REFRESH_TOKEN` (read access only), or with the legacy service account if that fallback is intentionally being used
 - [ ] Sheet ID confirmed in `config/settings.json → google_sheets.sop_matrix_sheet_id`
 

@@ -153,8 +153,8 @@ However, if the system ever expands to include drafting actual post captions or 
 
 ### 4.3 Google Sheets Access
 
-- The SOP matrix sheet should be shared with the Make service account (or OAuth user) with **Viewer** access only — Make reads from it but should never write to it.
-- The master log sheet must be shared with the Make service account with **Editor** access (Make writes new rows).
+- The SOP matrix sheet should be shared with the Google account used to generate `GOOGLE_SHEETS_REFRESH_TOKEN`, with **Viewer** access only. If you are intentionally using the legacy service-account path, share it with that service account instead.
+- The master log sheet must be shared with the Google account used to generate `GOOGLE_SHEETS_REFRESH_TOKEN`, with **Editor** access so the app can append rows. If you are intentionally using the legacy service-account path, share it with that service account instead.
 - Do not share either sheet publicly or "Anyone with the link."
 - If a talent or brand contact accidentally gains access to the master log, revoke their access and review what data was exposed.
 
