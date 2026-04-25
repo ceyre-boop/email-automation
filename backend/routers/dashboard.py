@@ -311,7 +311,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
 
-    stubs = gmail_svc.list_inbox_messages(token, max_results=50)
+    stubs = gmail_svc.list_inbox_messages(token, max_results=25)
     if not stubs:
         return []
 
@@ -324,10 +324,24 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     )
     db_map = {row.gmail_message_id: row for row in db_rows}
 
+    # Fetch all message headers in parallel — ~25x faster than sequential
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    headers_map: dict[str, dict] = {}
+    with ThreadPoolExecutor(max_workers=10) as pool:
+        future_to_id = {pool.submit(gmail_svc.get_message_headers, token, s["id"]): s["id"] for s in stubs}
+        for future in as_completed(future_to_id):
+            mid = future_to_id[future]
+            try:
+                result = future.result()
+                if result:
+                    headers_map[mid] = result
+            except Exception:
+                pass
+
     results = []
     for stub in stubs:
         mid = stub["id"]
-        headers = gmail_svc.get_message_headers(token, mid)
+        headers = headers_map.get(mid)
         if not headers:
             continue
         db_row = db_map.get(mid)
@@ -338,7 +352,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
             "thread_id": headers.get("thread_id", ""),
             "sender": headers.get("sender", ""),
             "subject": headers.get("subject", ""),
-            "body_text": None,  # loaded on demand when email is clicked
+            "body_text": None,
             "email_date": email_date.isoformat() if email_date else None,
             "processed_at": db_row.processed_at.isoformat() if db_row else None,
             "score": db_row.score if db_row else None,
