@@ -1359,13 +1359,17 @@ function setGmailNav(nav) {
   state.gmailNav = nav;
   state.selectedEmail = null;
   state.selectedDraft = null;
-  // Update active highlight
   ['inbox','starred','sent','drafts','all','trash'].forEach(n => {
     const el = document.getElementById('gnav-' + n);
     if (el) el.classList.toggle('active', n === nav);
   });
-  renderEmailList();
   resetReadingPane();
+  // Inbox pulls live from Gmail; switching to/from it needs a fresh fetch
+  if (state.selectedTalent) {
+    loadTalentData(state.selectedTalent, true);
+  } else {
+    renderEmailList();
+  }
 }
 
 function setScoreFilter(score) {
@@ -1409,14 +1413,17 @@ async function openTalentView(talent) {
 
 async function loadTalentData(talent, silent = false) {
   try {
+    const isInbox = state.gmailNav === 'inbox';
     const [emails, drafts] = await Promise.all([
-      api('GET', `/api/dashboard/talents/${talent.key}/emails`),
+      // Inbox tab = live Gmail feed; all other tabs = our DB log
+      api('GET', isInbox
+        ? `/api/dashboard/talents/${talent.key}/inbox/live`
+        : `/api/dashboard/talents/${talent.key}/emails`),
       api('GET', `/api/dashboard/talents/${talent.key}/drafts`),
     ]);
     state.emails = emails;
     state.drafts = drafts;
     renderEmailList();
-    // Only reset reading pane on explicit navigation, not background refresh
     if (!silent) resetReadingPane();
   } catch (e) {}
 }
@@ -1469,7 +1476,7 @@ function renderEmailList() {
     const sc = scoreClass(email.score);
     const sn = scoreName(email.score);
     const hasDraft = draftsIds.has(email.gmail_message_id);
-    const isUnread = email.score === 3 || email.score == null;
+    const isUnread = email.is_unread ?? (email.score === 3 || email.score == null);
     const row = document.createElement('div');
     row.className = `email-row${isUnread ? ' unread' : ''}`;
     row.dataset.msgId = email.gmail_message_id;

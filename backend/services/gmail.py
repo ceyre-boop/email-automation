@@ -62,6 +62,25 @@ def list_all_messages_since(token_row, days_back: int = 30) -> list[dict]:
     return messages
 
 
+def list_inbox_messages(token_row, max_results: int = 50) -> list[dict]:
+    """
+    Return the talent's actual Gmail inbox (read + unread), newest first.
+    Each item: {"id": <gmail_message_id>, "threadId": <thread_id>}
+    """
+    service = _gmail_service(token_row)
+    try:
+        result = (
+            service.users()
+            .messages()
+            .list(userId="me", labelIds=["INBOX"], maxResults=max_results)
+            .execute()
+        )
+    except HttpError as exc:
+        logger.error("Gmail inbox list error for %s: %s", token_row.talent_key, exc)
+        return []
+    return result.get("messages", [])
+
+
 def list_unread_inbox_messages(token_row, max_results: int = 30) -> list[dict]:
     """
     Return a list of unread INBOX messages for the talent.

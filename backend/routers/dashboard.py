@@ -293,6 +293,65 @@ def delete_context(context_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+# ── Live Gmail inbox ───────────────────────────────────────────────────────────
+
+@router.get("/talents/{talent_key}/inbox/live")
+def live_inbox(talent_key: str, db: Session = Depends(get_db)):
+    """
+    Fetch the talent's real Gmail inbox live, enriched with our triage scores.
+    Returns the actual inbox so the dashboard always matches Gmail exactly.
+    """
+    from backend.services import gmail as gmail_svc
+    _validate_talent(talent_key)
+    token = (
+        db.query(TalentToken)
+        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .first()
+    )
+    if not token:
+        raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
+
+    stubs = gmail_svc.list_inbox_messages(token, max_results=50)
+    if not stubs:
+        return []
+
+    # Bulk-fetch our triage records for these message IDs
+    msg_ids = [s["id"] for s in stubs]
+    db_rows = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.gmail_message_id.in_(msg_ids))
+        .all()
+    )
+    db_map = {row.gmail_message_id: row for row in db_rows}
+
+    results = []
+    for stub in stubs:
+        mid = stub["id"]
+        detail = gmail_svc.get_message_detail(token, mid)
+        if not detail:
+            continue
+        db_row = db_map.get(mid)
+        results.append({
+            "id": db_row.id if db_row else None,
+            "gmail_message_id": mid,
+            "thread_id": detail.get("thread_id", ""),
+            "sender": detail.get("sender", ""),
+            "subject": detail.get("subject", ""),
+            "body_text": detail.get("body_text", ""),
+            "email_date": detail.get("email_date").isoformat() if detail.get("email_date") else None,
+            "processed_at": db_row.processed_at.isoformat() if db_row else None,
+            "score": db_row.score if db_row else None,
+            "brand_name": db_row.brand_name if db_row else None,
+            "proposed_rate": db_row.proposed_rate if db_row else None,
+            "offer_type": db_row.offer_type if db_row else None,
+            "triage_reason": db_row.triage_reason if db_row else None,
+            "status": db_row.status if db_row else "unprocessed",
+            "is_unread": "UNREAD" in detail.get("label_ids", []),
+        })
+
+    return results
+
+
 # ── Archive email ─────────────────────────────────────────────────────────────
 
 @router.post("/talents/{talent_key}/emails/{gmail_message_id}/archive")
