@@ -9,7 +9,9 @@ import base64
 import email as email_lib
 import logging
 import re
+from datetime import datetime, timezone
 from email.mime.text import MIMEText
+from email.utils import parsedate_to_datetime
 from typing import Any
 
 from googleapiclient.discovery import build
@@ -108,6 +110,7 @@ def get_message_detail(token_row, message_id: str) -> dict[str, Any]:
     sender = headers.get("from", "")
     sender_domain = _extract_domain(sender)
     body = _extract_body(msg.get("payload", {}))
+    email_date = _parse_email_date(headers.get("date", ""))
 
     return {
         "id": message_id,
@@ -118,7 +121,19 @@ def get_message_detail(token_row, message_id: str) -> dict[str, Any]:
         "body_text": body,
         "snippet": msg.get("snippet", ""),
         "label_ids": msg.get("labelIds", []),
+        "email_date": email_date,
     }
+
+
+def _parse_email_date(date_header: str) -> datetime | None:
+    """Parse RFC 2822 Date header into a naive UTC datetime, or None on failure."""
+    if not date_header:
+        return None
+    try:
+        dt = parsedate_to_datetime(date_header)
+        return dt.astimezone(timezone.utc).replace(tzinfo=None)
+    except Exception:
+        return None
 
 
 def _extract_domain(from_header: str) -> str:

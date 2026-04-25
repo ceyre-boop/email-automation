@@ -963,33 +963,29 @@ body {
       <!-- Left nav -->
       <div class="gmail-nav-panel">
         <button class="compose-btn">✏️ Compose</button>
-        <div class="gmail-nav-item active">
+        <div class="gmail-nav-item active" id="gnav-inbox" onclick="setGmailNav('inbox')">
           <span class="nav-icon">📥</span>
           Inbox
           <span class="gmail-nav-count" id="gmail-inbox-count"></span>
         </div>
-        <div class="gmail-nav-item">
+        <div class="gmail-nav-item" id="gnav-starred" onclick="setGmailNav('starred')">
           <span class="nav-icon">⭐</span>
           Starred
         </div>
-        <div class="gmail-nav-item">
-          <span class="nav-icon">🕐</span>
-          Snoozed
-        </div>
-        <div class="gmail-nav-item">
+        <div class="gmail-nav-item" id="gnav-sent" onclick="setGmailNav('sent')">
           <span class="nav-icon">📤</span>
           Sent
         </div>
-        <div class="gmail-nav-item">
+        <div class="gmail-nav-item" id="gnav-drafts" onclick="setGmailNav('drafts')">
           <span class="nav-icon">📝</span>
           Drafts
           <span class="gmail-nav-count" id="gmail-draft-count"></span>
         </div>
-        <div class="gmail-nav-item">
+        <div class="gmail-nav-item" id="gnav-all" onclick="setGmailNav('all')">
           <span class="nav-icon">🏷️</span>
           All Mail
         </div>
-        <div class="gmail-nav-item">
+        <div class="gmail-nav-item" id="gnav-trash" onclick="setGmailNav('trash')">
           <span class="nav-icon">🗑️</span>
           Trash
         </div>
@@ -1001,9 +997,10 @@ body {
         <!-- Email list -->
         <div id="gmail-email-list">
           <div class="gmail-list-toolbar">
-            <button class="gmail-tab-pill active">Primary</button>
-            <button class="gmail-tab-pill">Promotions</button>
-            <button class="gmail-tab-pill">Updates</button>
+            <button class="gmail-tab-pill active" id="tab-all" onclick="setScoreFilter(null)">All</button>
+            <button class="gmail-tab-pill" id="tab-good" onclick="setScoreFilter(3)">Good Deals</button>
+            <button class="gmail-tab-pill" id="tab-uncert" onclick="setScoreFilter(2)">Uncertain</button>
+            <button class="gmail-tab-pill" id="tab-trash" onclick="setScoreFilter(1)">Trash</button>
           </div>
           <div id="email-rows"></div>
         </div>
@@ -1031,9 +1028,11 @@ let API_KEY = localStorage.getItem('inbox_api_key') || '';
 
 const state = {
   view: 'overview',       // 'overview' | 'gmail'
-  selectedTalent: null,   // TalentOut
-  selectedEmail: null,    // EmailOut
-  selectedDraft: null,    // DraftOut
+  gmailNav: 'inbox',      // 'inbox' | 'drafts' | 'sent' | 'starred' | 'trash' | 'all'
+  scoreFilter: null,      // null | 1 | 2 | 3
+  selectedTalent: null,
+  selectedEmail: null,
+  selectedDraft: null,
   report: null,
   talents: [],
   emails: [],
@@ -1070,9 +1069,35 @@ function esc(s) {
   if (s == null) return '';
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
-function fmtDate(iso) {
+function fmtDate(email) {
+  // Prefer actual email send date; fall back to our processing timestamp
+  const iso = email.email_date || email.processed_at;
   if (!iso) return '';
-  const d = new Date(iso);
+  // The DB stores UTC without 'Z', so append it for correct parsing
+  const raw = iso.endsWith('Z') ? iso : iso + 'Z';
+  const d = new Date(raw);
+  const now = new Date();
+  const isToday = d.toDateString() === now.toDateString();
+  const isThisYear = d.getFullYear() === now.getFullYear();
+  if (isToday) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  if (isThisYear) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+}
+function fmtDateFull(email) {
+  const iso = email.email_date || email.processed_at;
+  if (!iso) return '';
+  const raw = iso.endsWith('Z') ? iso : iso + 'Z';
+  const d = new Date(raw);
+  return d.toLocaleString('en-US', {
+    weekday: 'short', month: 'short', day: 'numeric',
+    year: 'numeric', hour: '2-digit', minute: '2-digit',
+  });
+}
+function fmtDateIso(iso) {
+  // Simple helper for non-email timestamps (context entries, etc.)
+  if (!iso) return '';
+  const raw = iso.endsWith('Z') ? iso : iso + 'Z';
+  const d = new Date(raw);
   const now = new Date();
   const isToday = d.toDateString() === now.toDateString();
   if (isToday) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
@@ -1085,9 +1110,11 @@ function shortSender(sender) {
   return sender.split('@')[0];
 }
 function scoreClass(score) {
+  if (score == null) return 'uncert';
   return score === 3 ? 'good' : score === 1 ? 'trash' : 'uncert';
 }
 function scoreName(score) {
+  if (score == null) return 'Pending';
   return score === 3 ? 'Good' : score === 1 ? 'Trash' : 'Uncertain';
 }
 function initial(name) {
@@ -1132,9 +1159,11 @@ document.getElementById('api-key-input').addEventListener('keydown', (e) => {
 async function bootstrap() {
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
+  // Auto-refresh: overview every 60s, gmail view every 30s (silent, no toast)
   setInterval(() => {
     if (state.view === 'overview') loadOverview();
-  }, 60000);
+    else if (state.view === 'gmail' && state.selectedTalent) loadTalentData(state.selectedTalent, true);
+  }, 30000);
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
@@ -1257,7 +1286,7 @@ function renderContextPanel() {
     div.innerHTML = `
       <div style="flex:1">
         <div class="context-entry-text">${esc(entry.text)}</div>
-        <div class="context-entry-meta">Added by ${esc(entry.added_by || 'unknown')} · ${fmtDate(entry.added_at)}</div>
+        <div class="context-entry-meta">Added by ${esc(entry.added_by || 'unknown')} · ${fmtDateIso(entry.added_at)}</div>
       </div>
       <button class="btn-del" data-id="${entry.id}" title="Remove">×</button>
     `;
@@ -1325,18 +1354,52 @@ document.getElementById('btn-backfill').addEventListener('click', async () => {
   setTimeout(() => { btn.textContent = '↓ Load 30-day history'; btn.disabled = false; }, 5000);
 });
 
+// ── Gmail nav + score filter ───────────────────────────────────────────────
+function setGmailNav(nav) {
+  state.gmailNav = nav;
+  state.selectedEmail = null;
+  state.selectedDraft = null;
+  // Update active highlight
+  ['inbox','starred','sent','drafts','all','trash'].forEach(n => {
+    const el = document.getElementById('gnav-' + n);
+    if (el) el.classList.toggle('active', n === nav);
+  });
+  renderEmailList();
+  resetReadingPane();
+}
+
+function setScoreFilter(score) {
+  state.scoreFilter = score;
+  // Update tab pills
+  document.querySelectorAll('.gmail-tab-pill').forEach(b => b.classList.remove('active'));
+  const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert', 1: 'tab-trash' };
+  const el = document.getElementById(ids[score]);
+  if (el) el.classList.add('active');
+  renderEmailList();
+}
+
 // ── Talent Gmail view ──────────────────────────────────────────────────────
 async function openTalentView(talent) {
   state.selectedTalent = talent;
   state.selectedEmail = null;
   state.selectedDraft = null;
+  state.gmailNav = 'inbox';
+  state.scoreFilter = null;
 
-  // Update header
+  // Reset UI chrome
   document.getElementById('gmail-avatar').textContent = initial(talent.full_name);
   document.getElementById('gmail-talent-label').textContent = talent.email || talent.full_name;
+  document.getElementById('gmail-search').value = '';
+
+  // Nav + tab pill highlights (no render yet — loadTalentData will render)
+  ['inbox','starred','sent','drafts','all','trash'].forEach(n => {
+    const el = document.getElementById('gnav-' + n);
+    if (el) el.classList.toggle('active', n === 'inbox');
+  });
+  document.querySelectorAll('.gmail-tab-pill').forEach(b => b.classList.remove('active'));
+  document.getElementById('tab-all').classList.add('active');
 
   showView('gmail');
-  // Mark sidebar item
   document.querySelectorAll('.talent-item').forEach(el => {
     el.classList.toggle('active', el.dataset.key === talent.key);
   });
@@ -1344,7 +1407,7 @@ async function openTalentView(talent) {
   await loadTalentData(talent);
 }
 
-async function loadTalentData(talent) {
+async function loadTalentData(talent, silent = false) {
   try {
     const [emails, drafts] = await Promise.all([
       api('GET', `/api/dashboard/talents/${talent.key}/emails`),
@@ -1353,47 +1416,76 @@ async function loadTalentData(talent) {
     state.emails = emails;
     state.drafts = drafts;
     renderEmailList();
-    resetReadingPane();
+    // Only reset reading pane on explicit navigation, not background refresh
+    if (!silent) resetReadingPane();
   } catch (e) {}
 }
 
 // ── Email list ─────────────────────────────────────────────────────────────
+function getVisibleEmails() {
+  const nav = state.gmailNav;
+  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id));
+
+  let visible = state.emails;
+  if (nav === 'drafts') {
+    visible = visible.filter(e => draftsIds.has(e.gmail_message_id));
+  } else if (nav === 'trash') {
+    visible = visible.filter(e => e.status === 'archived');
+  } else if (nav === 'sent') {
+    visible = visible.filter(e => e.status === 'sent');
+  } else if (nav === 'starred') {
+    visible = visible.filter(e => e.score === 3);
+  }
+  // inbox / all: show everything (all mail)
+
+  if (state.scoreFilter != null) {
+    visible = visible.filter(e => e.score === state.scoreFilter);
+  }
+
+  return visible;
+}
+
 function renderEmailList() {
   const rows = document.getElementById('email-rows');
   rows.innerHTML = '';
 
-  // Count stats for Gmail nav
-  const good = state.emails.filter(e => e.score === 3).length;
-  const pending = state.drafts.length;
+  // Update nav counts
+  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id));
   const elInbox = document.getElementById('gmail-inbox-count');
   const elDraft = document.getElementById('gmail-draft-count');
   if (elInbox) elInbox.textContent = state.emails.length > 0 ? state.emails.length : '';
-  if (elDraft) elDraft.textContent = pending > 0 ? pending : '';
+  if (elDraft) elDraft.textContent = state.drafts.length > 0 ? state.drafts.length : '';
 
-  if (state.emails.length === 0) {
-    rows.innerHTML = '<div class="gmail-empty-state"><div style="font-size:32px">📭</div>No emails processed yet</div>';
+  const visible = getVisibleEmails();
+
+  if (visible.length === 0) {
+    const labels = { inbox: 'No emails processed yet', drafts: 'No pending drafts',
+      trash: 'No archived emails', sent: 'No sent replies', starred: 'No good deals yet', all: 'No emails yet' };
+    rows.innerHTML = `<div class="gmail-empty-state"><div style="font-size:32px">📭</div>${labels[state.gmailNav] || 'No emails'}</div>`;
     return;
   }
 
-  state.emails.forEach(email => {
+  visible.forEach(email => {
     const sc = scoreClass(email.score);
     const sn = scoreName(email.score);
-    const hasDraft = state.drafts.some(d => d.gmail_message_id === email.gmail_message_id);
-    const isUnread = email.score === 3; // treat score-3 as "important" (bold)
+    const hasDraft = draftsIds.has(email.gmail_message_id);
+    const isUnread = email.score === 3 || email.score == null;
     const row = document.createElement('div');
     row.className = `email-row${isUnread ? ' unread' : ''}`;
     row.dataset.msgId = email.gmail_message_id;
+
+    const snippet = [email.offer_type, email.brand_name ? '· ' + email.brand_name : ''].filter(Boolean).join(' ');
     row.innerHTML = `
       <div class="score-stripe ${sc}"></div>
       <div class="email-meta-col">
         <div class="email-sender-col">${esc(shortSender(email.sender))}</div>
         <div class="email-subject-col">${esc(email.subject || '(no subject)')}</div>
-        <div class="email-snippet-col">${esc(email.offer_type || '')} ${email.brand_name ? '· ' + email.brand_name : ''}</div>
+        <div class="email-snippet-col">${esc(snippet || email.triage_reason || '')}</div>
       </div>
       <div class="email-right-col">
-        <span class="email-date">${fmtDate(email.processed_at)}</span>
+        <span class="email-date" title="${esc(fmtDateFull(email))}">${fmtDate(email)}</span>
         <span class="score-label ${sc}">${sn}</span>
-        ${hasDraft ? '<span style="font-size:10px;color:#1a73e8">Draft</span>' : ''}
+        ${hasDraft ? '<span style="font-size:10px;color:#1a73e8">✏️ Draft</span>' : ''}
       </div>
     `;
     row.addEventListener('click', () => selectEmail(email));
@@ -1452,9 +1544,7 @@ function renderReadingPane(email, draft) {
   pane.innerHTML = `
     <div class="reading-toolbar">
       <button class="tool-btn" onclick="resetReadingPane();document.querySelectorAll('.email-row').forEach(r=>r.classList.remove('selected'))">← Back</button>
-      <button class="tool-btn">🗄️ Archive</button>
-      <button class="tool-btn">🗑️ Delete</button>
-      <button class="tool-btn">📁 Move to</button>
+      <button class="tool-btn" onclick="archiveEmail('${email.gmail_message_id}')" title="Archive this email">🗄️ Archive</button>
     </div>
     <div class="email-thread">
       <div class="email-thread-subject">${esc(email.subject || '(no subject)')}</div>
@@ -1465,7 +1555,7 @@ function renderReadingPane(email, draft) {
             <div class="msg-from">${esc(senderShort)} <span class="msg-from-email">&lt;${esc(email.sender || '')}&gt;</span></div>
             <div style="font-size:12px;color:#5f6368;font-family:var(--sans)">to ${esc(state.selectedTalent?.email || state.selectedTalent?.full_name || 'talent')}</div>
           </div>
-          <div class="msg-date">${fmtDate(email.processed_at)}</div>
+          <div class="msg-date" title="${esc(fmtDateFull(email))}">${fmtDate(email)}</div>
         </div>
         <div class="msg-body" id="msg-body-${email.gmail_message_id}">
           <p style="color:#9aa0a6;font-size:13px">Loading email content...</p>
@@ -1538,6 +1628,20 @@ function renderDraftCompose(draft, email) {
   document.getElementById(`btn-discard-${draft.id}`)?.addEventListener('click', () => discardDraft(draft.id));
 }
 
+// ── Archive email ──────────────────────────────────────────────────────────
+async function archiveEmail(gmailMsgId) {
+  if (!state.selectedTalent) return;
+  if (!confirm('Archive this email? It will be removed from the inbox.')) return;
+  try {
+    await api('POST', `/api/dashboard/talents/${state.selectedTalent.key}/emails/${gmailMsgId}/archive`);
+    showToast('Email archived.');
+    resetReadingPane();
+    await loadTalentData(state.selectedTalent);
+  } catch (e) {
+    showToast('Archive failed — ' + e.message);
+  }
+}
+
 // ── Draft actions ──────────────────────────────────────────────────────────
 async function sendDraft(draftId) {
   if (!confirm('Send this reply from the talent\'s Gmail now?')) return;
@@ -1570,12 +1674,13 @@ async function discardDraft(draftId) {
   } catch (e) {}
 }
 
-// Gmail search filter (client-side)
+// Gmail search filter (client-side, applied on top of nav/score filter)
+let searchQuery = '';
 document.getElementById('gmail-search').addEventListener('input', (e) => {
-  const q = e.target.value.toLowerCase();
-  document.querySelectorAll('.email-row').forEach(row => {
-    const text = row.textContent.toLowerCase();
-    row.style.display = text.includes(q) ? '' : 'none';
+  searchQuery = e.target.value.toLowerCase().trim();
+  const rows = document.querySelectorAll('.email-row');
+  rows.forEach(row => {
+    row.style.display = !searchQuery || row.textContent.toLowerCase().includes(searchQuery) ? '' : 'none';
   });
 });
 

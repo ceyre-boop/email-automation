@@ -86,6 +86,7 @@ class EmailOut(BaseModel):
     offer_type: Optional[str] = None
     triage_reason: Optional[str] = None
     body_text: Optional[str] = None
+    email_date: Optional[datetime] = None
     processed_at: datetime
     status: str
 
@@ -292,6 +293,32 @@ def delete_context(context_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+# ── Archive email ─────────────────────────────────────────────────────────────
+
+@router.post("/talents/{talent_key}/emails/{gmail_message_id}/archive")
+def archive_email(talent_key: str, gmail_message_id: str, db: Session = Depends(get_db)):
+    """Archive a specific email in the talent's Gmail account and mark it in DB."""
+    from backend.services import gmail as gmail_svc
+    _validate_talent(talent_key)
+    token = (
+        db.query(TalentToken)
+        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .first()
+    )
+    if not token:
+        raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
+    gmail_svc.archive_message(token, gmail_message_id)
+    # Update status in DB if record exists
+    row = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == gmail_message_id
+    ).first()
+    if row:
+        from backend.models.db import EmailStatus
+        row.status = EmailStatus.archived
+        db.commit()
+    return {"ok": True}
+
+
 # ── Email body (live fetch from Gmail) ────────────────────────────────────────
 
 @router.get("/talents/{talent_key}/emails/{gmail_message_id}/body")
@@ -358,6 +385,7 @@ def _run_backfill(talent_key: str, days: int):
                     offer_type=None,
                     triage_reason=None,
                     body_text=detail.get("body_text", "") or None,
+                    email_date=detail.get("email_date"),
                     processed_at=datetime.utcnow(),
                     status=EmailStatus.flagged,
                 )
@@ -375,6 +403,23 @@ def _run_backfill(talent_key: str, days: int):
                     talent_key, stored, skipped, errors)
     finally:
         db.close()
+
+
+@router.post("/backfill-all")
+def start_backfill_all(
+    background_tasks: BackgroundTasks,
+    days: int = 30,
+    db: Session = Depends(get_db),
+):
+    """Start a background 30-day backfill for ALL connected talents at once."""
+    tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+    if not tokens:
+        raise HTTPException(status_code=400, detail="No connected Gmail accounts found.")
+    for token in tokens:
+        background_tasks.add_task(_run_backfill, token.talent_key, days)
+    keys = [t.talent_key for t in tokens]
+    logger.info("Backfill-all triggered for %s talents: %s", len(keys), keys)
+    return {"ok": True, "talents": keys, "message": f"Backfill started for {len(keys)} talent(s) — last {days} days"}
 
 
 @router.post("/talents/{talent_key}/backfill")

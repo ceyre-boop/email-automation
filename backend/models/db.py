@@ -81,6 +81,7 @@ class ProcessedEmail(Base):
     offer_type: Mapped[str | None] = mapped_column(String(128))
     triage_reason: Mapped[str | None] = mapped_column(Text)
     body_text: Mapped[str | None] = mapped_column(Text)
+    email_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     processed_at: Mapped[datetime] = mapped_column(
         DateTime, default=datetime.utcnow, nullable=False
     )
@@ -163,4 +164,11 @@ def create_tables():
             ))
             conn.commit()
         except Exception:
-            pass  # Column already exists or DB doesn't support IF NOT EXISTS
+            pass
+        try:
+            conn.execute(text(
+                "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS email_date TIMESTAMP"
+            ))
+            conn.commit()
+        except Exception:
+            pass

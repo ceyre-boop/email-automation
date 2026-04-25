@@ -112,6 +112,7 @@ def poll_all_inboxes(db: Session) -> dict:
                     offer_type="Unknown",
                     reason=f"Error: {exc}",
                     status=EmailStatus.error,
+                    email_date=None,
                 )
 
     logger.info("Poll complete: %s", summary)
@@ -138,6 +139,7 @@ def _process_one_message(
     sender = detail.get("sender", "")
     sender_domain = detail.get("sender_domain", "")
     body = detail.get("body_text", "")
+    email_date = detail.get("email_date")
 
     # ── Triage ───────────────────────────────────────────────────────────────
     triage_result = triage_svc.triage_email(
@@ -161,7 +163,7 @@ def _process_one_message(
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
-            body_text=body,
+            body_text=body, email_date=email_date,
         )
         sheets_svc.log_email(
             talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason
@@ -174,7 +176,7 @@ def _process_one_message(
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
-            body_text=body,
+            body_text=body, email_date=email_date,
         )
         sheets_svc.log_email(
             talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason
@@ -232,7 +234,7 @@ def _process_one_message(
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved,
-            body_text=body,
+            body_text=body, email_date=email_date,
         )
         sheets_svc.log_email(
             talent_key, sender, subject, score, brand_name, proposed_rate,
@@ -259,6 +261,7 @@ def _record_processed(
     reason: str,
     status: EmailStatus,
     body_text: str = "",
+    email_date=None,
 ):
     row = ProcessedEmail(
         talent_key=talent_key,
@@ -272,6 +275,7 @@ def _record_processed(
         offer_type=offer_type,
         triage_reason=reason,
         body_text=body_text or None,
+        email_date=email_date,
         processed_at=datetime.utcnow(),
         status=status,
     )
