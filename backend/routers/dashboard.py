@@ -327,18 +327,19 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     results = []
     for stub in stubs:
         mid = stub["id"]
-        detail = gmail_svc.get_message_detail(token, mid)
-        if not detail:
+        headers = gmail_svc.get_message_headers(token, mid)
+        if not headers:
             continue
         db_row = db_map.get(mid)
+        email_date = headers.get("email_date")
         results.append({
             "id": db_row.id if db_row else None,
             "gmail_message_id": mid,
-            "thread_id": detail.get("thread_id", ""),
-            "sender": detail.get("sender", ""),
-            "subject": detail.get("subject", ""),
-            "body_text": detail.get("body_text", ""),
-            "email_date": detail.get("email_date").isoformat() if detail.get("email_date") else None,
+            "thread_id": headers.get("thread_id", ""),
+            "sender": headers.get("sender", ""),
+            "subject": headers.get("subject", ""),
+            "body_text": None,  # loaded on demand when email is clicked
+            "email_date": email_date.isoformat() if email_date else None,
             "processed_at": db_row.processed_at.isoformat() if db_row else None,
             "score": db_row.score if db_row else None,
             "brand_name": db_row.brand_name if db_row else None,
@@ -346,7 +347,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
             "offer_type": db_row.offer_type if db_row else None,
             "triage_reason": db_row.triage_reason if db_row else None,
             "status": db_row.status if db_row else "unprocessed",
-            "is_unread": "UNREAD" in detail.get("label_ids", []),
+            "is_unread": "UNREAD" in headers.get("label_ids", []),
         })
 
     return results

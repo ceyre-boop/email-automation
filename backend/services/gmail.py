@@ -104,6 +104,38 @@ def list_unread_inbox_messages(token_row, max_results: int = 30) -> list[dict]:
     return result.get("messages", [])
 
 
+def get_message_headers(token_row, message_id: str) -> dict[str, Any]:
+    """
+    Fetch only headers (subject, from, date) + labels for a message — no body.
+    ~10x faster than get_message_detail; used for inbox list rendering.
+    """
+    service = _gmail_service(token_row)
+    try:
+        msg = (
+            service.users()
+            .messages()
+            .get(userId="me", id=message_id, format="metadata",
+                 metadataHeaders=["From", "Subject", "Date"])
+            .execute()
+        )
+    except HttpError as exc:
+        logger.error("Gmail headers error for message %s: %s", message_id, exc)
+        return {}
+
+    headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}
+    sender = headers.get("from", "")
+    return {
+        "id": message_id,
+        "thread_id": msg.get("threadId", ""),
+        "subject": headers.get("subject", ""),
+        "sender": sender,
+        "sender_domain": _extract_domain(sender),
+        "email_date": _parse_email_date(headers.get("date", "")),
+        "label_ids": msg.get("labelIds", []),
+        "snippet": msg.get("snippet", ""),
+    }
+
+
 def get_message_detail(token_row, message_id: str) -> dict[str, Any]:
     """
     Fetch full message detail and parse it into a flat dict:
