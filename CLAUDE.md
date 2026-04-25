@@ -27,7 +27,7 @@ cd backend && python -c "from backend.models.db import create_tables; create_tab
 
 **Polling loop.** An external cron (Render) hits `GET /cron/poll-inboxes` every 5 min → `services/poller.py` → for each connected `TalentToken`: fetch unread Gmail → GPT triage → score 1 archive, score 2 flag, score 3 draft reply → log to Google Sheets.
 
-**AI providers — critical rule.** `openai` is the TABOOST *business* account used for email triage (`gpt-4o-mini`) and reply drafting (`gpt-4o`). Anthropic/Claude is only for this IDE. **Never migrate triage.py or reply.py away from OpenAI** — if quota errors appear, tell the user to add billing credits at platform.openai.com.
+**AI providers — critical rule.** `openai` is the TABOOST *business* account used for email triage (`gpt-4o-mini`) and reply drafting (`gpt-4o`). Anthropic/Claude is only for this IDE. **Never migrate triage.py or reply.py away from OpenAI** — if quota errors appear, tell Colin to add billing credits at platform.openai.com.
 
 **DB migrations are additive only.** No Alembic migrations — new columns are added via raw `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `models/db.py::create_tables()`, which runs at startup. Always use this pattern for schema changes.
 
@@ -60,3 +60,50 @@ cd backend && python -c "from backend.models.db import create_tables; create_tab
 Talents are defined in `config/settings.json` under `"talents"`. Each has `key`, `full_name`, `minimum_rate_usd`, `rate_unit` (`"per video"` or `"per hour"`), and `manager`. The `key` is used everywhere as the identifier and must match the DB `talent_key` (case-sensitive in config, lowercased in DB queries).
 
 Special routing logic for specific talents lives in `triage.py::_apply_special_routing()` and is policy-driven from `config/confidence_policy.json`.
+
+---
+
+## Memory Protocol
+
+At the end of any session where something non-obvious was learned, update the memory files at:
+`C:\Users\Admin\.claude\projects\C--Users-Admin-email-automation\memory\`
+
+**When to write a memory:**
+- A decision was made that future Claude won't be able to infer from the code (e.g. why OpenAI stays as-is)
+- Colin corrected an approach or confirmed an unusual one
+- A new talent was added, a new env var is required, or a Render config changed
+- A bug was found with a non-obvious root cause
+
+**Memory index:** `MEMORY.md` in that folder is auto-loaded each session. Keep entries under 150 chars. Write individual files for each memory, link them from the index.
+
+**What not to save:** anything already in this CLAUDE.md, git history, or directly readable from code.
+
+---
+
+## Project Roadmap
+
+The goal is a fully autonomous inbox management system for 16+ creator talents. Colin reviews and approves — Claude does all the building. Prioritized in order:
+
+### Now — Stability & completeness
+- [ ] Connect all 16 talent Gmail accounts (only Katrina connected as of 2026-04-24)
+- [ ] Verify OpenAI billing is active so triage stops falling back to score=2
+- [ ] Trigger `POST /api/dashboard/backfill-all?days=30` once all talents are connected
+
+### Next — Dashboard UX
+- [ ] **Sent tab** — show emails where a reply was actually sent (status=`sent`)
+- [ ] **Mobile-friendly layout** — sidebar collapses, readable on phone
+- [ ] **Unread badge** on sidebar talent names showing pending draft count
+- [ ] **Draft approval flow** — one-click approve from the email list (no need to open reading pane)
+- [ ] **Email threading** — group replies under the original email in reading pane
+
+### Soon — Intelligence upgrades
+- [ ] **Rate negotiation replies** — when Score 3 offer is below minimum, GPT counter-offers instead of just flagging
+- [ ] **Brand recognition** — maintain a known-brand list so recognized brands always get Score 3 regardless of rate
+- [ ] **Duplicate detection** — same brand emailing twice in 30 days → surface the prior interaction in the reply
+- [ ] **Daily digest email** — send Colin/managers a morning summary of overnight activity
+
+### Later — Autonomy
+- [ ] **Auto-send mode** — after 30-day trial, flip `draft_mode: false` in `config/settings.json` to send replies without human review
+- [ ] **Webhook / Gmail push notifications** — replace 5-min polling with real-time Gmail Pub/Sub push for instant email processing
+- [ ] **Analytics dashboard** — conversion rates, average deal value per talent, reply-to-close time
+- [ ] **Multi-manager portal** — Cara, Chenni, Nicole each get a filtered view showing only their talents
