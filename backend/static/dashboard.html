@@ -1412,10 +1412,13 @@ async function openTalentView(talent) {
 }
 
 async function loadTalentData(talent, silent = false) {
+  const isInbox = state.gmailNav === 'inbox';
+  if (!silent) {
+    document.getElementById('email-rows').innerHTML =
+      '<div class="gmail-empty-state"><span class="spinner"></span>&nbsp; Loading inbox...</div>';
+  }
   try {
-    const isInbox = state.gmailNav === 'inbox';
     const [emails, drafts] = await Promise.all([
-      // Inbox tab = live Gmail feed; all other tabs = our DB log
       api('GET', isInbox
         ? `/api/dashboard/talents/${talent.key}/inbox/live`
         : `/api/dashboard/talents/${talent.key}/emails`),
@@ -1425,7 +1428,10 @@ async function loadTalentData(talent, silent = false) {
     state.drafts = drafts;
     renderEmailList();
     if (!silent) resetReadingPane();
-  } catch (e) {}
+  } catch (e) {
+    document.getElementById('email-rows').innerHTML =
+      `<div class="gmail-empty-state" style="color:#d93025">⚠️ ${e.message}</div>`;
+  }
 }
 
 // ── Email list ─────────────────────────────────────────────────────────────
