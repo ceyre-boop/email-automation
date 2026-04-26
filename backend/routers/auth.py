@@ -25,9 +25,9 @@ from backend.services.oauth import build_authorization_url, exchange_code
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
 
-# In-memory CSRF state store {state_token: True}
+# In-memory CSRF state store {state_token: Optional[talent_key]}
 # Fine for a single-process server; tokens expire naturally after use.
-_pending_states: dict[str, bool] = {}
+_pending_states: dict[str, str | None] = {}
 
 
 def _generate_talent_key(name: str, email: str, db: Session) -> str:
@@ -48,10 +48,10 @@ def _generate_talent_key(name: str, email: str, db: Session) -> str:
 
 
 @router.get("/connect")
-def connect_gmail():
-    """Redirect any user to the Google consent screen. No account needed in advance."""
+def connect_gmail(talent_key: str | None = Query(None)):
+    """Redirect any user to the Google consent screen. Pin to a talent_key if provided."""
     state = secrets.token_urlsafe(32)
-    _pending_states[state] = True
+    _pending_states[state] = talent_key # May be None
     auth_url = build_authorization_url(state)
     return RedirectResponse(url=auth_url)
 
@@ -82,10 +82,10 @@ def _oauth_callback_inner(
     if not code or not state:
         return HTMLResponse(content=_error_page("missing_params"))
 
-    # Validate CSRF state
+    # 1. Validate CSRF state and retrieve pinned talent_key
     if state not in _pending_states:
         return HTMLResponse(content=_error_page("invalid_state"))
-    del _pending_states[state]
+    pinned_talent_key = _pending_states.pop(state)
 
     settings = get_settings()
 
@@ -113,10 +113,18 @@ def _oauth_callback_inner(
         google_user_id = ""
         full_name = "there"
 
-    # Upsert: find by google_user_id first, then email, else create new
+    # Upsert:
+    # A. If we pinned a talent_key (from /connect?talent_key=X), use that.
+    # B. Else try to find existing by google_user_id or email.
+    # C. Else create new with auto-key.
+    
     existing = None
-    if google_user_id:
+    if pinned_talent_key:
+        existing = db.query(TalentToken).filter(TalentToken.talent_key == pinned_talent_key).first()
+    
+    if not existing and google_user_id:
         existing = db.query(TalentToken).filter(TalentToken.google_user_id == google_user_id).first()
+    
     if not existing and email:
         existing = db.query(TalentToken).filter(TalentToken.email == email).first()
 
@@ -130,7 +138,8 @@ def _oauth_callback_inner(
         db.add(existing)
         talent_key = existing.talent_key
     else:
-        talent_key = _generate_talent_key(full_name, email, db)
+        # Create new — use pinned key if available, else generate
+        talent_key = pinned_talent_key or _generate_talent_key(full_name, email, db)
         row = TalentToken(
             talent_key=talent_key,
             email=email,

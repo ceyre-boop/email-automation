@@ -165,7 +165,7 @@
           avatarEl.textContent = talentKey.charAt(0).toUpperCase();
         });
 
-      btnEl.href = '/auth/connect';
+      btnEl.href = '/auth/connect?talent_key=' + encodeURIComponent(talentKey);
     }
   </script>
 </body>
