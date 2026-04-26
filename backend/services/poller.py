@@ -22,8 +22,11 @@ from backend.services import gmail as gmail_svc
 from backend.services import reply as reply_svc
 from backend.services import sheets as sheets_svc
 from backend.services import triage as triage_svc
+from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
 
 logger = logging.getLogger(__name__)
+
+BODY_FETCH_BATCH = 5  # bodies fetched per talent per poll cycle
 
 
 def _talent_config_map(settings) -> dict[str, dict]:
@@ -78,6 +81,18 @@ def poll_all_inboxes(db: Session) -> dict:
             if existing_drafts >= max_drafts:
                 logger.info("Draft cap (%d) reached for %s — skipping poll", max_drafts, talent_key)
                 continue
+
+        # ── Inbox cache sync (runs before triage) ────────────────────────────
+        try:
+            sync_result = sync_inbox_for_talent(token_row, db)
+            logger.info("Inbox sync %s: %s", talent_key, sync_result)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Inbox sync failed for %s (non-fatal): %s", talent_key, exc)
+
+        try:
+            fetch_pending_bodies(token_row, db, limit=BODY_FETCH_BATCH)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Body fetch failed for %s (non-fatal): %s", talent_key, exc)
 
         try:
             messages = gmail_svc.list_unread_inbox_messages(token_row)

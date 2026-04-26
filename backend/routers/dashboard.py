@@ -300,11 +300,47 @@ def delete_context(context_id: int, db: Session = Depends(get_db)):
 @router.get("/talents/{talent_key}/inbox/live")
 def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     """
-    Fetch the talent's real Gmail inbox live, enriched with our triage scores.
-    Returns the actual inbox so the dashboard always matches Gmail exactly.
+    Return the talent's inbox from the server-side cache (1 DB query, instant).
+    Falls back to live Gmail fetch if the cache hasn't been populated yet.
     """
+    from backend.models.db import InboxEmail
     from backend.services import gmail as gmail_svc
     _validate_talent(talent_key)
+
+    # ── Primary: read from cache ──────────────────────────────────────────────
+    cached = (
+        db.query(InboxEmail)
+        .filter(InboxEmail.talent_key == talent_key.lower())
+        .order_by(InboxEmail.email_date.desc().nullslast())
+        .limit(50)
+        .all()
+    )
+
+    if cached:
+        return [
+            {
+                "id": None,
+                "gmail_message_id": r.gmail_message_id,
+                "thread_id": r.thread_id or "",
+                "sender": r.sender or "",
+                "subject": r.subject or "",
+                "body_text": None,
+                "snippet": r.snippet or "",
+                "email_date": r.email_date.isoformat() if r.email_date else None,
+                "processed_at": None,
+                "score": r.score,
+                "brand_name": r.brand_name,
+                "proposed_rate": r.proposed_rate,
+                "offer_type": r.offer_type,
+                "triage_reason": r.triage_reason,
+                "status": r.triage_status or "unprocessed",
+                "is_unread": r.is_unread,
+                "last_synced_at": r.last_synced_at.isoformat() if r.last_synced_at else None,
+            }
+            for r in cached
+        ]
+
+    # ── Fallback: live Gmail fetch (cache not yet populated) ──────────────────
     token = (
         db.query(TalentToken)
         .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
@@ -317,7 +353,6 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     if not stubs:
         return []
 
-    # Bulk-fetch our triage records for these message IDs
     msg_ids = [s["id"] for s in stubs]
     db_rows = (
         db.query(ProcessedEmail)
@@ -326,7 +361,6 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     )
     db_map = {row.gmail_message_id: row for row in db_rows}
 
-    # Fetch all message headers in parallel — ~25x faster than sequential
     from concurrent.futures import ThreadPoolExecutor, as_completed
     headers_map: dict[str, dict] = {}
     with ThreadPoolExecutor(max_workers=10) as pool:
@@ -355,6 +389,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
             "sender": headers.get("sender", ""),
             "subject": headers.get("subject", ""),
             "body_text": None,
+            "snippet": "",
             "email_date": email_date.isoformat() if email_date else None,
             "processed_at": db_row.processed_at.isoformat() if db_row else None,
             "score": db_row.score if db_row else None,
@@ -364,6 +399,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
             "triage_reason": db_row.triage_reason if db_row else None,
             "status": db_row.status if db_row else "unprocessed",
             "is_unread": "UNREAD" in headers.get("label_ids", []),
+            "last_synced_at": None,
         })
 
     return results
@@ -437,14 +473,20 @@ def archive_email(talent_key: str, gmail_message_id: str, db: Session = Depends(
     if not token:
         raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
     gmail_svc.archive_message(token, gmail_message_id)
-    # Update status in DB if record exists
+    # Update status in ProcessedEmail if record exists
     row = db.query(ProcessedEmail).filter(
         ProcessedEmail.gmail_message_id == gmail_message_id
     ).first()
     if row:
         from backend.models.db import EmailStatus
         row.status = EmailStatus.archived
-        db.commit()
+    # Remove from inbox cache so it doesn't reappear
+    from backend.models.db import InboxEmail
+    db.query(InboxEmail).filter(
+        InboxEmail.gmail_message_id == gmail_message_id,
+        InboxEmail.talent_key == talent_key.lower(),
+    ).delete()
+    db.commit()
     return {"ok": True}
 
 
@@ -452,8 +494,26 @@ def archive_email(talent_key: str, gmail_message_id: str, db: Session = Depends(
 
 @router.get("/talents/{talent_key}/emails/{gmail_message_id}/body")
 def email_body(talent_key: str, gmail_message_id: str, db: Session = Depends(get_db)):
-    """Fetch the full email body live from Gmail for the reading pane."""
+    """Return email body — from cache if available, else live from Gmail."""
+    from backend.models.db import InboxEmail
     from backend.services import gmail as gmail_svc
+
+    # Check inbox cache first
+    cached = db.query(InboxEmail).filter(
+        InboxEmail.gmail_message_id == gmail_message_id,
+        InboxEmail.talent_key == talent_key.lower(),
+    ).first()
+    if cached and cached.body_text:
+        return {"body": cached.body_text}
+
+    # Check ProcessedEmail (triage also stores body_text)
+    processed = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == gmail_message_id
+    ).first()
+    if processed and processed.body_text:
+        return {"body": processed.body_text}
+
+    # Fall back to live Gmail fetch
     token = (
         db.query(TalentToken)
         .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
@@ -462,7 +522,15 @@ def email_body(talent_key: str, gmail_message_id: str, db: Session = Depends(get
     if not token:
         raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
     detail = gmail_svc.get_message_detail(token, gmail_message_id)
-    return {"body": detail.get("body_text", "") or ""}
+    body = detail.get("body_text", "") or "" if detail else ""
+
+    # Opportunistically populate the cache
+    if cached and not cached.body_text:
+        cached.body_text = body
+        cached.body_fetched_at = datetime.utcnow()
+        db.commit()
+
+    return {"body": body}
 
 
 # ── 30-day backfill ───────────────────────────────────────────────────────────

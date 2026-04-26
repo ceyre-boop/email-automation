@@ -12,6 +12,7 @@ from sqlalchemy import (
     Integer,
     String,
     Text,
+    UniqueConstraint,
     create_engine,
     text,
 )
@@ -117,6 +118,36 @@ class Draft(Base):
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
     reviewed_by: Mapped[str | None] = mapped_column(String(128))
+
+
+class InboxEmail(Base):
+    """Server-side cache of each talent's Gmail inbox. Upserted every sync cycle."""
+
+    __tablename__ = "inbox_emails"
+    __table_args__ = (
+        UniqueConstraint("talent_key", "gmail_message_id", name="uq_inbox_talent_msg"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    talent_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    gmail_message_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
+    thread_id: Mapped[str | None] = mapped_column(String(128))
+    sender: Mapped[str | None] = mapped_column(String(256))
+    subject: Mapped[str | None] = mapped_column(String(512))
+    snippet: Mapped[str | None] = mapped_column(String(512))
+    email_date: Mapped[datetime | None] = mapped_column(DateTime)
+    is_unread: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    label_ids: Mapped[str | None] = mapped_column(String(512))
+    body_text: Mapped[str | None] = mapped_column(Text)
+    body_fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
+    score: Mapped[int | None] = mapped_column(Integer)
+    brand_name: Mapped[str | None] = mapped_column(String(256))
+    proposed_rate: Mapped[float | None] = mapped_column(Float)
+    offer_type: Mapped[str | None] = mapped_column(String(128))
+    triage_reason: Mapped[str | None] = mapped_column(Text)
+    triage_status: Mapped[str | None] = mapped_column(String(64))
+    first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    last_synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class ManagerContext(Base):
