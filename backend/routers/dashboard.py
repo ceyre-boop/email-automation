@@ -307,7 +307,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     token = (
         db.query(TalentToken)
-        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
         .first()
     )
     if not token:
@@ -381,7 +381,7 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     token = (
         db.query(TalentToken)
-        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
         .first()
     )
     if not token:
@@ -431,7 +431,7 @@ def archive_email(talent_key: str, gmail_message_id: str, db: Session = Depends(
     _validate_talent(talent_key)
     token = (
         db.query(TalentToken)
-        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
         .first()
     )
     if not token:
@@ -456,7 +456,7 @@ def email_body(talent_key: str, gmail_message_id: str, db: Session = Depends(get
     from backend.services import gmail as gmail_svc
     token = (
         db.query(TalentToken)
-        .filter(TalentToken.talent_key == talent_key.lower(), TalentToken.active == True)  # noqa: E712
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
         .first()
     )
     if not token:
@@ -478,7 +478,7 @@ def _run_backfill(talent_key: str, days: int):
     stored = skipped = errors = 0
     try:
         token = db.query(TalentToken).filter(
-            TalentToken.talent_key == talent_key.lower(),
+            TalentToken.talent_key.ilike(talent_key),
             TalentToken.active == True,  # noqa: E712
         ).first()
         if not token:

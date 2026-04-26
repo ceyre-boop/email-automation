@@ -120,11 +120,14 @@ def _oauth_callback_inner(
     
     existing = None
     if pinned_talent_key:
-        existing = db.query(TalentToken).filter(TalentToken.talent_key == pinned_talent_key).first()
-    
+        # Case-insensitive lookup so reconnects always find the existing row
+        existing = db.query(TalentToken).filter(
+            TalentToken.talent_key.ilike(pinned_talent_key)
+        ).first()
+
     if not existing and google_user_id:
         existing = db.query(TalentToken).filter(TalentToken.google_user_id == google_user_id).first()
-    
+
     if not existing and email:
         existing = db.query(TalentToken).filter(TalentToken.email == email).first()
 
