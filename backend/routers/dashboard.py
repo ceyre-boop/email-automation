@@ -894,3 +894,92 @@ def start_backfill(
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
     background_tasks.add_task(_run_backfill, talent_key, days)
     return {"ok": True, "message": f"Backfill started — fetching last {days} days for {talent_key}"}
+
+
+def _run_triage_unscored(talent_key: str, batch_size: int = 20):
+    """Background job: triage InboxEmail rows that have no score yet, in batches."""
+    from backend.models.db import get_session_factory
+    from backend.services import triage as triage_svc
+    from backend.core.config import get_settings as _gs
+
+    settings = _gs()
+    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_cfg = talent_map.get(talent_key.lower(), {})
+    talent_name = talent_cfg.get("full_name", talent_key)
+    minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
+
+    _db = get_session_factory()()
+    total = 0
+    try:
+        while True:
+            rows = (
+                _db.query(InboxEmail)
+                .filter(
+                    InboxEmail.talent_key == talent_key.lower(),
+                    InboxEmail.score == None,  # noqa: E711
+                    InboxEmail.body_text != None,  # noqa: E711
+                )
+                .limit(batch_size)
+                .all()
+            )
+            if not rows:
+                break
+            for row in rows:
+                try:
+                    result = triage_svc.triage_email(
+                        talent_key=talent_key,
+                        talent_name=talent_name,
+                        minimum_rate=minimum_rate,
+                        subject=row.subject or "",
+                        sender=row.sender or "",
+                        sender_domain=(row.sender or "").split("@")[-1].split(">")[0] if "@" in (row.sender or "") else "",
+                        body=row.body_text or "",
+                    )
+                    row.score = result["score"]
+                    row.brand_name = result.get("brand_name")
+                    row.proposed_rate = result.get("proposed_rate_usd")
+                    row.offer_type = result.get("offer_type")
+                    row.triage_reason = result.get("reason")
+                    row.triage_status = "triaged"
+                    _db.add(row)
+                    total += 1
+                except Exception as exc:
+                    logger.warning("Triage failed for %s / %s: %s", talent_key, row.gmail_message_id, exc)
+            _db.commit()
+    except Exception as exc:
+        logger.error("Triage-unscored job failed for %s: %s", talent_key, exc)
+    finally:
+        _db.close()
+    logger.info("Triage-unscored complete for %s: %d emails scored", talent_key, total)
+
+
+@router.post("/talents/{talent_key}/triage-unscored")
+def triage_unscored(
+    talent_key: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """Triage all InboxEmail rows that have body text but no score yet. Runs in background."""
+    unscored_count = (
+        db.query(InboxEmail)
+        .filter(
+            InboxEmail.talent_key == talent_key.lower(),
+            InboxEmail.score == None,  # noqa: E711
+            InboxEmail.body_text != None,  # noqa: E711
+        )
+        .count()
+    )
+    if unscored_count == 0:
+        return {"ok": True, "message": "No unscored emails with body text found."}
+    background_tasks.add_task(_run_triage_unscored, talent_key)
+    return {"ok": True, "message": f"Triaging {unscored_count} unscored emails for {talent_key} in background."}
+
+
+@router.post("/triage-all-unscored")
+def triage_all_unscored(background_tasks: BackgroundTasks, db: Session = Depends(get_db)):
+    """Triage unscored emails for ALL connected talents."""
+    tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+    keys = [t.talent_key for t in tokens]
+    for key in keys:
+        background_tasks.add_task(_run_triage_unscored, key)
+    return {"ok": True, "talents": keys, "message": f"Triage started for {len(keys)} talent(s)"}

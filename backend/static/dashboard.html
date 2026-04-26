@@ -960,6 +960,9 @@ body {
       <button id="btn-backfill" style="margin-left:8px;padding:6px 14px;background:#1a73e8;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;" title="Load last 30 days of email history from Gmail">
         ↓ Load 30-day history
       </button>
+      <button id="btn-triage-unscored" style="margin-left:6px;padding:6px 14px;background:#1e8e3e;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;" title="Run AI triage on all emails that haven't been scored yet">
+        🤖 Triage unscored
+      </button>
     </div>
 
     <!-- Gmail body -->
@@ -967,7 +970,7 @@ body {
 
       <!-- Left nav -->
       <div class="gmail-nav-panel">
-        <button class="compose-btn">✏️ Compose</button>
+        <button class="compose-btn" onclick="setGmailNav('drafts')" title="View AI-generated draft replies">✏️ Drafts</button>
         <div class="gmail-nav-item active" id="gnav-inbox" onclick="setGmailNav('inbox')">
           <span class="nav-icon">📥</span>
           Inbox
@@ -1110,9 +1113,16 @@ function fmtDateIso(iso) {
 }
 function shortSender(sender) {
   if (!sender) return 'Unknown';
-  const nameMatch = sender.match(/^"?([^"<]+)"?\s*</);
-  if (nameMatch) return nameMatch[1].trim();
-  return sender.split('@')[0];
+  // "Display Name <email@domain>" or Display Name <email@domain>
+  const nameMatch = sender.match(/^"?([^"<]+?)"?\s*<[^>]+>/);
+  if (nameMatch) {
+    const name = nameMatch[1].trim().replace(/^["']|["']$/g, '');
+    if (name.length > 0) return name;
+  }
+  // bare email — use local part before @
+  const emailMatch = sender.match(/([^@\s<>]+)@/);
+  if (emailMatch) return emailMatch[1].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  return sender.slice(0, 30) || 'Unknown';
 }
 function scoreClass(score) {
   if (score == null) return 'uncert';
@@ -1225,6 +1235,7 @@ function renderSidebar() {
       <span class="status-dot ${t.connected ? 'on' : 'off'}"></span>
       <span class="talent-name">${esc(t.full_name)}</span>
       ${pending > 0 ? `<span class="badge">${pending}</span>` : ''}
+      ${!t.connected ? `<a href="/auth/connect?talent_key=${encodeURIComponent(t.key)}" target="_blank" onclick="event.stopPropagation()" title="Connect Gmail for ${esc(t.full_name)}" style="margin-left:auto;font-size:10px;color:#1a73e8;text-decoration:none;white-space:nowrap;padding:2px 6px;border:1px solid #1a73e8;border-radius:4px;line-height:1.4">Connect</a>` : ''}
     `;
     li.addEventListener('click', () => openTalentView(t));
     ul.appendChild(li);
@@ -1359,6 +1370,20 @@ document.getElementById('btn-backfill').addEventListener('click', async () => {
   setTimeout(() => { btn.textContent = '↓ Load 30-day history'; btn.disabled = false; }, 5000);
 });
 
+document.getElementById('btn-triage-unscored').addEventListener('click', async () => {
+  if (!state.selectedTalent) { showToast('Select a talent first.'); return; }
+  const btn = document.getElementById('btn-triage-unscored');
+  btn.textContent = '⏳ Triaging...';
+  btn.disabled = true;
+  try {
+    const r = await api('POST', `/api/dashboard/talents/${state.selectedTalent.key}/triage-unscored`);
+    showToast(r.message || 'Triage started — scores will appear as emails are processed.');
+  } catch (e) {
+    showToast('Triage failed: ' + e.message);
+  }
+  setTimeout(() => { btn.textContent = '🤖 Triage unscored'; btn.disabled = false; }, 8000);
+});
+
 // ── Gmail nav + score filter ───────────────────────────────────────────────
 function setGmailNav(nav) {
   state.gmailNav = nav;
@@ -1399,6 +1424,7 @@ async function openTalentView(talent) {
   document.getElementById('gmail-avatar').textContent = initial(talent.full_name);
   document.getElementById('gmail-talent-label').textContent = talent.email || talent.full_name;
   document.getElementById('gmail-search').value = '';
+  resetReadingPane();
 
   // Nav + tab pill highlights (no render yet — loadTalentData will render)
   ['inbox','starred','sent','drafts','all','trash'].forEach(n => {
@@ -1443,8 +1469,21 @@ async function loadTalentData(talent, silent = false) {
     renderEmailList();
     if (!silent) resetReadingPane();
   } catch (e) {
-    document.getElementById('email-rows').innerHTML =
-      `<div class="gmail-empty-state" style="color:#d93025">⚠️ ${e.message}</div>`;
+    resetReadingPane();
+    const isNotConnected = e.message && (e.message.includes('not connected') || e.message.includes('400') || e.message.includes('token'));
+    if (isNotConnected) {
+      const connectUrl = `/auth/connect?talent_key=${encodeURIComponent(talent.key)}`;
+      document.getElementById('email-rows').innerHTML = `
+        <div class="gmail-empty-state" style="flex-direction:column;gap:16px;padding:48px 24px">
+          <div style="font-size:40px">📭</div>
+          <div style="font-size:15px;font-weight:600;color:var(--text)">Gmail not connected for ${esc(talent.full_name)}</div>
+          <div style="font-size:13px;color:var(--text3);max-width:320px;text-align:center">Connect their Gmail account to start syncing emails and running AI triage automatically.</div>
+          <a href="${connectUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:#1a73e8;color:#fff;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;font-family:var(--sans)">🔗 Connect Gmail</a>
+        </div>`;
+    } else {
+      document.getElementById('email-rows').innerHTML =
+        `<div class="gmail-empty-state" style="color:#d93025">⚠️ ${esc(e.message.slice(0,120))}</div>`;
+    }
   }
 }
 
