@@ -55,7 +55,7 @@ def poll_all_inboxes(db: Session) -> dict:
 
     active_tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
 
-    summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+    summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": []}
 
     for token_row in active_tokens:
         talent_key = token_row.talent_key
@@ -86,7 +86,7 @@ def poll_all_inboxes(db: Session) -> dict:
             db.commit()
         except Exception as exc:  # noqa: BLE001
             logger.error("Gmail list failed for %s: %s", talent_key, exc)
-            summary["errors"] += 1
+            summary["errors"].append({"talent": talent_key, "error": str(exc)})
             continue
 
         for msg_stub in messages:
@@ -109,7 +109,7 @@ def poll_all_inboxes(db: Session) -> dict:
                 logger.error(
                     "Error processing %s / %s: %s", talent_key, message_id, exc
                 )
-                summary["errors"] += 1
+                summary["errors"].append({"talent": talent_key, "error": str(exc)})
                 # Record the failure so we don't retry forever on a broken message
                 _record_processed(
                     db=db,
@@ -126,6 +126,7 @@ def poll_all_inboxes(db: Session) -> dict:
                     status=EmailStatus.error,
                     email_date=None,
                 )
+                db.commit()
 
     logger.info("Poll complete: %s", summary)
     return summary

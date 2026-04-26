@@ -1,7 +1,7 @@
 """
 Cron + status routes.
 
-GET  /cron/poll-inboxes   → triggered by Railway cron every 5 minutes
+GET  /cron/poll-inboxes   → triggered by GitHub Actions / external cron
 GET  /health              → health check
 GET  /api/status          → talent connection status overview
 """
@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -21,36 +21,24 @@ router = APIRouter(tags=["internal"])
 logger = logging.getLogger(__name__)
 
 
-from datetime import datetime as _dt
-_DEPLOY_TIME = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
-
 @router.get("/health")
 def health():
-    return {"status": "ok", "deployed_at": _DEPLOY_TIME}
-
-
-def _run_poll():
-    """Run the poll in a background thread with its own DB session."""
-    from backend.models.db import get_session_factory
-    SessionLocal = get_session_factory()
-    db = SessionLocal()
-    try:
-        summary = poll_all_inboxes(db)
-        logger.info("Background poll complete: %s", summary)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("Background poll failed: %s", exc)
-    finally:
-        db.close()
+    return {"status": "ok"}
 
 
 @router.get("/cron/poll-inboxes")
-def cron_poll(background_tasks: BackgroundTasks):
+def cron_poll(db: Session = Depends(get_db)):
     """
-    Poll all connected talent inboxes in the background.
-    Returns immediately — poll result appears in logs and DB.
+    Poll all connected talent inboxes synchronously.
+    Returns the poll summary so callers can confirm it ran.
     """
-    background_tasks.add_task(_run_poll)
-    return {"ok": True, "status": "poll started in background"}
+    try:
+        summary = poll_all_inboxes(db)
+        logger.info("Poll complete: %s", summary)
+        return {"ok": True, "summary": summary}
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Poll failed: %s", exc)
+        return {"ok": False, "error": "Poll failed — check server logs"}
 
 
 @router.get("/api/db-check", dependencies=[Depends(verify_api_key)])

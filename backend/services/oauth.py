@@ -11,6 +11,8 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
+_REFRESH_SLACK_MINUTES = 5  # Refresh if token expires within this many minutes
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
@@ -93,7 +95,13 @@ def credentials_from_token_row(row) -> Credentials:
 
 
 def refresh_if_needed(creds: Credentials) -> Credentials:
-    """Refresh the access token if it's expired or about to expire."""
-    if creds.expired or not creds.valid:
+    """Refresh the access token if it's expired, invalid, or expiring within 5 minutes."""
+    needs_refresh = creds.expired or not creds.valid
+    if not needs_refresh and creds.expiry:
+        # Proactively refresh to avoid races with short-lived tokens.
+        # Use timezone-aware comparison: google-auth stores expiry as UTC-aware.
+        expiry_utc = creds.expiry if creds.expiry.tzinfo else creds.expiry.replace(tzinfo=timezone.utc)
+        needs_refresh = datetime.now(timezone.utc) + timedelta(minutes=_REFRESH_SLACK_MINUTES) >= expiry_utc
+    if needs_refresh:
         creds.refresh(Request())
     return creds
