@@ -317,6 +317,33 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     )
 
     if cached:
+        # If cache is stale (>2 min), kick off a background sync so next
+        # refresh shows fresh data without blocking this response
+        from datetime import timedelta
+        from backend.models.db import InboxEmail as _IE
+        most_recent_sync = max((r.last_synced_at for r in cached), default=None)
+        if most_recent_sync and (datetime.utcnow() - most_recent_sync) > timedelta(minutes=2):
+            token = (
+                db.query(TalentToken)
+                .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
+                .first()
+            )
+            if token:
+                import threading
+                from backend.services.inbox_sync import sync_inbox_for_talent, fetch_pending_bodies
+                from backend.models.db import get_session_factory
+                def _bg_sync(tk=talent_key, tok_id=token.id):
+                    _db = get_session_factory()()
+                    try:
+                        tok = _db.query(TalentToken).filter(TalentToken.id == tok_id).first()
+                        if tok:
+                            sync_inbox_for_talent(tok, _db)
+                            fetch_pending_bodies(tok, _db)
+                    except Exception as exc:
+                        logger.warning("Background sync failed for %s: %s", tk, exc)
+                    finally:
+                        _db.close()
+                threading.Thread(target=_bg_sync, daemon=True).start()
         return [
             {
                 "id": None,

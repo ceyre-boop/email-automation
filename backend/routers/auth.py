@@ -157,6 +157,28 @@ def _oauth_callback_inner(
     db.commit()
     logger.info("User connected: talent_key=%s email=%s", talent_key, email)
 
+    # Kick off an immediate inbox sync in the background so the dashboard
+    # is populated before the manager even opens it
+    try:
+        import threading
+        from backend.models.db import get_session_factory, TalentToken as _TT
+        from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
+        connected_key = talent_key
+        def _initial_sync(tk=connected_key):
+            _db = get_session_factory()()
+            try:
+                tok = _db.query(_TT).filter(_TT.talent_key.ilike(tk), _TT.active == True).first()  # noqa: E712
+                if tok:
+                    sync_inbox_for_talent(tok, _db)
+                    fetch_pending_bodies(tok, _db, limit=50)
+            except Exception as exc:
+                logger.warning("Initial inbox sync failed for %s: %s", tk, exc)
+            finally:
+                _db.close()
+        threading.Thread(target=_initial_sync, daemon=True).start()
+    except Exception as exc:
+        logger.warning("Could not start initial sync thread: %s", exc)
+
     return HTMLResponse(content=_success_page(html_lib.escape(full_name)))
 
 

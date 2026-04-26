@@ -19,8 +19,9 @@ from backend.services import gmail as gmail_svc
 logger = logging.getLogger(__name__)
 
 MAX_INBOX_RESULTS = 50
-BODY_FETCH_BATCH = 5
+BODY_FETCH_BATCH = 20
 HEADER_WORKERS = 10
+BODY_WORKERS = 10
 
 
 def sync_inbox_for_talent(token_row, db: Session) -> dict:
@@ -157,17 +158,26 @@ def fetch_pending_bodies(token_row, db: Session, limit: int = BODY_FETCH_BATCH) 
     if not pending:
         return 0
 
+    row_map = {r.gmail_message_id: r for r in pending}
     fetched = 0
-    for row in pending:
-        try:
-            detail = gmail_svc.get_message_detail(token_row, row.gmail_message_id)
-            row.body_text = detail.get("body_text") or "" if detail else ""
-            row.body_fetched_at = datetime.utcnow()
-            if detail:
-                fetched += 1
-        except Exception as exc:
-            logger.warning("Body fetch failed for %s / %s: %s", talent_key, row.gmail_message_id, exc)
-            row.body_fetched_at = datetime.utcnow()  # prevent infinite retry
+
+    with ThreadPoolExecutor(max_workers=BODY_WORKERS) as pool:
+        future_to_id = {
+            pool.submit(gmail_svc.get_message_detail, token_row, r.gmail_message_id): r.gmail_message_id
+            for r in pending
+        }
+        for future in as_completed(future_to_id):
+            mid = future_to_id[future]
+            row = row_map[mid]
+            try:
+                detail = future.result()
+                row.body_text = detail.get("body_text") or "" if detail else ""
+                row.body_fetched_at = datetime.utcnow()
+                if detail:
+                    fetched += 1
+            except Exception as exc:
+                logger.warning("Body fetch failed for %s / %s: %s", talent_key, mid, exc)
+                row.body_fetched_at = datetime.utcnow()
 
     db.commit()
     return fetched
