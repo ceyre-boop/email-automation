@@ -25,9 +25,13 @@ from backend.core.config import get_settings
 from backend.models.db import (
     Draft,
     DraftStatus,
+    EmailStatus,
+    InboxEmail,
     ManagerContext,
+    PollHealth,
     ProcessedEmail,
     TalentToken,
+    TriageAudit,
 )
 from backend.routers.deps import get_db, verify_api_key
 
@@ -293,6 +297,233 @@ def delete_context(context_id: int, db: Session = Depends(get_db)):
     db.commit()
     logger.info("Manager context %d deactivated.", context_id)
     return {"ok": True}
+
+
+# ── Health & observability ────────────────────────────────────────────────────
+
+
+@router.get("/health/tokens")
+def token_health(db: Session = Depends(get_db)):
+    """Per-talent token health: consecutive failures, last error, last poll time."""
+    rows = db.query(TalentToken).all()
+    return [
+        {
+            "talent_key": r.talent_key,
+            "email": r.email,
+            "active": r.active,
+            "consecutive_failures": r.consecutive_failures or 0,
+            "last_error": r.last_error,
+            "last_poll_at": r.last_poll_at.isoformat() if r.last_poll_at else None,
+            "token_expiry": r.token_expiry.isoformat() if r.token_expiry else None,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/health/poll-log")
+def poll_log(talent_key: str, limit: int = 20, db: Session = Depends(get_db)):
+    """Recent poll history for a talent — shows errors and durations."""
+    rows = (
+        db.query(PollHealth)
+        .filter(PollHealth.talent_key == talent_key)
+        .order_by(PollHealth.polled_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "polled_at": r.polled_at.isoformat(),
+            "emails_found": r.emails_found,
+            "emails_processed": r.emails_processed,
+            "error_message": r.error_message,
+            "duration_ms": r.duration_ms,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/health/summary")
+def health_summary(db: Session = Depends(get_db)):
+    """Today's stats across all talents: emails, drafts, escalations, errors."""
+    today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    emails_today = db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= today).count()
+    drafts_today = db.query(Draft).filter(Draft.created_at >= today).count()
+    escalations_today = db.query(Draft).filter(Draft.created_at >= today, Draft.is_escalate == True).count()  # noqa: E712
+    errors_today = db.query(PollHealth).filter(PollHealth.polled_at >= today, PollHealth.error_message != None).count()  # noqa: E711
+    pending_drafts = db.query(Draft).filter(Draft.status == DraftStatus.pending).count()
+    return {
+        "emails_today": emails_today,
+        "drafts_today": drafts_today,
+        "escalations_today": escalations_today,
+        "errors_today": errors_today,
+        "pending_drafts": pending_drafts,
+    }
+
+
+@router.get("/audit/triage")
+def triage_audit_for_email(email_id: str, db: Session = Depends(get_db)):
+    """Return the triage audit record for a specific email — shows AI reasoning."""
+    row = db.query(TriageAudit).filter(TriageAudit.gmail_message_id == email_id).order_by(TriageAudit.created_at.desc()).first()
+    if not row:
+        raise HTTPException(status_code=404, detail="No triage audit found for this email.")
+    return {
+        "gmail_message_id": row.gmail_message_id,
+        "talent_key": row.talent_key,
+        "parsed_score": row.parsed_score,
+        "brand_detected": row.brand_detected,
+        "rate_detected": row.rate_detected,
+        "confidence": row.confidence,
+        "reasoning": row.reasoning,
+        "model_used": row.model_used,
+        "prompt_tokens": row.prompt_tokens,
+        "completion_tokens": row.completion_tokens,
+        "created_at": row.created_at.isoformat(),
+    }
+
+
+@router.get("/audit/recent")
+def recent_triage_audits(talent_key: str, limit: int = 50, db: Session = Depends(get_db)):
+    """Recent triage audit records for a talent — useful for spotting misclassifications."""
+    rows = (
+        db.query(TriageAudit)
+        .filter(TriageAudit.talent_key == talent_key)
+        .order_by(TriageAudit.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "gmail_message_id": r.gmail_message_id,
+            "parsed_score": r.parsed_score,
+            "brand_detected": r.brand_detected,
+            "confidence": r.confidence,
+            "reasoning": r.reasoning,
+            "created_at": r.created_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+
+@router.get("/talents/{talent_key}/sent")
+def talent_sent_emails(talent_key: str, limit: int = 50, db: Session = Depends(get_db)):
+    """Emails where a reply was sent — the missing 'Sent' tab."""
+    rows = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.talent_key == talent_key.lower(), ProcessedEmail.status == EmailStatus.sent)
+        .order_by(ProcessedEmail.processed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "gmail_message_id": r.gmail_message_id,
+            "sender": r.sender,
+            "subject": r.subject,
+            "brand_name": r.brand_name,
+            "proposed_rate": r.proposed_rate,
+            "processed_at": r.processed_at.isoformat(),
+        }
+        for r in rows
+    ]
+
+
+@router.get("/talents/{talent_key}/settings")
+def get_talent_settings(talent_key: str, db: Session = Depends(get_db)):
+    """Talent voice profile and manager instructions."""
+    settings = get_settings()
+    talent_cfg = next((t for t in settings.app_config.get("talents", []) if t["key"].lower() == talent_key.lower()), None)
+    ctx = db.query(ManagerContext).filter(
+        ManagerContext.talent_key == talent_key.lower(),
+        ManagerContext.active == True,  # noqa: E712
+    ).order_by(ManagerContext.added_at.desc()).first()
+    return {
+        "talent_key": talent_key,
+        "full_name": talent_cfg.get("full_name") if talent_cfg else talent_key,
+        "minimum_rate_usd": talent_cfg.get("minimum_rate_usd") if talent_cfg else None,
+        "manager": talent_cfg.get("manager") if talent_cfg else None,
+        "voice_profile": ctx.voice_profile if ctx else None,
+        "manager_instructions": ctx.text if ctx else None,
+        "context_id": ctx.id if ctx else None,
+    }
+
+
+class TalentSettingsIn(BaseModel):
+    voice_profile: Optional[str] = None
+    manager_instructions: Optional[str] = None
+    added_by: Optional[str] = None
+
+
+@router.put("/talents/{talent_key}/settings")
+def update_talent_settings(talent_key: str, body: TalentSettingsIn, db: Session = Depends(get_db)):
+    """Update voice profile / manager instructions for a talent without code changes."""
+    ctx = db.query(ManagerContext).filter(
+        ManagerContext.talent_key == talent_key.lower(),
+        ManagerContext.active == True,  # noqa: E712
+    ).order_by(ManagerContext.added_at.desc()).first()
+
+    if ctx:
+        if body.voice_profile is not None:
+            ctx.voice_profile = body.voice_profile
+        if body.manager_instructions is not None:
+            ctx.text = body.manager_instructions
+        db.add(ctx)
+    else:
+        ctx = ManagerContext(
+            text=body.manager_instructions or "",
+            voice_profile=body.voice_profile,
+            talent_key=talent_key.lower(),
+            added_by=body.added_by,
+            active=True,
+        )
+        db.add(ctx)
+    db.commit()
+    return {"ok": True}
+
+
+# ── n8n webhook: process a single email in real-time ─────────────────────────
+
+
+class ProcessEmailIn(BaseModel):
+    talent_key: str
+    gmail_message_id: str
+
+
+@router.post("/process-email")
+def process_single_email(body: ProcessEmailIn, db: Session = Depends(get_db)):
+    """
+    Process one email through triage + reply. Called by n8n Gmail trigger
+    for near-real-time processing (replaces waiting for the 60s poll cycle).
+    """
+    from backend.services.poller import _already_processed, _process_one_message
+    from backend.core.config import get_settings as _gs
+
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key.ilike(body.talent_key),
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(status_code=404, detail=f"No active token for {body.talent_key}")
+
+    if _already_processed(db, body.gmail_message_id):
+        return {"ok": True, "status": "already_processed"}
+
+    settings = _gs()
+    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_cfg = talent_map.get(body.talent_key.lower(), {})
+    draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
+    summary: dict = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+
+    _process_one_message(
+        db=db,
+        token_row=token,
+        message_id=body.gmail_message_id,
+        talent_key=body.talent_key,
+        talent_name=talent_cfg.get("full_name", body.talent_key),
+        minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
+        draft_mode=draft_mode,
+        summary=summary,
+    )
+    return {"ok": True, "summary": summary}
 
 
 # ── Live Gmail inbox ───────────────────────────────────────────────────────────

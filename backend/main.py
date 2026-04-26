@@ -269,13 +269,14 @@ def on_startup():
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
 
-    # Auto-poll every 5 minutes so new emails appear in real time
+    # Auto-poll every 60 seconds + proactive token refresh every 10 minutes
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll
+        from backend.routers.cron import _run_poll, _run_proactive_refresh
         scheduler = BackgroundScheduler(daemon=True)
-        scheduler.add_job(_run_poll, "interval", minutes=5, id="auto_poll", replace_existing=True)
+        scheduler.add_job(_run_poll, "interval", seconds=60, id="auto_poll", replace_existing=True)
+        scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
         scheduler.start()
-        logger.info("Auto-poll scheduler started — polling every 5 minutes.")
+        logger.info("Scheduler started — polling every 60s, token refresh every 10 min.")
     except Exception:
-        logger.warning("Could not start auto-poll scheduler — polls must be triggered manually.")
+        logger.warning("Could not start scheduler — polls must be triggered manually.")

@@ -63,6 +63,9 @@ class TalentToken(Base):
         DateTime, default=datetime.utcnow, nullable=False
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_poll_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class ProcessedEmail(Base):
@@ -158,6 +161,8 @@ class InboxEmail(Base):
     triage_status: Mapped[str | None] = mapped_column(String(64))
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     last_synced_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    body_fetch_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    body_fetch_failed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
 
 class ManagerContext(Base):
@@ -170,6 +175,41 @@ class ManagerContext(Base):
     added_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     added_by: Mapped[str | None] = mapped_column(String(128))
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    talent_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    voice_profile: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class PollHealth(Base):
+    """Rolling log of every poll cycle — powers the observability dashboard."""
+
+    __tablename__ = "poll_health"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    talent_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    polled_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    emails_found: Mapped[int] = mapped_column(Integer, default=0)
+    emails_processed: Mapped[int] = mapped_column(Integer, default=0)
+    error_message: Mapped[str | None] = mapped_column(Text)
+    duration_ms: Mapped[int | None] = mapped_column(Integer)
+
+
+class TriageAudit(Base):
+    """Full audit trail of every triage call — for prompt debugging and accuracy tracking."""
+
+    __tablename__ = "triage_audit"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    gmail_message_id: Mapped[str | None] = mapped_column(String(128), index=True)
+    talent_key: Mapped[str | None] = mapped_column(String(64), index=True)
+    parsed_score: Mapped[int | None] = mapped_column(Integer)
+    brand_detected: Mapped[str | None] = mapped_column(String(256))
+    rate_detected: Mapped[str | None] = mapped_column(String(64))
+    confidence: Mapped[str | None] = mapped_column(String(16))
+    reasoning: Mapped[str | None] = mapped_column(Text)
+    model_used: Mapped[str | None] = mapped_column(String(64))
+    prompt_tokens: Mapped[int | None] = mapped_column(Integer)
+    completion_tokens: Mapped[int | None] = mapped_column(Integer)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 # ── Engine / session factory ─────────────────────────────────────────────────
@@ -213,11 +253,20 @@ def create_tables():
             conn.commit()
         except Exception:
             pass
-        # Clear all cached bodies so improved HTML extractor re-fetches them cleanly
-        try:
-            conn.execute(text(
-                "UPDATE inbox_emails SET body_text = NULL, body_fetched_at = NULL"
-            ))
-            conn.commit()
-        except Exception:
-            pass
+        # Token health tracking columns
+        for stmt in [
+            "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMP",
+            "ALTER TABLE talents ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER DEFAULT 0",
+            "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_error TEXT",
+            # Inbox body fetch resilience
+            "ALTER TABLE inbox_emails ADD COLUMN IF NOT EXISTS body_fetch_attempts INTEGER DEFAULT 0",
+            "ALTER TABLE inbox_emails ADD COLUMN IF NOT EXISTS body_fetch_failed BOOLEAN DEFAULT FALSE",
+            # Manager context scoping + voice profiles
+            "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS talent_key TEXT",
+            "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS voice_profile TEXT",
+        ]:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                pass

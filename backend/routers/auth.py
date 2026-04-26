@@ -20,7 +20,7 @@ from sqlalchemy.orm import Session
 from backend.core.config import get_settings
 from backend.models.db import OAuthState, TalentToken
 from backend.routers.deps import get_db
-from backend.services.oauth import build_authorization_url, exchange_code
+from backend.services.oauth import build_authorization_url, exchange_code, reset_token_failure
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -155,6 +155,7 @@ def _oauth_callback_inner(
         db.add(row)
 
     db.commit()
+    reset_token_failure(db, talent_key)
     logger.info("User connected: talent_key=%s email=%s", talent_key, email)
 
     # Kick off an immediate inbox sync in the background so the dashboard

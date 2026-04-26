@@ -16,8 +16,10 @@ from datetime import datetime
 
 from sqlalchemy.orm import Session
 
+import time
+
 from backend.core.config import get_settings
-from backend.models.db import Draft, DraftStatus, EmailStatus, ProcessedEmail, TalentToken
+from backend.models.db import Draft, DraftStatus, EmailStatus, PollHealth, ProcessedEmail, TalentToken
 from backend.services import gmail as gmail_svc
 from backend.services import reply as reply_svc
 from backend.services import sheets as sheets_svc
@@ -27,7 +29,10 @@ from backend.services.oauth import TokenRefreshError
 
 logger = logging.getLogger(__name__)
 
-BODY_FETCH_BATCH = 5  # bodies fetched per talent per poll cycle
+BODY_FETCH_BATCH = 5
+
+# Per-talent poll lock — prevents a slow poll from overlapping the next cycle
+_poll_locks: dict[str, bool] = {}
 
 
 def _talent_config_map(settings) -> dict[str, dict]:
@@ -47,6 +52,22 @@ def _already_processed(db: Session, message_id: str) -> bool:
     )
 
 
+def _record_poll_health(db: Session, talent_key: str, emails_found: int, emails_processed: int,
+                        error_message: str | None, duration_ms: int) -> None:
+    """Insert a PollHealth row. Never raises."""
+    try:
+        db.add(PollHealth(
+            talent_key=talent_key,
+            emails_found=emails_found,
+            emails_processed=emails_processed,
+            error_message=error_message,
+            duration_ms=duration_ms,
+        ))
+        db.commit()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Failed to write PollHealth for %s: %s", talent_key, exc)
+
+
 def poll_all_inboxes(db: Session) -> dict:
     """
     Main polling function. Processes all active connected talents.
@@ -54,15 +75,24 @@ def poll_all_inboxes(db: Session) -> dict:
     """
     settings = get_settings()
     talent_map = _talent_config_map(settings)
-    policy = settings.confidence_policy
     draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 
     active_tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
 
     summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
 
-    for token_row in active_tokens:
+    for idx, token_row in enumerate(active_tokens):
         talent_key = token_row.talent_key
+
+        # Stagger: 4 seconds between talents to avoid bursting Gmail API quota
+        if idx > 0:
+            time.sleep(4)
+
+        # Skip if a previous poll cycle is still running for this talent
+        if _poll_locks.get(talent_key):
+            logger.info("Poll still running for %s — skipping cycle", talent_key)
+            continue
+
         talent_cfg = talent_map.get(talent_key.lower())
         if not talent_cfg:
             logger.warning("No config for talent_key=%s — skipping", talent_key)
@@ -83,69 +113,99 @@ def poll_all_inboxes(db: Session) -> dict:
                 logger.info("Draft cap (%d) reached for %s — skipping poll", max_drafts, talent_key)
                 continue
 
-        # ── Inbox cache sync (runs before triage) ────────────────────────────
+        _poll_locks[talent_key] = True
+        poll_start = time.monotonic()
+        emails_found = 0
+        emails_processed_count = 0
         try:
-            sync_result = sync_inbox_for_talent(token_row, db)
-            logger.info("Inbox sync %s: %s", talent_key, sync_result)
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Inbox sync failed for %s (non-fatal): %s", talent_key, exc)
-
-        try:
-            fetch_pending_bodies(token_row, db, limit=BODY_FETCH_BATCH)
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("Body fetch failed for %s (non-fatal): %s", talent_key, exc)
-
-        try:
-            messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
-        except TokenRefreshError as exc:
-            logger.error("Token refresh rejected for %s — marking inactive: %s", talent_key, exc)
-            token_row.active = False
-            db.add(token_row)
-            db.commit()
-            summary["errors"] += 1
-            continue
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Gmail list failed for %s: %s", talent_key, exc)
-            summary["errors"] += 1
-            continue
-
-        for msg_stub in messages:
-            message_id = msg_stub["id"]
-            if _already_processed(db, message_id):
-                continue
+            # ── Inbox cache sync (runs before triage) ─────────────────────────
+            try:
+                sync_result = sync_inbox_for_talent(token_row, db)
+                logger.info("Inbox sync %s: %s", talent_key, sync_result)
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Inbox sync failed for %s (non-fatal): %s", talent_key, exc)
 
             try:
-                _process_one_message(
-                    db=db,
-                    token_row=token_row,
-                    message_id=message_id,
-                    talent_key=talent_key,
-                    talent_name=talent_name,
-                    minimum_rate=minimum_rate,
-                    draft_mode=draft_mode,
-                    summary=summary,
-                )
+                fetch_pending_bodies(token_row, db, limit=BODY_FETCH_BATCH)
             except Exception as exc:  # noqa: BLE001
-                logger.error(
-                    "Error processing %s / %s: %s", talent_key, message_id, exc
-                )
+                logger.warning("Body fetch failed for %s (non-fatal): %s", talent_key, exc)
+
+            try:
+                messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
+            except TokenRefreshError as exc:
+                logger.error("Token refresh rejected for %s — marking inactive: %s", talent_key, exc)
+                token_row.active = False
+                token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
+                token_row.last_error = str(exc)
+                db.add(token_row)
+                db.commit()
                 summary["errors"] += 1
-                # Record the failure so we don't retry forever on a broken message
-                _record_processed(
-                    db=db,
-                    talent_key=talent_key,
-                    message_id=message_id,
-                    thread_id="",
-                    sender="",
-                    subject="",
-                    score=2,
-                    brand_name="",
-                    proposed_rate=0,
-                    offer_type="Unknown",
-                    reason=f"Error: {exc}",
-                    status=EmailStatus.error,
-                    email_date=None,
-                )
+                _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
+                continue
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Gmail list failed for %s: %s", talent_key, exc)
+                token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
+                token_row.last_error = str(exc)
+                db.add(token_row)
+                db.commit()
+                summary["errors"] += 1
+                _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
+                continue
+
+            emails_found = len(messages)
+
+            for msg_stub in messages:
+                message_id = msg_stub["id"]
+                if _already_processed(db, message_id):
+                    continue
+
+                try:
+                    _process_one_message(
+                        db=db,
+                        token_row=token_row,
+                        message_id=message_id,
+                        talent_key=talent_key,
+                        talent_name=talent_name,
+                        minimum_rate=minimum_rate,
+                        draft_mode=draft_mode,
+                        summary=summary,
+                    )
+                    emails_processed_count += 1
+                except Exception as exc:  # noqa: BLE001
+                    logger.error("Error processing %s / %s: %s", talent_key, message_id, exc)
+                    summary["errors"] += 1
+                    _record_processed(
+                        db=db,
+                        talent_key=talent_key,
+                        message_id=message_id,
+                        thread_id="",
+                        sender="",
+                        subject="",
+                        score=2,
+                        brand_name="",
+                        proposed_rate=0,
+                        offer_type="Unknown",
+                        reason=f"Error: {exc}",
+                        status=EmailStatus.error,
+                        email_date=None,
+                    )
+
+            # Success — reset failure counters, record last_poll_at
+            token_row.consecutive_failures = 0
+            token_row.last_error = None
+            token_row.last_poll_at = datetime.utcnow()
+            db.add(token_row)
+            db.commit()
+            _record_poll_health(db, talent_key, emails_found, emails_processed_count, None,
+                                int((time.monotonic() - poll_start) * 1000))
+
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Unhandled poll error for %s: %s", talent_key, exc)
+            summary["errors"] += 1
+            _record_poll_health(db, talent_key, emails_found, emails_processed_count, str(exc),
+                                int((time.monotonic() - poll_start) * 1000))
+        finally:
+            _poll_locks[talent_key] = False
 
     logger.info("Poll complete: %s", summary)
     return summary

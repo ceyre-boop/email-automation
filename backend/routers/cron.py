@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 from backend.core.config import get_settings
 from backend.models.db import Draft, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
+from backend.services.oauth import proactive_refresh_all_tokens
 from backend.services.poller import poll_all_inboxes
 
 router = APIRouter(tags=["internal"])
@@ -39,6 +40,21 @@ def _run_poll():
         logger.info("Background poll complete: %s", summary)
     except Exception as exc:  # noqa: BLE001
         logger.error("Background poll failed: %s", exc)
+    finally:
+        db.close()
+
+
+def _run_proactive_refresh():
+    """Proactively refresh tokens expiring within 30 minutes. Runs every 10 min."""
+    from backend.models.db import get_session_factory
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        summary = proactive_refresh_all_tokens(db)
+        if summary["refreshed"] or summary["failed"] or summary["deactivated"]:
+            logger.info("Proactive token refresh: %s", summary)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Proactive token refresh failed: %s", exc)
     finally:
         db.close()
 

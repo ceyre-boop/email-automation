@@ -20,6 +20,7 @@ from google_auth_oauthlib.flow import Flow
 class TokenRefreshError(Exception):
     """Raised when Google rejects a token refresh. Talent must reconnect."""
 
+
 from backend.core.config import get_settings
 
 logger = logging.getLogger(__name__)
@@ -95,6 +96,60 @@ def credentials_from_token_row(row) -> Credentials:
     if row.token_expiry:
         creds.expiry = row.token_expiry  # stored as naive UTC; google-auth compares with utcnow()
     return creds
+
+
+def proactive_refresh_all_tokens(db) -> dict:
+    """
+    Proactively refresh all active tokens expiring within 30 minutes.
+    Called every 10 minutes by the scheduler. Returns a summary dict.
+    """
+    from backend.models.db import TalentToken
+    summary = {"refreshed": 0, "failed": 0, "deactivated": 0}
+    cutoff = datetime.utcnow() + timedelta(minutes=30)
+    candidates = (
+        db.query(TalentToken)
+        .filter(
+            TalentToken.active == True,  # noqa: E712
+            TalentToken.token_expiry != None,  # noqa: E711
+            TalentToken.token_expiry < cutoff,
+        )
+        .all()
+    )
+    for row in candidates:
+        creds = credentials_from_token_row(row)
+        try:
+            creds.refresh(Request())
+            row.access_token = creds.token
+            if creds.expiry:
+                row.token_expiry = creds.expiry.replace(tzinfo=None)
+            row.consecutive_failures = 0
+            row.last_error = None
+            db.add(row)
+            summary["refreshed"] += 1
+        except (RefreshError, Exception) as exc:
+            row.consecutive_failures = (row.consecutive_failures or 0) + 1
+            row.last_error = str(exc)
+            if row.consecutive_failures >= 3:
+                row.active = False
+                summary["deactivated"] += 1
+                logger.error("Deactivated %s after 3 consecutive refresh failures: %s", row.talent_key, exc)
+            else:
+                summary["failed"] += 1
+                logger.warning("Proactive refresh failed for %s (attempt %d): %s", row.talent_key, row.consecutive_failures, exc)
+            db.add(row)
+    db.commit()
+    return summary
+
+
+def reset_token_failure(db, talent_key: str) -> None:
+    """Reset failure counters after a successful reconnect."""
+    from backend.models.db import TalentToken
+    row = db.query(TalentToken).filter(TalentToken.talent_key.ilike(talent_key)).first()
+    if row:
+        row.consecutive_failures = 0
+        row.last_error = None
+        db.add(row)
+        db.commit()
 
 
 def refresh_if_needed(creds: Credentials) -> Credentials:
