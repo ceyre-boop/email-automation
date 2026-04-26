@@ -201,24 +201,50 @@ def _extract_domain(from_header: str) -> str:
     return match.group(1).lower() if match else ""
 
 
-def _extract_body(payload: dict) -> str:
-    """Recursively extract plain-text body from a Gmail message payload."""
+def _collect_parts(payload: dict, plain: list, html: list) -> None:
+    """Walk the MIME tree and collect all text/plain and text/html parts."""
     mime_type = payload.get("mimeType", "")
     body_data = payload.get("body", {}).get("data", "")
 
     if mime_type == "text/plain" and body_data:
-        return base64.urlsafe_b64decode(body_data).decode("utf-8", errors="replace")
-
-    if mime_type == "text/html" and body_data:
-        # Fall back: strip tags if no plain text found
-        html = base64.urlsafe_b64decode(body_data).decode("utf-8", errors="replace")
-        return re.sub(r"<[^>]+>", " ", html).strip()
+        plain.append(base64.urlsafe_b64decode(body_data).decode("utf-8", errors="replace"))
+    elif mime_type == "text/html" and body_data:
+        html.append(base64.urlsafe_b64decode(body_data).decode("utf-8", errors="replace"))
 
     for part in payload.get("parts", []):
-        result = _extract_body(part)
-        if result:
-            return result
+        _collect_parts(part, plain, html)
 
+
+def _html_to_text(html: str) -> str:
+    """Strip HTML to readable plain text, removing style/script blocks first."""
+    # Remove style and script blocks entirely (content between tags, not just the tags)
+    html = re.sub(r"<style[^>]*>.*?</style>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+    html = re.sub(r"<script[^>]*>.*?</script>", " ", html, flags=re.DOTALL | re.IGNORECASE)
+    # Replace block-level tags with newlines for readable formatting
+    html = re.sub(r"<(br|p|div|tr|li|h[1-6])[^>]*>", "\n", html, flags=re.IGNORECASE)
+    # Strip remaining tags
+    html = re.sub(r"<[^>]+>", "", html)
+    # Decode common HTML entities
+    html = html.replace("&nbsp;", " ").replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", '"').replace("&#39;", "'").replace("&zwnj;", "").replace("&rsquo;", "'").replace("&lsquo;", "'").replace("&mdash;", "—").replace("&ndash;", "–")
+    # Collapse excessive whitespace / blank lines
+    html = re.sub(r" {2,}", " ", html)
+    html = re.sub(r"\n{3,}", "\n\n", html)
+    return html.strip()
+
+
+def _extract_body(payload: dict) -> str:
+    """
+    Extract readable plain-text body from a Gmail message payload.
+    Prefers text/plain parts; falls back to HTML-stripped text/html.
+    """
+    plain_parts: list[str] = []
+    html_parts: list[str] = []
+    _collect_parts(payload, plain_parts, html_parts)
+
+    if plain_parts:
+        return "\n\n".join(plain_parts).strip()
+    if html_parts:
+        return _html_to_text("\n".join(html_parts))
     return ""
 
 

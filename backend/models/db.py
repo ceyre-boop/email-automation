@@ -203,3 +203,11 @@ def create_tables():
             conn.commit()
         except Exception:
             pass
+        # Clear all cached bodies so improved HTML extractor re-fetches them cleanly
+        try:
+            conn.execute(text(
+                "UPDATE inbox_emails SET body_text = NULL, body_fetched_at = NULL"
+            ))
+            conn.commit()
+        except Exception:
+            pass
