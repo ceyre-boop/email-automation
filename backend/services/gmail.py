@@ -17,34 +17,36 @@ from typing import Any
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
-from backend.services.oauth import credentials_from_token_row, refresh_if_needed
+from backend.services.oauth import TokenRefreshError, credentials_from_token_row, refresh_if_needed
 
 logger = logging.getLogger(__name__)
 
 
-def _gmail_service(token_row):
-    """Return an authenticated Gmail API service for the given token row."""
+def _gmail_service(token_row, db=None):
+    """Return an authenticated Gmail API service. Persists refreshed token to DB if db is given."""
+    from datetime import timezone as _tz
     creds = credentials_from_token_row(token_row)
-    creds = refresh_if_needed(creds)
-    # Update the token in the token_row in case it was refreshed
+    creds = refresh_if_needed(creds)  # raises TokenRefreshError if Google rejects it
     token_row.access_token = creds.token
     if creds.expiry:
-        from datetime import timezone
         token_row.token_expiry = creds.expiry.replace(tzinfo=None)
+    if db is not None:
+        db.add(token_row)
+        db.commit()
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
 
 
 # ── Reading ──────────────────────────────────────────────────────────────────
 
 
-def list_all_messages_since(token_row, days_back: int = 30) -> list[dict]:
+def list_all_messages_since(token_row, days_back: int = 30, db=None) -> list[dict]:
     """
     Return ALL message stubs (id + threadId) from the last N days, paginating
     through the full history. Can return thousands of messages for active inboxes.
     """
     import datetime as dt
     since = (dt.datetime.utcnow() - dt.timedelta(days=days_back)).strftime("%Y/%m/%d")
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     messages: list[dict] = []
     page_token = None
     try:
@@ -62,12 +64,12 @@ def list_all_messages_since(token_row, days_back: int = 30) -> list[dict]:
     return messages
 
 
-def list_inbox_messages(token_row, max_results: int = 50) -> list[dict]:
+def list_inbox_messages(token_row, max_results: int = 50, db=None) -> list[dict]:
     """
     Return the talent's actual Gmail inbox (read + unread), newest first.
     Each item: {"id": <gmail_message_id>, "threadId": <thread_id>}
     """
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         result = (
             service.users()
@@ -81,12 +83,12 @@ def list_inbox_messages(token_row, max_results: int = 50) -> list[dict]:
     return result.get("messages", [])
 
 
-def list_unread_inbox_messages(token_row, max_results: int = 30) -> list[dict]:
+def list_unread_inbox_messages(token_row, db=None, max_results: int = 30) -> list[dict]:
     """
     Return a list of unread INBOX messages for the talent.
     Each item: {"id": <gmail_message_id>, "threadId": <thread_id>}
     """
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         result = (
             service.users()
@@ -104,12 +106,12 @@ def list_unread_inbox_messages(token_row, max_results: int = 30) -> list[dict]:
     return result.get("messages", [])
 
 
-def get_message_headers(token_row, message_id: str) -> dict[str, Any]:
+def get_message_headers(token_row, message_id: str, db=None) -> dict[str, Any]:
     """
     Fetch only headers (subject, from, date) + labels for a message — no body.
     ~10x faster than get_message_detail; used for inbox list rendering.
     """
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         msg = (
             service.users()
@@ -136,7 +138,7 @@ def get_message_headers(token_row, message_id: str) -> dict[str, Any]:
     }
 
 
-def get_message_detail(token_row, message_id: str) -> dict[str, Any]:
+def get_message_detail(token_row, message_id: str, db=None) -> dict[str, Any]:
     """
     Fetch full message detail and parse it into a flat dict:
     {
@@ -145,7 +147,7 @@ def get_message_detail(token_row, message_id: str) -> dict[str, Any]:
     }
     Retries once on transient failure.
     """
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     for attempt in range(2):
         try:
             msg = (
@@ -158,7 +160,7 @@ def get_message_detail(token_row, message_id: str) -> dict[str, Any]:
         except HttpError as exc:
             if attempt == 0 and exc.resp.status in (429, 500, 503):
                 logger.warning("Gmail get transient error for %s (retrying): %s", message_id, exc)
-                service = _gmail_service(token_row)  # rebuild service with fresh token
+                service = _gmail_service(token_row, db)
                 continue
             logger.error("Gmail get error for message %s: %s", message_id, exc)
             return {}
@@ -251,9 +253,9 @@ def _extract_body(payload: dict) -> str:
 # ── Labelling / archiving ─────────────────────────────────────────────────────
 
 
-def archive_message(token_row, message_id: str) -> bool:
+def archive_message(token_row, message_id: str, db=None) -> bool:
     """Remove INBOX and UNREAD labels (archives the message)."""
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         service.users().messages().modify(
             userId="me",
@@ -266,9 +268,9 @@ def archive_message(token_row, message_id: str) -> bool:
         return False
 
 
-def mark_as_read(token_row, message_id: str) -> bool:
+def mark_as_read(token_row, message_id: str, db=None) -> bool:
     """Remove UNREAD label only."""
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         service.users().messages().modify(
             userId="me",
@@ -284,12 +286,12 @@ def mark_as_read(token_row, message_id: str) -> bool:
 # ── Drafts ────────────────────────────────────────────────────────────────────
 
 
-def create_gmail_draft(token_row, thread_id: str, reply_to: str, subject: str, body: str) -> str | None:
+def create_gmail_draft(token_row, thread_id: str, reply_to: str, subject: str, body: str, db=None) -> str | None:
     """
     Save a draft reply in the talent's Gmail account.
     Returns the Gmail draft ID, or None on failure.
     """
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     mime_msg = MIMEText(body, "plain")
     mime_msg["To"] = reply_to
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
@@ -310,12 +312,12 @@ def create_gmail_draft(token_row, thread_id: str, reply_to: str, subject: str, b
         return None
 
 
-def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str) -> bool:
+def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str, db=None) -> bool:
     """
     Send a reply email as the talent.
     Used when an agency reviewer approves a draft.
     """
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     mime_msg = MIMEText(body, "plain")
     mime_msg["To"] = reply_to
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
@@ -331,9 +333,9 @@ def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str
         return False
 
 
-def delete_gmail_draft(token_row, gmail_draft_id: str) -> bool:
+def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
     """Delete a draft from the talent's Gmail account."""
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         service.users().drafts().delete(userId="me", id=gmail_draft_id).execute()
         return True

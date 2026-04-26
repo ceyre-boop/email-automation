@@ -18,16 +18,12 @@ from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
-from backend.models.db import TalentToken
+from backend.models.db import OAuthState, TalentToken
 from backend.routers.deps import get_db
 from backend.services.oauth import build_authorization_url, exchange_code
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
-
-# In-memory CSRF state store {state_token: Optional[talent_key]}
-# Fine for a single-process server; tokens expire naturally after use.
-_pending_states: dict[str, str | None] = {}
 
 
 def _generate_talent_key(name: str, email: str, db: Session) -> str:
@@ -48,10 +44,11 @@ def _generate_talent_key(name: str, email: str, db: Session) -> str:
 
 
 @router.get("/connect")
-def connect_gmail(talent_key: str | None = Query(None)):
+def connect_gmail(talent_key: str | None = Query(None), db: Session = Depends(get_db)):
     """Redirect any user to the Google consent screen. Pin to a talent_key if provided."""
     state = secrets.token_urlsafe(32)
-    _pending_states[state] = talent_key # May be None
+    db.add(OAuthState(state=state, pinned_talent_key=talent_key))
+    db.commit()
     auth_url = build_authorization_url(state)
     return RedirectResponse(url=auth_url)
 
@@ -82,10 +79,13 @@ def _oauth_callback_inner(
     if not code or not state:
         return HTMLResponse(content=_error_page("missing_params"))
 
-    # 1. Validate CSRF state and retrieve pinned talent_key
-    if state not in _pending_states:
+    # Validate CSRF state (DB-backed so restarts don't invalidate it)
+    state_row = db.query(OAuthState).filter(OAuthState.state == state).first()
+    if not state_row:
         return HTMLResponse(content=_error_page("invalid_state"))
-    pinned_talent_key = _pending_states.pop(state)
+    pinned_talent_key = state_row.pinned_talent_key
+    db.delete(state_row)
+    db.commit()
 
     settings = get_settings()
 

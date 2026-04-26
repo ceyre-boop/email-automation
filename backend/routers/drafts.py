@@ -20,6 +20,7 @@ from sqlalchemy.orm import Session
 from backend.models.db import Draft, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
 from backend.services import gmail as gmail_svc
+from backend.services.oauth import TokenRefreshError
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"], dependencies=[Depends(verify_api_key)])
 logger = logging.getLogger(__name__)
@@ -119,22 +120,27 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
 
     token = _get_token_or_404(db, draft.talent_key)
 
-    success = gmail_svc.send_reply(
-        token_row=token,
-        thread_id=draft.thread_id or "",
-        reply_to=draft.sender or "",
-        subject=draft.subject or "",
-        body=draft.draft_text,
-    )
-    # Persist refreshed token
-    db.add(token)
+    try:
+        success = gmail_svc.send_reply(
+            token_row=token,
+            thread_id=draft.thread_id or "",
+            reply_to=draft.sender or "",
+            subject=draft.subject or "",
+            body=draft.draft_text,
+            db=db,
+        )
+    except TokenRefreshError:
+        token.active = False
+        db.add(token)
+        db.commit()
+        raise HTTPException(status_code=401, detail="Gmail token expired — talent must reconnect.")
 
     if not success:
         raise HTTPException(status_code=502, detail="Gmail send failed — check token and try again.")
 
     # Delete the Gmail draft copy (sent from the Sent folder now)
     if draft.gmail_draft_id:
-        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id)
+        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
 
     draft.status = DraftStatus.sent
     draft.reviewed_at = datetime.utcnow()
@@ -163,16 +169,16 @@ def edit_draft(draft_id: int, body: EditBody, db: Session = Depends(get_db)):
     # If there's an existing Gmail draft, delete it and recreate with new text
     if draft.gmail_draft_id:
         token = _get_token_or_404(db, draft.talent_key)
-        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id)
+        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
         new_gmail_draft_id = gmail_svc.create_gmail_draft(
             token,
             thread_id=draft.thread_id or "",
             reply_to=draft.sender or "",
             subject=draft.subject or "",
             body=body.draft_text,
+            db=db,
         )
         draft.gmail_draft_id = new_gmail_draft_id
-        db.add(token)
 
     db.add(draft)
     db.commit()

@@ -23,6 +23,7 @@ from backend.services import reply as reply_svc
 from backend.services import sheets as sheets_svc
 from backend.services import triage as triage_svc
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
+from backend.services.oauth import TokenRefreshError
 
 logger = logging.getLogger(__name__)
 
@@ -95,10 +96,14 @@ def poll_all_inboxes(db: Session) -> dict:
             logger.warning("Body fetch failed for %s (non-fatal): %s", talent_key, exc)
 
         try:
-            messages = gmail_svc.list_unread_inbox_messages(token_row)
-            # Persist refreshed token back to DB
+            messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
+        except TokenRefreshError as exc:
+            logger.error("Token refresh rejected for %s — marking inactive: %s", talent_key, exc)
+            token_row.active = False
             db.add(token_row)
             db.commit()
+            summary["errors"] += 1
+            continue
         except Exception as exc:  # noqa: BLE001
             logger.error("Gmail list failed for %s: %s", talent_key, exc)
             summary["errors"] += 1
@@ -156,7 +161,7 @@ def _process_one_message(
     draft_mode: bool,
     summary: dict,
 ):
-    detail = gmail_svc.get_message_detail(token_row, message_id)
+    detail = gmail_svc.get_message_detail(token_row, message_id, db=db)
     if not detail:
         logger.warning("Empty detail for %s / %s — skipping", talent_key, message_id)
         return
@@ -186,7 +191,7 @@ def _process_one_message(
 
     # ── Score 1 → Archive ────────────────────────────────────────────────────
     if score == 1:
-        gmail_svc.archive_message(token_row, message_id)
+        gmail_svc.archive_message(token_row, message_id, db=db)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
@@ -198,7 +203,7 @@ def _process_one_message(
 
     # ── Score 2 → Flag for review ────────────────────────────────────────────
     elif score == 2:
-        gmail_svc.mark_as_read(token_row, message_id)
+        gmail_svc.mark_as_read(token_row, message_id, db=db)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
@@ -235,6 +240,7 @@ def _process_one_message(
                 reply_to=sender,
                 subject=subject,
                 body=draft_text,
+                db=db,
             )
 
         # Persist draft + processed record together, then commit once

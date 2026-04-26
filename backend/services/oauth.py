@@ -11,9 +11,14 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta, timezone
 
+from google.auth.exceptions import RefreshError
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import Flow
+
+
+class TokenRefreshError(Exception):
+    """Raised when Google rejects a token refresh. Talent must reconnect."""
 
 from backend.core.config import get_settings
 
@@ -49,14 +54,14 @@ def build_flow() -> Flow:
     return flow
 
 
-def build_authorization_url(talent_key: str) -> str:
-    """Return the Google consent URL with talent_key encoded in the state param."""
+def build_authorization_url(state: str) -> str:
+    """Return the Google consent URL with a CSRF state token."""
     flow = build_flow()
     auth_url, _ = flow.authorization_url(
         access_type="offline",
         include_granted_scopes="true",
-        prompt="consent",  # Force refresh_token to be returned every time
-        state=talent_key,
+        prompt="consent",
+        state=state,
     )
     return auth_url
 
@@ -93,7 +98,7 @@ def credentials_from_token_row(row) -> Credentials:
 
 
 def refresh_if_needed(creds: Credentials) -> Credentials:
-    """Refresh the access token if expired or expiring within 5 minutes."""
+    """Refresh the access token if expired or expiring within 5 minutes. Raises TokenRefreshError if Google rejects it."""
     expiring_soon = (
         creds.expiry is not None
         and (creds.expiry.replace(tzinfo=None) - datetime.utcnow()) < timedelta(minutes=5)
@@ -101,6 +106,8 @@ def refresh_if_needed(creds: Credentials) -> Credentials:
     if creds.expired or not creds.valid or expiring_soon:
         try:
             creds.refresh(Request())
+        except RefreshError as exc:
+            raise TokenRefreshError(f"Google rejected token refresh: {exc}") from exc
         except Exception as exc:
             logger.error("Token refresh failed: %s", exc)
             raise

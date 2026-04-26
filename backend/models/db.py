@@ -91,6 +91,16 @@ class ProcessedEmail(Base):
     )
 
 
+class OAuthState(Base):
+    """Short-lived CSRF state tokens for the OAuth flow. DB-backed so restarts don't break reconnects."""
+
+    __tablename__ = "oauth_states"
+
+    state: Mapped[str] = mapped_column(String(64), primary_key=True)
+    pinned_talent_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class Draft(Base):
     """AI-generated reply drafts awaiting human approval."""
 
