@@ -221,7 +221,8 @@
       "category": "Test",
       "minimum_rate_usd": 0,
       "rate_unit": "per video",
-      "_note": "Owner test account — used to verify GPT triage and draft flow before rolling out to talent accounts."
+      "max_drafts": 30,
+      "_note": "Owner test account — capped at 30 drafts. Used to verify GPT triage and draft flow before rolling out to talent accounts."
     }
   ],
 

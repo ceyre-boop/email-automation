@@ -66,6 +66,18 @@ def poll_all_inboxes(db: Session) -> dict:
 
         talent_name = talent_cfg.get("full_name", talent_key)
         minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
+        max_drafts = talent_cfg.get("max_drafts")
+
+        # Enforce per-talent draft cap if configured
+        if max_drafts is not None:
+            existing_drafts = (
+                db.query(Draft)
+                .filter(Draft.talent_key == talent_key.lower(), Draft.status == DraftStatus.pending)
+                .count()
+            )
+            if existing_drafts >= max_drafts:
+                logger.info("Draft cap (%d) reached for %s — skipping poll", max_drafts, talent_key)
+                continue
 
         try:
             messages = gmail_svc.list_unread_inbox_messages(token_row)
