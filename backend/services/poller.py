@@ -177,9 +177,8 @@ def _process_one_message(
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
             body_text=body, email_date=email_date,
         )
-        sheets_svc.log_email(
-            talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason
-        )
+        db.commit()
+        _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason)
         summary["archived"] += 1
 
     # ── Score 2 → Flag for review ────────────────────────────────────────────
@@ -190,9 +189,8 @@ def _process_one_message(
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
             body_text=body, email_date=email_date,
         )
-        sheets_svc.log_email(
-            talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason
-        )
+        db.commit()
+        _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason)
         summary["flagged"] += 1
 
     # ── Score 3 → Draft reply ────────────────────────────────────────────────
@@ -224,7 +222,7 @@ def _process_one_message(
                 body=draft_text,
             )
 
-        # Persist draft to DB
+        # Persist draft + processed record together, then commit once
         draft_row = Draft(
             talent_key=talent_key,
             gmail_message_id=message_id,
@@ -241,22 +239,29 @@ def _process_one_message(
             escalate_reason=escalate_reason,
         )
         db.add(draft_row)
-
-        status_label = "escalated" if is_escalate else "draft_saved"
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved,
             body_text=body, email_date=email_date,
         )
-        sheets_svc.log_email(
+        db.commit()
+
+        status_label = "escalated" if is_escalate else "draft_saved"
+        _safe_log_sheet(
             talent_key, sender, subject, score, brand_name, proposed_rate,
-            offer_type, status_label,
-            escalate_reason or reason,
+            offer_type, status_label, escalate_reason or reason,
         )
         summary["drafted"] += 1
 
-    db.commit()
     summary["processed"] += 1
+
+
+def _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, status_label, reason):
+    """Log to Google Sheets — failure is non-fatal."""
+    try:
+        sheets_svc.log_email(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, status_label, reason)
+    except Exception as exc:
+        logger.warning("Sheets log failed for %s / %s (non-fatal): %s", talent_key, subject, exc)
 
 
 def _record_processed(

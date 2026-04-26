@@ -143,17 +143,26 @@ def get_message_detail(token_row, message_id: str) -> dict[str, Any]:
         id, thread_id, subject, sender, sender_domain,
         body_text, snippet, label_ids
     }
+    Retries once on transient failure.
     """
     service = _gmail_service(token_row)
-    try:
-        msg = (
-            service.users()
-            .messages()
-            .get(userId="me", id=message_id, format="full")
-            .execute()
-        )
-    except HttpError as exc:
-        logger.error("Gmail get error for message %s: %s", message_id, exc)
+    for attempt in range(2):
+        try:
+            msg = (
+                service.users()
+                .messages()
+                .get(userId="me", id=message_id, format="full")
+                .execute()
+            )
+            break
+        except HttpError as exc:
+            if attempt == 0 and exc.resp.status in (429, 500, 503):
+                logger.warning("Gmail get transient error for %s (retrying): %s", message_id, exc)
+                service = _gmail_service(token_row)  # rebuild service with fresh token
+                continue
+            logger.error("Gmail get error for message %s: %s", message_id, exc)
+            return {}
+    else:
         return {}
 
     headers = {h["name"].lower(): h["value"] for h in msg.get("payload", {}).get("headers", [])}

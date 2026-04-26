@@ -93,7 +93,15 @@ def credentials_from_token_row(row) -> Credentials:
 
 
 def refresh_if_needed(creds: Credentials) -> Credentials:
-    """Refresh the access token if it's expired or about to expire."""
-    if creds.expired or not creds.valid:
-        creds.refresh(Request())
+    """Refresh the access token if expired or expiring within 5 minutes."""
+    expiring_soon = (
+        creds.expiry is not None
+        and (creds.expiry.replace(tzinfo=None) - datetime.utcnow()) < timedelta(minutes=5)
+    )
+    if creds.expired or not creds.valid or expiring_soon:
+        try:
+            creds.refresh(Request())
+        except Exception as exc:
+            logger.error("Token refresh failed: %s", exc)
+            raise
     return creds
