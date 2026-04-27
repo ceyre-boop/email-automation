@@ -1,0 +1,343 @@
+{
+  "name": "TABOOST Email Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 🔧 SETUP — Do This First\n\n**1. Add credential in n8n:**\n   Settings → Credentials → Add → HTTP Header Auth\n   - Name: `TABOOST API`\n   - Header Name: `x-api-key`\n   - Value: your APP_API_KEY from Render env vars\n\n**2. Set these env vars in Render:**\n   - `N8N_WEBHOOK_SECRET` = any random string (e.g. `mysecret123`)\n     This protects the draft-approve webhook from unauthorized sends.\n\n**3. After importing this workflow:**\n   - Activate it\n   - Copy the Webhook URL from the 'Webhook — Approve Draft' node\n   - Paste it into your dashboard.html approve button handler\n\n**4. All URLs already point to your real backend.**\n   Replace `email-automation-qp2v.onrender.com` if your URL changes.",
+        "height": 340,
+        "width": 420,
+        "color": 4
+      },
+      "id": "sticky-setup",
+      "name": "Setup Instructions",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1200, -300]
+    },
+    {
+      "parameters": {
+        "content": "## ⚙️ FLOW 1: Poll + Escalation Check\n\nRuns every 2 minutes:\n1. Check backend is alive\n2. If alive: trigger the poll cycle\n3. Wait 45s for poll to finish\n4. Check for new escalations\n5. If any: send Slack/email alert to manager",
+        "height": 200,
+        "width": 380,
+        "color": 2
+      },
+      "id": "sticky-flow1",
+      "name": "Flow 1 Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1200, -620]
+    },
+    {
+      "parameters": {
+        "content": "## ✅ FLOW 2: Approve Draft (Webhook)\n\nCalled by dashboard when manager clicks Approve:\n1. Verify X-N8N-Secret header\n2. POST to backend /api/n8n/approve-draft\n3. Backend sends email via Gmail as the talent\n4. Respond 200 to dashboard\n\nThe backend is idempotent — double-clicks won't double-send.",
+        "height": 220,
+        "width": 380,
+        "color": 3
+      },
+      "id": "sticky-flow2",
+      "name": "Flow 2 Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1200, 280]
+    },
+    {
+      "parameters": {
+        "content": "## 📊 FLOW 3: Daily Digest (8am)\n\nEvery morning:\n1. Fetch yesterday's report\n2. Format as plain-text summary\n3. Send email/Slack to manager\n\nTells you: good deals, drafts pending, escalations.",
+        "height": 180,
+        "width": 360,
+        "color": 6
+      },
+      "id": "sticky-flow3",
+      "name": "Flow 3 Description",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-1200, 620]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "minutes", "minutesInterval": 2}]
+        }
+      },
+      "id": "schedule-poll",
+      "name": "Every 2 Minutes",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [-800, -480]
+    },
+    {
+      "parameters": {
+        "url": "https://email-automation-qp2v.onrender.com/health",
+        "options": {"timeout": 8000}
+      },
+      "id": "health-check",
+      "name": "GET — Health Check",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-560, -480],
+      "continueOnFail": true
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": false, "typeValidation": "loose"},
+          "conditions": [
+            {
+              "id": "backend-ok",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "ok",
+              "operator": {"type": "string", "operation": "equals"}
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-backend-ok",
+      "name": "IF — Backend Alive?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [-320, -480]
+    },
+    {
+      "parameters": {
+        "url": "https://email-automation-qp2v.onrender.com/cron/poll-inboxes",
+        "options": {"timeout": 10000}
+      },
+      "id": "trigger-poll",
+      "name": "GET — Trigger Poll",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-80, -480]
+    },
+    {
+      "parameters": {
+        "amount": 45,
+        "unit": "seconds"
+      },
+      "id": "wait-for-poll",
+      "name": "Wait 45s (Poll Runs)",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [160, -480]
+    },
+    {
+      "parameters": {
+        "url": "https://email-automation-qp2v.onrender.com/api/n8n/new-escalations?since_minutes=5",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-escalations",
+      "name": "GET — New Escalations",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [400, -480]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"typeValidation": "loose"},
+          "conditions": [
+            {
+              "id": "has-escalations",
+              "leftValue": "={{ $json.count }}",
+              "rightValue": 0,
+              "operator": {"type": "number", "operation": "gt"}
+            }
+          ],
+          "combinator": "and"
+        }
+      },
+      "id": "if-escalations",
+      "name": "IF — New Escalations?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [640, -480]
+    },
+    {
+      "parameters": {
+        "jsCode": "const escalations = $input.item.json.escalations || [];\nconst lines = escalations.map(e =>\n  `• ${e.talent_key} — ${e.subject || '(no subject)'}\\n  From: ${e.sender || 'unknown'}\\n  Reason: ${e.escalate_reason || 'needs review'}${e.proposed_rate ? '\\n  Rate: $' + e.proposed_rate : ''}`\n).join('\\n\\n');\nreturn [{ json: {\n  count: escalations.length,\n  message: `🚨 ${escalations.length} escalation(s) need your attention:\\n\\n${lines}\\n\\nReview at: https://email-automation-qp2v.onrender.com/dashboard`,\n  escalations\n}}];"
+      },
+      "id": "format-alert",
+      "name": "Code — Format Alert",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [880, -560]
+    },
+    {
+      "parameters": {
+        "sendTo": "colineyre222@gmail.com",
+        "subject": "=🚨 {{ $json.count }} Escalation(s) Need Review — TABOOST",
+        "message": "={{ $json.message }}",
+        "options": {}
+      },
+      "id": "send-alert-email",
+      "name": "Send Alert Email",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [1120, -560],
+      "notes": "Connect your Gmail credential here. Or swap for Slack node."
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "approve-draft",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-approve",
+      "name": "Webhook — Approve Draft",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [-800, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.item.json.body || $input.item.json;\nconst secret = $input.item.json.headers?.['x-n8n-secret'] || '';\nconst expected = $env['N8N_WEBHOOK_SECRET'] || '';\nif (expected && secret !== expected) {\n  throw new Error('Unauthorized: invalid webhook secret');\n}\nreturn [{ json: { draft_id: body.draft_id, reviewed_by: body.reviewed_by || 'manager' } }];"
+      },
+      "id": "verify-secret",
+      "name": "Code — Verify Secret",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-560, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://email-automation-qp2v.onrender.com/api/n8n/approve-draft",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {"name": "x-n8n-secret", "value": "={{ $env['N8N_WEBHOOK_SECRET'] }}"}
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={ \"draft_id\": {{ $json.draft_id }}, \"reviewed_by\": \"{{ $json.reviewed_by }}\" }",
+        "options": {}
+      },
+      "id": "post-approve",
+      "name": "POST — Approve Draft",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-320, 400]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: $json.ok, status: $json.status, draft_id: $json.draft_id }) }}",
+        "options": {}
+      },
+      "id": "respond-ok",
+      "name": "Respond — 200 OK",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [-80, 400]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [{"field": "cronExpression", "expression": "0 8 * * *"}]
+        }
+      },
+      "id": "schedule-digest",
+      "name": "Daily 8am",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.1,
+      "position": [-800, 720]
+    },
+    {
+      "parameters": {
+        "url": "https://email-automation-qp2v.onrender.com/api/dashboard/report",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "httpHeaderAuth",
+        "options": {}
+      },
+      "id": "get-report",
+      "name": "GET — Daily Report",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [-560, 720]
+    },
+    {
+      "parameters": {
+        "jsCode": "const r = $input.item.json;\nconst talentLines = (r.talents || []).map(t =>\n  `  ${t.full_name}: ${t.good_deals || 0} deals, ${t.uncertain || 0} uncertain${t.pending_drafts > 0 ? `, ⚡ ${t.pending_drafts} draft(s) pending` : ''}`\n).filter(l => !l.includes('0 deals, 0 uncertain')).join('\\n');\nreturn [{ json: {\n  subject: `📬 Daily Report ${r.report_date} — ${r.total_good} deals, ${r.pending_drafts} pending`,\n  body: `Good morning!\\n\\nHere's your inbox summary for ${r.report_date}:\\n\\n✅ Good Deals: ${r.total_good}\\n❓ Uncertain: ${r.total_uncertain}\\n🗑️ Trash: ${r.total_trash}\\n📋 Pending Drafts: ${r.pending_drafts}\\n\\nBy talent:\\n${talentLines || '  (no activity)'}\\n\\nReview drafts: https://email-automation-qp2v.onrender.com/dashboard`\n}}];"
+      },
+      "id": "format-digest",
+      "name": "Code — Format Digest",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-320, 720]
+    },
+    {
+      "parameters": {
+        "sendTo": "colineyre222@gmail.com",
+        "subject": "={{ $json.subject }}",
+        "message": "={{ $json.body }}",
+        "options": {}
+      },
+      "id": "send-digest",
+      "name": "Send Daily Digest",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [-80, 720],
+      "notes": "Connect your Gmail credential here."
+    }
+  ],
+  "connections": {
+    "Every 2 Minutes": {
+      "main": [[{"node": "GET — Health Check", "type": "main", "index": 0}]]
+    },
+    "GET — Health Check": {
+      "main": [[{"node": "IF — Backend Alive?", "type": "main", "index": 0}]]
+    },
+    "IF — Backend Alive?": {
+      "main": [
+        [{"node": "GET — Trigger Poll", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "GET — Trigger Poll": {
+      "main": [[{"node": "Wait 45s (Poll Runs)", "type": "main", "index": 0}]]
+    },
+    "Wait 45s (Poll Runs)": {
+      "main": [[{"node": "GET — New Escalations", "type": "main", "index": 0}]]
+    },
+    "GET — New Escalations": {
+      "main": [[{"node": "IF — New Escalations?", "type": "main", "index": 0}]]
+    },
+    "IF — New Escalations?": {
+      "main": [
+        [{"node": "Code — Format Alert", "type": "main", "index": 0}],
+        []
+      ]
+    },
+    "Code — Format Alert": {
+      "main": [[{"node": "Send Alert Email", "type": "main", "index": 0}]]
+    },
+    "Webhook — Approve Draft": {
+      "main": [[{"node": "Code — Verify Secret", "type": "main", "index": 0}]]
+    },
+    "Code — Verify Secret": {
+      "main": [[{"node": "POST — Approve Draft", "type": "main", "index": 0}]]
+    },
+    "POST — Approve Draft": {
+      "main": [[{"node": "Respond — 200 OK", "type": "main", "index": 0}]]
+    },
+    "Daily 8am": {
+      "main": [[{"node": "GET — Daily Report", "type": "main", "index": 0}]]
+    },
+    "GET — Daily Report": {
+      "main": [[{"node": "Code — Format Digest", "type": "main", "index": 0}]]
+    },
+    "Code — Format Digest": {
+      "main": [[{"node": "Send Daily Digest", "type": "main", "index": 0}]]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  }
+}

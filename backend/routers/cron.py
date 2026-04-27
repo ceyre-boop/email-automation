@@ -8,8 +8,11 @@ GET  /api/status          → talent connection status overview
 from __future__ import annotations
 
 import logging
+import os
+from datetime import datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends
+from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -111,3 +114,105 @@ def get_status(db: Session = Depends(get_db)):
         ],
         "pending_drafts": pending_count,
     }
+
+
+@router.get("/api/n8n/new-escalations", dependencies=[Depends(verify_api_key)])
+def new_escalations(since_minutes: int = 5, db: Session = Depends(get_db)):
+    """
+    Returns escalations created in the last N minutes.
+    n8n polls this after each poll cycle to detect new escalations needing manager attention.
+    """
+    since = datetime.utcnow() - timedelta(minutes=since_minutes)
+    rows = (
+        db.query(Draft)
+        .filter(Draft.is_escalate == True, Draft.created_at >= since)  # noqa: E712
+        .order_by(Draft.created_at.desc())
+        .all()
+    )
+    return {
+        "count": len(rows),
+        "escalations": [
+            {
+                "id": r.id,
+                "talent_key": r.talent_key,
+                "sender": r.sender,
+                "subject": r.subject,
+                "escalate_reason": r.escalate_reason,
+                "brand_name": r.brand_name,
+                "proposed_rate": r.proposed_rate,
+                "created_at": r.created_at.isoformat(),
+            }
+            for r in rows
+        ],
+    }
+
+
+class N8nApproveBody(BaseModel):
+    draft_id: int
+    reviewed_by: str = "n8n"
+
+
+@router.post("/api/n8n/approve-draft")
+def n8n_approve_draft(
+    body: N8nApproveBody,
+    x_n8n_secret: str = Header(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Webhook endpoint called by n8n when a manager approves a draft.
+    Protected by X-N8N-Secret header (set N8N_WEBHOOK_SECRET in Render env vars).
+    Idempotent: returns 200 silently if draft is already sent.
+    """
+    expected = os.environ.get("N8N_WEBHOOK_SECRET", "")
+    if expected and x_n8n_secret != expected:
+        raise HTTPException(status_code=403, detail="Invalid n8n webhook secret.")
+
+    draft = db.query(Draft).filter(Draft.id == body.draft_id).first()
+    if not draft:
+        raise HTTPException(status_code=404, detail=f"Draft {body.draft_id} not found.")
+
+    # Idempotent — already sent is a success, not an error
+    if draft.status == DraftStatus.sent:
+        return {"ok": True, "status": "already_sent", "draft_id": body.draft_id}
+
+    if draft.status != DraftStatus.pending:
+        raise HTTPException(status_code=400, detail=f"Draft is '{draft.status}' — cannot approve.")
+
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key.ilike(draft.talent_key),
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(status_code=400, detail=f"No active Gmail token for {draft.talent_key}.")
+
+    from backend.services import gmail as gmail_svc
+    from backend.services.oauth import TokenRefreshError
+
+    try:
+        success = gmail_svc.send_reply(
+            token_row=token,
+            thread_id=draft.thread_id or "",
+            reply_to=draft.sender or "",
+            subject=draft.subject or "",
+            body=draft.draft_text,
+            db=db,
+        )
+    except TokenRefreshError:
+        token.active = False
+        db.add(token)
+        db.commit()
+        raise HTTPException(status_code=401, detail=f"Gmail token expired for {draft.talent_key} — reconnect needed.")
+
+    if not success:
+        raise HTTPException(status_code=502, detail="Gmail send failed.")
+
+    if draft.gmail_draft_id:
+        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
+
+    draft.status = DraftStatus.sent
+    draft.reviewed_at = datetime.utcnow()
+    draft.reviewed_by = body.reviewed_by
+    db.add(draft)
+    db.commit()
+    logger.info("Draft %d approved via n8n by %s", body.draft_id, body.reviewed_by)
+    return {"ok": True, "status": "sent", "draft_id": body.draft_id}
