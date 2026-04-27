@@ -15,7 +15,8 @@ POST /internal/logs/automation-error
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+import re as _re
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -23,7 +24,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
-from backend.models.db import Draft, DraftStatus, ProcessedEmail, TalentToken
+from backend.models.db import Draft, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
 from backend.services import gmail as gmail_svc
 from backend.services import reply as reply_svc
@@ -203,7 +204,7 @@ def send_reply(body: SendReplyBody, db: Session = Depends(get_db)):
         ) from exc
     except Exception as exc:
         logger.error("send-reply failed for %s: %s", body.gmail_account_id, exc)
-        raise HTTPException(status_code=502, detail=f"Gmail send error: {exc}") from exc
+        raise HTTPException(status_code=502, detail="Gmail send failed — check server logs for details.") from exc
 
     if not success:
         raise HTTPException(status_code=502, detail="Gmail send failed — check token and try again.")
@@ -240,13 +241,7 @@ def generate_draft(body: GenerateDraftBody, db: Session = Depends(get_db)):
     talent_name: str = talent_cfg.get("full_name", talent_key)
     minimum_rate: float = float(talent_cfg.get("minimum_rate_usd", 0))
 
-    # ── 2. Skip if already processed ─────────────────────────────────────────
-    already = (
-        db.query(ProcessedEmail)
-        .filter(ProcessedEmail.gmail_message_id == body.gmail_message_id)
-        .first()
-    )
-    # If a draft already exists for this message, return it instead of regenerating
+    # ── 2. Return existing draft if already generated ─────────────────────────
     existing_draft = (
         db.query(Draft)
         .filter(
@@ -265,7 +260,6 @@ def generate_draft(body: GenerateDraftBody, db: Session = Depends(get_db)):
 
     if not offer_type or not brand_name:
         try:
-            import re as _re
             sender_domain = ""
             match = _re.search(r"@([\w.\-]+)", body.sender)
             if match:
@@ -309,7 +303,7 @@ def generate_draft(body: GenerateDraftBody, db: Session = Depends(get_db)):
         )
     except Exception as exc:
         logger.error("GPT draft generation failed for %s: %s", talent_key, exc)
-        raise HTTPException(status_code=502, detail=f"GPT draft generation failed: {exc}") from exc
+        raise HTTPException(status_code=502, detail="GPT draft generation failed — check server logs for details.") from exc
 
     draft_text: str = reply_result["draft_text"]
     is_escalate: bool = reply_result.get("is_escalate", False)
@@ -329,7 +323,7 @@ def generate_draft(body: GenerateDraftBody, db: Session = Depends(get_db)):
         status=DraftStatus.pending,
         is_escalate=is_escalate,
         escalate_reason=escalate_reason,
-        created_at=datetime.utcnow(),
+        created_at=datetime.now(timezone.utc).replace(tzinfo=None),
     )
     db.add(draft_row)
     db.commit()
