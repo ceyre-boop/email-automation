@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from backend.core.config import get_settings
 from backend.models.db import create_tables
 try:
-    from backend.routers import auth, cron, drafts, dashboard
+    from backend.routers import auth, cron, drafts, dashboard, internal
 except Exception as _import_exc:
     print(f"FATAL: router import failed — {_import_exc}", file=sys.stderr, flush=True)
     import traceback; traceback.print_exc(file=sys.stderr)
@@ -56,6 +56,7 @@ app.include_router(auth.router)
 app.include_router(drafts.router)
 app.include_router(cron.router)
 app.include_router(dashboard.router)
+app.include_router(internal.router)
 
 
 # ── Manager Dashboard ─────────────────────────────────────────────────────────
