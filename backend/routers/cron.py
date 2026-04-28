@@ -147,6 +147,70 @@ def new_escalations(since_minutes: int = 5, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/api/test/gpt-demo-reply", dependencies=[Depends(verify_api_key)])
+def gpt_demo_reply(db: Session = Depends(get_db)):
+    """
+    Demo: GPT drafts a reply as Katrina to a fake low-ball offer, sends to colineyre222@gmail.com.
+    Bypasses ai_enabled — this is an explicit one-off test only.
+    """
+    from openai import OpenAI
+    from backend.services import gmail as gmail_svc
+
+    token_row = db.query(TalentToken).filter(
+        TalentToken.talent_key.ilike("katrina"),
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token_row:
+        raise HTTPException(status_code=503, detail="Katrina's Gmail not connected")
+
+    settings = get_settings()
+    client = OpenAI(api_key=settings.openai_api_key)
+
+    response = client.chat.completions.create(
+        model="gpt-4o",
+        messages=[
+            {
+                "role": "system",
+                "content": (
+                    "You are Katrina, a fashion content creator managed by TABOOST talent agency. "
+                    "You write short, warm, conversational emails — never stiff or corporate. "
+                    "Your minimum rate is $300 per video. When a brand low-balls you, you decline "
+                    "the rate politely but leave the door open for them to come back with a real offer. "
+                    "2-4 sentences max. Sign off as just 'Katrina'."
+                ),
+            },
+            {
+                "role": "user",
+                "content": (
+                    "Reply to this email from a brand:\n\n"
+                    "From: partnerships@budgetbeauty.com\n"
+                    "Subject: Collab opportunity!\n\n"
+                    "Hey Katrina! Huge fan of your content — your style is exactly what we're "
+                    "looking for. We'd love to send you our new skincare line and pay $50 per video. "
+                    "Let us know if you're in!\n\n"
+                    "— BudgetBeauty team"
+                ),
+            },
+        ],
+        max_tokens=250,
+        temperature=0.5,
+    )
+
+    draft_text = response.choices[0].message.content.strip()
+
+    success = gmail_svc.send_standalone_message(
+        token_row,
+        to="colineyre222@gmail.com",
+        subject="Re: Collab opportunity! (BudgetBeauty)",
+        body=draft_text,
+        db=db,
+    )
+    if not success:
+        raise HTTPException(status_code=500, detail="Gmail send failed — check logs")
+
+    return {"ok": True, "sent_from": "katrina@taboost.me", "draft_text": draft_text}
+
+
 @router.post("/api/test/send-test-email", dependencies=[Depends(verify_api_key)])
 def send_test_email(db: Session = Depends(get_db)):
     """
