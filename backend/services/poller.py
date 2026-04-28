@@ -154,41 +154,44 @@ def poll_all_inboxes(db: Session) -> dict:
 
             emails_found = len(messages)
 
-            for msg_stub in messages:
-                message_id = msg_stub["id"]
-                if _already_processed(db, message_id):
-                    continue
+            if not settings.app_config.get("ai_enabled", True):
+                logger.info("AI disabled — inbox synced for %s but triage skipped (ai_enabled=false)", talent_key)
+            else:
+                for msg_stub in messages:
+                    message_id = msg_stub["id"]
+                    if _already_processed(db, message_id):
+                        continue
 
-                try:
-                    _process_one_message(
-                        db=db,
-                        token_row=token_row,
-                        message_id=message_id,
-                        talent_key=talent_key,
-                        talent_name=talent_name,
-                        minimum_rate=minimum_rate,
-                        draft_mode=draft_mode,
-                        summary=summary,
-                    )
-                    emails_processed_count += 1
-                except Exception as exc:  # noqa: BLE001
-                    logger.error("Error processing %s / %s: %s", talent_key, message_id, exc)
-                    summary["errors"] += 1
-                    _record_processed(
-                        db=db,
-                        talent_key=talent_key,
-                        message_id=message_id,
-                        thread_id="",
-                        sender="",
-                        subject="",
-                        score=2,
-                        brand_name="",
-                        proposed_rate=0,
-                        offer_type="Unknown",
-                        reason=f"Error: {exc}",
-                        status=EmailStatus.error,
-                        email_date=None,
-                    )
+                    try:
+                        _process_one_message(
+                            db=db,
+                            token_row=token_row,
+                            message_id=message_id,
+                            talent_key=talent_key,
+                            talent_name=talent_name,
+                            minimum_rate=minimum_rate,
+                            draft_mode=draft_mode,
+                            summary=summary,
+                        )
+                        emails_processed_count += 1
+                    except Exception as exc:  # noqa: BLE001
+                        logger.error("Error processing %s / %s: %s", talent_key, message_id, exc)
+                        summary["errors"] += 1
+                        _record_processed(
+                            db=db,
+                            talent_key=talent_key,
+                            message_id=message_id,
+                            thread_id="",
+                            sender="",
+                            subject="",
+                            score=2,
+                            brand_name="",
+                            proposed_rate=0,
+                            offer_type="Unknown",
+                            reason=f"Error: {exc}",
+                            status=EmailStatus.error,
+                            email_date=None,
+                        )
 
             # Success — reset failure counters, record last_poll_at
             token_row.consecutive_failures = 0

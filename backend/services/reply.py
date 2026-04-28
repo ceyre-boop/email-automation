@@ -155,6 +155,8 @@ def draft_reply(
     Always returns something — falls back to ESCALATE on error.
     """
     settings = get_settings()
+    if not settings.app_config.get("ai_enabled", True):
+        raise RuntimeError("AI is disabled (ai_enabled=false in settings.json) — reply drafting skipped")
     cfg = settings.app_config.get("openai", {})
     client = OpenAI(api_key=settings.openai_api_key)
 

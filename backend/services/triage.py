@@ -163,6 +163,8 @@ def triage_email(
     Falls back to score=2 on any error (never silently drops emails).
     """
     settings = get_settings()
+    if not settings.app_config.get("ai_enabled", True):
+        raise RuntimeError("AI is disabled (ai_enabled=false in settings.json) — triage skipped")
     cfg = settings.app_config.get("openai", {})
     policy = settings.confidence_policy
 

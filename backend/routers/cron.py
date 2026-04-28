@@ -147,6 +147,36 @@ def new_escalations(since_minutes: int = 5, db: Session = Depends(get_db)):
     }
 
 
+@router.post("/api/test/send-test-email", dependencies=[Depends(verify_api_key)])
+def send_test_email(db: Session = Depends(get_db)):
+    """
+    Send a test email to colineyre222@gmail.com using the first active talent token.
+    Verifies that Gmail OAuth + sending is fully wired up.
+    """
+    from backend.services import gmail as gmail_svc
+
+    token_row = db.query(TalentToken).filter(TalentToken.active == True).first()  # noqa: E712
+    if not token_row:
+        raise HTTPException(status_code=503, detail="No active talent tokens — connect a Gmail account first")
+
+    success = gmail_svc.send_standalone_message(
+        token_row,
+        to="colineyre222@gmail.com",
+        subject="TABOOST System Test — Email Sending Works",
+        body=(
+            "This is a test email from the TABOOST email automation system.\n\n"
+            f"Sent from: {token_row.talent_key} inbox ({token_row.email})\n"
+            "System status: Gmail OAuth connected and sending operational\n\n"
+            "You can safely delete this email."
+        ),
+        db=db,
+    )
+    if not success:
+        raise HTTPException(status_code=500, detail="Email send failed — check server logs for Gmail API error")
+
+    return {"ok": True, "sent_from": token_row.talent_key, "sent_from_email": token_row.email, "sent_to": "colineyre222@gmail.com"}
+
+
 class N8nApproveBody(BaseModel):
     draft_id: int
     reviewed_by: str = "n8n"

@@ -1,6 +1,9 @@
 {
   "_comment": "Global configuration for the Talent Inbox Automation system. Fill in all TODO values before deploying.",
 
+  "ai_enabled": false,
+  "_ai_enabled_comment": "HARD BLOCKER — set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
+
   "openai": {
     "triage_model": "gpt-4o-mini",
     "_triage_model_comment": "Use gpt-4o-mini for triage (cheaper, nearly as accurate). Switch to gpt-4o only if quality drops.",

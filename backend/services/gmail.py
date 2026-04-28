@@ -333,6 +333,21 @@ def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str
         return False
 
 
+def send_standalone_message(token_row, to: str, subject: str, body: str, db=None) -> bool:
+    """Send a fresh (non-reply) email from the talent's Gmail account."""
+    service = _gmail_service(token_row, db)
+    mime_msg = MIMEText(body, "plain")
+    mime_msg["To"] = to
+    mime_msg["Subject"] = subject
+    raw = base64.urlsafe_b64encode(mime_msg.as_bytes()).decode()
+    try:
+        service.users().messages().send(userId="me", body={"raw": raw}).execute()
+        return True
+    except HttpError as exc:
+        logger.error("Standalone send failed for %s: %s", token_row.talent_key, exc)
+        return False
+
+
 def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
     """Delete a draft from the talent's Gmail account."""
     service = _gmail_service(token_row, db)
