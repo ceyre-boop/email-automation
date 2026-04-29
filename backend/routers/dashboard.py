@@ -526,6 +526,98 @@ def process_single_email(body: ProcessEmailIn, db: Session = Depends(get_db)):
     return {"ok": True, "summary": summary}
 
 
+@router.post("/talents/{talent_key}/process-batch")
+def process_batch(
+    talent_key: str,
+    background_tasks: BackgroundTasks,
+    limit: int = 30,
+    db: Session = Depends(get_db),
+):
+    """
+    Run the full triage + reply pipeline on up to `limit` cached inbox emails
+    that haven't been processed yet. Runs in the background so the response
+    returns immediately.
+    """
+    from backend.services.poller import _already_processed
+    _validate_talent(talent_key)
+
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key.ilike(talent_key),
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
+
+    # Find cached inbox emails that have body text and haven't been processed
+    candidates = (
+        db.query(InboxEmail)
+        .filter(
+            InboxEmail.talent_key == talent_key.lower(),
+            InboxEmail.body_text != None,  # noqa: E711
+        )
+        .order_by(InboxEmail.email_date.desc().nullslast())
+        .limit(limit * 3)  # fetch extra so we can skip already-processed ones
+        .all()
+    )
+
+    # Filter out already-processed
+    unprocessed = [c for c in candidates if not _already_processed(db, c.gmail_message_id)]
+    batch = unprocessed[:limit]
+
+    if not batch:
+        return {"ok": True, "message": "No unprocessed emails with body text found.", "queued": 0}
+
+    msg_ids = [e.gmail_message_id for e in batch]
+    background_tasks.add_task(_run_process_batch, talent_key, msg_ids)
+    return {"ok": True, "message": f"Processing {len(batch)} emails in background.", "queued": len(batch)}
+
+
+def _run_process_batch(talent_key: str, msg_ids: list):
+    """Background task: run full triage + reply on a list of message IDs."""
+    from backend.models.db import get_session_factory, TalentToken
+    from backend.services.poller import _already_processed, _process_one_message
+    from backend.core.config import get_settings as _gs
+
+    SessionLocal = get_session_factory()
+    _db = SessionLocal()
+    summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+    try:
+        token = _db.query(TalentToken).filter(
+            TalentToken.talent_key.ilike(talent_key),
+            TalentToken.active == True,  # noqa: E712
+        ).first()
+        if not token:
+            logger.error("Batch: no token for %s", talent_key)
+            return
+
+        settings = _gs()
+        talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+        talent_cfg = talent_map.get(talent_key.lower(), {})
+        draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
+
+        for msg_id in msg_ids:
+            if _already_processed(_db, msg_id):
+                continue
+            try:
+                _process_one_message(
+                    db=_db,
+                    token_row=token,
+                    message_id=msg_id,
+                    talent_key=talent_key,
+                    talent_name=talent_cfg.get("full_name", talent_key),
+                    minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
+                    draft_mode=draft_mode,
+                    summary=summary,
+                )
+            except Exception as exc:
+                logger.warning("Batch error on %s / %s: %s", talent_key, msg_id, exc)
+                summary["errors"] += 1
+
+        logger.info("Batch complete for %s: %s", talent_key, summary)
+    finally:
+        _db.close()
+
+
 # ── Live Gmail inbox ───────────────────────────────────────────────────────────
 
 @router.get("/talents/{talent_key}/inbox/live")

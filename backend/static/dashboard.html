@@ -688,6 +688,7 @@ body {
       <div class="topbar-actions">
         <button class="btn btn-ghost" onclick="openRealGmail()">Open Gmail ↗</button>
         <button class="btn btn-ghost" onclick="openSettings()" title="AI Settings for this talent">⚙ AI Settings</button>
+        <button class="btn btn-ghost" id="btn-batch" onclick="runBatchDraft()">⚡ Draft Batch</button>
         <button class="btn btn-primary" id="btn-run-ai" onclick="runAiDraft()">✦ Run AI Draft</button>
       </div>
     </header>
@@ -1422,6 +1423,26 @@ function openRealGmail() {
   window.open(email
     ? `https://mail.google.com/mail/u/${encodeURIComponent(email)}/#inbox`
     : 'https://mail.google.com/', '_blank');
+}
+
+// ── Batch draft ────────────────────────────────────────────────────────────
+async function runBatchDraft() {
+  if (!state.selectedTalent) return showToast('Select a talent first.');
+  const t = state.selectedTalent;
+  if (!confirm(`Run AI triage + drafting on up to 30 unprocessed emails for ${t.full_name}?\n\nThis uses OpenAI tokens. Drafts will be saved to Gmail — nothing sends automatically.`)) return;
+  const btn = document.getElementById('btn-batch');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Queuing…';
+  btn.disabled = true;
+  try {
+    const res = await api('POST', `/api/dashboard/talents/${t.key}/process-batch?limit=30`);
+    showToast(`⚡ ${res.message} Switch to Drafts tab to see results.`);
+  } catch (e) {
+    showToast('Batch failed: ' + e.message);
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
 }
 
 // ── Run AI Draft ───────────────────────────────────────────────────────────
