@@ -195,28 +195,6 @@
       "rate_unit": "per video"
     },
     {
-      "key": "KatrinaD",
-      "full_name": "Katrina D",
-      "gmail_connection_name": "Gmail - KatrinaD",
-      "sop_tab_name": "Katrina D",
-      "manager": "Cara",
-      "category": "Fashion (livestream)",
-      "minimum_rate_usd": 150,
-      "rate_unit": "per hour",
-      "_note": "Rate is per hour for livestreams. Standard rate is $300/hr. Triage should flag any hourly offer below $150 as Score 1."
-    },
-    {
-      "key": "Michaela",
-      "full_name": "Michaela",
-      "gmail_connection_name": "Gmail - Michaela",
-      "sop_tab_name": "Michaela",
-      "manager": "Cara",
-      "category": "Fashion/Beauty",
-      "minimum_rate_usd": 3500,
-      "rate_unit": "per video",
-      "_note": "Dual manager escalation: offers above $4,000 go to Cara; at or below $4,000 go to Chenni. Offers below $1,000 go straight to Revisit."
-    },
-    {
       "key": "colineyre222",
       "full_name": "Colin Eyre",
       "inbox_email": "colineyre222@gmail.com",
