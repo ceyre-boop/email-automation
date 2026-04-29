@@ -176,18 +176,23 @@ body {
 /* ─── Overview view ─────────────────────────────────────────────────────── */
 #view-overview.reader {
   flex: 1;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-rows: auto 1fr;
   height: 100vh;
   background: var(--bg);
   overflow: hidden;
-  position: relative;
+}
+
+.reader-header {
+  padding: 20px 40px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg);
+  z-index: 10;
 }
 
 .reader-content {
-  flex: 1;
   overflow-y: auto !important;
-  padding: 30px 40px;
+  padding: 40px;
   -webkit-overflow-scrolling: touch;
 }
 
@@ -1269,6 +1274,17 @@ function renderEmailList() {
         ${hasDraft ? '<span class="draft-badge">DRAFT</span>' : ''}
       </div>
     `;
+    const html = `
+      <div class="reader-header">
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <div style="font-size:20px; font-weight:700; color:var(--text);">${email.subject || '(No Subject)'}</div>
+          <div style="display:flex; gap:12px;">
+            <button class="btn-secondary" onclick="archiveEmail('${email.gmail_message_id}')">Archive</button>
+          </div>
+        </div>
+      </div>
+      <div class="reader-content">
+        <div class="email-card">`;
     div.addEventListener('click', () => selectEmail(email));
     rows.appendChild(div);
   });
