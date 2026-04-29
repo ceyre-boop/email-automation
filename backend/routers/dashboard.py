@@ -244,7 +244,7 @@ def talent_emails(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(ProcessedEmail)
-        .filter(ProcessedEmail.talent_key == talent_key.lower())
+        .filter(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(250)
         .all()
@@ -257,7 +257,7 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(Draft)
-        .filter(Draft.talent_key == talent_key.lower(), Draft.status == DraftStatus.pending)
+        .filter(func.lower(Draft.talent_key) == talent_key.lower(), Draft.status == DraftStatus.pending)
         .order_by(Draft.created_at.desc())
         .all()
     )
@@ -409,7 +409,7 @@ def talent_sent_emails(talent_key: str, limit: int = 50, db: Session = Depends(g
     """Emails where a reply was sent — the missing 'Sent' tab."""
     rows = (
         db.query(ProcessedEmail)
-        .filter(ProcessedEmail.talent_key == talent_key.lower(), ProcessedEmail.status == EmailStatus.sent)
+        .filter(func.lower(ProcessedEmail.talent_key) == talent_key.lower(), ProcessedEmail.status == EmailStatus.sent)
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(limit)
         .all()
