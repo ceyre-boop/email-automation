@@ -3,30 +3,32 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Inbox Manager</title>
+<title>TABOOST · Inbox Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
-/* ── Premium Design System ────────────────────────────────────────────────── */
 :root {
-  --bg: #0d0f14;
-  --sidebar: #13161d;
-  --panel: rgba(19, 22, 29, 0.8);
-  --panel-light: rgba(30, 35, 46, 0.4);
-  --border: rgba(255, 255, 255, 0.08);
-  --border-active: rgba(59, 130, 246, 0.4);
-  --text: #e2e8f0;
-  --text-dim: #94a3b8;
-  --text-muted: #64748b;
-  --primary: #3b82f6;
-  --primary-glow: rgba(59, 130, 246, 0.3);
-  --success: #10b981;
-  --warning: #f59e0b;
-  --danger: #ef4444;
-  --sans: 'Inter', system-ui, -apple-system, sans-serif;
-  --mono: 'JetBrains Mono', monospace;
-  --sidebar-w: 260px;
-  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --bg:          #080809;
+  --surface:     #101013;
+  --surface-2:   #17171c;
+  --surface-3:   #1e1e25;
+  --border:      rgba(255,255,255,0.07);
+  --border-2:    rgba(255,255,255,0.12);
+  --red:         #e31c25;
+  --red-dim:     rgba(227,28,37,0.18);
+  --red-glow:    rgba(227,28,37,0.35);
+  --red-line:    rgba(227,28,37,0.5);
+  --text:        #f2f2f3;
+  --text-2:      #9a9aa8;
+  --text-3:      #55555f;
+  --green:       #00d68f;
+  --green-dim:   rgba(0,214,143,0.12);
+  --amber:       #ffb300;
+  --amber-dim:   rgba(255,179,0,0.12);
+  --sans:        'Inter', system-ui, sans-serif;
+  --mono:        'JetBrains Mono', monospace;
+  --r:           0.2s cubic-bezier(0.4,0,0.2,1);
+  --sidebar-w:   248px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -41,620 +43,632 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── Typography & Icons ────────────────────────────────────────────────────── */
-h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
-.mono { font-family: var(--mono); }
+/* ─── Scrollbar ─────────────────────────────────────────────────────────── */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
-/* ── Glassmorphism Elements ────────────────────────────────────────────────── */
-.glass {
-  background: var(--panel);
-  backdrop-filter: blur(12px);
-  border: 1px solid var(--border);
-}
-
-/* ── Sidebar (The Navigator) ───────────────────────────────────────────────── */
+/* ─── Sidebar ───────────────────────────────────────────────────────────── */
 #sidebar {
   width: var(--sidebar-w);
-  background: var(--sidebar);
+  background: var(--surface);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  z-index: 100;
+  flex-shrink: 0;
+  z-index: 10;
 }
 
-.sidebar-header {
-  padding: 24px 20px;
-}
-
-.sidebar-logo {
+.sidebar-brand {
+  padding: 24px 20px 20px;
+  border-bottom: 1px solid var(--border);
   display: flex;
   align-items: center;
-  gap: 12px;
-  font-size: 14px;
-  font-weight: 700;
-  color: #fff;
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
+  gap: 11px;
 }
 
-.sidebar-logo-icon {
-  width: 24px;
-  height: 24px;
-  background: var(--primary);
-  border-radius: 6px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 0 15px var(--primary-glow);
-}
-
-.nav-section {
-  padding: 12px 12px 0;
-}
-
-.nav-item {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 10px 12px;
+.brand-mark {
+  width: 30px; height: 30px;
+  background: var(--red);
   border-radius: 8px;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-dim);
-  transition: var(--transition);
-  margin-bottom: 4px;
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+  box-shadow: 0 0 18px var(--red-glow);
 }
 
-.nav-item:hover {
-  background: var(--panel-light);
-  color: #fff;
+.brand-mark svg { width: 16px; height: 16px; fill: #fff; }
+
+.brand-text { display: flex; flex-direction: column; gap: 1px; }
+.brand-name {
+  font-size: 13px; font-weight: 800;
+  letter-spacing: 0.08em; text-transform: uppercase; color: #fff;
+}
+.brand-sub { font-size: 10px; color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; }
+
+.sidebar-nav { padding: 12px 10px 0; }
+
+.nav-btn {
+  display: flex; align-items: center; gap: 10px;
+  width: 100%; padding: 9px 12px;
+  border-radius: 8px; border: none; background: none;
+  font-family: var(--sans); font-size: 13px; font-weight: 500;
+  color: var(--text-2); cursor: pointer;
+  transition: var(--r); margin-bottom: 2px; text-align: left;
+}
+.nav-btn:hover { background: var(--surface-2); color: var(--text); }
+.nav-btn.active { background: var(--red-dim); color: var(--red); border: 1px solid var(--red-line); }
+.nav-btn .nb-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
+
+.sidebar-divider { height: 1px; background: var(--border); margin: 12px 10px; }
+
+.sidebar-section-label {
+  padding: 4px 12px 6px;
+  font-size: 10px; font-weight: 700; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.06em;
 }
 
-.nav-item.active {
-  background: var(--primary);
-  color: #fff;
-  box-shadow: 0 4px 12px var(--primary-glow);
-}
-
-.sidebar-label {
-  padding: 24px 24px 8px;
-  font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
-#talent-list {
-  flex: 1;
-  overflow-y: auto;
-  padding: 4px 12px;
-}
+#talent-list { flex: 1; overflow-y: auto; padding: 2px 10px; }
 
 .talent-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-  color: var(--text-dim);
-  transition: var(--transition);
-  margin-bottom: 2px;
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--text-2);
+  cursor: pointer; transition: var(--r); margin-bottom: 1px;
+  border: 1px solid transparent;
 }
+.talent-item:hover { background: var(--surface-2); color: var(--text); }
+.talent-item.active { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
 
-.talent-item:hover {
-  background: var(--panel-light);
-  color: #fff;
+.t-avatar {
+  width: 22px; height: 22px; border-radius: 50%;
+  background: var(--surface-3); border: 1px solid var(--border-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+  color: var(--text-2);
 }
+.talent-item.active .t-avatar { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
 
-.talent-item.active {
-  background: rgba(255, 255, 255, 0.05);
-  color: var(--primary);
-  border: 1px solid var(--border-active);
+.t-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.t-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
 }
+.t-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.t-dot.offline { background: var(--text-3); }
 
-.talent-avatar {
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  background: var(--panel-light);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 11px;
-  font-weight: 700;
-  border: 1px solid var(--border);
+.t-badge {
+  background: var(--red); color: #fff;
+  font-size: 9px; font-weight: 700;
+  padding: 2px 5px; border-radius: 8px;
+  flex-shrink: 0;
 }
-
-.talent-status {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  margin-left: auto;
-}
-
-.status-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
-.status-offline { background: var(--text-muted); }
 
 .sidebar-footer {
-  padding: 16px;
+  padding: 14px 10px;
   border-top: 1px solid var(--border);
 }
 
-.btn-premium {
-  width: 100%;
-  padding: 10px;
-  background: var(--panel-light);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 12px;
-  font-weight: 600;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: var(--transition);
+.btn-sync {
+  width: 100%; padding: 9px;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: 8px; color: var(--text-2);
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: var(--r);
+  display: flex; align-items: center; justify-content: center; gap: 8px;
 }
+.btn-sync:hover { background: var(--surface-3); color: var(--text); }
 
-.btn-premium:hover {
-  background: var(--border);
-  border-color: var(--text-muted);
-}
+/* ─── Main shell ────────────────────────────────────────────────────────── */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 
-/* ── Layout Shell ─────────────────────────────────────────────────────────── */
-#main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  position: relative;
-}
+/* ─── Animations ────────────────────────────────────────────────────────── */
+@keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
+.fade-up { animation: fadeUp 0.28s ease-out forwards; }
 
-/* ── Animations ────────────────────────────────────────────────────────────── */
-@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
-.animate-fade { animation: fadeIn 0.3s ease-out forwards; }
-
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spin { to { transform:rotate(360deg); } }
 .spinner {
-  width: 16px;
-  height: 16px;
-  border: 2px solid var(--border);
-  border-top-color: var(--primary);
-  border-radius: 50%;
-  animation: spin 0.7s linear infinite;
+  display: inline-block; width: 14px; height: 14px;
+  border: 2px solid var(--border-2); border-top-color: var(--red);
+  border-radius: 50%; animation: spin 0.65s linear infinite; flex-shrink: 0;
 }
 
-/* Rest of standard Gmail styles modified for dark mode... (will expand in next steps) */
+/* ─── Overview view ─────────────────────────────────────────────────────── */
+#view-overview {
+  flex: 1; overflow-y: auto; padding: 36px 40px;
+  background: var(--bg);
+}
+
+.ov-header {
+  display: flex; align-items: baseline; justify-content: space-between;
+  margin-bottom: 28px;
+}
+.ov-title { font-size: 22px; font-weight: 700; color: #fff; }
+.ov-date { font-size: 12px; color: var(--text-3); font-family: var(--mono); }
+
+.stat-row { display: flex; gap: 16px; margin-bottom: 36px; }
+.stat-card {
+  flex: 1; padding: 20px 22px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 12px; transition: var(--r);
+}
+.stat-card:hover { border-color: var(--border-2); transform: translateY(-1px); }
+.stat-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+.stat-value { font-size: 30px; font-weight: 700; color: #fff; font-family: var(--mono); }
+.stat-card.s-red .stat-value { color: var(--red); }
+.stat-card.s-green .stat-value { color: var(--green); }
+.stat-card.s-amber .stat-value { color: var(--amber); }
+
+.ov-grid { display: grid; grid-template-columns: 1fr 340px; gap: 28px; max-width: 1400px; }
+
+.section-head { font-size: 13px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+
+#talent-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px,1fr)); gap: 14px; }
+
+.talent-card {
+  padding: 20px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; cursor: pointer; transition: var(--r);
+}
+.talent-card:hover { background: var(--surface-2); border-color: var(--border-2); }
+
+.tc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.tc-name { font-size: 14px; font-weight: 600; color: #fff; }
+.tc-manager { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+.tc-av { width: 32px; height: 32px; border-radius: 50%; background: var(--red-dim); border: 1px solid var(--red-line); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--red); flex-shrink: 0; }
+
+.tc-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+
+.pill { padding: 3px 9px; border-radius: 100px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
+.pill.good  { background: var(--green-dim); color: var(--green); }
+.pill.misc  { background: var(--amber-dim); color: var(--amber); }
+.pill.filtered { background: rgba(255,255,255,0.05); color: var(--text-3); }
+.pill.red   { background: var(--red-dim); color: var(--red); border: 1px solid var(--red-line); }
+
+.tc-deal { font-size: 11px; color: var(--text-2); }
+.tc-deal strong { color: #fff; }
+
+/* ─── Context / instructions panel ─────────────────────────────────────── */
+.ctx-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+
+.ctx-item {
+  padding: 12px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 10px;
+  font-size: 12px; line-height: 1.5; color: var(--text);
+  margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start;
+}
+.ctx-item-text { flex: 1; }
+.ctx-item-meta { font-size: 10px; color: var(--text-3); margin-top: 6px; }
+.ctx-del {
+  background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 16px;
+  padding: 0 4px; line-height: 1; transition: var(--r); flex-shrink: 0;
+}
+.ctx-del:hover { color: var(--red); }
+
+.ctx-add-area { margin-top: 16px; }
+.ctx-textarea {
+  width: 100%; padding: 11px 14px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text);
+  font-family: var(--sans); font-size: 13px; line-height: 1.5;
+  outline: none; resize: none;
+  transition: border-color var(--r);
+}
+.ctx-textarea:focus { border-color: var(--red-line); }
+
+/* ─── Gmail view ────────────────────────────────────────────────────────── */
+#view-gmail { flex:1; display:flex; flex-direction:column; background: var(--bg); }
+
+.gmail-topbar {
+  height: 58px; display: flex; align-items: center;
+  padding: 0 20px; gap: 16px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface); flex-shrink: 0;
+}
+
+.back-btn {
+  display: flex; align-items: center; gap: 6px;
+  font-size: 12px; font-weight: 600; color: var(--text-3);
+  background: none; border: none; cursor: pointer; transition: var(--r);
+  white-space: nowrap;
+}
+.back-btn:hover { color: var(--text); }
+.back-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+.gmail-talent-id {
+  display: flex; align-items: center; gap: 9px;
+  font-size: 13px; font-weight: 600; color: #fff;
+  white-space: nowrap;
+}
+.gmail-av {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--red-dim); border: 1px solid var(--red-line);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 700; color: var(--red); flex-shrink: 0;
+}
+
+.topbar-search {
+  flex: 1; max-width: 480px;
+  padding: 8px 14px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px;
+  color: var(--text); font-family: var(--sans); font-size: 13px; outline: none;
+  transition: border-color var(--r);
+}
+.topbar-search:focus { border-color: var(--red-line); }
+.topbar-search::placeholder { color: var(--text-3); }
+
+.topbar-actions { display: flex; gap: 8px; margin-left: auto; }
+
+.btn { padding: 7px 16px; border-radius: 8px; font-family: var(--sans); font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--r); border: none; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.btn:hover { opacity: 0.85; }
+.btn-ghost { background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text-2); }
+.btn-ghost:hover { color: var(--text); background: var(--surface-3); }
+.btn-primary { background: var(--red); color: #fff; box-shadow: 0 0 14px rgba(227,28,37,0.3); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ─── Split layout ──────────────────────────────────────────────────────── */
+.gmail-split { flex: 1; display: flex; overflow: hidden; }
+
+/* Narrow left nav — inbox / drafts only */
+.gmail-nav {
+  width: 60px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  align-items: center; padding: 16px 0; gap: 6px;
+  background: var(--surface);
+}
+
+.gnav-btn {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+  padding: 10px 8px; border-radius: 10px; cursor: pointer;
+  font-size: 11px; font-weight: 600; color: var(--text-3);
+  transition: var(--r); border: 1px solid transparent; width: 48px;
+}
+.gnav-btn:hover { background: var(--surface-2); color: var(--text-2); }
+.gnav-btn.active { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
+.gnav-icon { font-size: 17px; }
+
+/* Email list column */
+.email-col {
+  width: 380px; flex-shrink: 0;
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  background: var(--bg);
+}
+
+.email-col-header {
+  padding: 12px 16px; border-bottom: 1px solid var(--border);
+  display: flex; gap: 6px; flex-shrink: 0;
+}
+
+.filter-tab {
+  padding: 5px 12px; border-radius: 6px; border: none; background: none;
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  color: var(--text-3); cursor: pointer; transition: var(--r);
+}
+.filter-tab:hover { color: var(--text-2); }
+.filter-tab.active { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-2); }
+
+#email-rows { flex: 1; overflow-y: auto; }
+
+.email-row {
+  padding: 14px 16px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background var(--r);
+  border-left: 3px solid transparent;
+}
+.email-row:hover { background: var(--surface); }
+.email-row.active { background: var(--red-dim); border-left-color: var(--red); }
+
+.er-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 3px; }
+.er-sender { font-size: 13px; font-weight: 600; color: var(--text); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+.er-date { font-size: 10px; color: var(--text-3); flex-shrink: 0; font-family: var(--mono); }
+.er-subject { font-size: 12px; color: var(--text-2); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.er-meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+.score-dot {
+  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
+}
+.score-dot.good { background: var(--green); }
+.score-dot.misc { background: var(--amber); }
+.score-dot.pending { background: var(--text-3); }
+.score-dot.red { background: var(--red); }
+
+.draft-badge {
+  font-size: 9px; font-weight: 700; color: var(--red);
+  border: 1px solid var(--red-line); border-radius: 4px;
+  padding: 1px 5px; flex-shrink: 0;
+}
+
+.empty-state {
+  display: flex; flex-direction: column; align-items: center;
+  justify-content: center; padding: 60px 24px;
+  color: var(--text-3); text-align: center; gap: 12px;
+}
+.empty-state .es-icon { font-size: 36px; opacity: 0.4; }
+.empty-state .es-text { font-size: 13px; line-height: 1.5; max-width: 260px; }
+
+/* ─── Reading pane ──────────────────────────────────────────────────────── */
+.reader-pane {
+  flex: 1; overflow-y: auto; padding: 32px 36px;
+  background: var(--bg);
+}
+
+.reading-placeholder {
+  height: 100%; display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  color: var(--text-3); gap: 12px;
+}
+.reading-placeholder .rp-icon { font-size: 40px; opacity: 0.3; }
+.reading-placeholder .rp-text { font-size: 13px; }
+
+.thread-head { margin-bottom: 24px; }
+.thread-subject { font-size: 20px; font-weight: 700; color: #fff; line-height: 1.3; margin-bottom: 14px; }
+.thread-actions { display: flex; gap: 8px; }
+
+.msg-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 22px; margin-bottom: 20px;
+}
+.msg-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.msg-av {
+  width: 38px; height: 38px; border-radius: 50%; background: var(--surface-2);
+  border: 1px solid var(--border-2); display: flex; align-items: center;
+  justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0;
+}
+.msg-from { font-size: 14px; font-weight: 600; color: #fff; }
+.msg-addr { font-size: 11px; color: var(--text-3); margin-top: 1px; }
+.msg-score-pill { margin-left: auto; }
+
+.msg-body { font-size: 13px; line-height: 1.65; color: var(--text); white-space: pre-wrap; font-family: var(--sans); }
+
+.msg-tags { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--border); }
+
+/* ─── AI Composer ───────────────────────────────────────────────────────── */
+.ai-composer {
+  background: var(--surface);
+  border: 1px solid var(--red-line);
+  border-radius: 12px; padding: 22px; margin-top: 20px;
+  position: relative; overflow: hidden;
+}
+.ai-composer::before {
+  content: '';
+  position: absolute; top: 0; left: 0; right: 0; height: 2px;
+  background: linear-gradient(90deg, var(--red), rgba(227,28,37,0.2));
+}
+
+.ai-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+.ai-label {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 11px; font-weight: 700; color: var(--red); letter-spacing: 0.06em; text-transform: uppercase;
+}
+.ai-label-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--red); box-shadow: 0 0 8px var(--red-glow); }
+
+.ai-to { font-size: 12px; color: var(--text-3); margin-bottom: 12px; }
+.ai-to span { color: var(--text); }
+
+.ai-textarea {
+  width: 100%; padding: 14px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 10px; color: var(--text);
+  font-family: var(--sans); font-size: 13px; line-height: 1.6;
+  min-height: 180px; outline: none; resize: vertical;
+  transition: border-color var(--r);
+}
+.ai-textarea:focus { border-color: var(--red-line); }
+
+.ai-footer { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+.escalate-notice {
+  padding: 10px 14px; border-radius: 8px;
+  background: rgba(227,28,37,0.08); border: 1px solid rgba(227,28,37,0.2);
+  color: var(--red); font-size: 12px; margin-bottom: 14px;
+}
+
+.draft-pending-hint {
+  margin-top: 20px; padding: 20px;
+  border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px;
+  text-align: center; font-size: 12px; color: var(--text-3);
+}
+
+/* ─── Toast ─────────────────────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 28px; right: 28px;
+  padding: 12px 20px; border-radius: 10px;
+  background: var(--surface-3); border: 1px solid var(--border-2);
+  color: var(--text); font-size: 13px; font-weight: 500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
+  z-index: 2000; display: none;
+  animation: fadeUp 0.25s ease-out;
+}
+#toast.show { display: block; }
+
+/* ─── API key overlay ───────────────────────────────────────────────────── */
+#api-key-overlay {
+  position: fixed; inset: 0; background: rgba(8,8,9,0.95);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 9999; display: none;
+}
+.api-box {
+  background: var(--surface); border: 1px solid var(--border-2);
+  border-radius: 16px; padding: 40px; width: 380px; text-align: center;
+}
+.api-box-logo {
+  width: 48px; height: 48px; background: var(--red);
+  border-radius: 12px; margin: 0 auto 24px;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: 0 0 24px var(--red-glow);
+}
+.api-box-logo svg { width: 24px; height: 24px; fill: #fff; }
+.api-box h2 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
+.api-box p { font-size: 13px; color: var(--text-2); margin-bottom: 24px; }
+.api-input {
+  width: 100%; padding: 13px 16px;
+  background: var(--bg); border: 1px solid var(--border-2);
+  border-radius: 10px; color: var(--text);
+  font-family: var(--mono); font-size: 14px; text-align: center;
+  outline: none; margin-bottom: 14px;
+  transition: border-color var(--r);
+}
+.api-input:focus { border-color: var(--red-line); }
+
+/* deploy pill */
+#deploy-pill {
+  font-size: 10px; color: var(--text-3); margin-top: 6px;
+  background: var(--surface-2); border-radius: 100px;
+  padding: 3px 10px; display: inline-block;
+  font-family: var(--mono);
+}
 </style>
 </head>
 <body>
 
 <!-- API key overlay -->
-<div id="api-key-overlay" style="display:none" class="glass">
-  <div class="api-key-box" style="background:var(--sidebar); padding:40px; border-radius:24px; border:1px solid var(--border); text-align:center;">
-    <div class="sidebar-logo-icon" style="width:48px; height:48px; margin:0 auto 24px;">🚀</div>
-    <h2 style="margin-bottom:8px; font-size:20px;">Inbox Command Center</h2>
-    <p style="color:var(--text-muted); margin-bottom:24px;">Enter your management console key.</p>
-    <input type="password" id="api-key-input" placeholder="••••••••••••" style="padding:14px; background:var(--bg); border:1px solid var(--border); border-radius:12px; color:var(--text); font-family:var(--mono); text-align:center; width:100%; margin-bottom:16px;">
-    <button class="btn-api-submit" id="btn-api-submit" style="width:100%; padding:14px; background:var(--primary); color:white; border-radius:12px; font-weight:700;">Authorize Console</button>
+<div id="api-key-overlay">
+  <div class="api-box fade-up">
+    <div class="api-box-logo">
+      <svg viewBox="0 0 20 20"><path d="M10 2L2 7v6l8 5 8-5V7L10 2zm0 2.5l5.5 3.25L10 11 4.5 7.75 10 4.5zM3.5 9.2l5.5 3.3V17l-5.5-3.5V9.2zm7 3.3l5.5-3.3v4.3L10.5 17V12.5z"/></svg>
+    </div>
+    <h2>TABOOST Command Center</h2>
+    <p>Enter your management console key</p>
+    <input type="password" id="api-key-input" class="api-input" placeholder="••••••••••••••••">
+    <button class="btn btn-primary" id="btn-api-submit" style="width:100%; justify-content:center; padding:13px;">Authorize Access</button>
   </div>
 </div>
 
 <!-- Sidebar -->
 <aside id="sidebar">
-  <div class="sidebar-header">
-    <div class="sidebar-logo">
-      <div class="sidebar-logo-icon">M</div>
-      Inbox Manager
+  <div class="sidebar-brand">
+    <div class="brand-mark">
+      <svg viewBox="0 0 20 20"><path d="M10 2L2 7v6l8 5 8-5V7L10 2zm0 2.5l5.5 3.25L10 11 4.5 7.75 10 4.5zM3.5 9.2l5.5 3.3V17l-5.5-3.5V9.2zm7 3.3l5.5-3.3v4.3L10.5 17V12.5z"/></svg>
     </div>
-    <div id="deploy-pill" style="font-size:10px; color:var(--text-muted); margin-top:8px; border-radius:100px; background:var(--panel-light); padding:4px 12px; display:inline-block;">🛰️ Connected</div>
-  </div>
-
-  <div class="nav-section">
-    <div class="nav-item active" id="nav-overview">
-      <span>📊 Activity Hub</span>
-      <span class="mono" style="font-size:10px; opacity:0.5">⌘1</span>
+    <div class="brand-text">
+      <div class="brand-name">Taboost</div>
+      <div class="brand-sub">Inbox Manager</div>
     </div>
   </div>
 
-  <div class="sidebar-label">16 Connected Talents</div>
-  <ul id="talent-list">
-    <!-- Talent items populated by JS -->
-  </ul>
+  <div id="deploy-pill" style="margin:10px 16px 0;">● Live</div>
+
+  <div class="sidebar-nav">
+    <button class="nav-btn active" id="nav-overview">
+      <span class="nb-icon">◈</span> Activity Hub
+    </button>
+  </div>
+
+  <div class="sidebar-divider"></div>
+  <div class="sidebar-section-label">Talent Inboxes</div>
+
+  <ul id="talent-list" style="list-style:none;"></ul>
 
   <div class="sidebar-footer">
-    <button class="btn-premium" id="btn-refresh">
-      <span>↻</span> Synchronize
-    </button>
+    <button class="btn-sync" id="btn-refresh">↻ &nbsp;Synchronize</button>
   </div>
 </aside>
 
-/* ── Main Dashboard (Overview) ────────────────────────────────────────────── */
-#view-overview {
-  flex: 1;
-  overflow-y: auto;
-  padding: 40px;
-  background: var(--bg);
-}
+<!-- Main -->
+<main id="main">
 
-.overview-grid {
-  display: grid;
-  grid-template-columns: 2fr 1fr;
-  gap: 32px;
-  max-width: 1400px;
-  margin: 0 auto;
-}
+  <!-- ── Overview ─────────────────────────────────────────────────────── -->
+  <div id="view-overview" style="display:none;">
+    <div class="ov-header fade-up">
+      <div class="ov-title">Activity Hub</div>
+      <div class="ov-date" id="report-date">—</div>
+    </div>
 
-.section-title {
-  font-size: 24px;
-  margin-bottom: 24px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-/* ── Activity Summary ─────────────────────────────────────────────────────── */
-.summary-bar {
-  display: flex;
-  gap: 16px;
-  margin-bottom: 32px;
-}
-
-.stat-card {
-  flex: 1;
-  padding: 24px;
-  border-radius: 16px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  transition: var(--transition);
-}
-
-.stat-card:hover { border-color: var(--primary); transform: translateY(-2px); }
-.stat-card .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; display: block; }
-.stat-card .value { font-size: 32px; font-weight: 700; color: #fff; }
-
-.stat-card.primary .value { color: var(--primary); }
-.stat-card.success .value { color: var(--success); }
-.stat-card.warning .value { color: var(--warning); }
-.stat-card.danger .value { color: var(--danger); }
-
-/* ── Talent Grid ──────────────────────────────────────────────────────────── */
-#talent-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-}
-
-.talent-card {
-  padding: 24px;
-  border-radius: 16px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.talent-card:hover { background: var(--panel-light); border-color: var(--primary); }
-
-.card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
-.card-info h3 { font-size: 16px; margin-bottom: 4px; }
-.card-info p { font-size: 12px; color: var(--text-muted); }
-
-.card-stats { display: flex; gap: 8px; margin-bottom: 16px; }
-.pill { padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; }
-.pill.good { background: rgba(16, 185, 129, 0.1); color: var(--success); }
-.pill.uncert { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
-.pill.fail { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
-
-/* ── Instruction Panel ─────────────────────────────────────────────────────── */
-#context-panel {
-  padding: 24px;
-  border-radius: 16px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-}
-
-.instruction-item {
-  padding: 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  margin-bottom: 12px;
-  font-size: 13px;
-  line-height: 1.5;
-  position: relative;
-}
-
-.instruction-item .meta { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
-
-/* ── Gmail Command View ────────────────────────────────────────────────────── */
-#view-gmail {
-  flex: 1;
-  display: flex !important;
-  flex-direction: column;
-  background: var(--bg);
-}
-
-.top-nav {
-  height: 64px;
-  display: flex;
-  align-items: center;
-  padding: 0 24px;
-  border-bottom: 1px solid var(--border);
-  gap: 24px;
-}
-
-.back-link {
-  color: var(--text-muted);
-  font-size: 13px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  cursor: pointer;
-  transition: var(--transition);
-}
-
-.back-link:hover { color: #fff; }
-
-.search-container {
-  flex: 1;
-  max-width: 600px;
-  position: relative;
-}
-
-.search-container input {
-  width: 100%;
-  padding: 10px 16px 10px 40px;
-  background: var(--panel-light);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: #fff;
-  font-family: var(--sans);
-  outline: none;
-}
-
-.search-container::before {
-  content: '🔍';
-  position: absolute;
-  left: 14px;
-  top: 50%;
-  transform: translateY(-50%);
-  font-size: 14px;
-  opacity: 0.5;
-}
-
-/* ── Three Column Split ───────────────────────────────────────────────────── */
-.split-view {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-/* Middle: Email List */
-.email-feed {
-  width: 400px;
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  background: var(--bg);
-}
-
-.feed-header {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  gap: 8px;
-}
-
-.feed-tab {
-  padding: 6px 12px;
-  border-radius: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-muted);
-  cursor: pointer;
-}
-
-.feed-tab.active { background: var(--panel-light); color: #fff; }
-
-.email-row {
-  padding: 16px 20px;
-  border-bottom: 1px solid var(--border);
-  cursor: pointer;
-  transition: var(--transition);
-  position: relative;
-}
-
-.email-row:hover { background: var(--panel-light); }
-.email-row.active { background: rgba(59, 130, 246, 0.15); border-left: 3px solid var(--primary); }
-
-.row-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
-.row-sender { font-size: 14px; font-weight: 600; color: #fff; }
-.row-date { font-size: 11px; color: var(--text-muted); }
-.row-subject { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.row-snippet { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-/* Right: Reading Pane & Composer */
-.reader {
-  flex: 1;
-  overflow-y: auto;
-  padding: 40px;
-  background: var(--bg);
-}
-
-.thread-header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
-.thread-header h1 { font-size: 24px; margin-bottom: 16px; }
-
-.message-card {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 16px;
-  padding: 24px;
-  margin-bottom: 24px;
-}
-
-.message-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
-.avatar-large { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; }
-
-.message-body { font-size: 15px; line-height: 1.6; color: var(--text); }
-
-/* AI Composer */
-.ai-composer {
-  margin-top: 40px;
-  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.05));
-  border: 1px solid var(--primary-glow);
-  border-radius: 16px;
-  padding: 24px;
-  position: relative;
-}
-
-.ai-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
-.ai-badge { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--primary); }
-
-.ai-body textarea {
-  width: 100%;
-  background: rgba(0,0,0,0.2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px;
-  color: #fff;
-  font-family: var(--sans);
-  font-size: 14px;
-  line-height: 1.6;
-  min-height: 200px;
-  outline: none;
-}
-
-.ai-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
-
-.btn-action { padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--transition); border: none; }
-.btn-action.primary { background: var(--primary); color: white; }
-.btn-action.secondary { background: var(--panel-light); color: #fff; border: 1px solid var(--border); }
-.btn-action:hover { opacity: 0.9; transform: scale(1.02); }
-
-/* ── Toast & Overlays ─────────────────────────────────────────────────────── */
-#toast {
-  position: fixed;
-  bottom: 32px;
-  right: 32px;
-  padding: 14px 24px;
-  border-radius: 12px;
-  background: #fff;
-  color: #000;
-  font-weight: 600;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-  z-index: 1000;
-  display: none;
-  animation: slideUp 0.3s ease-out;
-}
-
-@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-
-</style>
-</head>
-<body>
-
-<!-- AI API key overlay -->
-<div id="api-key-overlay" style="display:none">
-  <!-- (Retained design from previous step) -->
-</div>
-
-<!-- Main UI -->
-<div id="app-shell" style="display: flex; width: 100%; height: 100vh;">
-  
-  <!-- Sidebar Navigator (Step 1) -->
-  <!-- [SIDEBAR FROM PREVIOUS STEP] -->
-
-  <!-- Main Content Area -->
-  <main id="main">
-
-    <!-- Activity Hub / Overview -->
-    <div id="view-overview" style="display:none">
-      <div class="overview-header animate-fade">
-        <h1 class="section-title">📊 Activity Hub</h1>
-        <div class="summary-bar">
-          <div class="stat-card primary">
-            <span class="label">Total Managed</span>
-            <div class="value" id="total-all">—</div>
-          </div>
-          <div class="stat-card success">
-            <span class="label">High Value</span>
-            <div class="value" id="total-good">—</div>
-          </div>
-          <div class="stat-card warning">
-            <span class="label">Uncertain</span>
-            <div class="value" id="total-uncert">—</div>
-          </div>
-          <div class="stat-card danger">
-            <span class="label">Filtered</span>
-            <div class="value" id="total-trash">—</div>
-          </div>
-        </div>
+    <div class="stat-row fade-up">
+      <div class="stat-card">
+        <div class="stat-label">Total Managed</div>
+        <div class="stat-value" id="total-all">—</div>
       </div>
+      <div class="stat-card s-green">
+        <div class="stat-label">High Value Deals</div>
+        <div class="stat-value" id="total-good">—</div>
+      </div>
+      <div class="stat-card s-amber">
+        <div class="stat-label">Needs Review</div>
+        <div class="stat-value" id="total-uncert">—</div>
+      </div>
+      <div class="stat-card s-red">
+        <div class="stat-label">AI Filtered</div>
+        <div class="stat-value" id="total-trash">—</div>
+      </div>
+    </div>
 
-      <div class="overview-grid animate-fade">
-        <div class="talent-section">
-          <h2 class="section-title" style="font-size: 18px;">Talent Performance</h2>
-          <div id="talent-cards-grid"></div>
-        </div>
-        
-        <div class="instruction-section">
-          <h2 class="section-title" style="font-size: 18px;">Global Instructions</h2>
-          <div id="context-panel">
-            <div id="context-list"></div>
-            <div class="context-add" style="margin-top:20px;">
-              <textarea id="context-input" placeholder="Update AI strategy..." rows="3" style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:12px; color:#fff; padding:12px; font-size:13px;"></textarea>
-              <button class="btn-action primary" id="btn-add-context" style="width:100%; margin-top:12px;">Update Strategy</button>
-            </div>
+    <div class="ov-grid fade-up">
+      <div>
+        <div class="section-head">Talent Performance</div>
+        <div id="talent-cards-grid"></div>
+      </div>
+      <div>
+        <div class="section-head">Global AI Instructions</div>
+        <div class="ctx-panel">
+          <div id="context-list"></div>
+          <div class="ctx-add-area">
+            <textarea id="context-input" class="ctx-textarea" rows="3" placeholder="Update AI strategy — e.g. always reply within 24h, push for exclusivity..."></textarea>
+            <button class="btn btn-primary" id="btn-add-context" style="width:100%; margin-top:10px; justify-content:center;">Save Instruction</button>
           </div>
         </div>
       </div>
     </div>
+  </div>
 
-    <!-- Gmail Command Center -->
-    <div id="view-gmail" style="display:none;">
-      <header class="top-nav">
-        <div class="back-link" id="gmail-back">← Back to Hub</div>
-        <div class="search-container">
-          <input type="text" placeholder="Search across communications..." id="gmail-search">
-        </div>
-        <div style="display:flex; gap:12px;">
-           <button class="btn-action secondary" onclick="openRealGmail()">Open Gmail</button>
-           <button class="btn-action primary" id="btn-run-ai" onclick="runAiDraft()">✨ Run AI Draft</button>
-        </div>
-      </header>
+  <!-- ── Gmail view ────────────────────────────────────────────────────── -->
+  <div id="view-gmail" style="display:none; flex-direction:column;">
 
-      <div class="split-view">
-        <!-- Sidebar Navigation (Categories) -->
-        <div style="width:72px; border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding-top:20px; gap:20px; background:var(--bg);">
-           <div id="gnav-inbox" onclick="setGmailNav('inbox')" title="Inbox" style="cursor:pointer; font-size:20px;">📥</div>
-           <div id="gnav-drafts" onclick="setGmailNav('drafts')" title="Drafts" style="cursor:pointer; font-size:20px;">📝</div>
-           <div id="gnav-sent" onclick="setGmailNav('sent')" title="Sent" style="cursor:pointer; font-size:20px;">📤</div>
-        </div>
+    <header class="gmail-topbar">
+      <button class="back-btn" id="gmail-back">
+        <svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Hub
+      </button>
+      <div class="gmail-talent-id">
+        <div class="gmail-av" id="gmail-avatar">—</div>
+        <span id="gmail-talent-label">—</span>
+      </div>
+      <input type="text" class="topbar-search" id="gmail-search" placeholder="Search emails...">
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" onclick="openRealGmail()">Open Gmail ↗</button>
+        <button class="btn btn-primary" id="btn-run-ai" onclick="runAiDraft()">✦ Run AI Draft</button>
+      </div>
+    </header>
 
-        <div class="email-feed">
-          <div class="feed-header">
-            <div class="feed-tab active" id="tab-all" onclick="setScoreFilter(null)">All</div>
-            <div class="feed-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</div>
-            <div class="feed-tab" id="tab-uncert" onclick="setScoreFilter(2)">Misc</div>
-          </div>
-          <div id="email-rows" style="flex:1; overflow-y:auto;"></div>
-        </div>
+    <div class="gmail-split">
 
-        <div class="reader" id="gmail-reading-pane">
-           <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text-muted);">
-             <div style="font-size:48px; margin-bottom:16px;">📂</div>
-             Select a thread to view activity
-           </div>
+      <!-- Narrow nav: Inbox + Drafts only -->
+      <nav class="gmail-nav">
+        <div class="gnav-btn active" id="gnav-inbox" onclick="setGmailNav('inbox')">
+          <span class="gnav-icon">📥</span>
+          <span>Inbox</span>
+        </div>
+        <div class="gnav-btn" id="gnav-drafts" onclick="setGmailNav('drafts')">
+          <span class="gnav-icon">✏️</span>
+          <span>Drafts</span>
+        </div>
+      </nav>
+
+      <!-- Email list -->
+      <div class="email-col">
+        <div class="email-col-header" id="filter-bar">
+          <button class="filter-tab active" id="tab-all" onclick="setScoreFilter(null)">All</button>
+          <button class="filter-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</button>
+          <button class="filter-tab" id="tab-uncert" onclick="setScoreFilter(2)">Review</button>
+        </div>
+        <div id="email-rows"></div>
+      </div>
+
+      <!-- Reading pane -->
+      <div class="reader-pane" id="gmail-reading-pane">
+        <div class="reading-placeholder">
+          <div class="rp-icon">📂</div>
+          <div class="rp-text">Select an email to read it</div>
         </div>
       </div>
-    </div>
-  </main>
-</div>
 
-<!-- Toast -->
+    </div>
+  </div>
+
+</main>
+
 <div id="toast"></div>
 
 <script>
@@ -662,9 +676,9 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
 let API_KEY = localStorage.getItem('inbox_api_key') || '';
 
 const state = {
-  view: 'overview',       // 'overview' | 'gmail'
-  gmailNav: 'inbox',      // 'inbox' | 'drafts' | 'sent' | 'starred' | 'trash' | 'all'
-  scoreFilter: null,      // null | 1 | 2 | 3
+  view: 'overview',
+  gmailNav: 'inbox',   // 'inbox' | 'drafts'
+  scoreFilter: null,
   selectedTalent: null,
   selectedEmail: null,
   selectedDraft: null,
@@ -675,12 +689,9 @@ const state = {
   context: [],
 };
 
-// ── API helper ─────────────────────────────────────────────────────────────
+// ── API ────────────────────────────────────────────────────────────────────
 async function api(method, path, body = null) {
-  const opts = {
-    method,
-    headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' },
-  };
+  const opts = { method, headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   let res;
   try { res = await fetch(path, opts); }
@@ -695,11 +706,7 @@ async function api(method, path, body = null) {
     let msg;
     try { const j = await res.json(); msg = j.detail || j.message || res.statusText; }
     catch (_) { msg = res.statusText; }
-    if (res.status === 503) {
-      showToast('⚠️ Gmail API temporarily unavailable. Try again in a few minutes.');
-    } else {
-      showToast('Error ' + res.status + ': ' + String(msg).slice(0, 120));
-    }
+    if (res.status !== 503) showToast('Error ' + res.status + ': ' + String(msg).slice(0, 120));
     throw new Error(msg);
   }
   return res.json();
@@ -711,86 +718,75 @@ function esc(s) {
   return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 function fmtDate(email) {
-  // Prefer actual email send date; fall back to our processing timestamp
   const iso = email.email_date || email.processed_at;
   if (!iso) return '';
-  // The DB stores UTC without 'Z', so append it for correct parsing
   const raw = iso.endsWith('Z') ? iso : iso + 'Z';
   const d = new Date(raw);
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  const isThisYear = d.getFullYear() === now.getFullYear();
-  if (isToday) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-  if (isThisYear) return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  if (d.toDateString() === now.toDateString())
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  if (d.getFullYear() === now.getFullYear())
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 function fmtDateFull(email) {
   const iso = email.email_date || email.processed_at;
   if (!iso) return '';
   const raw = iso.endsWith('Z') ? iso : iso + 'Z';
-  const d = new Date(raw);
-  return d.toLocaleString('en-US', {
+  return new Date(raw).toLocaleString('en-US', {
     weekday: 'short', month: 'short', day: 'numeric',
     year: 'numeric', hour: '2-digit', minute: '2-digit',
   });
 }
 function fmtDateIso(iso) {
-  // Simple helper for non-email timestamps (context entries, etc.)
   if (!iso) return '';
   const raw = iso.endsWith('Z') ? iso : iso + 'Z';
   const d = new Date(raw);
   const now = new Date();
-  const isToday = d.toDateString() === now.toDateString();
-  if (isToday) return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+  if (d.toDateString() === now.toDateString())
+    return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
-function shortSender(sender) {
-  if (!sender) return 'Unknown';
-  // "Display Name <email@domain>" or Display Name <email@domain>
-  const nameMatch = sender.match(/^"?([^"<]+?)"?\s*<[^>]+>/);
-  if (nameMatch) {
-    const name = nameMatch[1].trim().replace(/^["']|["']$/g, '');
-    if (name.length > 0) return name;
-  }
-  // bare email — use local part before @
-  const emailMatch = sender.match(/([^@\s<>]+)@/);
-  if (emailMatch) return emailMatch[1].replace(/[._-]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  return sender.slice(0, 30) || 'Unknown';
+function shortSender(s) {
+  if (!s) return 'Unknown';
+  const nm = s.match(/^"?([^"<]+?)"?\s*<[^>]+>/);
+  if (nm) { const n = nm[1].trim().replace(/^["']|["']$/g,''); if (n) return n; }
+  const em = s.match(/([^@\s<>]+)@/);
+  if (em) return em[1].replace(/[._-]/g,' ').replace(/\b\w/g,c=>c.toUpperCase());
+  return s.slice(0,30) || 'Unknown';
 }
-function scoreClass(score) {
-  if (score == null) return 'uncert';
-  return score === 3 ? 'good' : score === 1 ? 'trash' : 'uncert';
+function scoreDotClass(score) {
+  if (score == null) return 'pending';
+  return score === 3 ? 'good' : score === 2 ? 'misc' : 'pending';
 }
-function scoreName(score) {
+function scoreLabel(score) {
   if (score == null) return 'Pending';
-  return score === 3 ? 'Good' : score === 1 ? 'Trash' : 'Uncertain';
+  return score === 3 ? 'Deal' : score === 2 ? 'Review' : 'Filtered';
 }
-function initial(name) {
-  if (!name) return '?';
-  return name.trim()[0].toUpperCase();
+function scorePillClass(score) {
+  if (score == null) return 'misc';
+  return score === 3 ? 'good' : score === 2 ? 'misc' : 'filtered';
 }
+function initial(name) { return name?.trim()[0]?.toUpperCase() || '?'; }
 function formatRate(r) {
   if (r == null) return '—';
   return '$' + Number(r).toLocaleString('en-US', { maximumFractionDigits: 0 });
 }
 
 // ── Toast ──────────────────────────────────────────────────────────────────
-let toastTimer;
+let _toastTimer;
 function showToast(msg) {
   const t = document.getElementById('toast');
   t.textContent = msg;
   t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
 // ── API key overlay ────────────────────────────────────────────────────────
-function showApiKeyOverlay() {
-  document.getElementById('api-key-overlay').style.display = 'flex';
-}
-function hideApiKeyOverlay() {
-  document.getElementById('api-key-overlay').style.display = 'none';
-}
+function showApiKeyOverlay() { document.getElementById('api-key-overlay').style.display = 'flex'; }
+function hideApiKeyOverlay() { document.getElementById('api-key-overlay').style.display = 'none'; }
+
 document.getElementById('btn-api-submit').addEventListener('click', () => {
   const val = document.getElementById('api-key-input').value.trim();
   if (!val) return;
@@ -799,7 +795,7 @@ document.getElementById('btn-api-submit').addEventListener('click', () => {
   hideApiKeyOverlay();
   bootstrap();
 });
-document.getElementById('api-key-input').addEventListener('keydown', (e) => {
+document.getElementById('api-key-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') document.getElementById('btn-api-submit').click();
 });
 
@@ -807,7 +803,6 @@ document.getElementById('api-key-input').addEventListener('keydown', (e) => {
 async function bootstrap() {
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
-  // Auto-refresh: overview every 60s, gmail view every 30s (silent, no toast)
   setInterval(() => {
     if (state.view === 'overview') loadOverview();
     else if (state.view === 'gmail' && state.selectedTalent) loadTalentData(state.selectedTalent, true);
@@ -830,25 +825,17 @@ async function loadOverview() {
     renderTalentCards();
     renderContextPanel();
     showView('overview');
-  } catch (e) {
-    // Already handled by api()
-  }
+  } catch (_) {}
 }
 
 function showView(name) {
   state.view = name;
   document.getElementById('view-overview').style.display = name === 'overview' ? '' : 'none';
-  const gmailEl = document.getElementById('view-gmail');
-  if (name === 'gmail') {
-    gmailEl.style.display = 'flex';
-  } else {
-    gmailEl.style.display = 'none';
-  }
-  // Update nav highlight
+  const gv = document.getElementById('view-gmail');
+  gv.style.display = name === 'gmail' ? 'flex' : 'none';
   document.getElementById('nav-overview').classList.toggle('active', name === 'overview');
-  document.querySelectorAll('.talent-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.key === state.selectedTalent?.key && name === 'gmail');
-  });
+  document.querySelectorAll('.talent-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.key === state.selectedTalent?.key && name === 'gmail'));
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -856,19 +843,17 @@ function renderSidebar() {
   const ul = document.getElementById('talent-list');
   ul.innerHTML = '';
   const pendingMap = {};
-  if (state.report) {
-    state.report.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_drafts; });
-  }
+  state.report?.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_drafts; });
   state.talents.forEach(t => {
     const pending = pendingMap[t.key] || 0;
     const li = document.createElement('li');
     li.className = 'talent-item';
     li.dataset.key = t.key;
     li.innerHTML = `
-      <div class="talent-avatar">${initial(t.full_name)}</div>
-      <span class="talent-name">${esc(t.full_name)}</span>
-      ${pending > 0 ? `<div style="background:var(--primary); color:white; font-size:10px; font-weight:700; padding:2px 6px; border-radius:10px; margin-left:auto;">${pending}</div>` : ''}
-      <div class="talent-status ${t.connected ? 'status-online' : 'status-offline'}" style="margin-left: ${pending > 0 ? '8px' : 'auto'}"></div>
+      <div class="t-avatar">${initial(t.full_name)}</div>
+      <span class="t-name">${esc(t.full_name)}</span>
+      ${pending > 0 ? `<span class="t-badge">${pending}</span>` : ''}
+      <div class="t-dot ${t.connected ? 'online' : 'offline'}"></div>
     `;
     li.addEventListener('click', () => openTalentView(t));
     ul.appendChild(li);
@@ -893,29 +878,25 @@ function renderTalentCards() {
   if (!state.report) return;
   state.report.talents.forEach(card => {
     const div = document.createElement('div');
-    div.className = 'talent-card';
+    div.className = 'talent-card fade-up';
     const bestDeal = card.best_deal_brand
       ? `<strong>${esc(card.best_deal_brand)}</strong> · ${formatRate(card.best_deal_rate)}`
-      : 'No deals today';
+      : '<span style="color:var(--text-3)">No deals this week</span>';
     div.innerHTML = `
-      <div class="card-top">
-        <div class="card-info">
-          <h3>${esc(card.full_name)}</h3>
-          <p>${esc(card.manager || 'No manager assigned')}</p>
+      <div class="tc-top">
+        <div>
+          <div class="tc-name">${esc(card.full_name)}</div>
+          <div class="tc-manager">${esc(card.manager || 'No manager')}</div>
         </div>
-        <div class="talent-avatar" style="width:32px; height:32px;">${initial(card.full_name)}</div>
+        <div class="tc-av">${initial(card.full_name)}</div>
       </div>
-      <div class="card-stats">
-        <span class="pill good">${card.count_good} High</span>
-        <span class="pill uncert">${card.count_uncertain} Misc</span>
-        <span class="pill fail">${card.count_trash} Filtered</span>
+      <div class="tc-pills">
+        <span class="pill good">${card.count_good} Deals</span>
+        <span class="pill misc">${card.count_uncertain} Review</span>
+        <span class="pill filtered">${card.count_trash} Filtered</span>
+        ${card.pending_drafts > 0 ? `<span class="pill red">${card.pending_drafts} Draft${card.pending_drafts > 1 ? 's' : ''}</span>` : ''}
       </div>
-      <div style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">Top Op: <span style="color:#fff">${bestDeal}</span></div>
-      <div class="card-footer">
-        ${card.pending_drafts > 0
-          ? `<span class="pill" style="background:rgba(59, 130, 246, 0.2); color:var(--primary);">${card.pending_drafts} AI Draft${card.pending_drafts > 1 ? 's' : ''}</span>`
-          : '<span style="font-size:11px; color:var(--text-muted)">Ready for sync</span>'}
-      </div>
+      <div class="tc-deal">Top: ${bestDeal}</div>
     `;
     const talentObj = state.talents.find(t => t.key === card.talent_key);
     div.addEventListener('click', () => { if (talentObj) openTalentView(talentObj); });
@@ -928,26 +909,26 @@ function renderContextPanel() {
   const list = document.getElementById('context-list');
   list.innerHTML = '';
   if (state.context.length === 0) {
-    list.innerHTML = '<p class="muted-text" style="font-style:italic">No instructions yet.</p>';
+    list.innerHTML = '<div style="font-size:12px;color:var(--text-3);font-style:italic;margin-bottom:12px;">No instructions yet.</div>';
     return;
   }
   state.context.forEach(entry => {
     const div = document.createElement('div');
-    div.className = 'context-entry';
+    div.className = 'ctx-item';
     div.innerHTML = `
-      <div style="flex:1">
-        <div class="context-entry-text">${esc(entry.text)}</div>
-        <div class="context-entry-meta">Added by ${esc(entry.added_by || 'unknown')} · ${fmtDateIso(entry.added_at)}</div>
+      <div class="ctx-item-text">
+        <div>${esc(entry.text)}</div>
+        <div class="ctx-item-meta">Added by ${esc(entry.added_by || 'unknown')} · ${fmtDateIso(entry.added_at)}</div>
       </div>
-      <button class="btn-del" data-id="${entry.id}" title="Remove">×</button>
+      <button class="ctx-del" data-id="${entry.id}" title="Remove">×</button>
     `;
-    div.querySelector('.btn-del').addEventListener('click', () => removeContext(entry.id));
+    div.querySelector('.ctx-del').addEventListener('click', () => removeContext(entry.id));
     list.appendChild(div);
   });
 }
 
 document.getElementById('btn-add-context').addEventListener('click', addContext);
-document.getElementById('context-input').addEventListener('keydown', (e) => {
+document.getElementById('context-input').addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.metaKey) addContext();
 });
 
@@ -960,8 +941,8 @@ async function addContext() {
     input.value = '';
     state.context = await api('GET', '/api/dashboard/context');
     renderContextPanel();
-    showToast('Instruction added — takes effect on next poll.');
-  } catch (e) {}
+    showToast('Instruction saved — takes effect on next poll.');
+  } catch (_) {}
 }
 
 async function removeContext(id) {
@@ -970,20 +951,17 @@ async function removeContext(id) {
     state.context = await api('GET', '/api/dashboard/context');
     renderContextPanel();
     showToast('Instruction removed.');
-  } catch (e) {}
+  } catch (_) {}
 }
 
-// ── Nav ────────────────────────────────────────────────────────────────────
+// ── Nav buttons ────────────────────────────────────────────────────────────
 document.getElementById('nav-overview').addEventListener('click', async () => {
   state.selectedTalent = null;
   await loadOverview();
 });
 document.getElementById('btn-refresh').addEventListener('click', async () => {
-  if (state.view === 'gmail' && state.selectedTalent) {
-    await loadTalentData(state.selectedTalent);
-  } else {
-    await loadOverview();
-  }
+  if (state.view === 'gmail' && state.selectedTalent) await loadTalentData(state.selectedTalent);
+  else await loadOverview();
   showToast('Refreshed.');
 });
 document.getElementById('gmail-back').addEventListener('click', async () => {
@@ -991,38 +969,32 @@ document.getElementById('gmail-back').addEventListener('click', async () => {
   await loadOverview();
 });
 
-// ── Gmail nav + score filter ───────────────────────────────────────────────
+// ── Gmail nav ──────────────────────────────────────────────────────────────
 function setGmailNav(nav) {
   state.gmailNav = nav;
   state.selectedEmail = null;
   state.selectedDraft = null;
-  ['inbox','sent','drafts'].forEach(n => {
+  ['inbox','drafts'].forEach(n => {
     const el = document.getElementById('gnav-' + n);
     if (el) el.classList.toggle('active', n === nav);
   });
-  // Show/hide score filter tabs — only relevant in inbox
-  const filterBar = document.querySelector('.feed-header');
-  if (filterBar) filterBar.style.display = (nav === 'inbox') ? '' : 'none';
+  const fb = document.getElementById('filter-bar');
+  if (fb) fb.style.display = nav === 'inbox' ? '' : 'none';
   resetReadingPane();
-  // Inbox pulls live from Gmail; switching to/from it needs a fresh fetch
-  if (state.selectedTalent) {
-    loadTalentData(state.selectedTalent, true);
-  } else {
-    renderEmailList();
-  }
+  if (state.selectedTalent) loadTalentData(state.selectedTalent, true);
+  else renderEmailList();
 }
 
 function setScoreFilter(score) {
   state.scoreFilter = score;
-  // Update tab pills
-  document.querySelectorAll('.gmail-tab-pill').forEach(b => b.classList.remove('active'));
-  const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert', 1: 'tab-trash' };
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert' };
   const el = document.getElementById(ids[score]);
   if (el) el.classList.add('active');
   renderEmailList();
 }
 
-// ── Talent Gmail view ──────────────────────────────────────────────────────
+// ── Talent view ────────────────────────────────────────────────────────────
 async function openTalentView(talent) {
   state.selectedTalent = talent;
   state.selectedEmail = null;
@@ -1030,53 +1002,44 @@ async function openTalentView(talent) {
   state.gmailNav = 'inbox';
   state.scoreFilter = null;
 
-  // Reset UI chrome
   document.getElementById('gmail-avatar').textContent = initial(talent.full_name);
   document.getElementById('gmail-talent-label').textContent = talent.email || talent.full_name;
   document.getElementById('gmail-search').value = '';
   resetReadingPane();
 
-  // Nav + tab pill highlights (no render yet — loadTalentData will render)
-  ['inbox','sent','drafts'].forEach(n => {
+  ['inbox','drafts'].forEach(n => {
     const el = document.getElementById('gnav-' + n);
     if (el) el.classList.toggle('active', n === 'inbox');
   });
-  const filterBar = document.querySelector('.feed-header');
-  if (filterBar) filterBar.style.display = '';
-  document.querySelectorAll('.gmail-tab-pill').forEach(b => b.classList.remove('active'));
+  const fb = document.getElementById('filter-bar');
+  if (fb) fb.style.display = '';
+  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-all').classList.add('active');
 
   showView('gmail');
-  document.querySelectorAll('.talent-item').forEach(el => {
-    el.classList.toggle('active', el.dataset.key === talent.key);
-  });
+  document.querySelectorAll('.talent-item').forEach(el =>
+    el.classList.toggle('active', el.dataset.key === talent.key));
 
   await loadTalentData(talent);
 }
 
 async function loadTalentData(talent, silent = false) {
   const nav = state.gmailNav;
-  const isDrafts = nav === 'drafts';
-  const isInbox = nav === 'inbox';
   if (!silent) {
-    document.getElementById('email-rows').innerHTML =
-      `<div class="gmail-empty-state"><span class="spinner"></span>&nbsp; Loading ${isDrafts ? 'drafts' : 'inbox'}...</div>`;
+    document.getElementById('email-rows').innerHTML = `
+      <div class="empty-state">
+        <span class="spinner"></span>
+        <span class="es-text">Loading ${nav === 'drafts' ? 'drafts' : 'inbox'}…</span>
+      </div>`;
   }
   try {
-    if (isDrafts) {
-      // Live Gmail drafts — fetch real drafts folder directly
+    if (nav === 'drafts') {
       const liveDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts/live`);
       state.emails = [];
       state.drafts = liveDrafts;
-    } else if (nav === 'sent') {
-      const sent = await api('GET', `/api/dashboard/talents/${talent.key}/sent`);
-      state.emails = sent;
-      state.drafts = [];
     } else {
       const [emails, drafts] = await Promise.all([
-        api('GET', isInbox
-          ? `/api/dashboard/talents/${talent.key}/inbox/live`
-          : `/api/dashboard/talents/${talent.key}/emails`),
+        api('GET', `/api/dashboard/talents/${talent.key}/inbox/live`),
         api('GET', `/api/dashboard/talents/${talent.key}/drafts`),
       ]);
       state.emails = emails;
@@ -1086,57 +1049,52 @@ async function loadTalentData(talent, silent = false) {
     if (!silent) resetReadingPane();
   } catch (e) {
     resetReadingPane();
-    const isNotConnected = e.message && (e.message.includes('not connected') || e.message.includes('400') || e.message.includes('token'));
-    if (isNotConnected) {
-      const connectUrl = `/auth/connect?talent_key=${encodeURIComponent(talent.key)}`;
+    const notConn = e.message && (e.message.includes('not connected') || e.message.includes('400'));
+    if (notConn) {
+      const url = `/auth/connect?talent_key=${encodeURIComponent(talent.key)}`;
       document.getElementById('email-rows').innerHTML = `
-        <div class="gmail-empty-state" style="flex-direction:column;gap:16px;padding:48px 24px">
-          <div style="font-size:40px">📭</div>
-          <div style="font-size:15px;font-weight:600;color:var(--text)">Gmail not connected for ${esc(talent.full_name)}</div>
-          <div style="font-size:13px;color:var(--text3);max-width:320px;text-align:center">Connect their Gmail account to start syncing emails and running AI triage automatically.</div>
-          <a href="${connectUrl}" target="_blank" style="display:inline-flex;align-items:center;gap:8px;padding:10px 24px;background:#1a73e8;color:#fff;border-radius:6px;font-size:13px;font-weight:600;text-decoration:none;font-family:var(--sans)">🔗 Connect Gmail</a>
+        <div class="empty-state" style="gap:16px;padding:60px 24px;">
+          <div class="es-icon">📭</div>
+          <div style="font-size:14px;font-weight:600;color:var(--text)">Gmail not connected</div>
+          <div class="es-text">Connect ${esc(talent.full_name)}'s Gmail to start syncing and running AI triage.</div>
+          <a href="${url}" target="_blank" style="padding:9px 22px;background:var(--red);color:#fff;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">Connect Gmail →</a>
         </div>`;
     } else {
       document.getElementById('email-rows').innerHTML =
-        `<div class="gmail-empty-state" style="color:#d93025">⚠️ ${esc(e.message.slice(0,120))}</div>`;
+        `<div class="empty-state"><div class="es-text" style="color:var(--red);">⚠ ${esc(String(e.message).slice(0,120))}</div></div>`;
     }
   }
 }
 
 // ── Email list ─────────────────────────────────────────────────────────────
 function getVisibleEmails() {
-  let visible = state.emails;
-  if (state.scoreFilter != null && state.gmailNav === 'inbox') {
-    visible = visible.filter(e => e.score === state.scoreFilter);
-  }
-  return visible;
+  let v = state.emails;
+  if (state.scoreFilter != null && state.gmailNav === 'inbox')
+    v = v.filter(e => e.score === state.scoreFilter);
+  return v;
 }
 
 function renderEmailList() {
   const rows = document.getElementById('email-rows');
   rows.innerHTML = '';
 
-  // Use state variables for display
-  const visible = getVisibleEmails();
-  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
-
   if (state.gmailNav === 'drafts') {
     if (state.drafts.length === 0) {
-      rows.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);"><div style="font-size:32px; margin-bottom:12px;">✏️</div>No drafts available</div>`;
+      rows.innerHTML = `<div class="empty-state"><div class="es-icon">✏️</div><div class="es-text">No drafts yet.<br>Run AI Draft on an inbox email to generate one.</div></div>`;
       return;
     }
     state.drafts.forEach(draft => {
-      const isEscalate = draft.is_escalate;
+      const isAi = !!draft.is_escalate !== undefined && draft.db_draft_id != null;
       const div = document.createElement('div');
-      div.className = 'email-row animate-fade';
+      div.className = 'email-row fade-up';
       div.dataset.draftGmailId = draft.gmail_draft_id;
       div.innerHTML = `
-        <div class="row-top">
-          <span class="row-sender">To: ${esc(shortSender(draft.to || draft.sender || ''))}</span>
-          <span class="pill ${isEscalate ? 'fail' : 'good'}" style="font-size:9px;">${isEscalate ? 'ESCALATE' : 'AI DRAFT'}</span>
+        <div class="er-top">
+          <span class="er-sender">To: ${esc(shortSender(draft.to || draft.sender || ''))}</span>
+          <span class="pill ${draft.is_escalate ? 'filtered' : 'red'}" style="font-size:9px;">${draft.is_escalate ? 'ESCALATE' : 'AI DRAFT'}</span>
         </div>
-        <div class="row-subject">${esc(draft.subject || '(no subject)')}</div>
-        <div class="row-snippet">${esc(draft.snippet || draft.brand_name || '')}</div>
+        <div class="er-subject">${esc(draft.subject || '(no subject)')}</div>
+        <div class="er-meta">${esc(draft.snippet || draft.brand_name || '')}</div>
       `;
       div.addEventListener('click', () => selectDraft(draft));
       rows.appendChild(div);
@@ -1144,32 +1102,29 @@ function renderEmailList() {
     return;
   }
 
+  const visible = getVisibleEmails();
   if (visible.length === 0) {
-    const emptyMsg = state.gmailNav === 'sent'
-      ? 'No sent replies yet — approve a draft to send the first one.'
-      : 'No emails here.';
-    rows.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);"><div style="font-size:32px; margin-bottom:12px;">📭</div>${emptyMsg}</div>`;
+    rows.innerHTML = `<div class="empty-state"><div class="es-icon">📭</div><div class="es-text">No emails here.</div></div>`;
     return;
   }
 
+  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
   visible.forEach(email => {
-    const sc = (email.score === 3) ? 'good' : (email.score === 2 ? 'uncert' : 'fail');
     const hasDraft = draftsIds.has(email.gmail_message_id);
     const div = document.createElement('div');
-    div.className = 'email-row animate-fade';
+    div.className = 'email-row fade-up';
     div.dataset.msgId = email.gmail_message_id;
-
-    const snippet = [email.offer_type, email.brand_name ? '· ' + email.brand_name : ''].filter(Boolean).join(' ');
+    const meta = [email.offer_type, email.brand_name].filter(Boolean).join(' · ');
     div.innerHTML = `
-      <div class="row-top">
-        <span class="row-sender">${esc(shortSender(email.sender))}</span>
-        <span class="row-date">${fmtDate(email)}</span>
+      <div class="er-top">
+        <span class="er-sender">${esc(shortSender(email.sender))}</span>
+        <span class="er-date">${fmtDate(email)}</span>
       </div>
-      <div class="row-subject">${esc(email.subject || '(no subject)')}</div>
-      <div class="row-snippet" style="display:flex; align-items:center; gap:8px;">
-        <span class="pill ${sc}" style="padding:2px 6px; font-size:9px;">${scoreName(email.score)}</span>
-        ${esc(snippet || email.triage_reason || '')}
-        ${hasDraft ? '<span style="color:var(--primary); border:1px solid var(--primary-glow); border-radius:4px; padding:0 4px; font-size:9px; font-weight:700;">DRAFT</span>' : ''}
+      <div class="er-subject">${esc(email.subject || '(no subject)')}</div>
+      <div class="er-meta">
+        <span class="score-dot ${scoreDotClass(email.score)}"></span>
+        ${esc(meta || email.triage_reason || scoreLabel(email.score))}
+        ${hasDraft ? '<span class="draft-badge">DRAFT</span>' : ''}
       </div>
     `;
     div.addEventListener('click', () => selectEmail(email));
@@ -1177,51 +1132,47 @@ function renderEmailList() {
   });
 }
 
+// ── Select draft (from drafts tab) ─────────────────────────────────────────
 function selectDraft(draft) {
   state.selectedDraft = draft;
   state.selectedEmail = null;
-  document.querySelectorAll('.email-row').forEach(r => {
-    r.classList.toggle('active', r.dataset.draftGmailId === draft.gmail_draft_id);
-  });
+  document.querySelectorAll('.email-row').forEach(r =>
+    r.classList.toggle('active', r.dataset.draftGmailId === draft.gmail_draft_id));
   renderDraftOnlyPane(draft);
 }
 
 function renderDraftOnlyPane(draft) {
   const pane = document.getElementById('gmail-reading-pane');
-  const textareaId = `draft-text-gmail-${draft.gmail_draft_id}`;
   const isEscalate = draft.is_escalate;
-
   pane.innerHTML = `
-    <div class="thread-header animate-fade">
-      <h1>${esc(draft.subject || '(no subject)')}</h1>
+    <div class="thread-head fade-up">
+      <div class="thread-subject">${esc(draft.subject || '(no subject)')}</div>
     </div>
-    <div class="ai-composer animate-fade">
-      <div class="ai-header">
-        <div class="ai-badge">✨ LIVE GMAIL DRAFT</div>
-        <span class="pill ${isEscalate ? 'fail' : 'good'}">${isEscalate ? 'ESCALATE' : 'DRAFT'}</span>
+    <div class="ai-composer fade-up">
+      <div class="ai-head">
+        <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT — LIVE GMAIL</div>
+        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
       </div>
-      <div style="margin-bottom:12px; font-size:12px; color:var(--text-muted);">To: <span style="color:#fff">${esc(draft.to || draft.sender)}</span></div>
-      <div class="ai-body">
-        <textarea id="${textareaId}">${esc(draft.body_text || '')}</textarea>
-      </div>
+      ${isEscalate ? `<div class="escalate-notice">⚠ ${esc(draft.escalate_reason || 'Manual review required before sending.')}</div>` : ''}
+      <div class="ai-to">To: <span>${esc(draft.to || draft.sender || '')}</span></div>
+      <textarea class="ai-textarea" id="at-${draft.gmail_draft_id}">${esc(draft.body_text || '')}</textarea>
       <div class="ai-footer">
-        <button class="btn-action secondary" onclick="resetReadingPane()">Close</button>
-        <button class="btn-action primary" id="btn-send-draft-${draft.gmail_draft_id}" ${isEscalate ? 'disabled' : ''}>Send Message ✉️</button>
+        <button class="btn btn-ghost" onclick="resetReadingPane()">Close</button>
+        <button class="btn btn-primary" id="bs-${draft.gmail_draft_id}" ${isEscalate ? 'disabled' : ''}>Send Reply ✉</button>
       </div>
     </div>
   `;
-  
   if (draft.db_draft_id) {
-    document.getElementById(`btn-send-draft-${draft.gmail_draft_id}`)?.addEventListener('click', () => sendDraft(draft.db_draft_id));
+    document.getElementById(`bs-${draft.gmail_draft_id}`)?.addEventListener('click', () => sendDraft(draft.db_draft_id));
   }
 }
 
+// ── Select email (from inbox) ──────────────────────────────────────────────
 function selectEmail(email) {
   state.selectedEmail = email;
   state.selectedDraft = state.drafts.find(d => d.gmail_message_id === email.gmail_message_id) || null;
-  document.querySelectorAll('.email-row').forEach(r => {
-    r.classList.toggle('active', r.dataset.msgId === email.gmail_message_id);
-  });
+  document.querySelectorAll('.email-row').forEach(r =>
+    r.classList.toggle('active', r.dataset.msgId === email.gmail_message_id));
   renderReadingPane(email, state.selectedDraft);
   fetchEmailBody(email);
 }
@@ -1229,65 +1180,63 @@ function selectEmail(email) {
 async function fetchEmailBody(email) {
   const bodyEl = document.getElementById(`msg-body-${email.gmail_message_id}`);
   if (!bodyEl) return;
-  // Use stored body_text if available
-  if (email.body_text && email.body_text.trim()) {
-    bodyEl.innerHTML = `<pre style="white-space:pre-wrap;font-family:var(--sans);font-size:14px;color:#202124;line-height:1.6">${esc(email.body_text)}</pre>`;
+  if (email.body_text?.trim()) {
+    bodyEl.innerHTML = `<div class="msg-body">${esc(email.body_text)}</div>`;
     return;
   }
-  // Live fetch from Gmail
   try {
     const r = await api('GET', `/api/dashboard/talents/${state.selectedTalent.key}/emails/${email.gmail_message_id}/body`);
     const body = r.body || '';
-    if (body.trim()) {
-      bodyEl.innerHTML = `<pre style="white-space:pre-wrap;font-family:var(--sans);font-size:14px;color:#202124;line-height:1.6">${esc(body)}</pre>`;
-    } else {
-      bodyEl.innerHTML = `<p style="color:#9aa0a6;font-size:13px;font-style:italic">No readable body content found.</p>`;
-    }
-  } catch (e) {
-    bodyEl.innerHTML = `<p style="color:#9aa0a6;font-size:13px;font-style:italic">Could not load email body.</p>`;
+    bodyEl.innerHTML = body.trim()
+      ? `<div class="msg-body">${esc(body)}</div>`
+      : `<div style="color:var(--text-3);font-size:13px;font-style:italic;">No readable body content.</div>`;
+  } catch (_) {
+    bodyEl.innerHTML = `<div style="color:var(--text-3);font-size:13px;font-style:italic;">Could not load body.</div>`;
   }
 }
 
 // ── Reading pane ───────────────────────────────────────────────────────────
 function resetReadingPane() {
-  const pane = document.getElementById('gmail-reading-pane');
-  pane.innerHTML = '<div class="reading-placeholder"><div class="icon">📧</div>Select an email to read it</div>';
+  document.getElementById('gmail-reading-pane').innerHTML = `
+    <div class="reading-placeholder">
+      <div class="rp-icon">📧</div>
+      <div class="rp-text">Select an email to read it</div>
+    </div>`;
 }
 
 function renderReadingPane(email, draft) {
   const pane = document.getElementById('gmail-reading-pane');
   const senderShort = shortSender(email.sender);
-  const sc = (email.score === 3) ? 'good' : (email.score === 2 ? 'uncert' : 'fail');
 
   pane.innerHTML = `
-    <div class="thread-header animate-fade">
-      <h1>${esc(email.subject || '(no subject)')}</h1>
-      <div style="display:flex; gap:12px;">
-        <button class="btn-action secondary" onclick="archiveEmail('${email.gmail_message_id}')">🗄️ Archive</button>
+    <div class="thread-head fade-up">
+      <div class="thread-subject">${esc(email.subject || '(no subject)')}</div>
+      <div class="thread-actions">
+        <button class="btn btn-ghost" onclick="archiveEmail('${email.gmail_message_id}')">Archive</button>
       </div>
     </div>
-    
-    <div class="message-card animate-fade">
-      <div class="message-meta">
-        <div class="avatar-large">${initial(senderShort)}</div>
+
+    <div class="msg-card fade-up">
+      <div class="msg-meta">
+        <div class="msg-av">${initial(senderShort)}</div>
         <div style="flex:1">
-          <div style="font-weight:600; font-size:16px;">${esc(senderShort)}</div>
-          <div style="color:var(--text-muted); font-size:12px;">&lt;${esc(email.sender)}&gt; · ${fmtDate(email)}</div>
+          <div class="msg-from">${esc(senderShort)}</div>
+          <div class="msg-addr">${esc(email.sender)} · ${fmtDate(email)}</div>
         </div>
-        <span class="pill ${sc}">${scoreName(email.score)}</span>
+        <span class="pill ${scorePillClass(email.score)}">${scoreLabel(email.score)}</span>
       </div>
-      
-      <div class="message-body" id="msg-body-${email.gmail_message_id}" style="white-space: pre-wrap; font-family:var(--sans);">
-        <p style="color:var(--text-muted); font-style:italic">Loading content...</p>
+
+      <div id="msg-body-${email.gmail_message_id}">
+        <div style="color:var(--text-3);font-size:13px;font-style:italic;">Loading…</div>
       </div>
-      
-      <div style="display:flex; gap:8px; margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
-        ${email.brand_name ? `<span class="pill good">🏷️ ${esc(email.brand_name)}</span>` : ''}
-        ${email.proposed_rate ? `<span class="pill" style="background:rgba(59, 130, 246, 0.1); color:var(--primary);">💰 ${formatRate(email.proposed_rate)}</span>` : ''}
-        ${email.offer_type ? `<span class="pill uncert">${esc(email.offer_type)}</span>` : ''}
+
+      <div class="msg-tags">
+        ${email.brand_name ? `<span class="pill good">🏷 ${esc(email.brand_name)}</span>` : ''}
+        ${email.proposed_rate ? `<span class="pill red">💰 ${formatRate(email.proposed_rate)}</span>` : ''}
+        ${email.offer_type ? `<span class="pill misc">${esc(email.offer_type)}</span>` : ''}
       </div>
     </div>
-    
+
     <div id="draft-compose-area"></div>
   `;
 
@@ -1295,10 +1244,7 @@ function renderReadingPane(email, draft) {
     renderDraftCompose(draft, email);
   } else if (email.score === 3) {
     document.getElementById('draft-compose-area').innerHTML = `
-      <div style="padding:32px; text-align:center; border:1px dashed var(--border); border-radius:16px; color:var(--text-muted); font-size:13px;">
-        AI drafting in progress. Check back soon.
-      </div>
-    `;
+      <div class="draft-pending-hint">AI drafting in progress — check back in a moment.</div>`;
   }
 }
 
@@ -1306,150 +1252,122 @@ function renderDraftCompose(draft, email) {
   const area = document.getElementById('draft-compose-area');
   if (!area) return;
   const isEscalate = draft.is_escalate;
-  const replySubject = 'Re: ' + (email.subject || '');
-
   area.innerHTML = `
-    <div class="ai-composer animate-fade">
-      <div class="ai-header">
-        <div class="ai-badge">✨ AI DRAFT COMPOSER</div>
-        <span class="pill ${isEscalate ? 'fail' : 'good'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
+    <div class="ai-composer fade-up">
+      <div class="ai-head">
+        <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT COMPOSER</div>
+        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
       </div>
-      
-      ${isEscalate ? `<div style="margin-bottom:16px; padding:12px; border-radius:10px; background:rgba(239,68,68,0.1); color:var(--danger); font-size:12px; border:1px solid var(--danger);">⚠️ ${esc(draft.escalate_reason || 'Manual review required.')}</div>` : ''}
-      
-      <div style="margin-bottom:12px; font-size:12px; color:var(--text-muted);">Reply to: <span style="color:#fff">${esc(draft.sender || email.sender)}</span></div>
-      
-      <div class="ai-body">
-        <textarea id="draft-text-${draft.id}">${esc(draft.draft_text)}</textarea>
-      </div>
-      
+      ${isEscalate ? `<div class="escalate-notice">⚠ ${esc(draft.escalate_reason || 'Manual review required.')}</div>` : ''}
+      <div class="ai-to">Reply to: <span>${esc(draft.sender || email.sender)}</span></div>
+      <textarea class="ai-textarea" id="draft-text-${draft.id}">${esc(draft.draft_text)}</textarea>
       <div class="ai-footer">
-        <button class="btn-action secondary" id="btn-discard-${draft.id}">Discard</button>
-        <button class="btn-action secondary" id="btn-save-${draft.id}">Save Edits</button>
-        <button class="btn-action primary" id="btn-send-${draft.id}" ${isEscalate ? 'disabled' : ''}>Send Message ✉️</button>
+        <button class="btn btn-ghost" id="btn-discard-${draft.id}">Discard</button>
+        <button class="btn btn-ghost" id="btn-save-${draft.id}">Save Edits</button>
+        <button class="btn btn-primary" id="btn-send-${draft.id}" ${isEscalate ? 'disabled' : ''}>Send Reply ✉</button>
       </div>
     </div>
   `;
-
   document.getElementById(`btn-send-${draft.id}`)?.addEventListener('click', () => sendDraft(draft.id));
   document.getElementById(`btn-save-${draft.id}`)?.addEventListener('click', () => saveDraft(draft.id));
   document.getElementById(`btn-discard-${draft.id}`)?.addEventListener('click', () => discardDraft(draft.id));
 }
 
-// ── Archive email ──────────────────────────────────────────────────────────
+// ── Archive ────────────────────────────────────────────────────────────────
 async function archiveEmail(gmailMsgId) {
   if (!state.selectedTalent) return;
   if (!confirm('Archive this email? It will be removed from the inbox.')) return;
   try {
     await api('POST', `/api/dashboard/talents/${state.selectedTalent.key}/emails/${gmailMsgId}/archive`);
-    showToast('Email archived.');
+    showToast('Archived.');
     resetReadingPane();
     await loadTalentData(state.selectedTalent);
-  } catch (e) {
-    showToast('Archive failed — ' + e.message);
-  }
+  } catch (e) { showToast('Archive failed — ' + e.message); }
 }
 
 // ── Draft actions ──────────────────────────────────────────────────────────
 async function sendDraft(draftId) {
-  if (!confirm('Send this reply from the talent\'s Gmail now?')) return;
+  if (!confirm("Send this reply from the talent's Gmail now?")) return;
   try {
     await api('POST', `/api/drafts/${draftId}/approve`, { reviewed_by: 'manager-dashboard' });
     showToast('Reply sent.');
     await loadTalentData(state.selectedTalent);
-  } catch (e) {}
+  } catch (_) {}
 }
-
 async function saveDraft(draftId) {
   const ta = document.getElementById(`draft-text-${draftId}`);
   if (!ta) return;
   try {
-    await api('POST', `/api/drafts/${draftId}/edit`, {
-      draft_text: ta.value,
-      reviewed_by: 'manager-dashboard',
-    });
-    showToast('Draft saved — changes reflected in Gmail drafts folder.');
+    await api('POST', `/api/drafts/${draftId}/edit`, { draft_text: ta.value, reviewed_by: 'manager-dashboard' });
+    showToast('Draft saved.');
     await loadTalentData(state.selectedTalent);
-  } catch (e) {}
+  } catch (_) {}
 }
-
 async function discardDraft(draftId) {
   if (!confirm('Permanently discard this draft?')) return;
   try {
     await api('POST', `/api/drafts/${draftId}/discard`, { reviewed_by: 'manager-dashboard' });
     showToast('Draft discarded.');
     await loadTalentData(state.selectedTalent);
-  } catch (e) {}
+  } catch (_) {}
 }
 
-// Gmail search filter (client-side, applied on top of nav/score filter)
-let searchQuery = '';
-document.getElementById('gmail-search').addEventListener('input', (e) => {
-  searchQuery = e.target.value.toLowerCase().trim();
-  const rows = document.querySelectorAll('.email-row');
-  rows.forEach(row => {
-    row.style.display = !searchQuery || row.textContent.toLowerCase().includes(searchQuery) ? '' : 'none';
-  });
+// ── Search ─────────────────────────────────────────────────────────────────
+document.getElementById('gmail-search').addEventListener('input', e => {
+  const q = e.target.value.toLowerCase().trim();
+  document.querySelectorAll('.email-row').forEach(row =>
+    row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none');
 });
 
 // ── Open real Gmail ────────────────────────────────────────────────────────
 function openRealGmail() {
   const email = state.selectedTalent?.email || state.selectedTalent?.inbox_email;
-  const url = email
+  window.open(email
     ? `https://mail.google.com/mail/u/${encodeURIComponent(email)}/#inbox`
-    : 'https://mail.google.com/';
-  window.open(url, '_blank');
+    : 'https://mail.google.com/', '_blank');
 }
 
+// ── Run AI Draft ───────────────────────────────────────────────────────────
 async function runAiDraft() {
   if (!state.selectedTalent) return showToast('Select a talent first.');
-  if (!state.selectedEmail) return showToast('Select an email from the inbox first.');
-  
+  if (!state.selectedEmail) return showToast('Select an inbox email first.');
   const btn = document.getElementById('btn-run-ai');
-  const oldText = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner"></span> Working...';
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Processing…';
   btn.disabled = true;
-
   try {
     const res = await api('POST', '/api/dashboard/process-email', {
       talent_key: state.selectedTalent.key,
-      gmail_message_id: state.selectedEmail.gmail_message_id
+      gmail_message_id: state.selectedEmail.gmail_message_id,
     });
-    
     if (res.ok) {
-      showToast('✨ AI Triage complete! Checking for drafts...');
-      // Switch to drafts tab to show the result
+      showToast('AI triage complete — checking drafts…');
       setGmailNav('drafts');
     } else {
-      showToast('AI processing finished: ' + JSON.stringify(res.summary || res));
+      showToast('Done: ' + JSON.stringify(res.summary || res));
     }
   } catch (e) {
     showToast('AI Draft failed: ' + e.message);
   } finally {
-    btn.innerHTML = oldText;
+    btn.innerHTML = orig;
     btn.disabled = false;
   }
 }
 
 // ── Deploy watcher ─────────────────────────────────────────────────────────
-let _knownDeployTime = null;
+let _knownDeploy = null;
 async function checkDeploy() {
   try {
-    const r = await fetch('/health');
-    const data = await r.json();
+    const data = await fetch('/health').then(r => r.json());
     const t = data.deployed_at;
     const pill = document.getElementById('deploy-pill');
-    if (!_knownDeployTime) {
-      _knownDeployTime = t;
-      if (pill) pill.textContent = 'v ' + t.replace('T', ' ').replace('Z', '') + ' UTC';
-    } else if (t !== _knownDeployTime) {
-      _knownDeployTime = t;
-      if (pill) {
-        pill.textContent = 'v ' + t.replace('T', ' ').replace('Z', '') + ' UTC';
-        pill.style.color = '#00d4aa';
-        setTimeout(() => { pill.style.color = '#5f6368'; }, 5000);
-      }
-      showToast('🚀 New version deployed — reload to get the latest.');
+    if (!_knownDeploy) {
+      _knownDeploy = t;
+      if (pill) pill.textContent = '● v' + t.slice(0,16).replace('T',' ');
+    } else if (t !== _knownDeploy) {
+      _knownDeploy = t;
+      if (pill) pill.textContent = '● v' + t.slice(0,16).replace('T',' ');
+      showToast('New version deployed — reload for the latest.');
     }
   } catch (_) {}
 }
