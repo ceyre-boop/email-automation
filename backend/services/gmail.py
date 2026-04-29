@@ -184,6 +184,7 @@ def get_message_detail(token_row, message_id: str, db=None) -> dict[str, Any]:
         "snippet": msg.get("snippet", ""),
         "label_ids": msg.get("labelIds", []),
         "email_date": email_date,
+        "message_id_header": headers.get("message-id", ""),  # for In-Reply-To threading
     }
 
 
@@ -286,15 +287,26 @@ def mark_as_read(token_row, message_id: str, db=None) -> bool:
 # ── Drafts ────────────────────────────────────────────────────────────────────
 
 
-def create_gmail_draft(token_row, thread_id: str, reply_to: str, subject: str, body: str, db=None) -> str | None:
+def create_gmail_draft(
+    token_row,
+    thread_id: str,
+    reply_to: str,
+    subject: str,
+    body: str,
+    db=None,
+    in_reply_to: str | None = None,
+) -> str | None:
     """
-    Save a draft reply in the talent's Gmail account.
+    Save a draft reply in the talent's Gmail account, threaded correctly.
     Returns the Gmail draft ID, or None on failure.
     """
     service = _gmail_service(token_row, db)
     mime_msg = MIMEText(body, "plain")
     mime_msg["To"] = reply_to
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
+    if in_reply_to:
+        mime_msg["In-Reply-To"] = in_reply_to
+        mime_msg["References"] = in_reply_to
     raw = base64.urlsafe_b64encode(mime_msg.as_bytes()).decode()
     try:
         draft = (

@@ -235,6 +235,7 @@ def _process_one_message(
     sender_domain = detail.get("sender_domain", "")
     body = detail.get("body_text", "")
     email_date = detail.get("email_date")
+    message_id_header = detail.get("message_id_header", "")
 
     # ── Triage ───────────────────────────────────────────────────────────────
     triage_result = triage_svc.triage_email(
@@ -304,6 +305,7 @@ def _process_one_message(
                 subject=subject,
                 body=draft_text,
                 db=db,
+                in_reply_to=message_id_header or None,
             )
 
         # Persist draft + processed record together, then commit once
