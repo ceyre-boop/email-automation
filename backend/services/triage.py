@@ -184,6 +184,34 @@ def triage_email(
         else ""
     )
 
+    # ── Pre-filter: known automated / non-human senders → Score 1, no GPT call ──
+    _AUTO_DOMAINS = {
+        "shop.tiktok.com", "tiktok.com", "notifications.tiktok.com",
+        "mailer.tiktok.com", "noreply.tiktok.com",
+    }
+    _AUTO_SUBJECT_KEYWORDS = [
+        "sample order has arrived", "your order has", "order confirmation",
+        "unsubscribe", "tracking number", "shipping update", "delivery update",
+        "password reset", "verify your email", "email verification",
+        "account alert", "security alert", "invoice #", "receipt for",
+    ]
+    sender_lower = sender.lower()
+    subject_lower = subject.lower()
+    is_auto_domain = any(d in sender_lower for d in _AUTO_DOMAINS)
+    is_auto_subject = any(kw in subject_lower for kw in _AUTO_SUBJECT_KEYWORDS)
+    if is_auto_domain or (is_auto_subject and "collab" not in subject_lower and "partner" not in subject_lower):
+        logger.info(
+            "Pre-filter: automated sender/subject for %s (%s / %s) → Score 1",
+            talent_key, sender, subject,
+        )
+        return {
+            "score": 1,
+            "reason": "Automated system email — not a real partnership offer.",
+            "offer_type": "Automated",
+            "proposed_rate_usd": 0.0,
+            "brand_name": "",
+        }
+
     messages = _build_triage_messages(
         talent_name=talent_name,
         minimum_rate=minimum_rate,
