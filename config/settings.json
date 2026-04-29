@@ -1,7 +1,7 @@
 {
   "_comment": "Global configuration for the Talent Inbox Automation system. Fill in all TODO values before deploying.",
 
-  "ai_enabled": false,
+  "ai_enabled": true,
   "_ai_enabled_comment": "HARD BLOCKER — set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
 
   "openai": {

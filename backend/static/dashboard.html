@@ -632,7 +632,6 @@ h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
            <div id="gnav-inbox" onclick="setGmailNav('inbox')" title="Inbox" style="cursor:pointer; font-size:20px;">📥</div>
            <div id="gnav-drafts" onclick="setGmailNav('drafts')" title="Drafts" style="cursor:pointer; font-size:20px;">📝</div>
            <div id="gnav-sent" onclick="setGmailNav('sent')" title="Sent" style="cursor:pointer; font-size:20px;">📤</div>
-           <div id="gnav-starred" onclick="setGmailNav('starred')" title="Starred" style="cursor:pointer; font-size:20px;">⭐</div>
         </div>
 
         <div class="email-feed">
@@ -997,10 +996,13 @@ function setGmailNav(nav) {
   state.gmailNav = nav;
   state.selectedEmail = null;
   state.selectedDraft = null;
-  ['inbox','starred','sent','drafts'].forEach(n => {
+  ['inbox','sent','drafts'].forEach(n => {
     const el = document.getElementById('gnav-' + n);
     if (el) el.classList.toggle('active', n === nav);
   });
+  // Show/hide score filter tabs — only relevant in inbox
+  const filterBar = document.querySelector('.feed-header');
+  if (filterBar) filterBar.style.display = (nav === 'inbox') ? '' : 'none';
   resetReadingPane();
   // Inbox pulls live from Gmail; switching to/from it needs a fresh fetch
   if (state.selectedTalent) {
@@ -1035,10 +1037,12 @@ async function openTalentView(talent) {
   resetReadingPane();
 
   // Nav + tab pill highlights (no render yet — loadTalentData will render)
-  ['inbox','starred','sent','drafts'].forEach(n => {
+  ['inbox','sent','drafts'].forEach(n => {
     const el = document.getElementById('gnav-' + n);
     if (el) el.classList.toggle('active', n === 'inbox');
   });
+  const filterBar = document.querySelector('.feed-header');
+  if (filterBar) filterBar.style.display = '';
   document.querySelectorAll('.gmail-tab-pill').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-all').classList.add('active');
 
@@ -1064,6 +1068,10 @@ async function loadTalentData(talent, silent = false) {
       const liveDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts/live`);
       state.emails = [];
       state.drafts = liveDrafts;
+    } else if (nav === 'sent') {
+      const sent = await api('GET', `/api/dashboard/talents/${talent.key}/sent`);
+      state.emails = sent;
+      state.drafts = [];
     } else {
       const [emails, drafts] = await Promise.all([
         api('GET', isInbox
@@ -1097,16 +1105,8 @@ async function loadTalentData(talent, silent = false) {
 
 // ── Email list ─────────────────────────────────────────────────────────────
 function getVisibleEmails() {
-  const nav = state.gmailNav;
   let visible = state.emails;
-  if (nav === 'trash') {
-    visible = visible.filter(e => e.status === 'archived');
-  } else if (nav === 'sent') {
-    visible = visible.filter(e => e.status === 'sent');
-  } else if (nav === 'starred') {
-    visible = visible.filter(e => e.score === 3);
-  }
-  if (state.scoreFilter != null) {
+  if (state.scoreFilter != null && state.gmailNav === 'inbox') {
     visible = visible.filter(e => e.score === state.scoreFilter);
   }
   return visible;
@@ -1145,7 +1145,10 @@ function renderEmailList() {
   }
 
   if (visible.length === 0) {
-    rows.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);"><div style="font-size:32px; margin-bottom:12px;">📭</div>Clear communications</div>`;
+    const emptyMsg = state.gmailNav === 'sent'
+      ? 'No sent replies yet — approve a draft to send the first one.'
+      : 'No emails here.';
+    rows.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);"><div style="font-size:32px; margin-bottom:12px;">📭</div>${emptyMsg}</div>`;
     return;
   }
 

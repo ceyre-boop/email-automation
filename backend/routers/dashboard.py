@@ -707,8 +707,6 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
     results = []
     for gd in gmail_drafts:
         db_row = db_map.get(gd["gmail_draft_id"])
-        if not db_row:
-            continue
         results.append({
             "gmail_draft_id": gd["gmail_draft_id"],
             "db_draft_id": db_row.id if db_row else None,
