@@ -607,7 +607,13 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
 
-    stubs = gmail_svc.list_inbox_messages(token, max_results=25)
+    try:
+        stubs = gmail_svc.list_inbox_messages(token, max_results=25)
+    except Exception as e:
+        logger.error(f"Live inbox fetch failed: {e}")
+        # Return a custom error instead of throwing a generic 500, or just return empty cache?
+        # Actually we want a specific error so frontend shows 'Gmail error, try again'
+        raise HTTPException(status_code=503, detail="Gmail API is currently unavailable. Please try again in a few minutes.")
     if not stubs:
         return []
 
@@ -681,7 +687,11 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
 
-    gmail_drafts = gmail_svc.list_gmail_drafts(token, max_results=25)
+    try:
+        gmail_drafts = gmail_svc.list_gmail_drafts(token, max_results=25)
+    except Exception as e:
+        logger.error(f"Live drafts fetch failed: {e}")
+        raise HTTPException(status_code=503, detail="Gmail API is currently unavailable. Please try again in a few minutes.")
     db.add(token)
     db.commit()
 
@@ -697,6 +707,8 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
     results = []
     for gd in gmail_drafts:
         db_row = db_map.get(gd["gmail_draft_id"])
+        if not db_row:
+            continue
         results.append({
             "gmail_draft_id": gd["gmail_draft_id"],
             "db_draft_id": db_row.id if db_row else None,

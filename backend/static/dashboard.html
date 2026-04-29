@@ -957,11 +957,8 @@ body {
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="#EA4335"/></svg>
         Open in Gmail
       </button>
-      <button id="btn-backfill" style="margin-left:8px;padding:6px 14px;background:#1a73e8;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;" title="Load last 30 days of email history from Gmail">
-        ↓ Load 30-day history
-      </button>
-      <button id="btn-triage-unscored" style="margin-left:6px;padding:6px 14px;background:#1e8e3e;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;" title="Run AI triage on all emails that haven't been scored yet">
-        🤖 Triage unscored
+      <button id="btn-run-ai" onclick="runAiDraft()" style="margin-left:8px;padding:6px 14px;background:#1e8e3e;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;" title="Run GPT triage + draft on the selected email (uses OpenAI credits)">
+        ✨ Run AI Draft
       </button>
     </div>
 
@@ -988,14 +985,6 @@ body {
           <span class="nav-icon">📝</span>
           Drafts
           <span class="gmail-nav-count" id="gmail-draft-count"></span>
-        </div>
-        <div class="gmail-nav-item" id="gnav-all" onclick="setGmailNav('all')">
-          <span class="nav-icon">🏷️</span>
-          All Mail
-        </div>
-        <div class="gmail-nav-item" id="gnav-trash" onclick="setGmailNav('trash')">
-          <span class="nav-icon">🗑️</span>
-          Trash
         </div>
       </div>
 
@@ -1065,8 +1054,14 @@ async function api(method, path, body = null) {
     throw new Error('Invalid API key');
   }
   if (!res.ok) {
-    const msg = await res.text().catch(() => res.statusText);
-    showToast('Error ' + res.status + ': ' + msg.slice(0, 120));
+    let msg;
+    try { const j = await res.json(); msg = j.detail || j.message || res.statusText; }
+    catch (_) { msg = res.statusText; }
+    if (res.status === 503) {
+      showToast('⚠️ Gmail API temporarily unavailable. Try again in a few minutes.');
+    } else {
+      showToast('Error ' + res.status + ': ' + String(msg).slice(0, 120));
+    }
     throw new Error(msg);
   }
   return res.json();
@@ -1356,40 +1351,12 @@ document.getElementById('gmail-back').addEventListener('click', async () => {
   await loadOverview();
 });
 
-document.getElementById('btn-backfill').addEventListener('click', async () => {
-  if (!state.selectedTalent) return;
-  const btn = document.getElementById('btn-backfill');
-  btn.textContent = '⏳ Loading history...';
-  btn.disabled = true;
-  try {
-    await api('POST', `/api/dashboard/talents/${state.selectedTalent.key}/backfill?days=30`);
-    showToast('30-day history loading in background — refresh inbox in ~2 minutes to see all emails.');
-  } catch (e) {
-    showToast('Backfill failed: ' + e.message);
-  }
-  setTimeout(() => { btn.textContent = '↓ Load 30-day history'; btn.disabled = false; }, 5000);
-});
-
-document.getElementById('btn-triage-unscored').addEventListener('click', async () => {
-  if (!state.selectedTalent) { showToast('Select a talent first.'); return; }
-  const btn = document.getElementById('btn-triage-unscored');
-  btn.textContent = '⏳ Triaging...';
-  btn.disabled = true;
-  try {
-    const r = await api('POST', `/api/dashboard/talents/${state.selectedTalent.key}/triage-unscored`);
-    showToast(r.message || 'Triage started — scores will appear as emails are processed.');
-  } catch (e) {
-    showToast('Triage failed: ' + e.message);
-  }
-  setTimeout(() => { btn.textContent = '🤖 Triage unscored'; btn.disabled = false; }, 8000);
-});
-
 // ── Gmail nav + score filter ───────────────────────────────────────────────
 function setGmailNav(nav) {
   state.gmailNav = nav;
   state.selectedEmail = null;
   state.selectedDraft = null;
-  ['inbox','starred','sent','drafts','all','trash'].forEach(n => {
+  ['inbox','starred','sent','drafts'].forEach(n => {
     const el = document.getElementById('gnav-' + n);
     if (el) el.classList.toggle('active', n === nav);
   });
@@ -1427,7 +1394,7 @@ async function openTalentView(talent) {
   resetReadingPane();
 
   // Nav + tab pill highlights (no render yet — loadTalentData will render)
-  ['inbox','starred','sent','drafts','all','trash'].forEach(n => {
+  ['inbox','starred','sent','drafts'].forEach(n => {
     const el = document.getElementById('gnav-' + n);
     if (el) el.classList.toggle('active', n === 'inbox');
   });
@@ -1545,8 +1512,7 @@ function renderEmailList() {
   const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
 
   if (visible.length === 0) {
-    const labels = { inbox: 'No emails processed yet', trash: 'No archived emails',
-      sent: 'No sent replies', starred: 'No good deals yet', all: 'No emails yet' };
+    const labels = { inbox: 'No emails processed yet', sent: 'No sent replies yet', starred: 'No starred emails', drafts: 'No AI drafts pending' };
     rows.innerHTML = `<div class="gmail-empty-state"><div style="font-size:32px">📭</div>${labels[state.gmailNav] || 'No emails'}</div>`;
     return;
   }
@@ -1854,6 +1820,36 @@ function openRealGmail() {
     ? `https://mail.google.com/mail/u/${encodeURIComponent(email)}/#inbox`
     : 'https://mail.google.com/';
   window.open(url, '_blank');
+}
+
+async function runAiDraft() {
+  if (!state.selectedTalent) return showToast('Select a talent first.');
+  if (!state.selectedEmail) return showToast('Select an email from the inbox first.');
+  
+  const btn = document.getElementById('btn-run-ai');
+  const oldText = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Working...';
+  btn.disabled = true;
+
+  try {
+    const res = await api('POST', '/api/dashboard/process-email', {
+      talent_key: state.selectedTalent.key,
+      gmail_message_id: state.selectedEmail.gmail_message_id
+    });
+    
+    if (res.ok) {
+      showToast('✨ AI Triage complete! Checking for drafts...');
+      // Switch to drafts tab to show the result
+      setGmailNav('drafts');
+    } else {
+      showToast('AI processing finished: ' + JSON.stringify(res.summary || res));
+    }
+  } catch (e) {
+    showToast('AI Draft failed: ' + e.message);
+  } finally {
+    btn.innerHTML = oldText;
+    btn.disabled = false;
+  }
 }
 
 // ── Deploy watcher ─────────────────────────────────────────────────────────
