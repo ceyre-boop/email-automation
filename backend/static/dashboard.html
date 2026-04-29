@@ -911,13 +911,34 @@ document.getElementById('api-key-input').addEventListener('keydown', e => {
 });
 
 // ── Bootstrap ──────────────────────────────────────────────────────────────
+let currentTalentKey = null;
+let currentEmailId = null;
+let isRefreshing = false;
+
+async function refreshData() {
+  if (isRefreshing) return;
+  isRefreshing = true;
+  
+  try {
+    const oldTalent = currentTalentKey;
+    await loadOverview();
+
+    if (oldTalent && state.view === 'gmail') {
+      const talent = state.talents.find(t => t.key === oldTalent);
+      if (talent) {
+        renderSidebar();
+        await loadTalentData(talent, true); 
+      }
+    }
+  } finally {
+    isRefreshing = false;
+  }
+}
+
 async function bootstrap() {
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
-  setInterval(() => {
-    if (state.view === 'overview') loadOverview();
-    else if (state.view === 'gmail' && state.selectedTalent) loadTalentData(state.selectedTalent, true);
-  }, 30000);
+  setInterval(refreshData, 30000);
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
@@ -1068,6 +1089,7 @@ async function removeContext(id) {
 // ── Nav buttons ────────────────────────────────────────────────────────────
 document.getElementById('nav-overview').addEventListener('click', async () => {
   state.selectedTalent = null;
+  currentTalentKey = null;
   await loadOverview();
 });
 document.getElementById('btn-refresh').addEventListener('click', async () => {
@@ -1077,6 +1099,7 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
 });
 document.getElementById('gmail-back').addEventListener('click', async () => {
   state.selectedTalent = null;
+  currentTalentKey = null;
   await loadOverview();
 });
 
@@ -1108,6 +1131,7 @@ function setScoreFilter(score) {
 // ── Talent view ────────────────────────────────────────────────────────────
 async function openTalentView(talent) {
   state.selectedTalent = talent;
+  currentTalentKey = talent.key;
   state.selectedEmail = null;
   state.selectedDraft = null;
   state.gmailNav = 'inbox';
