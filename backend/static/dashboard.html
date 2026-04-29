@@ -332,11 +332,13 @@ body {
 
 /* Email list column */
 .email-col {
-  width: 380px; flex-shrink: 0;
+  width: 400px;
   border-right: 1px solid var(--border);
-  display: flex; flex-direction: column;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
   background: var(--bg);
-  min-height: 0; overflow: hidden;
+  position: relative;
 }
 
 .email-col-header {
@@ -352,7 +354,11 @@ body {
 .filter-tab:hover { color: var(--text-2); }
 .filter-tab.active { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-2); }
 
-#email-rows { flex: 1; overflow-y: auto; min-height: 0; }
+.feed-tab {
+  padding: 5px 12px; border-radius: 6px; border: none; background: none;
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  color: var(--text-3); cursor: pointer; transition: var(--r);
+}
 
 .email-row {
   padding: 14px 16px; border-bottom: 1px solid var(--border);
@@ -713,10 +719,10 @@ body {
       <div class="email-col">
         <div class="email-col-header" id="filter-bar">
           <button class="filter-tab active" id="tab-all" onclick="setScoreFilter(null)">All</button>
-          <button class="filter-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</button>
-          <button class="filter-tab" id="tab-uncert" onclick="setScoreFilter(2)">Review</button>
+          <div class="feed-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</div>
+          <div class="feed-tab" id="tab-uncert" onclick="setScoreFilter(2)">Review</div>
         </div>
-        <div id="email-rows"></div>
+        <div id="email-rows" style="flex:1; overflow-y:auto; min-height: 0;"></div>
       </div>
 
       <!-- Reading pane -->
