@@ -548,13 +548,11 @@ def process_batch(
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
 
-    # Find cached inbox emails that have body text and haven't been processed
+    # Find cached inbox emails that haven't been processed yet
+    # (_process_one_message fetches body live from Gmail, no need for cached body_text)
     candidates = (
         db.query(InboxEmail)
-        .filter(
-            InboxEmail.talent_key == talent_key.lower(),
-            InboxEmail.body_text != None,  # noqa: E711
-        )
+        .filter(InboxEmail.talent_key == talent_key.lower())
         .order_by(InboxEmail.email_date.desc().nullslast())
         .limit(limit * 3)  # fetch extra so we can skip already-processed ones
         .all()
