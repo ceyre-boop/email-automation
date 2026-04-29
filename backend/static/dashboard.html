@@ -519,6 +519,65 @@ body {
   padding: 3px 10px; display: inline-block;
   font-family: var(--mono);
 }
+
+/* ─── Settings drawer ───────────────────────────────────────────────────── */
+#settings-overlay {
+  position: fixed; inset: 0; background: rgba(8,8,9,0.6);
+  z-index: 500; display: none;
+}
+#settings-overlay.open { display: block; }
+
+#settings-drawer {
+  position: fixed; top: 0; right: -520px; bottom: 0; width: 480px;
+  background: var(--surface); border-left: 1px solid var(--border-2);
+  display: flex; flex-direction: column;
+  transition: right 0.28s cubic-bezier(0.4,0,0.2,1);
+  z-index: 501;
+}
+#settings-drawer.open { right: 0; }
+
+.drawer-head {
+  padding: 22px 24px 18px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
+}
+.drawer-title { font-size: 15px; font-weight: 700; color: #fff; }
+.drawer-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
+.drawer-close {
+  background: none; border: none; color: var(--text-3); cursor: pointer;
+  font-size: 20px; padding: 4px; line-height: 1; transition: color var(--r);
+}
+.drawer-close:hover { color: var(--text); }
+
+.drawer-body { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 24px; }
+
+.drawer-section-label {
+  font-size: 10px; font-weight: 700; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 8px;
+}
+.drawer-hint {
+  font-size: 11px; color: var(--text-3); margin-bottom: 10px; line-height: 1.5;
+}
+.drawer-textarea {
+  width: 100%; padding: 12px 14px;
+  background: var(--bg); border: 1px solid var(--border-2);
+  border-radius: 10px; color: var(--text);
+  font-family: var(--sans); font-size: 13px; line-height: 1.55;
+  outline: none; resize: vertical;
+  transition: border-color var(--r);
+}
+.drawer-textarea:focus { border-color: var(--red-line); }
+
+.sop-rule {
+  padding: 10px 12px; background: var(--surface-2);
+  border: 1px solid var(--border); border-radius: 8px; margin-bottom: 8px;
+}
+.sop-trigger { font-size: 11px; font-weight: 600; color: var(--red); margin-bottom: 4px; }
+.sop-response { font-size: 11px; color: var(--text-2); line-height: 1.45; }
+
+.drawer-footer {
+  padding: 16px 24px; border-top: 1px solid var(--border); flex-shrink: 0;
+  display: flex; gap: 10px; justify-content: flex-end;
+}
 </style>
 </head>
 <body>
@@ -628,6 +687,7 @@ body {
       <input type="text" class="topbar-search" id="gmail-search" placeholder="Search emails...">
       <div class="topbar-actions">
         <button class="btn btn-ghost" onclick="openRealGmail()">Open Gmail ↗</button>
+        <button class="btn btn-ghost" onclick="openSettings()" title="AI Settings for this talent">⚙ AI Settings</button>
         <button class="btn btn-primary" id="btn-run-ai" onclick="runAiDraft()">✦ Run AI Draft</button>
       </div>
     </header>
@@ -668,6 +728,43 @@ body {
   </div>
 
 </main>
+
+<!-- Settings drawer -->
+<div id="settings-overlay" onclick="closeSettings()"></div>
+<div id="settings-drawer">
+  <div class="drawer-head">
+    <div>
+      <div class="drawer-title" id="drawer-talent-name">AI Settings</div>
+      <div class="drawer-sub">Controls how GPT writes replies for this talent</div>
+    </div>
+    <button class="drawer-close" onclick="closeSettings()">×</button>
+  </div>
+  <div class="drawer-body">
+
+    <div>
+      <div class="drawer-section-label">Voice & Tone</div>
+      <div class="drawer-hint">Describe how GPT should sound when writing for this talent. Examples: "Enthusiastic, uses exclamation points, always mentions her GMV stats" or "Professional but warm, keep it short, push for the higher rate confidently."</div>
+      <textarea class="drawer-textarea" id="drawer-voice" rows="4" placeholder="e.g. Friendly and direct. Always reference her conversion rate. End with an open question."></textarea>
+    </div>
+
+    <div>
+      <div class="drawer-section-label">Manager Instructions</div>
+      <div class="drawer-hint">Override or add rules on top of the SOP. GPT treats these as highest priority. Examples: "Never accept under $400. Always mention the bundle discount. CC Cara on anything over $600."</div>
+      <textarea class="drawer-textarea" id="drawer-instructions" rows="4" placeholder="e.g. If a brand mentions TikTok Shop, always ask about commission structure before agreeing."></textarea>
+    </div>
+
+    <div>
+      <div class="drawer-section-label">SOP Rules (read-only — from Excel)</div>
+      <div class="drawer-hint">These trigger/response rules are loaded from the SOP spreadsheet and fed to GPT on every draft.</div>
+      <div id="drawer-sop-rules"></div>
+    </div>
+
+  </div>
+  <div class="drawer-footer">
+    <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
+    <button class="btn btn-primary" id="drawer-save-btn" onclick="saveSettings()">Save & Apply</button>
+  </div>
+</div>
 
 <div id="toast"></div>
 
@@ -1348,6 +1445,63 @@ async function runAiDraft() {
     }
   } catch (e) {
     showToast('AI Draft failed: ' + e.message);
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
+}
+
+// ── AI Settings drawer ─────────────────────────────────────────────────────
+async function openSettings() {
+  if (!state.selectedTalent) return showToast('Select a talent first.');
+  const t = state.selectedTalent;
+  document.getElementById('drawer-talent-name').textContent = t.full_name + ' — AI Settings';
+
+  // Load current settings
+  try {
+    const s = await api('GET', `/api/dashboard/talents/${t.key}/settings`);
+    document.getElementById('drawer-voice').value = s.voice_profile || '';
+    document.getElementById('drawer-instructions').value = s.manager_instructions || '';
+  } catch (_) {
+    document.getElementById('drawer-voice').value = '';
+    document.getElementById('drawer-instructions').value = '';
+  }
+
+  // Load SOP rules from sop_data endpoint (settings endpoint returns talent config)
+  const sopEl = document.getElementById('drawer-sop-rules');
+  sopEl.innerHTML = '<div style="font-size:11px;color:var(--text-3);">Loading SOP rules…</div>';
+  try {
+    const s = await api('GET', `/api/dashboard/talents/${t.key}/settings`);
+    // SOP rules aren't returned by settings — fetch via a direct call
+    // We'll just show a note pointing to the Excel
+    sopEl.innerHTML = '<div style="font-size:11px;color:var(--text-3);">Rules loaded from <strong style="color:var(--text-2);">sheets/sop_data.json</strong> — update the Excel and re-import to change these.</div>';
+  } catch (_) { sopEl.innerHTML = ''; }
+
+  document.getElementById('settings-overlay').classList.add('open');
+  document.getElementById('settings-drawer').classList.add('open');
+}
+
+function closeSettings() {
+  document.getElementById('settings-overlay').classList.remove('open');
+  document.getElementById('settings-drawer').classList.remove('open');
+}
+
+async function saveSettings() {
+  if (!state.selectedTalent) return;
+  const btn = document.getElementById('drawer-save-btn');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+  try {
+    await api('PUT', `/api/dashboard/talents/${state.selectedTalent.key}/settings`, {
+      voice_profile: document.getElementById('drawer-voice').value.trim(),
+      manager_instructions: document.getElementById('drawer-instructions').value.trim(),
+      added_by: 'manager-dashboard',
+    });
+    showToast('AI settings saved — takes effect on next draft.');
+    closeSettings();
+  } catch (e) {
+    showToast('Save failed: ' + e.message);
   } finally {
     btn.innerHTML = orig;
     btn.disabled = false;

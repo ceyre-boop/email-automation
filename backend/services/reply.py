@@ -18,22 +18,48 @@ logger = logging.getLogger(__name__)
 _ESCALATE_PREFIX = "ESCALATE:"
 
 
-def _load_active_manager_context(db) -> str:
-    """Load active manager context entries from DB and join as bullet list."""
+def _load_talent_context(db, talent_key: str) -> tuple[str, str]:
+    """
+    Return (voice_profile, manager_instructions) for a talent.
+
+    Loads the most recent active ManagerContext row for this talent.
+    Also loads global (no talent_key) context entries as extra instructions.
+    """
     if db is None:
-        return ""
+        return "", ""
     try:
         from backend.models.db import ManagerContext  # local import avoids circular
-        rows = (
+
+        # Per-talent voice profile + instructions
+        talent_row = (
             db.query(ManagerContext)
-            .filter(ManagerContext.active == True)  # noqa: E712
+            .filter(
+                ManagerContext.talent_key == talent_key.lower(),
+                ManagerContext.active == True,  # noqa: E712
+            )
+            .order_by(ManagerContext.added_at.desc())
+            .first()
+        )
+        voice_profile = (talent_row.voice_profile or "").strip() if talent_row else ""
+        per_talent_instructions = (talent_row.text or "").strip() if talent_row else ""
+
+        # Global instructions (rows with no talent_key)
+        global_rows = (
+            db.query(ManagerContext)
+            .filter(
+                ManagerContext.talent_key == None,  # noqa: E711
+                ManagerContext.active == True,  # noqa: E712
+            )
             .order_by(ManagerContext.added_at.asc())
             .all()
         )
-        return "\n".join(f"- {r.text}" for r in rows) if rows else ""
+        global_text = "\n".join(f"- {r.text}" for r in global_rows) if global_rows else ""
+
+        combined_instructions = "\n".join(filter(None, [per_talent_instructions, global_text]))
+        return voice_profile, combined_instructions
     except Exception as exc:
-        logger.warning("Could not load manager_context: %s", exc)
-        return ""
+        logger.warning("Could not load talent context for %s: %s", talent_key, exc)
+        return "", ""
 
 # PII patterns that must never appear in AI-generated replies
 _PII_PATTERNS = [
@@ -96,17 +122,24 @@ def _build_reply_messages(
     brand_name: str,
     proposed_rate: float,
     triage_reason: str,
+    voice_profile: str = "",
     manager_context_text: str = "",
 ) -> list[dict]:
     """Fill reply.md template variables and return chat messages."""
     raw = get_settings().reply_prompt
     system_text, user_template = _parse_prompt_sections(raw)
 
+    if voice_profile.strip():
+        system_text += (
+            "\n\n## TALENT VOICE & TONE\n"
+            "Write all replies in this voice/style:\n"
+            + voice_profile
+        )
+
     if manager_context_text.strip():
         system_text += (
             "\n\n## MANAGER INSTRUCTIONS\n"
-            "The manager has added the following real-time instructions. "
-            "Apply these with higher priority than default SOP rules:\n"
+            "Apply these with highest priority — they override SOP defaults:\n"
             + manager_context_text
         )
 
@@ -160,7 +193,7 @@ def draft_reply(
     cfg = settings.app_config.get("openai", {})
     client = OpenAI(api_key=settings.openai_api_key)
 
-    manager_context_text = _load_active_manager_context(db)
+    voice_profile, manager_context_text = _load_talent_context(db, talent_key)
 
     messages = _build_reply_messages(
         talent_key=talent_key,
@@ -171,6 +204,7 @@ def draft_reply(
         offer_type=offer_type,
         brand_name=brand_name,
         proposed_rate=proposed_rate,
+        voice_profile=voice_profile,
         triage_reason=triage_reason,
         manager_context_text=manager_context_text,
     )
