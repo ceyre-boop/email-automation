@@ -9,5 +9,9 @@
       "Bash(git push *)",
       "Bash(gh run *)"
     ]
-  }
+  },
+  "enabledMcpjsonServers": [
+    "supabase"
+  ],
+  "enableAllProjectMcpServers": true
 }

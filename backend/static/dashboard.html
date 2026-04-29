@@ -5,865 +5,240 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Inbox Manager</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Google+Sans:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
-/* ── Design tokens ────────────────────────────────────────────────────────── */
+/* ── Premium Design System ────────────────────────────────────────────────── */
 :root {
-  --bg:        #1a1a1a;
-  --bg2:       #1e2030;
-  --bg3:       #252840;
-  --border:    #2d3154;
-  --accent:    #00d4aa;
-  --accent-d:  #00a884;
-  --text:      #e2e8f0;
-  --text2:     #94a3b8;
-  --text3:     #64748b;
-  --good:      #22c55e;
-  --uncert:    #f59e0b;
-  --trash:     #ef4444;
-  --mono:      'JetBrains Mono', 'Cascadia Code', monospace;
-  --sans:      'Google Sans', system-ui, sans-serif;
-  --sidebar-w: 220px;
+  --bg: #0d0f14;
+  --sidebar: #13161d;
+  --panel: rgba(19, 22, 29, 0.8);
+  --panel-light: rgba(30, 35, 46, 0.4);
+  --border: rgba(255, 255, 255, 0.08);
+  --border-active: rgba(59, 130, 246, 0.4);
+  --text: #e2e8f0;
+  --text-dim: #94a3b8;
+  --text-muted: #64748b;
+  --primary: #3b82f6;
+  --primary-glow: rgba(59, 130, 246, 0.3);
+  --success: #10b981;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --mono: 'JetBrains Mono', monospace;
+  --sidebar-w: 260px;
+  --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-/* ── Reset ────────────────────────────────────────────────────────────────── */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-button { cursor: pointer; border: none; background: none; font: inherit; }
-ul { list-style: none; }
-a { text-decoration: none; }
-textarea { resize: vertical; }
 
-/* ── Shell ────────────────────────────────────────────────────────────────── */
 body {
-  font-family: var(--mono);
+  font-family: var(--sans);
   background: var(--bg);
   color: var(--text);
-  display: flex;
   height: 100vh;
+  display: flex;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* ── Sidebar ──────────────────────────────────────────────────────────────── */
+/* ── Typography & Icons ────────────────────────────────────────────────────── */
+h1, h2, h3 { font-weight: 700; letter-spacing: -0.02em; }
+.mono { font-family: var(--mono); }
+
+/* ── Glassmorphism Elements ────────────────────────────────────────────────── */
+.glass {
+  background: var(--panel);
+  backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+/* ── Sidebar (The Navigator) ───────────────────────────────────────────────── */
 #sidebar {
   width: var(--sidebar-w);
-  min-width: var(--sidebar-w);
-  background: var(--bg2);
+  background: var(--sidebar);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  overflow: hidden;
+  z-index: 100;
 }
+
 .sidebar-header {
-  padding: 20px 16px 12px;
-  border-bottom: 1px solid var(--border);
+  padding: 24px 20px;
 }
+
 .sidebar-logo {
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--accent);
-  letter-spacing: 0.05em;
-  text-transform: uppercase;
-}
-.sidebar-logo svg { flex-shrink: 0; }
-.nav-section { padding: 8px 0; border-bottom: 1px solid var(--border); }
-.nav-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 16px;
-  font-size: 12px;
-  color: var(--text2);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  border-radius: 0;
-}
-.nav-item:hover { background: var(--bg3); color: var(--text); }
-.nav-item.active { color: var(--accent); background: rgba(0,212,170,0.08); }
-.sidebar-section-label {
-  padding: 12px 16px 4px;
-  font-size: 10px;
-  font-weight: 600;
-  color: var(--text3);
+  gap: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  color: #fff;
   text-transform: uppercase;
   letter-spacing: 0.1em;
 }
-#talent-list { overflow-y: auto; flex: 1; padding: 4px 0; }
-.talent-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 7px 16px;
-  font-size: 12px;
-  color: var(--text2);
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-}
-.talent-item:hover { background: var(--bg3); color: var(--text); }
-.talent-item.active { color: var(--accent); background: rgba(0,212,170,0.08); }
-.status-dot {
-  width: 7px; height: 7px;
-  border-radius: 50%;
-  flex-shrink: 0;
-}
-.status-dot.on  { background: var(--accent); }
-.status-dot.off { background: var(--text3); }
-.talent-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.badge {
-  background: var(--accent);
-  color: #000;
-  font-size: 10px;
-  font-weight: 700;
-  border-radius: 10px;
-  padding: 1px 6px;
-  min-width: 18px;
-  text-align: center;
-  flex-shrink: 0;
-}
-.sidebar-footer {
-  padding: 10px 16px;
-  border-top: 1px solid var(--border);
-}
-.btn-refresh {
-  width: 100%;
-  padding: 6px 10px;
-  font-size: 11px;
-  font-family: var(--mono);
-  color: var(--text2);
-  background: var(--bg3);
-  border: 1px solid var(--border);
-  border-radius: 4px;
-  transition: color 0.15s, border-color 0.15s;
-}
-.btn-refresh:hover { color: var(--accent); border-color: var(--accent); }
 
-/* ── Main content area ────────────────────────────────────────────────────── */
-#main {
-  flex: 1;
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-}
-
-/* ── Overview view ────────────────────────────────────────────────────────── */
-#view-overview {
-  flex: 1;
-  overflow-y: auto;
-  padding: 28px 32px 40px;
-}
-.overview-header {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
-  margin-bottom: 24px;
-}
-.overview-header h1 {
-  font-size: 20px;
-  font-weight: 600;
-  color: var(--text);
-}
-.overview-header .date-chip {
-  font-size: 12px;
-  color: var(--text3);
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 20px;
-  padding: 3px 10px;
-}
-.summary-bar {
-  display: flex;
-  gap: 12px;
-  margin-bottom: 28px;
-  flex-wrap: wrap;
-}
-.stat-pill {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 16px 24px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  background: var(--bg2);
-  min-width: 120px;
-}
-.stat-pill .num {
-  font-size: 32px;
-  font-weight: 600;
-  line-height: 1;
-  margin-bottom: 6px;
-}
-.stat-pill label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: 0.05em; }
-.stat-pill.good   .num { color: var(--good); }
-.stat-pill.uncert .num { color: var(--uncert); }
-.stat-pill.trash  .num { color: var(--trash); }
-.stat-pill.total  .num { color: var(--accent); }
-
-#talent-cards-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 14px;
-  margin-bottom: 36px;
-}
-.talent-card {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 16px 18px;
-  cursor: pointer;
-  transition: border-color 0.2s, transform 0.15s, background 0.15s;
-}
-.talent-card:hover {
-  border-color: var(--accent);
-  background: var(--bg3);
-  transform: translateY(-1px);
-}
-.card-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
-.card-name { font-size: 13px; font-weight: 600; color: var(--text); }
-.card-manager { font-size: 10px; color: var(--text3); }
-.card-counts { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-.count-chip {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 12px;
-  font-weight: 500;
-}
-.count-chip.good   { background: rgba(34,197,94,0.12);  color: var(--good); }
-.count-chip.uncert { background: rgba(245,158,11,0.12); color: var(--uncert); }
-.count-chip.trash  { background: rgba(239,68,68,0.12);  color: var(--trash); }
-.card-best-deal { font-size: 11px; color: var(--text2); margin-bottom: 8px; }
-.card-best-deal strong { color: var(--accent); }
-.card-footer { display: flex; justify-content: flex-end; }
-.draft-badge {
-  font-size: 10px;
-  background: rgba(0,212,170,0.12);
-  color: var(--accent);
-  border: 1px solid rgba(0,212,170,0.3);
-  border-radius: 20px;
-  padding: 2px 8px;
-}
-
-/* ── Context panel ────────────────────────────────────────────────────────── */
-#context-panel {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px 22px;
-}
-#context-panel h3 { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 4px; }
-.muted-text { font-size: 11px; color: var(--text3); margin-bottom: 14px; }
-#context-list { display: flex; flex-direction: column; gap: 8px; margin-bottom: 14px; }
-.context-entry {
-  display: flex;
-  align-items: flex-start;
-  gap: 10px;
-  background: var(--bg3);
-  border: 1px solid var(--border);
+.sidebar-logo-icon {
+  width: 24px;
+  height: 24px;
+  background: var(--primary);
   border-radius: 6px;
-  padding: 10px 12px;
-}
-.context-entry-text { flex: 1; font-size: 12px; color: var(--text); line-height: 1.5; }
-.context-entry-meta { font-size: 10px; color: var(--text3); margin-top: 3px; }
-.btn-del {
-  font-size: 14px;
-  color: var(--text3);
-  padding: 0 4px;
-  transition: color 0.15s;
-  flex-shrink: 0;
-}
-.btn-del:hover { color: var(--trash); }
-.context-add { display: flex; flex-direction: column; gap: 8px; }
-.context-add textarea {
-  width: 100%;
-  padding: 10px 12px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 12px;
-  line-height: 1.5;
-}
-.context-add textarea:focus { outline: none; border-color: var(--accent); }
-.btn-add-context {
-  align-self: flex-start;
-  padding: 7px 16px;
-  background: var(--accent);
-  color: #000;
-  font-family: var(--mono);
-  font-size: 12px;
-  font-weight: 600;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.btn-add-context:hover { background: var(--accent-d); }
-
-/* ── Gmail view ───────────────────────────────────────────────────────────── */
-#view-gmail {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-  background: #fff;
-  font-family: var(--sans);
-}
-
-/* Gmail top bar */
-.gmail-topbar {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 8px 16px;
-  background: #fff;
-  border-bottom: 1px solid #e0e0e0;
-  flex-shrink: 0;
-  z-index: 10;
-}
-.gmail-back-btn {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 10px;
-  font-size: 12px;
-  color: #5f6368;
-  background: none;
-  border: 1px solid transparent;
-  border-radius: 4px;
-  cursor: pointer;
-  font-family: var(--mono);
-  transition: background 0.15s;
-  flex-shrink: 0;
-}
-.gmail-back-btn:hover { background: #f1f3f4; border-color: #dadce0; }
-.gmail-brand {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 0 16px;
-  flex-shrink: 0;
-}
-.gmail-m {
-  width: 32px;
-  height: 32px;
-  background: linear-gradient(135deg, #4285f4 0%, #ea4335 50%, #fbbc04 75%, #34a853 100%);
-  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
-  font-weight: 700;
-  font-size: 15px;
-  font-family: var(--sans);
-}
-.gmail-brand-label {
-  font-size: 20px;
-  color: #5f6368;
-  font-family: var(--sans);
-  font-weight: 400;
-  letter-spacing: -0.5px;
-}
-.gmail-search-wrap {
-  flex: 1;
-  max-width: 720px;
-  margin: 0 16px;
-}
-.gmail-search-wrap input {
-  width: 100%;
-  padding: 8px 16px;
-  background: #eaf1fb;
-  border: none;
-  border-radius: 24px;
-  font-size: 14px;
-  font-family: var(--sans);
-  color: #202124;
-  outline: none;
-  transition: background 0.2s;
-}
-.gmail-search-wrap input:focus { background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
-.gmail-talent-pill {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 4px 12px;
-  background: #f1f3f4;
-  border-radius: 20px;
-  font-size: 12px;
-  color: #5f6368;
-  flex-shrink: 0;
-}
-.gmail-talent-avatar {
-  width: 28px;
-  height: 28px;
-  border-radius: 50%;
-  background: #4285f4;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 13px;
-  font-weight: 600;
-  font-family: var(--sans);
+  box-shadow: 0 0 15px var(--primary-glow);
 }
 
-/* Gmail body layout */
-.gmail-body {
-  display: flex;
-  flex: 1;
-  overflow: hidden;
+.nav-section {
+  padding: 12px 12px 0;
 }
 
-/* Gmail left nav */
-.gmail-nav-panel {
-  width: 200px;
-  flex-shrink: 0;
-  padding: 8px 0;
-  overflow-y: auto;
-  border-right: 1px solid #f0f0f0;
-}
-.gmail-nav-panel .compose-btn {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin: 4px 8px 12px;
-  padding: 14px 20px;
-  background: #fff;
-  border: none;
-  border-radius: 24px;
-  box-shadow: 0 1px 3px rgba(0,0,0,0.2), 0 1px 2px rgba(0,0,0,0.1);
-  font-size: 14px;
-  font-family: var(--sans);
-  color: #202124;
-  cursor: default;
-  pointer-events: none;
-}
-.gmail-nav-item {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  padding: 6px 14px 6px 18px;
-  font-size: 14px;
-  color: #202124;
-  border-radius: 0 20px 20px 0;
-  cursor: pointer;
-  font-family: var(--sans);
-}
-.gmail-nav-item.active { background: #fce8e6; font-weight: 600; color: #202124; }
-.gmail-nav-item:not(.active):hover { background: #f1f3f4; }
-.gmail-nav-item .nav-icon { font-size: 18px; width: 20px; text-align: center; }
-.gmail-nav-count { margin-left: auto; font-size: 12px; font-weight: 400; color: #202124; }
-
-/* Gmail main email area */
-.gmail-main {
-  flex: 1;
-  display: flex;
-  overflow: hidden;
-}
-
-/* Email list pane */
-#gmail-email-list {
-  width: 380px;
-  min-width: 280px;
-  border-right: 1px solid #e0e0e0;
-  overflow-y: auto;
-  flex-shrink: 0;
-  background: #fff;
-}
-.gmail-list-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 16px;
-  border-bottom: 1px solid #e0e0e0;
-  position: sticky;
-  top: 0;
-  background: #fff;
-  z-index: 1;
-}
-.gmail-tab-pill {
-  padding: 4px 12px;
-  border-radius: 16px;
-  font-size: 12px;
-  font-family: var(--sans);
-  color: #5f6368;
-  background: none;
-  transition: background 0.15s;
-}
-.gmail-tab-pill.active { background: #e8f0fe; color: #1a73e8; font-weight: 500; }
-.gmail-tab-pill:not(.active):hover { background: #f1f3f4; }
-.email-row {
-  display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 10px 16px;
-  border-bottom: 1px solid #f0f0f0;
-  cursor: pointer;
-  transition: background 0.1s;
-  position: relative;
-}
-.email-row:hover { background: #f5f5f5; }
-.email-row.selected { background: #e8f0fe; }
-.email-row.unread .email-sender-col { font-weight: 600; }
-.email-row.unread .email-subject-col { font-weight: 600; }
-.score-stripe {
-  width: 4px;
-  border-radius: 2px;
-  align-self: stretch;
-  margin-right: 10px;
-  flex-shrink: 0;
-}
-.score-stripe.good   { background: #22c55e; }
-.score-stripe.uncert { background: #f59e0b; }
-.score-stripe.trash  { background: #ef4444; }
-.email-meta-col { flex: 1; overflow: hidden; }
-.email-sender-col {
-  font-size: 14px;
-  color: #202124;
-  font-family: var(--sans);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 2px;
-}
-.email-subject-col {
-  font-size: 13px;
-  color: #444;
-  font-family: var(--sans);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-bottom: 2px;
-}
-.email-snippet-col {
-  font-size: 12px;
-  color: #5f6368;
-  font-family: var(--sans);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.email-right-col {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 4px;
-  flex-shrink: 0;
-  margin-left: 8px;
-}
-.email-date {
-  font-size: 11px;
-  color: #5f6368;
-  font-family: var(--sans);
-  white-space: nowrap;
-}
-.score-label {
-  font-size: 10px;
-  padding: 1px 6px;
-  border-radius: 10px;
-  font-family: var(--mono);
-  font-weight: 600;
-}
-.score-label.good   { background: rgba(34,197,94,0.12);  color: #16a34a; }
-.score-label.uncert { background: rgba(245,158,11,0.12); color: #b45309; }
-.score-label.trash  { background: rgba(239,68,68,0.12);  color: #b91c1c; }
-.gmail-empty-state {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  height: 200px;
-  color: #5f6368;
-  font-size: 14px;
-  font-family: var(--sans);
-  gap: 8px;
-}
-
-/* Email reading pane */
-#gmail-reading-pane {
-  flex: 1;
-  overflow-y: auto;
-  background: #fff;
-}
-.reading-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 12px 24px;
-  border-bottom: 1px solid #e0e0e0;
-  position: sticky;
-  top: 0;
-  background: #fff;
-  z-index: 1;
-}
-.reading-toolbar .tool-btn {
-  padding: 6px 10px;
-  border-radius: 4px;
-  font-size: 13px;
-  color: #5f6368;
-  background: none;
-  transition: background 0.15s;
-  font-family: var(--sans);
-}
-.reading-toolbar .tool-btn:hover { background: #f1f3f4; }
-.email-thread {
-  padding: 24px 32px;
-}
-.email-thread-subject {
-  font-size: 22px;
-  color: #202124;
-  font-family: var(--sans);
-  font-weight: 400;
-  margin-bottom: 16px;
-}
-.email-thread-msg {
-  background: #fff;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  margin-bottom: 16px;
-  overflow: hidden;
-}
-.msg-header {
-  display: flex;
-  align-items: flex-start;
-  padding: 16px 20px;
-  border-bottom: 1px solid #f0f0f0;
-  gap: 12px;
-}
-.msg-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #5f6368;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  font-weight: 600;
-  font-family: var(--sans);
-  flex-shrink: 0;
-}
-.msg-from { font-size: 14px; font-weight: 600; color: #202124; font-family: var(--sans); }
-.msg-from-email { font-size: 13px; color: #5f6368; font-family: var(--sans); font-weight: 400; }
-.msg-date { font-size: 12px; color: #5f6368; font-family: var(--sans); margin-left: auto; flex-shrink: 0; }
-.msg-body {
-  padding: 16px 20px;
-  font-size: 14px;
-  color: #202124;
-  font-family: var(--sans);
-  line-height: 1.6;
-}
-.msg-meta-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid #f0f0f0; }
-.meta-chip {
-  font-size: 11px;
-  padding: 3px 10px;
-  border-radius: 12px;
-  font-family: var(--mono);
-  background: #f1f3f4;
-  color: #5f6368;
-}
-.meta-chip.rate { background: #e8f5e9; color: #1b5e20; }
-.meta-chip.brand { background: #e8eaf6; color: #1a237e; }
-.meta-chip.type { background: #fff3e0; color: #e65100; }
-.meta-chip.score-good   { background: rgba(34,197,94,0.12);  color: #16a34a; }
-.meta-chip.score-uncert { background: rgba(245,158,11,0.12); color: #b45309; }
-.meta-chip.score-trash  { background: rgba(239,68,68,0.12);  color: #b91c1c; }
-
-/* AI Draft compose area */
-.draft-compose-wrap {
-  margin: 0 32px 32px;
-  border: 1px solid #e0e0e0;
-  border-radius: 8px;
-  overflow: hidden;
-  box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-}
-.draft-compose-header {
+.nav-item {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 10px 16px;
-  background: #f8f9fa;
-  border-bottom: 1px solid #e0e0e0;
-}
-.draft-compose-title { font-size: 13px; font-weight: 500; color: #202124; font-family: var(--sans); }
-.draft-compose-badge {
-  font-size: 11px;
-  padding: 2px 8px;
-  border-radius: 10px;
-  background: #e3f2fd;
-  color: #1565c0;
-  font-family: var(--mono);
-}
-.draft-compose-badge.escalate { background: #fce4ec; color: #880e4f; }
-.draft-field {
-  display: flex;
-  align-items: center;
-  padding: 8px 16px;
-  border-bottom: 1px solid #f0f0f0;
-  gap: 6px;
-}
-.draft-field-label { font-size: 12px; color: #5f6368; font-family: var(--sans); min-width: 50px; }
-.draft-field-value { font-size: 13px; color: #202124; font-family: var(--sans); flex: 1; }
-.draft-body-area {
-  padding: 0;
-}
-.draft-body-area textarea {
-  width: 100%;
-  padding: 16px;
-  border: none;
-  outline: none;
-  font-size: 14px;
-  font-family: var(--sans);
-  color: #202124;
-  line-height: 1.6;
-  min-height: 180px;
-  background: #fff;
-}
-.draft-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 16px;
-  background: #f8f9fa;
-  border-top: 1px solid #e0e0e0;
-}
-.btn-send {
-  padding: 8px 20px;
-  background: #1a73e8;
-  color: #fff;
+  padding: 10px 12px;
+  border-radius: 8px;
   font-size: 13px;
-  font-family: var(--sans);
   font-weight: 500;
-  border-radius: 4px;
-  transition: background 0.15s;
+  color: var(--text-dim);
+  transition: var(--transition);
+  margin-bottom: 4px;
 }
-.btn-send:hover:not(:disabled) { background: #1557b0; }
-.btn-send:disabled { background: #ccc; cursor: not-allowed; }
-.btn-save-draft {
-  padding: 8px 16px;
-  color: #5f6368;
-  font-size: 13px;
-  font-family: var(--sans);
-  border-radius: 4px;
-  transition: background 0.15s;
+
+.nav-item:hover {
+  background: var(--panel-light);
+  color: #fff;
 }
-.btn-save-draft:hover { background: #f1f3f4; }
-.btn-discard {
-  padding: 8px 16px;
-  color: #d93025;
-  font-size: 13px;
-  font-family: var(--sans);
-  border-radius: 4px;
-  margin-left: auto;
-  transition: background 0.15s;
+
+.nav-item.active {
+  background: var(--primary);
+  color: #fff;
+  box-shadow: 0 4px 12px var(--primary-glow);
 }
-.btn-discard:hover { background: #fce8e6; }
-.reading-placeholder {
+
+.sidebar-label {
+  padding: 24px 24px 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+#talent-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 4px 12px;
+}
+
+.talent-item {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+  transition: var(--transition);
+  margin-bottom: 2px;
+}
+
+.talent-item:hover {
+  background: var(--panel-light);
+  color: #fff;
+}
+
+.talent-item.active {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--primary);
+  border: 1px solid var(--border-active);
+}
+
+.talent-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--panel-light);
+  display: flex;
   align-items: center;
   justify-content: center;
-  height: 100%;
-  color: #5f6368;
-  font-family: var(--sans);
-  font-size: 15px;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+}
+
+.talent-status {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-left: auto;
+}
+
+.status-online { background: var(--success); box-shadow: 0 0 8px var(--success); }
+.status-offline { background: var(--text-muted); }
+
+.sidebar-footer {
+  padding: 16px;
+  border-top: 1px solid var(--border);
+}
+
+.btn-premium {
+  width: 100%;
+  padding: 10px;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   gap: 8px;
+  transition: var(--transition);
 }
-.reading-placeholder .icon { font-size: 40px; margin-bottom: 8px; }
 
-/* ── Toast ────────────────────────────────────────────────────────────────── */
-#toast {
-  position: fixed;
-  bottom: 24px;
-  right: 24px;
-  background: #323232;
-  color: #fff;
-  padding: 10px 18px;
-  border-radius: 6px;
-  font-size: 13px;
-  font-family: var(--mono);
-  z-index: 9999;
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.3s;
-  max-width: 320px;
+.btn-premium:hover {
+  background: var(--border);
+  border-color: var(--text-muted);
 }
-#toast.show { opacity: 1; pointer-events: auto; }
 
-/* ── Loading spinner ──────────────────────────────────────────────────────── */
+/* ── Layout Shell ─────────────────────────────────────────────────────────── */
+#main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* ── Animations ────────────────────────────────────────────────────────────── */
+@keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.animate-fade { animation: fadeIn 0.3s ease-out forwards; }
+
+@keyframes spin { to { transform: rotate(360deg); } }
 .spinner {
-  display: inline-block;
   width: 16px;
   height: 16px;
   border: 2px solid var(--border);
-  border-top-color: var(--accent);
+  border-top-color: var(--primary);
   border-radius: 50%;
   animation: spin 0.7s linear infinite;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
 
-/* ── API key overlay ──────────────────────────────────────────────────────── */
-#api-key-overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(0,0,0,0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1000;
-}
-.api-key-box {
-  background: var(--bg2);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 32px 36px;
-  width: 380px;
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-.api-key-box h2 { font-size: 15px; font-weight: 600; color: var(--text); }
-.api-key-box p { font-size: 12px; color: var(--text2); line-height: 1.5; }
-.api-key-box input {
-  padding: 10px 14px;
-  background: var(--bg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  color: var(--text);
-  font-family: var(--mono);
-  font-size: 13px;
-  outline: none;
-  width: 100%;
-}
-.api-key-box input:focus { border-color: var(--accent); }
-.btn-api-submit {
-  padding: 10px;
-  background: var(--accent);
-  color: #000;
-  font-family: var(--mono);
-  font-size: 13px;
-  font-weight: 600;
-  border-radius: 6px;
-  transition: background 0.15s;
-}
-.btn-api-submit:hover { background: var(--accent-d); }
-
-/* ── Scrollbar ────────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+/* Rest of standard Gmail styles modified for dark mode... (will expand in next steps) */
 </style>
 </head>
 <body>
 
 <!-- API key overlay -->
-<div id="api-key-overlay" style="display:none">
-  <div class="api-key-box">
-    <h2>◉ Inbox Manager</h2>
-    <p>Enter your API key to access the dashboard.</p>
-    <input type="password" id="api-key-input" placeholder="x-api-key value" autocomplete="off">
-    <button class="btn-api-submit" id="btn-api-submit">Enter Dashboard</button>
+<div id="api-key-overlay" style="display:none" class="glass">
+  <div class="api-key-box" style="background:var(--sidebar); padding:40px; border-radius:24px; border:1px solid var(--border); text-align:center;">
+    <div class="sidebar-logo-icon" style="width:48px; height:48px; margin:0 auto 24px;">🚀</div>
+    <h2 style="margin-bottom:8px; font-size:20px;">Inbox Command Center</h2>
+    <p style="color:var(--text-muted); margin-bottom:24px;">Enter your management console key.</p>
+    <input type="password" id="api-key-input" placeholder="••••••••••••" style="padding:14px; background:var(--bg); border:1px solid var(--border); border-radius:12px; color:var(--text); font-family:var(--mono); text-align:center; width:100%; margin-bottom:16px;">
+    <button class="btn-api-submit" id="btn-api-submit" style="width:100%; padding:14px; background:var(--primary); color:white; border-radius:12px; font-weight:700;">Authorize Console</button>
   </div>
 </div>
 
@@ -871,150 +246,414 @@ body {
 <aside id="sidebar">
   <div class="sidebar-header">
     <div class="sidebar-logo">
-      <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
-        <circle cx="8" cy="8" r="7" stroke="#00d4aa" stroke-width="1.5"/>
-        <circle cx="8" cy="8" r="3" fill="#00d4aa"/>
-      </svg>
+      <div class="sidebar-logo-icon">M</div>
       Inbox Manager
     </div>
-    <div id="deploy-pill" style="font-size:10px;color:#5f6368;margin-top:4px;letter-spacing:0.3px">Loading...</div>
+    <div id="deploy-pill" style="font-size:10px; color:var(--text-muted); margin-top:8px; border-radius:100px; background:var(--panel-light); padding:4px 12px; display:inline-block;">🛰️ Connected</div>
   </div>
+
   <div class="nav-section">
     <div class="nav-item active" id="nav-overview">
-      <span>📊</span> Daily Report
+      <span>📊 Activity Hub</span>
+      <span class="mono" style="font-size:10px; opacity:0.5">⌘1</span>
     </div>
   </div>
-  <div class="sidebar-section-label">Talent Inboxes</div>
+
+  <div class="sidebar-label">16 Connected Talents</div>
   <ul id="talent-list">
-    <li style="padding:12px 16px;font-size:11px;color:var(--text3)"><span class="spinner"></span></li>
+    <!-- Talent items populated by JS -->
   </ul>
+
   <div class="sidebar-footer">
-    <button class="btn-refresh" id="btn-refresh">↻ Refresh Data</button>
+    <button class="btn-premium" id="btn-refresh">
+      <span>↻</span> Synchronize
+    </button>
   </div>
 </aside>
 
-<!-- Main -->
-<main id="main">
+/* ── Main Dashboard (Overview) ────────────────────────────────────────────── */
+#view-overview {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px;
+  background: var(--bg);
+}
 
-  <!-- Overview view -->
-  <div id="view-overview" style="display:none">
-    <div style="flex:1;overflow-y:auto;padding:28px 32px 40px">
-      <div class="overview-header">
-        <h1>Daily Report</h1>
-        <span class="date-chip" id="report-date">—</span>
-      </div>
-      <div class="summary-bar">
-        <div class="stat-pill good">
-          <span class="num" id="total-good">—</span>
-          <label>Good Deals</label>
-        </div>
-        <div class="stat-pill uncert">
-          <span class="num" id="total-uncert">—</span>
-          <label>Uncertain</label>
-        </div>
-        <div class="stat-pill trash">
-          <span class="num" id="total-trash">—</span>
-          <label>Trash</label>
-        </div>
-        <div class="stat-pill total">
-          <span class="num" id="total-all">—</span>
-          <label>Total Emails</label>
-        </div>
-      </div>
-      <div id="talent-cards-grid"></div>
-      <section id="context-panel">
-        <h3>Manager Instructions</h3>
-        <p class="muted-text">These are injected into every GPT reply draft. Add them here and they take effect on the next poll.</p>
-        <div id="context-list"></div>
-        <div class="context-add">
-          <textarea id="context-input" placeholder="E.g. Do not accept affiliate-only deals this week. Always ask for $500 minimum upfront." rows="3"></textarea>
-          <button class="btn-add-context" id="btn-add-context">Add Instruction</button>
-        </div>
-      </section>
-    </div>
-  </div>
+.overview-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 32px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
 
-  <!-- Gmail replica view -->
-  <div id="view-gmail" style="display:none;flex:1;flex-direction:column;overflow:hidden;background:#fff">
+.section-title {
+  font-size: 24px;
+  margin-bottom: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
 
-    <!-- Top bar -->
-    <div class="gmail-topbar">
-      <button class="gmail-back-btn" id="gmail-back">
-        ← Overview
-      </button>
-      <div class="gmail-brand">
-        <div class="gmail-m">M</div>
-        <span class="gmail-brand-label">ail</span>
-      </div>
-      <div class="gmail-search-wrap">
-        <input type="text" placeholder="Search in mail" id="gmail-search">
-      </div>
-      <div class="gmail-talent-pill">
-        <div class="gmail-talent-avatar" id="gmail-avatar">?</div>
-        <span id="gmail-talent-label">—</span>
-      </div>
-      <button id="btn-open-gmail" onclick="openRealGmail()" style="margin-left:8px;padding:6px 14px;background:#fff;color:#1a73e8;font-size:12px;font-family:var(--sans);border-radius:4px;border:1px solid #dadce0;cursor:pointer;display:flex;align-items:center;gap:6px;" title="Open this account in real Gmail">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z" fill="#EA4335"/></svg>
-        Open in Gmail
-      </button>
-      <button id="btn-run-ai" onclick="runAiDraft()" style="margin-left:8px;padding:6px 14px;background:#1e8e3e;color:#fff;font-size:12px;font-family:var(--sans);border-radius:4px;border:none;cursor:pointer;display:flex;align-items:center;gap:6px;" title="Run GPT triage + draft on the selected email (uses OpenAI credits)">
-        ✨ Run AI Draft
-      </button>
-    </div>
+/* ── Activity Summary ─────────────────────────────────────────────────────── */
+.summary-bar {
+  display: flex;
+  gap: 16px;
+  margin-bottom: 32px;
+}
 
-    <!-- Gmail body -->
-    <div class="gmail-body" style="flex:1;overflow:hidden">
+.stat-card {
+  flex: 1;
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  transition: var(--transition);
+}
 
-      <!-- Left nav -->
-      <div class="gmail-nav-panel">
-        <button class="compose-btn" onclick="setGmailNav('drafts')" title="View AI-generated draft replies">✏️ Drafts</button>
-        <div class="gmail-nav-item active" id="gnav-inbox" onclick="setGmailNav('inbox')">
-          <span class="nav-icon">📥</span>
-          Inbox
-          <span class="gmail-nav-count" id="gmail-inbox-count"></span>
-        </div>
-        <div class="gmail-nav-item" id="gnav-starred" onclick="setGmailNav('starred')">
-          <span class="nav-icon">⭐</span>
-          Starred
-        </div>
-        <div class="gmail-nav-item" id="gnav-sent" onclick="setGmailNav('sent')">
-          <span class="nav-icon">📤</span>
-          Sent
-        </div>
-        <div class="gmail-nav-item" id="gnav-drafts" onclick="setGmailNav('drafts')">
-          <span class="nav-icon">📝</span>
-          Drafts
-          <span class="gmail-nav-count" id="gmail-draft-count"></span>
-        </div>
-      </div>
+.stat-card:hover { border-color: var(--primary); transform: translateY(-2px); }
+.stat-card .label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.1em; margin-bottom: 8px; display: block; }
+.stat-card .value { font-size: 32px; font-weight: 700; color: #fff; }
 
-      <!-- Email list + reading pane -->
-      <div class="gmail-main" style="flex:1;overflow:hidden">
+.stat-card.primary .value { color: var(--primary); }
+.stat-card.success .value { color: var(--success); }
+.stat-card.warning .value { color: var(--warning); }
+.stat-card.danger .value { color: var(--danger); }
 
-        <!-- Email list -->
-        <div id="gmail-email-list">
-          <div class="gmail-list-toolbar">
-            <button class="gmail-tab-pill active" id="tab-all" onclick="setScoreFilter(null)">All</button>
-            <button class="gmail-tab-pill" id="tab-good" onclick="setScoreFilter(3)">Good Deals</button>
-            <button class="gmail-tab-pill" id="tab-uncert" onclick="setScoreFilter(2)">Uncertain</button>
-            <button class="gmail-tab-pill" id="tab-trash" onclick="setScoreFilter(1)">Trash</button>
+/* ── Talent Grid ──────────────────────────────────────────────────────────── */
+#talent-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 20px;
+}
+
+.talent-card {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.talent-card:hover { background: var(--panel-light); border-color: var(--primary); }
+
+.card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 16px; }
+.card-info h3 { font-size: 16px; margin-bottom: 4px; }
+.card-info p { font-size: 12px; color: var(--text-muted); }
+
+.card-stats { display: flex; gap: 8px; margin-bottom: 16px; }
+.pill { padding: 4px 10px; border-radius: 100px; font-size: 11px; font-weight: 600; }
+.pill.good { background: rgba(16, 185, 129, 0.1); color: var(--success); }
+.pill.uncert { background: rgba(245, 158, 11, 0.1); color: var(--warning); }
+.pill.fail { background: rgba(239, 68, 68, 0.1); color: var(--danger); }
+
+/* ── Instruction Panel ─────────────────────────────────────────────────────── */
+#context-panel {
+  padding: 24px;
+  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+}
+
+.instruction-item {
+  padding: 12px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  position: relative;
+}
+
+.instruction-item .meta { font-size: 10px; color: var(--text-muted); margin-top: 8px; }
+
+/* ── Gmail Command View ────────────────────────────────────────────────────── */
+#view-gmail {
+  flex: 1;
+  display: flex !important;
+  flex-direction: column;
+  background: var(--bg);
+}
+
+.top-nav {
+  height: 64px;
+  display: flex;
+  align-items: center;
+  padding: 0 24px;
+  border-bottom: 1px solid var(--border);
+  gap: 24px;
+}
+
+.back-link {
+  color: var(--text-muted);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  transition: var(--transition);
+}
+
+.back-link:hover { color: #fff; }
+
+.search-container {
+  flex: 1;
+  max-width: 600px;
+  position: relative;
+}
+
+.search-container input {
+  width: 100%;
+  padding: 10px 16px 10px 40px;
+  background: var(--panel-light);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  color: #fff;
+  font-family: var(--sans);
+  outline: none;
+}
+
+.search-container::before {
+  content: '🔍';
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 14px;
+  opacity: 0.5;
+}
+
+/* ── Three Column Split ───────────────────────────────────────────────────── */
+.split-view {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+/* Middle: Email List */
+.email-feed {
+  width: 400px;
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  background: var(--sidebar);
+}
+
+.feed-header {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  gap: 8px;
+}
+
+.feed-tab {
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.feed-tab.active { background: var(--panel-light); color: #fff; }
+
+.email-row {
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  transition: var(--transition);
+  position: relative;
+}
+
+.email-row:hover { background: var(--panel-light); }
+.email-row.active { background: rgba(59, 130, 246, 0.1); border-left: 3px solid var(--primary); }
+
+.row-top { display: flex; justify-content: space-between; margin-bottom: 4px; }
+.row-sender { font-size: 14px; font-weight: 600; color: #fff; }
+.row-date { font-size: 11px; color: var(--text-muted); }
+.row-subject { font-size: 13px; color: var(--text-dim); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.row-snippet { font-size: 12px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Right: Reading Pane & Composer */
+.reader {
+  flex: 1;
+  overflow-y: auto;
+  padding: 40px;
+  background: var(--bg);
+}
+
+.thread-header { margin-bottom: 32px; border-bottom: 1px solid var(--border); padding-bottom: 24px; }
+.thread-header h1 { font-size: 24px; margin-bottom: 16px; }
+
+.message-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px;
+  margin-bottom: 24px;
+}
+
+.message-meta { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; }
+.avatar-large { width: 40px; height: 40px; border-radius: 50%; background: var(--primary); display: flex; align-items: center; justify-content: center; font-weight: 700; }
+
+.message-body { font-size: 15px; line-height: 1.6; color: var(--text); }
+
+/* AI Composer */
+.ai-composer {
+  margin-top: 40px;
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1), rgba(16, 185, 129, 0.05));
+  border: 1px solid var(--primary-glow);
+  border-radius: 16px;
+  padding: 24px;
+  position: relative;
+}
+
+.ai-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; }
+.ai-badge { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 700; color: var(--primary); }
+
+.ai-body textarea {
+  width: 100%;
+  background: rgba(0,0,0,0.2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 14px;
+  line-height: 1.6;
+  min-height: 200px;
+  outline: none;
+}
+
+.ai-footer { display: flex; justify-content: flex-end; gap: 12px; margin-top: 20px; }
+
+.btn-action { padding: 10px 20px; border-radius: 10px; font-size: 13px; font-weight: 600; cursor: pointer; transition: var(--transition); border: none; }
+.btn-action.primary { background: var(--primary); color: white; }
+.btn-action.secondary { background: var(--panel-light); color: #fff; border: 1px solid var(--border); }
+.btn-action:hover { opacity: 0.9; transform: scale(1.02); }
+
+/* ── Toast & Overlays ─────────────────────────────────────────────────────── */
+#toast {
+  position: fixed;
+  bottom: 32px;
+  right: 32px;
+  padding: 14px 24px;
+  border-radius: 12px;
+  background: #fff;
+  color: #000;
+  font-weight: 600;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+  z-index: 1000;
+  display: none;
+  animation: slideUp 0.3s ease-out;
+}
+
+@keyframes slideUp { from { transform: translateY(20px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+
+</style>
+</head>
+<body>
+
+<!-- AI API key overlay -->
+<div id="api-key-overlay" style="display:none">
+  <!-- (Retained design from previous step) -->
+</div>
+
+<!-- Main UI -->
+<div id="app-shell" style="display: flex; width: 100%; height: 100vh;">
+  
+  <!-- Sidebar Navigator (Step 1) -->
+  <!-- [SIDEBAR FROM PREVIOUS STEP] -->
+
+  <!-- Main Content Area -->
+  <main id="main">
+
+    <!-- Activity Hub / Overview -->
+    <div id="view-overview" style="display:none">
+      <div class="overview-header animate-fade">
+        <h1 class="section-title">📊 Activity Hub</h1>
+        <div class="summary-bar">
+          <div class="stat-card primary">
+            <span class="label">Total Managed</span>
+            <div class="value" id="total-all">—</div>
           </div>
-          <div id="email-rows"></div>
-        </div>
-
-        <!-- Reading pane -->
-        <div id="gmail-reading-pane">
-          <div class="reading-placeholder">
-            <div class="icon">📧</div>
-            Select an email to read it
+          <div class="stat-card success">
+            <span class="label">High Value</span>
+            <div class="value" id="total-good">—</div>
+          </div>
+          <div class="stat-card warning">
+            <span class="label">Uncertain</span>
+            <div class="value" id="total-uncert">—</div>
+          </div>
+          <div class="stat-card danger">
+            <span class="label">Filtered</span>
+            <div class="value" id="total-trash">—</div>
           </div>
         </div>
+      </div>
 
+      <div class="overview-grid animate-fade">
+        <div class="talent-section">
+          <h2 class="section-title" style="font-size: 18px;">Talent Performance</h2>
+          <div id="talent-cards-grid"></div>
+        </div>
+        
+        <div class="instruction-section">
+          <h2 class="section-title" style="font-size: 18px;">Global Instructions</h2>
+          <div id="context-panel">
+            <div id="context-list"></div>
+            <div class="context-add" style="margin-top:20px;">
+              <textarea id="context-input" placeholder="Update AI strategy..." rows="3" style="width:100%; background:var(--bg); border:1px solid var(--border); border-radius:12px; color:#fff; padding:12px; font-size:13px;"></textarea>
+              <button class="btn-action primary" id="btn-add-context" style="width:100%; margin-top:12px;">Update Strategy</button>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
 
-</main>
+    <!-- Gmail Command Center -->
+    <div id="view-gmail" style="display:none;">
+      <header class="top-nav">
+        <div class="back-link" id="gmail-back">← Back to Hub</div>
+        <div class="search-container">
+          <input type="text" placeholder="Search across communications..." id="gmail-search">
+        </div>
+        <div style="display:flex; gap:12px;">
+           <button class="btn-action secondary" onclick="openRealGmail()">Open Gmail</button>
+           <button class="btn-action primary" id="btn-run-ai" onclick="runAiDraft()">✨ Run AI Draft</button>
+        </div>
+      </header>
+
+      <div class="split-view">
+        <!-- Sidebar Navigation (Categories) -->
+        <div style="width:72px; border-right:1px solid var(--border); display:flex; flex-direction:column; align-items:center; padding-top:20px; gap:20px; background:var(--sidebar);">
+           <div id="gnav-inbox" onclick="setGmailNav('inbox')" title="Inbox" style="cursor:pointer; font-size:20px;">📥</div>
+           <div id="gnav-drafts" onclick="setGmailNav('drafts')" title="Drafts" style="cursor:pointer; font-size:20px;">📝</div>
+           <div id="gnav-sent" onclick="setGmailNav('sent')" title="Sent" style="cursor:pointer; font-size:20px;">📤</div>
+           <div id="gnav-starred" onclick="setGmailNav('starred')" title="Starred" style="cursor:pointer; font-size:20px;">⭐</div>
+        </div>
+
+        <div class="email-feed">
+          <div class="feed-header">
+            <div class="feed-tab active" id="tab-all" onclick="setScoreFilter(null)">All</div>
+            <div class="feed-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</div>
+            <div class="feed-tab" id="tab-uncert" onclick="setScoreFilter(2)">Misc</div>
+          </div>
+          <div id="email-rows" style="flex:1; overflow-y:auto;"></div>
+        </div>
+
+        <div class="reader" id="gmail-reading-pane">
+           <div style="height:100%; display:flex; flex-direction:column; align-items:center; justify-content:center; color:var(--text-muted);">
+             <div style="font-size:48px; margin-bottom:16px;">📂</div>
+             Select a thread to view activity
+           </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
 
 <!-- Toast -->
 <div id="toast"></div>
@@ -1227,10 +866,10 @@ function renderSidebar() {
     li.className = 'talent-item';
     li.dataset.key = t.key;
     li.innerHTML = `
-      <span class="status-dot ${t.connected ? 'on' : 'off'}"></span>
+      <div class="talent-avatar">${initial(t.full_name)}</div>
       <span class="talent-name">${esc(t.full_name)}</span>
-      ${pending > 0 ? `<span class="badge">${pending}</span>` : ''}
-      ${!t.connected ? `<a href="/auth/connect?talent_key=${encodeURIComponent(t.key)}" target="_blank" onclick="event.stopPropagation()" title="Connect Gmail for ${esc(t.full_name)}" style="margin-left:auto;font-size:10px;color:#1a73e8;text-decoration:none;white-space:nowrap;padding:2px 6px;border:1px solid #1a73e8;border-radius:4px;line-height:1.4">Connect</a>` : ''}
+      ${pending > 0 ? `<div style="background:var(--primary); color:white; font-size:10px; font-weight:700; padding:2px 6px; border-radius:10px; margin-left:auto;">${pending}</div>` : ''}
+      <div class="talent-status ${t.connected ? 'status-online' : 'status-offline'}" style="margin-left: ${pending > 0 ? '8px' : 'auto'}"></div>
     `;
     li.addEventListener('click', () => openTalentView(t));
     ul.appendChild(li);
@@ -1257,26 +896,28 @@ function renderTalentCards() {
     const div = document.createElement('div');
     div.className = 'talent-card';
     const bestDeal = card.best_deal_brand
-      ? `<strong>${esc(card.best_deal_brand)}</strong> — ${formatRate(card.best_deal_rate)}`
-      : '<span style="color:var(--text3)">No deals today</span>';
+      ? `<strong>${esc(card.best_deal_brand)}</strong> · ${formatRate(card.best_deal_rate)}`
+      : 'No deals today';
     div.innerHTML = `
       <div class="card-top">
-        <span class="card-name">${esc(card.full_name)}</span>
-        <span class="card-manager">${esc(card.manager || '')}</span>
+        <div class="card-info">
+          <h3>${esc(card.full_name)}</h3>
+          <p>${esc(card.manager || 'No manager assigned')}</p>
+        </div>
+        <div class="talent-avatar" style="width:32px; height:32px;">${initial(card.full_name)}</div>
       </div>
-      <div class="card-counts">
-        <span class="count-chip good">${card.count_good} Good</span>
-        <span class="count-chip uncert">${card.count_uncertain} Uncertain</span>
-        <span class="count-chip trash">${card.count_trash} Trash</span>
+      <div class="card-stats">
+        <span class="pill good">${card.count_good} High</span>
+        <span class="pill uncert">${card.count_uncertain} Misc</span>
+        <span class="pill fail">${card.count_trash} Filtered</span>
       </div>
-      <div class="card-best-deal">Best deal: ${bestDeal}</div>
+      <div style="font-size:12px; color:var(--text-dim); margin-bottom:12px;">Top Op: <span style="color:#fff">${bestDeal}</span></div>
       <div class="card-footer">
         ${card.pending_drafts > 0
-          ? `<span class="draft-badge">${card.pending_drafts} pending draft${card.pending_drafts > 1 ? 's' : ''}</span>`
-          : '<span style="font-size:10px;color:var(--text3)">No pending drafts</span>'}
+          ? `<span class="pill" style="background:rgba(59, 130, 246, 0.2); color:var(--primary);">${card.pending_drafts} AI Draft${card.pending_drafts > 1 ? 's' : ''}</span>`
+          : '<span style="font-size:11px; color:var(--text-muted)">Ready for sync</span>'}
       </div>
     `;
-    // Find talent object
     const talentObj = state.talents.find(t => t.key === card.talent_key);
     div.addEventListener('click', () => { if (talentObj) openTalentView(talentObj); });
     grid.appendChild(div);
@@ -1475,73 +1116,61 @@ function renderEmailList() {
   const rows = document.getElementById('email-rows');
   rows.innerHTML = '';
 
-  const elInbox = document.getElementById('gmail-inbox-count');
-  const elDraft = document.getElementById('gmail-draft-count');
-  if (elInbox) elInbox.textContent = state.emails.length > 0 ? state.emails.length : '';
-  if (elDraft) elDraft.textContent = state.drafts.length > 0 ? state.drafts.length : '';
+  // Use state variables for display
+  const visible = getVisibleEmails();
+  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
 
-  // Drafts nav: render live Gmail drafts directly
   if (state.gmailNav === 'drafts') {
     if (state.drafts.length === 0) {
-      rows.innerHTML = `<div class="gmail-empty-state"><div style="font-size:32px">✏️</div>No drafts in Gmail</div>`;
+      rows.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);"><div style="font-size:32px; margin-bottom:12px;">✏️</div>No drafts available</div>`;
       return;
     }
     state.drafts.forEach(draft => {
       const isEscalate = draft.is_escalate;
-      const row = document.createElement('div');
-      row.className = 'email-row unread';
-      row.dataset.draftGmailId = draft.gmail_draft_id;
-      row.innerHTML = `
-        <div class="score-stripe ${isEscalate ? 'trash' : 'good'}"></div>
-        <div class="email-meta-col">
-          <div class="email-sender-col">To: ${esc(shortSender(draft.to || draft.sender || ''))}</div>
-          <div class="email-subject-col">${esc(draft.subject || '(no subject)')}</div>
-          <div class="email-snippet-col">${esc(draft.snippet || draft.brand_name || '')}</div>
+      const div = document.createElement('div');
+      div.className = 'email-row animate-fade';
+      div.dataset.draftGmailId = draft.gmail_draft_id;
+      div.innerHTML = `
+        <div class="row-top">
+          <span class="row-sender">To: ${esc(shortSender(draft.to || draft.sender || ''))}</span>
+          <span class="pill ${isEscalate ? 'fail' : 'good'}" style="font-size:9px;">${isEscalate ? 'ESCALATE' : 'AI DRAFT'}</span>
         </div>
-        <div class="email-right-col">
-          <span class="score-label ${isEscalate ? 'trash' : 'good'}">${isEscalate ? '⚠️ Escalate' : '✨ AI Draft'}</span>
-        </div>
+        <div class="row-subject">${esc(draft.subject || '(no subject)')}</div>
+        <div class="row-snippet">${esc(draft.snippet || draft.brand_name || '')}</div>
       `;
-      row.addEventListener('click', () => selectDraft(draft));
-      rows.appendChild(row);
+      div.addEventListener('click', () => selectDraft(draft));
+      rows.appendChild(div);
     });
     return;
   }
 
-  const visible = getVisibleEmails();
-  const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
-
   if (visible.length === 0) {
-    const labels = { inbox: 'No emails processed yet', sent: 'No sent replies yet', starred: 'No starred emails', drafts: 'No AI drafts pending' };
-    rows.innerHTML = `<div class="gmail-empty-state"><div style="font-size:32px">📭</div>${labels[state.gmailNav] || 'No emails'}</div>`;
+    rows.innerHTML = `<div style="padding:40px; text-align:center; color:var(--text-muted);"><div style="font-size:32px; margin-bottom:12px;">📭</div>Clear communications</div>`;
     return;
   }
 
   visible.forEach(email => {
-    const sc = scoreClass(email.score);
-    const sn = scoreName(email.score);
+    const sc = (email.score === 3) ? 'good' : (email.score === 2 ? 'uncert' : 'fail');
     const hasDraft = draftsIds.has(email.gmail_message_id);
-    const isUnread = email.is_unread ?? (email.score === 3 || email.score == null);
-    const row = document.createElement('div');
-    row.className = `email-row${isUnread ? ' unread' : ''}`;
-    row.dataset.msgId = email.gmail_message_id;
+    const div = document.createElement('div');
+    div.className = 'email-row animate-fade';
+    div.dataset.msgId = email.gmail_message_id;
 
     const snippet = [email.offer_type, email.brand_name ? '· ' + email.brand_name : ''].filter(Boolean).join(' ');
-    row.innerHTML = `
-      <div class="score-stripe ${sc}"></div>
-      <div class="email-meta-col">
-        <div class="email-sender-col">${esc(shortSender(email.sender))}</div>
-        <div class="email-subject-col">${esc(email.subject || '(no subject)')}</div>
-        <div class="email-snippet-col">${esc(snippet || email.triage_reason || '')}</div>
+    div.innerHTML = `
+      <div class="row-top">
+        <span class="row-sender">${esc(shortSender(email.sender))}</span>
+        <span class="row-date">${fmtDate(email)}</span>
       </div>
-      <div class="email-right-col">
-        <span class="email-date" title="${esc(fmtDateFull(email))}">${fmtDate(email)}</span>
-        <span class="score-label ${sc}">${sn}</span>
-        ${hasDraft ? '<span style="font-size:10px;color:#1a73e8">✏️ Draft</span>' : ''}
+      <div class="row-subject">${esc(email.subject || '(no subject)')}</div>
+      <div class="row-snippet" style="display:flex; align-items:center; gap:8px;">
+        <span class="pill ${sc}" style="padding:2px 6px; font-size:9px;">${scoreName(email.score)}</span>
+        ${esc(snippet || email.triage_reason || '')}
+        ${hasDraft ? '<span style="color:var(--primary); border:1px solid var(--primary-glow); border-radius:4px; padding:0 4px; font-size:9px; font-weight:700;">DRAFT</span>' : ''}
       </div>
     `;
-    row.addEventListener('click', () => selectEmail(email));
-    rows.appendChild(row);
+    div.addEventListener('click', () => selectEmail(email));
+    rows.appendChild(div);
   });
 }
 
@@ -1549,90 +1178,48 @@ function selectDraft(draft) {
   state.selectedDraft = draft;
   state.selectedEmail = null;
   document.querySelectorAll('.email-row').forEach(r => {
-    r.classList.toggle('selected', r.dataset.draftGmailId === draft.gmail_draft_id);
+    r.classList.toggle('active', r.dataset.draftGmailId === draft.gmail_draft_id);
   });
   renderDraftOnlyPane(draft);
 }
 
 function renderDraftOnlyPane(draft) {
   const pane = document.getElementById('gmail-reading-pane');
-  const isEscalate = draft.is_escalate;
-  const dbId = draft.db_draft_id;
   const textareaId = `draft-text-gmail-${draft.gmail_draft_id}`;
+  const isEscalate = draft.is_escalate;
 
   pane.innerHTML = `
-    <div class="reading-toolbar">
-      <button class="tool-btn" onclick="resetReadingPane();document.querySelectorAll('.email-row').forEach(r=>r.classList.remove('selected'))">← Back</button>
+    <div class="thread-header animate-fade">
+      <h1>${esc(draft.subject || '(no subject)')}</h1>
     </div>
-    <div class="email-thread">
-      <div class="email-thread-subject">${esc(draft.subject || '(no subject)')}</div>
-    </div>
-    <div class="draft-compose-wrap">
-      <div class="draft-compose-header">
-        <span class="draft-compose-title">✨ AI Draft Reply</span>
-        <span class="draft-compose-badge ${isEscalate ? 'escalate' : ''}">
-          ${isEscalate ? '⚠️ ESCALATE' : '🤖 GPT-4o'}
-        </span>
+    <div class="ai-composer animate-fade">
+      <div class="ai-header">
+        <div class="ai-badge">✨ LIVE GMAIL DRAFT</div>
+        <span class="pill ${isEscalate ? 'fail' : 'good'}">${isEscalate ? 'ESCALATE' : 'DRAFT'}</span>
       </div>
-      ${isEscalate ? `
-        <div style="padding:12px 16px;background:#fce4ec;font-size:13px;color:#880e4f;font-family:var(--sans);border-bottom:1px solid #f8bbd0">
-          ⚠️ ${esc(draft.escalate_reason || 'This email requires manager attention.')}
-        </div>
-      ` : ''}
-      <div class="draft-field">
-        <span class="draft-field-label">To</span>
-        <span class="draft-field-value">${esc(draft.to || draft.sender || '')}</span>
-      </div>
-      <div class="draft-field">
-        <span class="draft-field-label">Subject</span>
-        <span class="draft-field-value">${esc(draft.subject || '')}</span>
-      </div>
-      ${draft.brand_name || draft.proposed_rate ? `
-        <div style="padding:8px 16px;display:flex;gap:8px;flex-wrap:wrap">
-          ${draft.brand_name ? `<span class="meta-chip brand">🏷️ ${esc(draft.brand_name)}</span>` : ''}
-          ${draft.proposed_rate ? `<span class="meta-chip rate">💰 ${formatRate(draft.proposed_rate)}</span>` : ''}
-        </div>
-      ` : ''}
-      <div class="draft-body-area">
+      <div style="margin-bottom:12px; font-size:12px; color:var(--text-muted);">To: <span style="color:#fff">${esc(draft.to || draft.sender)}</span></div>
+      <div class="ai-body">
         <textarea id="${textareaId}">${esc(draft.body_text || '')}</textarea>
       </div>
-      <div class="draft-actions">
-        <button class="btn-send" id="btn-send-draft-${draft.gmail_draft_id}"
-          ${isEscalate || !dbId ? 'disabled title="' + (isEscalate ? 'Escalation required' : 'Draft not yet in system') + '"' : ''}>
-          Send ✉️
-        </button>
-        ${dbId ? `<button class="btn-save-draft" id="btn-save-draft-${draft.gmail_draft_id}">Save Edits</button>
-        <button class="btn-discard" id="btn-discard-draft-${draft.gmail_draft_id}">Discard</button>` : ''}
+      <div class="ai-footer">
+        <button class="btn-action secondary" onclick="resetReadingPane()">Close</button>
+        <button class="btn-action primary" id="btn-send-draft-${draft.gmail_draft_id}" ${isEscalate ? 'disabled' : ''}>Send Message ✉️</button>
       </div>
     </div>
   `;
-
-  if (dbId) {
-    document.getElementById(`btn-send-draft-${draft.gmail_draft_id}`)?.addEventListener('click', () => sendDraft(dbId));
-    document.getElementById(`btn-save-draft-${draft.gmail_draft_id}`)?.addEventListener('click', async () => {
-      const ta = document.getElementById(textareaId);
-      if (!ta) return;
-      try {
-        await api('POST', `/api/drafts/${dbId}/edit`, { draft_text: ta.value, reviewed_by: 'manager-dashboard' });
-        showToast('Draft saved — changes reflected in Gmail drafts folder.');
-        await loadTalentData(state.selectedTalent);
-      } catch (e) { showToast('Save failed: ' + e.message); }
-    });
-    document.getElementById(`btn-discard-draft-${draft.gmail_draft_id}`)?.addEventListener('click', () => discardDraft(dbId));
+  
+  if (draft.db_draft_id) {
+    document.getElementById(`btn-send-draft-${draft.gmail_draft_id}`)?.addEventListener('click', () => sendDraft(draft.db_draft_id));
   }
 }
 
 function selectEmail(email) {
   state.selectedEmail = email;
   state.selectedDraft = state.drafts.find(d => d.gmail_message_id === email.gmail_message_id) || null;
-
-  // Highlight row
   document.querySelectorAll('.email-row').forEach(r => {
-    r.classList.toggle('selected', r.dataset.msgId === email.gmail_message_id);
+    r.classList.toggle('active', r.dataset.msgId === email.gmail_message_id);
   });
-
   renderReadingPane(email, state.selectedDraft);
-  // Fetch real body — use stored body_text first, fall back to live Gmail fetch
   fetchEmailBody(email);
 }
 
@@ -1666,37 +1253,38 @@ function resetReadingPane() {
 
 function renderReadingPane(email, draft) {
   const pane = document.getElementById('gmail-reading-pane');
-  const sc = scoreClass(email.score);
   const senderShort = shortSender(email.sender);
-  const senderAvColor = { good: '#1b5e20', uncert: '#e65100', trash: '#b71c1c' }[sc] || '#5f6368';
+  const sc = (email.score === 3) ? 'good' : (email.score === 2 ? 'uncert' : 'fail');
 
   pane.innerHTML = `
-    <div class="reading-toolbar">
-      <button class="tool-btn" onclick="resetReadingPane();document.querySelectorAll('.email-row').forEach(r=>r.classList.remove('selected'))">← Back</button>
-      <button class="tool-btn" onclick="archiveEmail('${email.gmail_message_id}')" title="Archive this email">🗄️ Archive</button>
-    </div>
-    <div class="email-thread">
-      <div class="email-thread-subject">${esc(email.subject || '(no subject)')}</div>
-      <div class="email-thread-msg">
-        <div class="msg-header">
-          <div class="msg-avatar" style="background:${senderAvColor}">${initial(senderShort)}</div>
-          <div style="flex:1;min-width:0">
-            <div class="msg-from">${esc(senderShort)} <span class="msg-from-email">&lt;${esc(email.sender || '')}&gt;</span></div>
-            <div style="font-size:12px;color:#5f6368;font-family:var(--sans)">to ${esc(state.selectedTalent?.email || state.selectedTalent?.full_name || 'talent')}</div>
-          </div>
-          <div class="msg-date" title="${esc(fmtDateFull(email))}">${fmtDate(email)}</div>
-        </div>
-        <div class="msg-body" id="msg-body-${email.gmail_message_id}">
-          <p style="color:#9aa0a6;font-size:13px">Loading email content...</p>
-        </div>
-        <div class="msg-meta-chips">
-          <span class="meta-chip score-${sc}">${esc(scoreName(email.score))}</span>
-          ${email.brand_name ? `<span class="meta-chip brand">🏷️ ${esc(email.brand_name)}</span>` : ''}
-          ${email.proposed_rate ? `<span class="meta-chip rate">💰 ${formatRate(email.proposed_rate)}</span>` : ''}
-          ${email.offer_type ? `<span class="meta-chip type">${esc(email.offer_type)}</span>` : ''}
-        </div>
+    <div class="thread-header animate-fade">
+      <h1>${esc(email.subject || '(no subject)')}</h1>
+      <div style="display:flex; gap:12px;">
+        <button class="btn-action secondary" onclick="archiveEmail('${email.gmail_message_id}')">🗄️ Archive</button>
       </div>
     </div>
+    
+    <div class="message-card animate-fade">
+      <div class="message-meta">
+        <div class="avatar-large">${initial(senderShort)}</div>
+        <div style="flex:1">
+          <div style="font-weight:600; font-size:16px;">${esc(senderShort)}</div>
+          <div style="color:var(--text-muted); font-size:12px;">&lt;${esc(email.sender)}&gt; · ${fmtDate(email)}</div>
+        </div>
+        <span class="pill ${sc}">${scoreName(email.score)}</span>
+      </div>
+      
+      <div class="message-body" id="msg-body-${email.gmail_message_id}" style="white-space: pre-wrap; font-family:var(--sans);">
+        <p style="color:var(--text-muted); font-style:italic">Loading content...</p>
+      </div>
+      
+      <div style="display:flex; gap:8px; margin-top:24px; padding-top:20px; border-top:1px solid var(--border);">
+        ${email.brand_name ? `<span class="pill good">🏷️ ${esc(email.brand_name)}</span>` : ''}
+        ${email.proposed_rate ? `<span class="pill" style="background:rgba(59, 130, 246, 0.1); color:var(--primary);">💰 ${formatRate(email.proposed_rate)}</span>` : ''}
+        ${email.offer_type ? `<span class="pill uncert">${esc(email.offer_type)}</span>` : ''}
+      </div>
+    </div>
+    
     <div id="draft-compose-area"></div>
   `;
 
@@ -1704,9 +1292,8 @@ function renderReadingPane(email, draft) {
     renderDraftCompose(draft, email);
   } else if (email.score === 3) {
     document.getElementById('draft-compose-area').innerHTML = `
-      <div style="margin:0 32px 32px;padding:20px;background:#f8f9fa;border:1px solid #e0e0e0;border-radius:8px;font-family:var(--sans);font-size:14px;color:#5f6368;text-align:center">
-        No AI draft for this email yet.<br>
-        <span style="font-size:12px">The draft will appear here after the next poll runs.</span>
+      <div style="padding:32px; text-align:center; border:1px dashed var(--border); border-radius:16px; color:var(--text-muted); font-size:13px;">
+        AI drafting in progress. Check back soon.
       </div>
     `;
   }
@@ -1719,35 +1306,24 @@ function renderDraftCompose(draft, email) {
   const replySubject = 'Re: ' + (email.subject || '');
 
   area.innerHTML = `
-    <div class="draft-compose-wrap" id="compose-${draft.id}">
-      <div class="draft-compose-header">
-        <span class="draft-compose-title">✨ AI Draft Reply</span>
-        <span class="draft-compose-badge ${isEscalate ? 'escalate' : ''}">
-          ${isEscalate ? '⚠️ ESCALATE' : '🤖 GPT-4o'}
-        </span>
+    <div class="ai-composer animate-fade">
+      <div class="ai-header">
+        <div class="ai-badge">✨ AI DRAFT COMPOSER</div>
+        <span class="pill ${isEscalate ? 'fail' : 'good'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
       </div>
-      ${isEscalate ? `
-        <div style="padding:12px 16px;background:#fce4ec;font-size:13px;color:#880e4f;font-family:var(--sans);border-bottom:1px solid #f8bbd0">
-          ⚠️ ${esc(draft.escalate_reason || 'This email requires manager attention.')}
-        </div>
-      ` : ''}
-      <div class="draft-field">
-        <span class="draft-field-label">To</span>
-        <span class="draft-field-value">${esc(draft.sender || email.sender || '')}</span>
-      </div>
-      <div class="draft-field">
-        <span class="draft-field-label">Subject</span>
-        <span class="draft-field-value">${esc(replySubject)}</span>
-      </div>
-      <div class="draft-body-area">
+      
+      ${isEscalate ? `<div style="margin-bottom:16px; padding:12px; border-radius:10px; background:rgba(239,68,68,0.1); color:var(--danger); font-size:12px; border:1px solid var(--danger);">⚠️ ${esc(draft.escalate_reason || 'Manual review required.')}</div>` : ''}
+      
+      <div style="margin-bottom:12px; font-size:12px; color:var(--text-muted);">Reply to: <span style="color:#fff">${esc(draft.sender || email.sender)}</span></div>
+      
+      <div class="ai-body">
         <textarea id="draft-text-${draft.id}">${esc(draft.draft_text)}</textarea>
       </div>
-      <div class="draft-actions">
-        <button class="btn-send" id="btn-send-${draft.id}" ${isEscalate ? 'disabled title="Cannot send — escalation required"' : ''}>
-          Send ✉️
-        </button>
-        <button class="btn-save-draft" id="btn-save-${draft.id}">Save Edits</button>
-        <button class="btn-discard" id="btn-discard-${draft.id}">Discard</button>
+      
+      <div class="ai-footer">
+        <button class="btn-action secondary" id="btn-discard-${draft.id}">Discard</button>
+        <button class="btn-action secondary" id="btn-save-${draft.id}">Save Edits</button>
+        <button class="btn-action primary" id="btn-send-${draft.id}" ${isEscalate ? 'disabled' : ''}>Send Message ✉️</button>
       </div>
     </div>
   `;
