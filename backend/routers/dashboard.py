@@ -246,7 +246,7 @@ def talent_emails(talent_key: str, db: Session = Depends(get_db)):
         db.query(ProcessedEmail)
         .filter(ProcessedEmail.talent_key == talent_key.lower())
         .order_by(ProcessedEmail.processed_at.desc())
-        .limit(200)
+        .limit(250)
         .all()
     )
 
@@ -635,7 +635,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
         db.query(InboxEmail)
         .filter(InboxEmail.talent_key == talent_key.lower())
         .order_by(InboxEmail.email_date.desc().nullslast())
-        .limit(50)
+        .limit(250)
         .all()
     )
 
