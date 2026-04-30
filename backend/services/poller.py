@@ -174,7 +174,7 @@ def poll_all_inboxes(db: Session) -> dict:
                 )
 
                 # Process new messages concurrently — each worker owns its own DB session
-                futures: dict = {}
+                futures: dict[str, str] = {}
                 with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
                     for message_id in pending_ids:
                         future = executor.submit(
@@ -244,7 +244,7 @@ def _process_message_in_thread(
         token_row = db.query(TalentToken).filter(TalentToken.id == token_row_id).first()
         if not token_row:
             return {"status": "error", "reason": f"TalentToken {token_row_id} not found"}
-        summary: dict = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+        summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
         _process_one_message(
             db=db,
             token_row=token_row,
