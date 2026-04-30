@@ -197,9 +197,8 @@ def triage_email(
     ]
     sender_lower = sender.lower()
     subject_lower = subject.lower()
-    is_auto_domain = any(d in sender_lower for d in _AUTO_DOMAINS)
-    is_auto_subject = any(kw in subject_lower for kw in _AUTO_SUBJECT_KEYWORDS)
-    if is_auto_domain or (is_auto_subject and "collab" not in subject_lower and "partner" not in subject_lower):
+    is_collab = "collab" in subject_lower or "partner" in subject_lower or "sample" in subject_lower or "order" in subject_lower
+    if (is_auto_domain or is_auto_subject) and not is_collab:
         logger.info(
             "Pre-filter: automated sender/subject for %s (%s / %s) → Score 1",
             talent_key, sender, subject,
