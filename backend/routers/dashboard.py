@@ -1072,7 +1072,7 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                 thread_db = SessionLocal()
                 try:
                     thread_token = thread_db.query(TalentToken).filter(
-                        TalentToken.talent_key.ilike(talent_key),
+                        TalentToken.talent_key == talent_key.lower(),
                         TalentToken.active == True,  # noqa: E712
                     ).first()
                     if not thread_token:
@@ -1092,7 +1092,8 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                 finally:
                     thread_db.close()
 
-            with ThreadPoolExecutor(max_workers=5) as executor:
+            # 10 workers mirrors _run_process_batch; each thread holds its own connection.
+            with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = [executor.submit(_process_in_thread, r.gmail_message_id) for r in rows]
                 for f in futures:
                     try:
