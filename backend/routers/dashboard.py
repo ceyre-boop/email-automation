@@ -1070,7 +1070,8 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                     except: pass
 
             total += summary['processed']
-            _db.commit()    except Exception as exc:
+            _db.commit()
+    except Exception as exc:
         logger.error("Triage-unscored job failed for %s: %s", talent_key, exc)
     finally:
         _db.close()
