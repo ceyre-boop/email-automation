@@ -600,11 +600,14 @@ def _run_process_batch(talent_key: str, msg_ids: list):
         talent_cfg = talent_map.get(talent_key.lower(), {})
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 
-        for msg_id in msg_ids:
-            if _already_processed(_db, msg_id):
-                continue
-            try:
-                _process_one_message(
+        from concurrent.futures import ThreadPoolExecutor
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = []
+            for msg_id in msg_ids:
+                if _already_processed(_db, msg_id):
+                    continue
+                futures.append(executor.submit(
+                    _process_one_message,
                     db=_db,
                     token_row=token,
                     message_id=msg_id,
@@ -613,10 +616,13 @@ def _run_process_batch(talent_key: str, msg_ids: list):
                     minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
                     draft_mode=draft_mode,
                     summary=summary,
-                )
-            except Exception as exc:
-                logger.warning("Batch error on %s / %s: %s", talent_key, msg_id, exc)
-                summary["errors"] += 1
+                ))
+            for f in futures:
+                try:
+                    f.result()
+                except Exception as exc:
+                    logger.warning("Batch error on %s: %s", talent_key, exc)
+                    summary["errors"] += 1
 
         logger.info("Batch complete for %s: %s", talent_key, summary)
     finally:
