@@ -548,22 +548,29 @@ def process_batch(
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
 
-    # Find cached inbox emails that haven't been processed yet
-    # (_process_one_message fetches body live from Gmail, no need for cached body_text)
+    # Pull all cached inbox emails and find ones not yet in ProcessedEmail
+    # Fetch up to 500 so we can skip already-processed ones and still fill the batch
+    from sqlalchemy import select
+    processed_ids = {
+        row[0] for row in db.execute(
+            select(ProcessedEmail.gmail_message_id).where(
+                func.lower(ProcessedEmail.talent_key) == talent_key.lower()
+            )
+        ).fetchall()
+    }
+
     candidates = (
         db.query(InboxEmail)
         .filter(InboxEmail.talent_key == talent_key.lower())
         .order_by(InboxEmail.email_date.desc().nullslast())
-        .limit(limit * 3)  # fetch extra so we can skip already-processed ones
+        .limit(500)
         .all()
     )
 
-    # Filter out already-processed
-    unprocessed = [c for c in candidates if not _already_processed(db, c.gmail_message_id)]
-    batch = unprocessed[:limit]
+    batch = [c for c in candidates if c.gmail_message_id not in processed_ids][:limit]
 
     if not batch:
-        return {"ok": True, "message": "No unprocessed emails with body text found.", "queued": 0}
+        return {"ok": True, "message": f"All {len(candidates)} cached emails already processed.", "queued": 0}
 
     msg_ids = [e.gmail_message_id for e in batch]
     background_tasks.add_task(_run_process_batch, talent_key, msg_ids)

@@ -930,17 +930,21 @@ let isRefreshing = false;
 async function refreshData() {
   if (isRefreshing) return;
   isRefreshing = true;
-  
   try {
-    const oldTalent = currentTalentKey;
-    await loadOverview();
-
-    if (oldTalent && state.view === 'gmail') {
-      const talent = state.talents.find(t => t.key === oldTalent);
-      if (talent) {
-        renderSidebar();
-        await loadTalentData(talent, true); 
-      }
+    if (state.view === 'gmail' && state.selectedTalent) {
+      // User is in a talent inbox — silently refresh email list only, never redirect
+      try {
+        const [report, talents] = await Promise.all([
+          api('GET', '/api/dashboard/report'),
+          api('GET', '/api/dashboard/talents'),
+        ]);
+        state.report = report;
+        state.talents = talents;
+        renderSidebar(); // update draft badges without touching the view
+      } catch (_) {}
+      await loadTalentData(state.selectedTalent, true);
+    } else if (state.view === 'overview') {
+      await loadOverview();
     }
   } finally {
     isRefreshing = false;
@@ -968,7 +972,7 @@ async function loadOverview() {
     renderSummaryBar();
     renderTalentCards();
     renderContextPanel();
-    showView('overview');
+    showView('overview'); // only called when explicitly navigating to overview
   } catch (_) {}
 }
 
