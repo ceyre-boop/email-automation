@@ -268,20 +268,8 @@ def _process_one_message(
         _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason)
         summary["archived"] += 1
 
-    # ── Score 2 → Flag for review ────────────────────────────────────────────
-    elif score == 2:
-        gmail_svc.mark_as_read(token_row, message_id, db=db)
-        _record_processed(
-            db, talent_key, message_id, thread_id, sender, subject,
-            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
-            body_text=body, email_date=email_date,
-        )
-        db.commit()
-        _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason)
-        summary["flagged"] += 1
-
-    # ── Score 3 → Draft reply ────────────────────────────────────────────────
-    else:  # score == 3
+    # ── Score 2 or 3 → Draft reply ──────────────────────────────────────────────
+    elif score >= 2:
         reply_result = reply_svc.draft_reply(
             talent_key=talent_key,
             talent_name=talent_name,

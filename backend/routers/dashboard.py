@@ -625,7 +625,7 @@ def _run_process_batch(talent_key: str, msg_ids: list):
 
         from concurrent.futures import ThreadPoolExecutor
         unqueued = [m for m in msg_ids if not _already_processed(_db, m)]
-        with ThreadPoolExecutor(max_workers=5) as executor:
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(_process_in_thread, mid) for mid in unqueued]
             for f in futures:
                 try:
@@ -1047,29 +1047,30 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
             )
             if not rows:
                 break
-            for row in rows:
-                try:
-                    result = triage_svc.triage_email(
-                        talent_key=talent_key,
-                        talent_name=talent_name,
-                        minimum_rate=minimum_rate,
-                        subject=row.subject or "",
-                        sender=row.sender or "",
-                        sender_domain=(row.sender or "").split("@")[-1].split(">")[0] if "@" in (row.sender or "") else "",
-                        body=row.body_text or "",
-                    )
-                    row.score = result["score"]
-                    row.brand_name = result.get("brand_name")
-                    row.proposed_rate = result.get("proposed_rate_usd")
-                    row.offer_type = result.get("offer_type")
-                    row.triage_reason = result.get("reason")
-                    row.triage_status = "triaged"
-                    _db.add(row)
-                    total += 1
-                except Exception as exc:
-                    logger.warning("Triage failed for %s / %s: %s", talent_key, row.gmail_message_id, exc)
-            _db.commit()
-    except Exception as exc:
+            from concurrent.futures import ThreadPoolExecutor
+            from backend.services.poller import _process_one_message
+            token = _db.query(TalentToken).filter(TalentToken.talent_key == talent_key.lower()).first()
+            if not token: break
+
+            summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                futures = [executor.submit(
+                    _process_one_message,
+                    db=_db,
+                    token_row=token,
+                    message_id=r.gmail_message_id,
+                    talent_key=talent_key,
+                    talent_name=talent_name,
+                    minimum_rate=minimum_rate,
+                    draft_mode=get_settings().app_config.get("reply", {}).get("draft_mode", True),
+                    summary=summary
+                ) for r in rows]
+                for f in futures:
+                    try: f.result()
+                    except: pass
+
+            total += summary['processed']
+            _db.commit()    except Exception as exc:
         logger.error("Triage-unscored job failed for %s: %s", talent_key, exc)
     finally:
         _db.close()
