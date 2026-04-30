@@ -29,7 +29,7 @@ from backend.services.oauth import TokenRefreshError
 
 logger = logging.getLogger(__name__)
 
-BODY_FETCH_BATCH = 5
+BODY_FETCH_BATCH = 20
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
@@ -84,9 +84,9 @@ def poll_all_inboxes(db: Session) -> dict:
     for idx, token_row in enumerate(active_tokens):
         talent_key = token_row.talent_key
 
-        # Stagger: 4 seconds between talents to avoid bursting Gmail API quota
+        # Stagger: 1 second between talents to maximize speed without hitting rate limits
         if idx > 0:
-            time.sleep(4)
+            time.sleep(1)
 
         # Skip if a previous poll cycle is still running for this talent
         if _poll_locks.get(talent_key):
