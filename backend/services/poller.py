@@ -249,10 +249,8 @@ def _process_one_message(
         sender=sender,
         sender_domain=sender_domain,
         body=body,
-        is_collab = "collab" in subject.lower() or "partner" in subject.lower() or "sample" in subject.lower()
     )
-    if (is_auto_domain or is_auto_subject) and not is_collab:
-        score = triage_result["score"]
+    score = triage_result["score"]
     reason = triage_result["reason"]
     offer_type = triage_result["offer_type"]
     proposed_rate = triage_result["proposed_rate_usd"]
