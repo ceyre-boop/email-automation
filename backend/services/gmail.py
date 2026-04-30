@@ -83,7 +83,7 @@ def list_inbox_messages(token_row, max_results: int = 50, db=None) -> list[dict]
     return result.get("messages", [])
 
 
-def list_unread_inbox_messages(token_row, db=None, max_results: int = 30) -> list[dict]:
+def list_unread_inbox_messages(token_row, db=None, max_results: int = 100) -> list[dict]:
     """
     Return a list of unread INBOX messages for the talent.
     Each item: {"id": <gmail_message_id>, "threadId": <thread_id>}
