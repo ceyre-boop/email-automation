@@ -600,23 +600,33 @@ def _run_process_batch(talent_key: str, msg_ids: list):
         talent_cfg = talent_map.get(talent_key.lower(), {})
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 
-        from concurrent.futures import ThreadPoolExecutor
-        with ThreadPoolExecutor(max_workers=5) as executor:
-            futures = []
-            for msg_id in msg_ids:
-                if _already_processed(_db, msg_id):
-                    continue
-                futures.append(executor.submit(
-                    _process_one_message,
-                    db=_db,
-                    token_row=token,
+        # Each thread gets its own DB session — SQLAlchemy sessions are not thread-safe
+        def _process_in_thread(msg_id: str):
+            thread_db = SessionLocal()
+            try:
+                thread_token = thread_db.query(TalentToken).filter(
+                    TalentToken.talent_key.ilike(talent_key),
+                    TalentToken.active == True,  # noqa: E712
+                ).first()
+                if not thread_token:
+                    return
+                _process_one_message(
+                    db=thread_db,
+                    token_row=thread_token,
                     message_id=msg_id,
                     talent_key=talent_key,
                     talent_name=talent_cfg.get("full_name", talent_key),
                     minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
                     draft_mode=draft_mode,
                     summary=summary,
-                ))
+                )
+            finally:
+                thread_db.close()
+
+        from concurrent.futures import ThreadPoolExecutor
+        unqueued = [m for m in msg_ids if not _already_processed(_db, m)]
+        with ThreadPoolExecutor(max_workers=5) as executor:
+            futures = [executor.submit(_process_in_thread, mid) for mid in unqueued]
             for f in futures:
                 try:
                     f.result()
