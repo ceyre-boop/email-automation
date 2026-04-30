@@ -1511,27 +1511,28 @@ async function runBatchDraft() {
 
 // ── Run AI Draft ───────────────────────────────────────────────────────────
 async function runAiDraft() {
-  if (!state.selectedTalent) return showToast('Select a talent first.');
-  if (!state.selectedEmail) return showToast('Select an inbox email first.');
+  if (!currentTalentKey) return;
   const btn = document.getElementById('btn-run-ai');
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner"></span> Processing…';
+  const originalText = btn.innerHTML;
+  btn.innerHTML = '⚡ Digging for Deals...';
   btn.disabled = true;
+  
   try {
-    const res = await api('POST', '/api/dashboard/process-email', {
-      talent_key: state.selectedTalent.key,
-      gmail_message_id: state.selectedEmail.gmail_message_id,
+    // Deep triage: Tell backend to scan deeper (last 200) for un-scored messages
+    const response = await fetch(`/api/dashboard/talents/${currentTalentKey}/triage-unscored`, {
+      method: 'POST',
+      headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' }
     });
-    if (res.ok) {
+    if (response.ok) {
       showToast('AI triage complete — checking drafts…');
       setGmailNav('drafts');
     } else {
-      showToast('Done: ' + JSON.stringify(res.summary || res));
+      showToast('Triage failed.');
     }
   } catch (e) {
     showToast('AI Draft failed: ' + e.message);
   } finally {
-    btn.innerHTML = orig;
+    btn.innerHTML = originalText;
     btn.disabled = false;
   }
 }
