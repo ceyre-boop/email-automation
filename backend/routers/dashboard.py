@@ -1020,10 +1020,19 @@ def start_backfill(
 
 
 def _run_triage_unscored(talent_key: str, batch_size: int = 20):
-    """Background job: triage InboxEmail rows that have no score yet, in batches."""
-    from backend.models.db import get_session_factory
-    from backend.services import triage as triage_svc
+    """Background job: triage InboxEmail rows that haven't been processed yet, in batches.
+
+    Each email is processed in its own thread with its own DB session — mirroring the
+    safe pattern used by _run_process_batch.  The main session is read-only (querying
+    candidates); writes happen only inside per-thread sessions so SQLAlchemy's
+    session-not-thread-safe constraint is respected.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+    from sqlalchemy import select as sa_select
+
     from backend.core.config import get_settings as _gs
+    from backend.models.db import ProcessedEmail, get_session_factory
+    from backend.services.poller import _already_processed, _process_one_message
 
     settings = _gs()
     talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
@@ -1031,46 +1040,68 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
     talent_name = talent_cfg.get("full_name", talent_key)
     minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
 
-    _db = get_session_factory()()
+    SessionLocal = get_session_factory()
+    _db = SessionLocal()
     total = 0
     try:
         while True:
+            # Exclude emails already in processed_emails so the loop terminates
+            # and we never hit a UniqueConstraint error on re-processing.
+            processed_subq = (
+                sa_select(ProcessedEmail.gmail_message_id)
+                .where(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
+                .scalar_subquery()
+            )
             rows = (
                 _db.query(InboxEmail)
                 .filter(
                     InboxEmail.talent_key == talent_key.lower(),
-                    InboxEmail.score == None,  # noqa: E711
                     InboxEmail.body_text != None,  # noqa: E711
+                    InboxEmail.gmail_message_id.not_in(processed_subq),
                 )
                 .limit(batch_size)
                 .all()
             )
             if not rows:
                 break
-            from concurrent.futures import ThreadPoolExecutor
-            from backend.services.poller import _process_one_message
-            token = _db.query(TalentToken).filter(TalentToken.talent_key == talent_key.lower()).first()
-            if not token: break
 
             summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
-            with ThreadPoolExecutor(max_workers=10) as executor:
-                futures = [executor.submit(
-                    _process_one_message,
-                    db=_db,
-                    token_row=token,
-                    message_id=r.gmail_message_id,
-                    talent_key=talent_key,
-                    talent_name=talent_name,
-                    minimum_rate=minimum_rate,
-                    draft_mode=get_settings().app_config.get("reply", {}).get("draft_mode", True),
-                    summary=summary
-                ) for r in rows]
-                for f in futures:
-                    try: f.result()
-                    except: pass
 
-            total += summary['processed']
-            _db.commit()
+            # Give each thread its own session + token row — sessions are not thread-safe.
+            def _process_in_thread(msg_id: str) -> None:
+                thread_db = SessionLocal()
+                try:
+                    thread_token = thread_db.query(TalentToken).filter(
+                        TalentToken.talent_key.ilike(talent_key),
+                        TalentToken.active == True,  # noqa: E712
+                    ).first()
+                    if not thread_token:
+                        return
+                    if _already_processed(thread_db, msg_id):
+                        return
+                    _process_one_message(
+                        db=thread_db,
+                        token_row=thread_token,
+                        message_id=msg_id,
+                        talent_key=talent_key,
+                        talent_name=talent_name,
+                        minimum_rate=minimum_rate,
+                        draft_mode=_gs().app_config.get("reply", {}).get("draft_mode", True),
+                        summary=summary,
+                    )
+                finally:
+                    thread_db.close()
+
+            with ThreadPoolExecutor(max_workers=5) as executor:
+                futures = [executor.submit(_process_in_thread, r.gmail_message_id) for r in rows]
+                for f in futures:
+                    try:
+                        f.result()
+                    except Exception as exc:
+                        logger.warning("Triage-unscored thread error for %s: %s", talent_key, exc)
+                        summary["errors"] += 1
+
+            total += summary.get("processed", 0)
     except Exception as exc:
         logger.error("Triage-unscored job failed for %s: %s", talent_key, exc)
     finally:
@@ -1084,18 +1115,25 @@ def triage_unscored(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """Triage all InboxEmail rows that have body text but no score yet. Runs in background."""
+    """Triage all InboxEmail rows that have body text but haven't been processed yet. Runs in background."""
+    from sqlalchemy import select as sa_select
+
+    processed_subq = (
+        sa_select(ProcessedEmail.gmail_message_id)
+        .where(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
+        .scalar_subquery()
+    )
     unscored_count = (
         db.query(InboxEmail)
         .filter(
             InboxEmail.talent_key == talent_key.lower(),
-            InboxEmail.score == None,  # noqa: E711
             InboxEmail.body_text != None,  # noqa: E711
+            InboxEmail.gmail_message_id.not_in(processed_subq),
         )
         .count()
     )
     if unscored_count == 0:
-        return {"ok": True, "message": "No unscored emails with body text found."}
+        return {"ok": True, "message": "No unprocessed emails with body text found."}
     background_tasks.add_task(_run_triage_unscored, talent_key)
     return {"ok": True, "message": f"Triaging {unscored_count} unscored emails for {talent_key} in background."}
 
