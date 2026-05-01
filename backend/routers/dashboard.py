@@ -244,7 +244,7 @@ def talent_emails(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(ProcessedEmail)
-        .filter(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
+        .filter(ProcessedEmail.talent_key.ilike(talent_key))
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(250)
         .all()
@@ -257,7 +257,7 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(Draft)
-        .filter(func.lower(Draft.talent_key) == talent_key.lower(), Draft.status == DraftStatus.pending)
+        .filter(Draft.talent_key.ilike(talent_key), Draft.status == DraftStatus.pending)
         .order_by(Draft.created_at.desc())
         .all()
     )
@@ -325,7 +325,7 @@ def poll_log(talent_key: str, limit: int = 20, db: Session = Depends(get_db)):
     """Recent poll history for a talent — shows errors and durations."""
     rows = (
         db.query(PollHealth)
-        .filter(PollHealth.talent_key == talent_key)
+        .filter(PollHealth.talent_key.ilike(talent_key))
         .order_by(PollHealth.polled_at.desc())
         .limit(limit)
         .all()
@@ -409,7 +409,7 @@ def talent_sent_emails(talent_key: str, limit: int = 50, db: Session = Depends(g
     """Emails where a reply was sent — the missing 'Sent' tab."""
     rows = (
         db.query(ProcessedEmail)
-        .filter(func.lower(ProcessedEmail.talent_key) == talent_key.lower(), ProcessedEmail.status == EmailStatus.sent)
+        .filter(ProcessedEmail.talent_key.ilike(talent_key), ProcessedEmail.status == EmailStatus.sent)
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(limit)
         .all()
@@ -554,7 +554,7 @@ def process_batch(
     processed_ids = {
         row[0] for row in db.execute(
             select(ProcessedEmail.gmail_message_id).where(
-                func.lower(ProcessedEmail.talent_key) == talent_key.lower()
+                ProcessedEmail.talent_key.ilike(talent_key)
             )
         ).fetchall()
     }
@@ -1104,7 +1104,7 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                     & (func.lower(ProcessedEmail.talent_key) == talent_key.lower()),
                 )
                 .filter(
-                    InboxEmail.talent_key == talent_key.lower(),
+                    InboxEmail.talent_key.ilike(talent_key),
                     ProcessedEmail.id == None,  # noqa: E711 — LEFT JOIN null means not processed
                 )
                 .limit(batch_size)

@@ -82,7 +82,10 @@ def _redact_pii(text: str) -> str:
 def _build_sop_rules_text(talent_key: str) -> str:
     """Return a formatted string of the talent's SOP rules from sop_data.json."""
     sop = get_settings().sop_data
-    talent_data = sop.get(talent_key, {})
+    # SOP data is keyed by the config key (title-case, e.g. "Katrina") but talent_key
+    # from the DB is often stored lowercase — do a case-insensitive lookup.
+    sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
+    talent_data = sop.get(sop_key, {}) if sop_key else {}
     rules = talent_data.get("rules", [])
     if not rules:
         return "No SOP rules found for this talent."

@@ -73,7 +73,7 @@ def _get_draft_or_404(db: Session, draft_id: int) -> Draft:
 def _get_token_or_404(db: Session, talent_key: str) -> TalentToken:
     token = (
         db.query(TalentToken)
-        .filter(TalentToken.talent_key == talent_key, TalentToken.active == True)  # noqa: E712
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
         .first()
     )
     if not token:
@@ -100,7 +100,7 @@ def list_drafts(
     else:
         q = q.filter(Draft.status == DraftStatus.pending)
     if talent_key:
-        q = q.filter(Draft.talent_key == talent_key)
+        q = q.filter(Draft.talent_key.ilike(talent_key))
     return q.order_by(Draft.created_at.desc()).all()
 
 

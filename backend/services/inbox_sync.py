@@ -194,11 +194,16 @@ def fetch_pending_bodies(token_row, db: Session, limit: int = BODY_FETCH_BATCH) 
                 detail = future.result()
                 row.body_text = detail.get("body_text") or "" if detail else ""
                 row.body_fetched_at = datetime.utcnow()
+                row.body_fetch_attempts = (row.body_fetch_attempts or 0) + 1
                 if detail:
                     fetched += 1
+                else:
+                    row.body_fetch_failed = True
             except Exception as exc:
                 logger.warning("Body fetch failed for %s / %s: %s", talent_key, mid, exc)
                 row.body_fetched_at = datetime.utcnow()
+                row.body_fetch_attempts = (row.body_fetch_attempts or 0) + 1
+                row.body_fetch_failed = True
 
     db.commit()
     return fetched
