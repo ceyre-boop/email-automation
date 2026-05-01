@@ -1024,22 +1024,24 @@ def start_backfill(
 
 
 def _run_triage_unscored(talent_key: str, batch_size: int = 20):
-    """Background job: sync inbox then triage all unscored emails in batches.
+    """Background job: sync inbox then triage all undrafted emails in batches.
 
     Steps:
       1. Sync the Gmail inbox → inbox_emails cache (picks up read *and* unread messages).
       2. Fetch body text for any cached emails that don't have it yet.
       3. Delete ProcessedEmail stubs with score=NULL (created by backfill, never actually
          triaged) so they are reprocessed properly here.
-      4. Iterate inbox_emails in batches, skipping only those already in processed_emails,
-         and run full triage + reply on each one.
+      4. Iterate inbox_emails in batches, skipping emails that:
+           - already have a ProcessedEmail record (already triaged as TRASH or DRAFT), OR
+           - already have a pending Draft record (draft exists even if ProcessedEmail is missing)
+         Run full triage + reply on everything else.
 
     Each email runs in its own thread with its own DB session — mirrors _run_process_batch.
     """
     from concurrent.futures import ThreadPoolExecutor
 
     from backend.core.config import get_settings as _gs
-    from backend.models.db import ProcessedEmail, get_session_factory
+    from backend.models.db import Draft, DraftStatus, ProcessedEmail, get_session_factory
     from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
     from backend.services.poller import _already_processed, _process_one_message
 
@@ -1091,21 +1093,28 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                 stubs_deleted, talent_key,
             )
 
-        # ── Step 5: Process emails not yet in processed_emails ────────────────
+        # ── Step 5: Process emails not yet triaged and not already drafted ──
         while True:
-            # LEFT JOIN is more efficient than NOT IN for large tables
+            # Skip emails that:
+            #   (a) already have a ProcessedEmail record (TRASH archived or DRAFT created), OR
+            #   (b) already have a pending Draft record (safety net if ProcessedEmail is missing)
             rows = (
                 _db.query(InboxEmail)
                 .outerjoin(
                     ProcessedEmail,
-                    # func.lower() required for case-insensitive join ON clause;
-                    # SQLAlchemy's .ilike() cannot be used in join conditions.
                     (ProcessedEmail.gmail_message_id == InboxEmail.gmail_message_id)
                     & (func.lower(ProcessedEmail.talent_key) == talent_key.lower()),
                 )
+                .outerjoin(
+                    Draft,
+                    (Draft.gmail_message_id == InboxEmail.gmail_message_id)
+                    & (func.lower(Draft.talent_key) == talent_key.lower())
+                    & (Draft.status == DraftStatus.pending),
+                )
                 .filter(
                     InboxEmail.talent_key.ilike(talent_key),
-                    ProcessedEmail.id == None,  # noqa: E711 — LEFT JOIN null means not processed
+                    ProcessedEmail.id == None,  # noqa: E711 — not yet triaged
+                    Draft.id == None,            # not already drafted
                 )
                 .limit(batch_size)
                 .all()

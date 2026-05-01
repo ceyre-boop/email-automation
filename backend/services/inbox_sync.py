@@ -96,12 +96,14 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
             if hdr:
                 existing.is_unread = "UNREAD" in hdr.get("label_ids", [])
                 existing.label_ids = ",".join(hdr.get("label_ids", []))
-            if triage and existing.score is None:
-                existing.score = triage.score
-                existing.brand_name = triage.brand_name
-                existing.proposed_rate = triage.proposed_rate
-                existing.offer_type = triage.offer_type
-                existing.triage_reason = triage.triage_reason
+            if triage:
+                # Always sync triage fields so TRASH/DRAFT status stays current
+                if existing.score is None:
+                    existing.score = triage.score
+                    existing.brand_name = triage.brand_name
+                    existing.proposed_rate = triage.proposed_rate
+                    existing.offer_type = triage.offer_type
+                    existing.triage_reason = triage.triage_reason
                 existing.triage_status = str(triage.status) if triage.status else None
             summary["updated"] += 1
         else:

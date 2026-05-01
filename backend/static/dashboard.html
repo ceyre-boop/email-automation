@@ -414,6 +414,10 @@ body {
   border: 1px solid var(--red-line); border-radius: 4px;
   padding: 1px 5px; flex-shrink: 0;
 }
+.draft-badge.trash {
+  color: var(--text-3);
+  border-color: rgba(255,255,255,0.15);
+}
 
 .empty-state {
   display: flex; flex-direction: column; align-items: center;
@@ -723,7 +727,6 @@ body {
       <div class="topbar-actions">
         <button class="btn btn-ghost" onclick="openRealGmail()">Open Gmail ↗</button>
         <button class="btn btn-ghost" onclick="openSettings()" title="AI Settings for this talent">⚙ AI Settings</button>
-        <button class="btn btn-ghost" id="btn-batch" onclick="runBatchDraft()">⚡ Draft Batch</button>
         <button class="btn btn-primary" id="btn-run-ai" onclick="runAiDraft()">✦ Run AI Draft</button>
       </div>
     </header>
@@ -1272,10 +1275,14 @@ function renderEmailList() {
   const draftsIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
   visible.forEach(email => {
     const hasDraft = draftsIds.has(email.gmail_message_id);
+    const isTrash = email.score === 1 || email.status === 'archived';
     const div = document.createElement('div');
     div.className = 'email-row fade-up';
     div.dataset.msgId = email.gmail_message_id;
     const meta = [email.offer_type, email.brand_name].filter(Boolean).join(' · ');
+    let badge = '';
+    if (isTrash) badge = '<span class="draft-badge trash">TRASH</span>';
+    else if (hasDraft) badge = '<span class="draft-badge">DRAFT</span>';
     div.innerHTML = `
       <div class="er-top">
         <span class="er-sender">${esc(shortSender(email.sender))}</span>
@@ -1285,7 +1292,7 @@ function renderEmailList() {
       <div class="er-meta">
         <span class="score-dot ${scoreDotClass(email.score)}"></span>
         ${esc(meta || email.triage_reason || scoreLabel(email.score))}
-        ${hasDraft ? '<span class="draft-badge">DRAFT</span>' : ''}
+        ${badge}
       </div>
     `;
     const html = `
@@ -1499,32 +1506,12 @@ function openRealGmail() {
     : 'https://mail.google.com/', '_blank');
 }
 
-// ── Batch draft ────────────────────────────────────────────────────────────
-async function runBatchDraft() {
-  if (!state.selectedTalent) return showToast('Select a talent first.');
-  const t = state.selectedTalent;
-  if (!confirm(`Run AI triage + drafting on up to 30 unprocessed emails for ${t.full_name}?\n\nThis uses OpenAI tokens. Drafts will be saved to Gmail — nothing sends automatically.`)) return;
-  const btn = document.getElementById('btn-batch');
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner"></span> Queuing…';
-  btn.disabled = true;
-  try {
-    const res = await api('POST', `/api/dashboard/talents/${t.key}/process-batch?limit=30`);
-    showToast(`⚡ ${res.message} Switch to Drafts tab to see results.`);
-  } catch (e) {
-    showToast('Batch failed: ' + e.message);
-  } finally {
-    btn.innerHTML = orig;
-    btn.disabled = false;
-  }
-}
-
 // ── Run AI Draft ───────────────────────────────────────────────────────────
 async function runAiDraft() {
   if (!currentTalentKey) return showToast('Select a talent first.');
   const btn = document.getElementById('btn-run-ai');
   const originalText = btn.innerHTML;
-  btn.innerHTML = '⚡ Starting…';
+  btn.innerHTML = '⚡ Running…';
   btn.disabled = true;
 
   try {
@@ -1534,14 +1521,13 @@ async function runAiDraft() {
     });
     if (response.ok) {
       const data = await response.json();
-      // Switch to drafts tab so user sees results appear
-      setGmailNav('drafts');
-      showToast('✦ ' + (data.message || 'AI pipeline started — drafts arriving in ~35s…'));
-      // Auto-reload drafts after 35 s to show results from the background job
+      // Stay on inbox tab — TRASH/DRAFT badges will update after reload
+      showToast('✦ ' + (data.message || 'AI pipeline started — updating inbox in ~35s…'));
+      // Auto-reload inbox after 35 s so TRASH and DRAFT badges reflect triage results
       setTimeout(async () => {
         if (state.selectedTalent) {
           await loadTalentData(state.selectedTalent, true);
-          showToast('✅ Drafts refreshed.');
+          showToast('✅ Inbox updated — emails tagged TRASH or DRAFT.');
         }
       }, 35000);
     } else {
