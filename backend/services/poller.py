@@ -395,9 +395,23 @@ def _process_one_message(
         )
         if existing_draft:
             logger.info(
-                "Draft already exists for %s / %s (draft_id=%s) — skipping duplicate",
+                "Draft already exists for %s / %s (draft_id=%s) — recording processed to prevent re-evaluation",
                 talent_key, message_id, existing_draft.id,
             )
+            # Record a ProcessedEmail so _batch_already_processed_ids excludes this message
+            # on the next poll cycle; without this the email would be re-evaluated forever.
+            processed_already = (
+                db.query(ProcessedEmail)
+                .filter(ProcessedEmail.gmail_message_id == message_id)
+                .first()
+            )
+            if not processed_already:
+                _record_processed(
+                    db, talent_key, message_id, thread_id, sender, subject,
+                    score, brand_name, proposed_rate, offer_type, reason,
+                    EmailStatus.draft_saved, body_text=body, email_date=email_date,
+                )
+                db.commit()
             summary["processed"] += 1
             return
 
