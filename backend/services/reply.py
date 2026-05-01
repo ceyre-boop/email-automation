@@ -17,6 +17,18 @@ logger = logging.getLogger(__name__)
 
 _ESCALATE_PREFIX = "ESCALATE:"
 
+# ── Prompt section cache ──────────────────────────────────────────────────────
+# Parsing the reply.md file (regex over ~3 KB) on every draft_reply call is wasteful.
+# Cache the parsed (system_text, user_template) pair — it doesn't change at runtime.
+_reply_sections: tuple[str, str] | None = None
+
+
+def _get_reply_sections() -> tuple[str, str]:
+    global _reply_sections
+    if _reply_sections is None:
+        _reply_sections = _parse_prompt_sections(get_settings().reply_prompt)
+    return _reply_sections
+
 
 def _load_talent_context(db, talent_key: str) -> tuple[str, str]:
     """
@@ -129,8 +141,7 @@ def _build_reply_messages(
     manager_context_text: str = "",
 ) -> list[dict]:
     """Fill reply.md template variables and return chat messages."""
-    raw = get_settings().reply_prompt
-    system_text, user_template = _parse_prompt_sections(raw)
+    system_text, user_template = _get_reply_sections()
 
     if voice_profile.strip():
         system_text += (

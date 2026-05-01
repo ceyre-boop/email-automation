@@ -18,10 +18,10 @@ from backend.services import gmail as gmail_svc
 
 logger = logging.getLogger(__name__)
 
-MAX_INBOX_RESULTS = 50
+MAX_INBOX_RESULTS = 100   # sync up to 100 messages per cycle (was 50)
 BODY_FETCH_BATCH = 20
-HEADER_WORKERS = 10
-BODY_WORKERS = 10
+HEADER_WORKERS = 20       # parallel header fetches (was 10)
+BODY_WORKERS = 20         # parallel body fetches (was 10)
 
 
 def sync_inbox_for_talent(token_row, db: Session) -> dict:

@@ -17,6 +17,18 @@ from backend.core.config import get_settings
 
 logger = logging.getLogger(__name__)
 
+# ── Prompt section cache ──────────────────────────────────────────────────────
+# Parsing the prompt file (regex over ~3 KB) on every triage call is wasteful.
+# Cache the parsed (system_text, user_template) pair — it doesn't change at runtime.
+_triage_sections: tuple[str, str] | None = None
+
+
+def _get_triage_sections() -> tuple[str, str]:
+    global _triage_sections
+    if _triage_sections is None:
+        _triage_sections = _parse_prompt_sections(get_settings().triage_prompt)
+    return _triage_sections
+
 
 # ── Prompt parsing ────────────────────────────────────────────────────────────
 
@@ -53,8 +65,7 @@ def _build_triage_messages(
     rate_note: Optional extra instruction appended to the user message for
     talents whose rate unit differs from the default (e.g. per-hour vs per-video).
     """
-    raw = get_settings().triage_prompt
-    system_text, user_template = _parse_prompt_sections(raw)
+    system_text, user_template = _get_triage_sections()
 
     user_text = (
         user_template
@@ -63,7 +74,7 @@ def _build_triage_messages(
         .replace("{{EMAIL_SUBJECT}}", subject)
         .replace("{{SENDER_EMAIL}}", sender)
         .replace("{{SENDER_DOMAIN}}", sender_domain)
-        .replace("{{EMAIL_BODY}}", body[:4000])  # Guard against massive emails
+        .replace("{{EMAIL_BODY}}", body[:2000])  # 2 KB is ample for triage scoring
     )
 
     if rate_note:

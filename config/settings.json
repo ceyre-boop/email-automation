@@ -10,7 +10,7 @@
     "reply_model": "gpt-4o",
     "_reply_model_comment": "Always use gpt-4o for reply drafting — quality matters here.",
     "max_tokens_triage": 200,
-    "max_tokens_reply": 800,
+    "max_tokens_reply": 500,
     "temperature_triage": 0.1,
     "_temperature_comment": "Low temperature for triage = consistent, deterministic scoring.",
     "temperature_reply": 0.4
