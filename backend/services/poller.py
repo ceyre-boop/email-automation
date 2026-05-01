@@ -34,7 +34,7 @@ BODY_FETCH_BATCH = 20
 
 # Concurrency: process this many emails per talent in parallel.
 # Each worker opens its own DB session and makes independent Gmail + OpenAI calls.
-MAX_CONCURRENT_EMAILS = 10
+MAX_CONCURRENT_EMAILS = 3
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
@@ -420,4 +420,8 @@ def _record_processed(
         processed_at=datetime.utcnow(),
         status=status,
     )
-    db.add(row)
+    try:
+        db.add(row)
+        db.flush()
+    except Exception:
+        db.rollback()
