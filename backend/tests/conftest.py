@@ -1,11 +1,6 @@
-"""
-Pytest configuration and shared fixtures.
-
-All tests use an in-memory SQLite database so no real Postgres/Supabase is needed.
-All external calls (OpenAI, Gmail, Google Sheets, OAuth) are mocked.
-"""
 from __future__ import annotations
 
+import itertools
 import os
 import json
 from datetime import datetime, timedelta
@@ -83,15 +78,22 @@ def make_token(db_session, talent_key: str = "Sylvia", active: bool = True) -> T
     return token
 
 
+# Counter ensures every make_draft() call gets a unique gmail_message_id within a test session.
+_draft_counter = itertools.count(1)
+
+
 def make_draft(
     db_session,
     talent_key: str = "Sylvia",
     status: DraftStatus = DraftStatus.pending,
     gmail_draft_id: str | None = None,
+    gmail_message_id: str | None = None,
 ) -> Draft:
+    if gmail_message_id is None:
+        gmail_message_id = f"msg-{next(_draft_counter):06d}"
     draft = Draft(
         talent_key=talent_key,
-        gmail_message_id="msg-001",
+        gmail_message_id=gmail_message_id,
         thread_id="thread-001",
         sender="brand@nike.com",
         subject="Partnership opportunity",

@@ -316,6 +316,21 @@ def _process_one_message(
 
     # ── Score 2 or 3 → Draft reply ──────────────────────────────────────────────
     elif score >= 2:
+        # Guard against duplicate drafts (e.g. if a previous poll cycle's DB commit
+        # failed after the Gmail draft was saved, leaving the email unprocessed).
+        existing_draft = (
+            db.query(Draft)
+            .filter(Draft.gmail_message_id == message_id)
+            .first()
+        )
+        if existing_draft:
+            logger.info(
+                "Draft already exists for %s / %s (draft_id=%s) — skipping duplicate",
+                talent_key, message_id, existing_draft.id,
+            )
+            summary["processed"] += 1
+            return
+
         reply_result = reply_svc.draft_reply(
             talent_key=talent_key,
             talent_name=talent_name,
