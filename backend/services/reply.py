@@ -143,6 +143,10 @@ def _build_reply_messages(
     """Fill reply.md template variables and return chat messages."""
     system_text, user_template = _get_reply_sections()
 
+    # Replace {{TALENT_NAME}} in the system prompt — new reply.md writes the persona
+    # directly into the system message so GPT adopts the talent's voice from the start.
+    system_text = system_text.replace("{{TALENT_NAME}}", talent_name)
+
     if voice_profile.strip():
         system_text += (
             "\n\n## TALENT VOICE & TONE\n"

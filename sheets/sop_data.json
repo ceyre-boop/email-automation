@@ -430,11 +430,11 @@
     "rules": [
       {
         "trigger": "Asking for rates or a potential to collab",
-        "response": "Thank you so much for reaching out about a potential partnership with Katrina!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $500\n\u2022 Cross posting to IG Reels: + $150\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!"
+        "response": "Hey! Thanks so much for reaching out \ud83d\ude0a I'd love to share Katrina's rates:\n\n\u2022 1 TikTok: $500\n\u2022 Cross-post to IG Reels: +$150\n\u2022 1 UGC Video: $400 (usage rights to be discussed separately)\n\nHer conversion rate is insane \u2014 she does $450k+ GMV/month, so her audience actually buys. Let me know what kind of collab you have in mind and we can go from there!"
       },
       {
         "trigger": "Initially offered a rate below her minimum ($300)",
-        "response": "Thank you for reaching out to Katrina to collab!! However her rates are higher than your offer. I\u2019m happy to share her rates below:\n\u2022 1 TikTok: $500\n\u2022 Cross posting to IG Reels: + $150\n\u2028\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you can expand your budget. We\u2019d love to explore working together!"
+        "response": "Hey, thanks for reaching out! Katrina loves connecting with brands but her rates are a bit higher than what you mentioned. Here's her current pricing:\n\n\u2022 1 TikTok: $500\n\u2022 Cross-post to IG Reels: +$150\n\u2022 1 UGC Video: $400 (usage rights TBD)\n\nShe drives serious results \u2014 $450k+ GMV/month \u2014 so it really shows in the content. Would you be able to work with these numbers? Would love to make something happen!"
       },
       {
         "trigger": "Initally offered a rate that is OVER $600\nfor one post",
@@ -462,7 +462,7 @@
       },
       {
         "trigger": "convos marked A Inital Response:\nif the brand offers at/below $650",
-        "response": "CC Chenni"
+        "response": "Hey, thanks for reaching out! Katrina loves connecting with brands but her rates are a bit higher than what you mentioned. Here's her current pricing:\n\n\u2022 1 TikTok: $500\n\u2022 Cross-post to IG Reels: +$150\n\u2022 1 UGC Video: $400 (usage rights TBD)\n\nShe drives serious results \u2014 $450k+ GMV/month \u2014 so it really shows in the content. Would you be able to work with these numbers? Would love to make something happen!"
       },
       {
         "trigger": "Comes back with a rate under $200",

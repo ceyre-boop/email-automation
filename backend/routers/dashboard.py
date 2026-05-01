@@ -628,7 +628,7 @@ def _run_process_batch(talent_key: str, msg_ids: list):
 
         from concurrent.futures import ThreadPoolExecutor
         unqueued = [m for m in msg_ids if not _already_processed(_db, m)]
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=3) as executor:
             futures = [executor.submit(_process_in_thread, mid) for mid in unqueued]
             for f in futures:
                 try:
@@ -745,7 +745,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
 
     from concurrent.futures import ThreadPoolExecutor, as_completed
     headers_map: dict[str, dict] = {}
-    with ThreadPoolExecutor(max_workers=10) as pool:
+    with ThreadPoolExecutor(max_workers=3) as pool:
         future_to_id = {pool.submit(gmail_svc.get_message_headers, token, s["id"]): s["id"] for s in stubs}
         for future in as_completed(future_to_id):
             mid = future_to_id[future]
@@ -1143,7 +1143,7 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                     thread_db.close()
                 return thread_summary
 
-            with ThreadPoolExecutor(max_workers=10) as executor:
+            with ThreadPoolExecutor(max_workers=3) as executor:
                 futures = [executor.submit(_process_in_thread, r.gmail_message_id) for r in rows]
                 for f in futures:
                     try:

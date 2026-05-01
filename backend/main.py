@@ -274,7 +274,7 @@ def on_startup():
         from apscheduler.schedulers.background import BackgroundScheduler
         from backend.routers.cron import _run_poll, _run_proactive_refresh
         scheduler = BackgroundScheduler(daemon=True)
-        scheduler.add_job(_run_poll, "interval", seconds=60, id="auto_poll", replace_existing=True)
+        scheduler.add_job(_run_poll, "interval", seconds=180, id="auto_poll", replace_existing=True)
         scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
         scheduler.start()
         logger.info("Scheduler started — polling every 60s, token refresh every 10 min.")
