@@ -357,6 +357,7 @@ def _process_one_message(
             offer_type=offer_type,
             draft_text=draft_text,
             gmail_draft_id=gmail_draft_id,
+            message_id_header=message_id_header or None,  # stored for In-Reply-To on approve
             status=DraftStatus.pending,
             is_escalate=is_escalate,
             escalate_reason=escalate_reason,

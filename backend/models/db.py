@@ -121,6 +121,7 @@ class Draft(Base):
     draft_text: Mapped[str] = mapped_column(Text, nullable=False)
     # ID of the draft saved inside the talent's Gmail account (if saved)
     gmail_draft_id: Mapped[str | None] = mapped_column(String(128))
+    message_id_header: Mapped[str | None] = mapped_column(String(512))  # for In-Reply-To threading on approve
     status: Mapped[str] = mapped_column(
         Enum(DraftStatus), default=DraftStatus.pending, nullable=False
     )
@@ -264,6 +265,8 @@ def create_tables():
             # Manager context scoping + voice profiles
             "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS talent_key TEXT",
             "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS voice_profile TEXT",
+            # Email threading: store original Message-ID header so approved replies thread correctly
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
         ]:
             try:
                 conn.execute(text(stmt))

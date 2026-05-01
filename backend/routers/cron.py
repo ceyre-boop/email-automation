@@ -290,6 +290,7 @@ def n8n_approve_draft(
             subject=draft.subject or "",
             body=draft.draft_text,
             db=db,
+            in_reply_to=getattr(draft, "message_id_header", None),
         )
     except TokenRefreshError:
         token.active = False
@@ -307,6 +308,16 @@ def n8n_approve_draft(
     draft.reviewed_at = datetime.utcnow()
     draft.reviewed_by = body.reviewed_by
     db.add(draft)
+
+    # Sync status on ProcessedEmail so the Sent tab reflects this
+    from backend.models.db import EmailStatus, ProcessedEmail
+    pe = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == draft.gmail_message_id
+    ).first()
+    if pe:
+        pe.status = EmailStatus.sent
+        db.add(pe)
+
     db.commit()
     logger.info("Draft %d approved via n8n by %s", body.draft_id, body.reviewed_by)
     return {"ok": True, "status": "sent", "draft_id": body.draft_id}

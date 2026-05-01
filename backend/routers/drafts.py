@@ -128,6 +128,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
             subject=draft.subject or "",
             body=draft.draft_text,
             db=db,
+            in_reply_to=getattr(draft, "message_id_header", None),
         )
     except TokenRefreshError:
         token.active = False
@@ -146,6 +147,16 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
     draft.reviewed_at = datetime.utcnow()
     draft.reviewed_by = body.reviewed_by
     db.add(draft)
+
+    # Sync status on the ProcessedEmail record so the Sent tab shows this email
+    from backend.models.db import EmailStatus, ProcessedEmail
+    pe = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == draft.gmail_message_id
+    ).first()
+    if pe:
+        pe.status = EmailStatus.sent
+        db.add(pe)
+
     db.commit()
     logger.info("Draft %s approved and sent by %s", draft_id, body.reviewed_by)
     return {"ok": True, "message": "Reply sent successfully."}

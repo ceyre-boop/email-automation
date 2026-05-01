@@ -132,6 +132,26 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
             summary["upserted"] += 1
 
     db.commit()
+
+    # ── Prune stale rows (emails no longer in inbox) ──────────────────────────
+    # Only prune when Gmail returned a complete result set smaller than MAX_INBOX_RESULTS,
+    # meaning we definitively know the full inbox contents. If we got a full page
+    # (len == MAX_INBOX_RESULTS) there could be more messages we didn't fetch, so
+    # we leave older cached rows alone to avoid false deletions.
+    if len(stubs) < MAX_INBOX_RESULTS:
+        pruned = (
+            db.query(InboxEmail)
+            .filter(
+                InboxEmail.talent_key == talent_key,
+                InboxEmail.gmail_message_id.not_in(current_ids),
+            )
+            .delete(synchronize_session=False)
+        )
+        if pruned:
+            db.commit()
+            logger.info("Inbox sync %s: pruned %d stale cache rows", talent_key, pruned)
+            summary["pruned"] = pruned
+
     return summary
 
 

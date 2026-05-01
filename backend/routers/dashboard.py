@@ -801,12 +801,11 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
 
     try:
-        gmail_drafts = gmail_svc.list_gmail_drafts(token, max_results=25)
+        gmail_drafts = gmail_svc.list_gmail_drafts(token, max_results=25, db=db)
     except Exception as e:
         logger.error(f"Live drafts fetch failed: {e}")
         raise HTTPException(status_code=503, detail="Gmail API is currently unavailable. Please try again in a few minutes.")
-    db.add(token)
-    db.commit()
+    # token refresh already persisted by _gmail_service inside list_gmail_drafts
 
     # Build lookup: gmail_draft_id → DB Draft row
     gmail_draft_ids = [d["gmail_draft_id"] for d in gmail_drafts]
@@ -1010,7 +1009,7 @@ def start_backfill(
     """Start a background backfill of the last N days of Gmail history."""
     _validate_talent(talent_key)
     token = db.query(TalentToken).filter(
-        TalentToken.talent_key == talent_key.lower(),
+        TalentToken.talent_key.ilike(talent_key),
         TalentToken.active == True,  # noqa: E712
     ).first()
     if not token:
@@ -1050,8 +1049,9 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
     total = 0
     try:
         # ── Step 1: Resolve Gmail token ───────────────────────────────────────
+        # ilike so we match regardless of how the talent_key was stored (e.g. "Katrina" vs "katrina")
         token = _db.query(TalentToken).filter(
-            TalentToken.talent_key == talent_key.lower(),
+            TalentToken.talent_key.ilike(talent_key),
             TalentToken.active == True,  # noqa: E712
         ).first()
         if not token:
@@ -1113,7 +1113,7 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                 thread_db = SessionLocal()
                 try:
                     thread_token = thread_db.query(TalentToken).filter(
-                        TalentToken.talent_key == talent_key.lower(),
+                        TalentToken.talent_key.ilike(talent_key),
                         TalentToken.active == True,  # noqa: E712
                     ).first()
                     if not thread_token:
