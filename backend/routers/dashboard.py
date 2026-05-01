@@ -1033,7 +1033,6 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
     Each email runs in its own thread with its own DB session — mirrors _run_process_batch.
     """
     from concurrent.futures import ThreadPoolExecutor
-    from sqlalchemy import select as sa_select
 
     from backend.core.config import get_settings as _gs
     from backend.models.db import ProcessedEmail, get_session_factory
@@ -1089,17 +1088,17 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
 
         # ── Step 5: Process emails not yet in processed_emails ────────────────
         while True:
-            processed_subq = (
-                sa_select(ProcessedEmail.gmail_message_id)
-                .where(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
-                .scalar_subquery()
-            )
-            # No body_text filter — _process_one_message fetches body from Gmail if needed
+            # LEFT JOIN is more efficient than NOT IN for large tables
             rows = (
                 _db.query(InboxEmail)
+                .outerjoin(
+                    ProcessedEmail,
+                    (ProcessedEmail.gmail_message_id == InboxEmail.gmail_message_id)
+                    & (func.lower(ProcessedEmail.talent_key) == talent_key.lower()),
+                )
                 .filter(
                     InboxEmail.talent_key == talent_key.lower(),
-                    InboxEmail.gmail_message_id.not_in(processed_subq),
+                    ProcessedEmail.id == None,  # noqa: E711 — LEFT JOIN null means not processed
                 )
                 .limit(batch_size)
                 .all()

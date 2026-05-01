@@ -12,7 +12,7 @@ Iterates over every connected talent, processes unread emails end-to-end:
 from __future__ import annotations
 
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -174,7 +174,7 @@ def poll_all_inboxes(db: Session) -> dict:
                 )
 
                 # Process new messages concurrently — each worker owns its own DB session
-                futures: dict[str, str] = {}
+                futures: dict[Future, str] = {}
                 with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
                     for message_id in pending_ids:
                         future = executor.submit(
