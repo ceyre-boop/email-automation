@@ -1511,23 +1511,32 @@ async function runBatchDraft() {
 
 // ── Run AI Draft ───────────────────────────────────────────────────────────
 async function runAiDraft() {
-  if (!currentTalentKey) return;
+  if (!currentTalentKey) return showToast('Select a talent first.');
   const btn = document.getElementById('btn-run-ai');
   const originalText = btn.innerHTML;
-  btn.innerHTML = '⚡ Digging for Deals...';
+  btn.innerHTML = '⚡ Starting…';
   btn.disabled = true;
-  
+
   try {
-    // Deep triage: Tell backend to scan deeper (last 200) for un-scored messages
     const response = await fetch(`/api/dashboard/talents/${currentTalentKey}/triage-unscored`, {
       method: 'POST',
       headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' }
     });
     if (response.ok) {
-      showToast('AI triage complete — checking drafts…');
+      const data = await response.json();
+      // Switch to drafts tab so user sees results appear
       setGmailNav('drafts');
+      showToast('✦ ' + (data.message || 'AI pipeline started — drafts arriving in ~30s…'));
+      // Auto-reload drafts after 35 s to show results from the background job
+      setTimeout(async () => {
+        if (state.selectedTalent) {
+          await loadTalentData(state.selectedTalent, true);
+          showToast('✅ Drafts refreshed.');
+        }
+      }, 35000);
     } else {
-      showToast('Triage failed.');
+      const err = await response.json().catch(() => ({}));
+      showToast('Error: ' + (err.detail || 'Triage request failed.'));
     }
   } catch (e) {
     showToast('AI Draft failed: ' + e.message);
