@@ -1024,7 +1024,7 @@ def start_backfill(
 
 
 def _run_triage_unscored(talent_key: str, batch_size: int = 20):
-    """Background job: sync inbox then triage all undrafted emails in batches.
+    """Background job: sync inbox then triage all untriaged and undrafted emails in batches.
 
     Steps:
       1. Sync the Gmail inbox → inbox_emails cache (picks up read *and* unread messages).
