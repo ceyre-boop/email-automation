@@ -243,7 +243,7 @@ def _process_message_in_thread(
     try:
         token_row = db.query(TalentToken).filter(TalentToken.id == token_row_id).first()
         if not token_row:
-            return {"status": "error", "reason": f"TalentToken {token_row_id} not found"}
+            return {"status": "error", "reason": f"TalentToken not found for {talent_key} (id={token_row_id})"}
         summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
         _process_one_message(
             db=db,

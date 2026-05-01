@@ -138,7 +138,8 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
     # meaning we definitively know the full inbox contents. If we got a full page
     # (len == MAX_INBOX_RESULTS) there could be more messages we didn't fetch, so
     # we leave older cached rows alone to avoid false deletions.
-    if len(stubs) < MAX_INBOX_RESULTS:
+    # Guard: never prune if current_ids is empty (would delete all cached rows).
+    if current_ids and len(stubs) < MAX_INBOX_RESULTS:
         pruned = (
             db.query(InboxEmail)
             .filter(

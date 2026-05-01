@@ -1526,7 +1526,7 @@ async function runAiDraft() {
       const data = await response.json();
       // Switch to drafts tab so user sees results appear
       setGmailNav('drafts');
-      showToast('✦ ' + (data.message || 'AI pipeline started — drafts arriving in ~30s…'));
+      showToast('✦ ' + (data.message || 'AI pipeline started — drafts arriving in ~35s…'));
       // Auto-reload drafts after 35 s to show results from the background job
       setTimeout(async () => {
         if (state.selectedTalent) {
