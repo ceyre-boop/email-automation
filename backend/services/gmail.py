@@ -417,9 +417,9 @@ def list_gmail_drafts(token_row, max_results: int = 25, db=None) -> list[dict]:
     return drafts
 
 
-def send_gmail_draft(token_row, gmail_draft_id: str) -> bool:
+def send_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
     """Send an existing Gmail draft by its draft ID."""
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         service.users().drafts().send(userId="me", body={"id": gmail_draft_id}).execute()
         return True

@@ -600,16 +600,18 @@ def _run_process_batch(talent_key: str, msg_ids: list):
         talent_cfg = talent_map.get(talent_key.lower(), {})
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 
-        # Each thread gets its own DB session — SQLAlchemy sessions are not thread-safe
-        def _process_in_thread(msg_id: str):
+        # Each thread gets its own DB session AND summary — SQLAlchemy sessions are not
+        # thread-safe, and sharing a mutable dict across threads causes race conditions.
+        def _process_in_thread(msg_id: str) -> dict:
             thread_db = SessionLocal()
+            thread_summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
             try:
                 thread_token = thread_db.query(TalentToken).filter(
                     TalentToken.talent_key.ilike(talent_key),
                     TalentToken.active == True,  # noqa: E712
                 ).first()
                 if not thread_token:
-                    return
+                    return thread_summary
                 _process_one_message(
                     db=thread_db,
                     token_row=thread_token,
@@ -618,10 +620,11 @@ def _run_process_batch(talent_key: str, msg_ids: list):
                     talent_name=talent_cfg.get("full_name", talent_key),
                     minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
                     draft_mode=draft_mode,
-                    summary=summary,
+                    summary=thread_summary,
                 )
             finally:
                 thread_db.close()
+            return thread_summary
 
         from concurrent.futures import ThreadPoolExecutor
         unqueued = [m for m in msg_ids if not _already_processed(_db, m)]
@@ -629,7 +632,9 @@ def _run_process_batch(talent_key: str, msg_ids: list):
             futures = [executor.submit(_process_in_thread, mid) for mid in unqueued]
             for f in futures:
                 try:
-                    f.result()
+                    result = f.result()
+                    for k, v in result.items():
+                        summary[k] += v
                 except Exception as exc:
                     logger.warning("Batch error on %s: %s", talent_key, exc)
                     summary["errors"] += 1
@@ -1108,18 +1113,20 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
 
             summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
 
-            # Give each thread its own session + token row — sessions are not thread-safe.
-            def _process_in_thread(msg_id: str) -> None:
+            # Give each thread its own session + summary dict — sessions are not thread-safe
+            # and sharing a mutable dict across threads causes race conditions.
+            def _process_in_thread(msg_id: str) -> dict:
                 thread_db = SessionLocal()
+                thread_summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
                 try:
                     thread_token = thread_db.query(TalentToken).filter(
                         TalentToken.talent_key.ilike(talent_key),
                         TalentToken.active == True,  # noqa: E712
                     ).first()
                     if not thread_token:
-                        return
+                        return thread_summary
                     if _already_processed(thread_db, msg_id):
-                        return
+                        return thread_summary
                     _process_one_message(
                         db=thread_db,
                         token_row=thread_token,
@@ -1128,16 +1135,19 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                         talent_name=talent_name,
                         minimum_rate=minimum_rate,
                         draft_mode=_gs().app_config.get("reply", {}).get("draft_mode", True),
-                        summary=summary,
+                        summary=thread_summary,
                     )
                 finally:
                     thread_db.close()
+                return thread_summary
 
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = [executor.submit(_process_in_thread, r.gmail_message_id) for r in rows]
                 for f in futures:
                     try:
-                        f.result()
+                        result = f.result()
+                        for k, v in result.items():
+                            summary[k] += v
                     except Exception as exc:  # noqa: BLE001
                         logger.warning("Triage-unscored thread error for %s: %s", talent_key, exc)
                         summary["errors"] += 1

@@ -207,8 +207,7 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
 
     if draft.gmail_draft_id:
         token = _get_token_or_404(db, draft.talent_key)
-        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id)
-        db.add(token)
+        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
 
     draft.status = DraftStatus.discarded
     draft.reviewed_at = datetime.utcnow()

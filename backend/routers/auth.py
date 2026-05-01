@@ -46,6 +46,11 @@ def _generate_talent_key(name: str, email: str, db: Session) -> str:
 @router.get("/connect")
 def connect_gmail(talent_key: str | None = Query(None), db: Session = Depends(get_db)):
     """Redirect any user to the Google consent screen. Pin to a talent_key if provided."""
+    if talent_key is not None:
+        valid_keys = {t["key"].lower() for t in get_settings().app_config.get("talents", [])}
+        if talent_key.lower() not in valid_keys:
+            from fastapi import HTTPException
+            raise HTTPException(status_code=404, detail=f"Unknown talent: {talent_key}")
     state = secrets.token_urlsafe(32)
     db.add(OAuthState(state=state, pinned_talent_key=talent_key))
     db.commit()
@@ -64,7 +69,7 @@ def oauth_callback(
         return _oauth_callback_inner(code=code, state=state, error=error, db=db)
     except Exception as exc:
         logger.exception("Unhandled error in oauth_callback: %s", exc)
-        return HTMLResponse(content=_error_page("token_exchange_failed"), status_code=200)
+        return HTMLResponse(content=_error_page("token_exchange_failed"), status_code=500)
 
 
 def _oauth_callback_inner(
@@ -74,15 +79,15 @@ def _oauth_callback_inner(
     db,
 ):
     if error:
-        return HTMLResponse(content=_error_page(error))
+        return HTMLResponse(content=_error_page(error), status_code=400)
 
     if not code or not state:
-        return HTMLResponse(content=_error_page("missing_params"))
+        return HTMLResponse(content=_error_page("missing_params"), status_code=422)
 
     # Validate CSRF state (DB-backed so restarts don't invalidate it)
     state_row = db.query(OAuthState).filter(OAuthState.state == state).first()
     if not state_row:
-        return HTMLResponse(content=_error_page("invalid_state"))
+        return HTMLResponse(content=_error_page("invalid_state"), status_code=400)
     pinned_talent_key = state_row.pinned_talent_key
     db.delete(state_row)
     db.commit()
@@ -93,7 +98,7 @@ def _oauth_callback_inner(
         token_data = exchange_code(code)
     except Exception as exc:
         logger.error("Token exchange failed: %s", exc)
-        return HTMLResponse(content=_error_page("token_exchange_failed"))
+        return HTMLResponse(content=_error_page("token_exchange_failed"), status_code=500)
 
     # Fetch Google profile via userinfo endpoint (simpler than googleapiclient.discovery)
     try:

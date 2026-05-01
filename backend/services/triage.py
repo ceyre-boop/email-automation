@@ -85,13 +85,14 @@ def _apply_special_routing(
     policy: dict,
 ) -> int:
     """Apply per-talent overrides from confidence_policy.json special_talent_routing."""
+    key = talent_key.lower()
 
-    if talent_key == "Trin":
+    if key == "trin":
         if "affiliate" in offer_type.lower() and proposed_rate == 0:
             logger.info("Trin commission-only override → Score 1")
             return 1
 
-    if talent_key == "Katrina":
+    if key == "katrina":
         # Dual-manager escalation: all Score-3 offers are escalated at the reply stage.
         # Threshold comes from confidence_policy.json special_talent_routing.Katrina.
         # Rate > threshold → CC Cara; rate ≤ threshold (or unknown) → CC Chenni.
@@ -119,7 +120,7 @@ def _apply_special_routing(
                     proposed_rate, cara_threshold,
                 )
 
-    if talent_key == "KatrinaD":
+    if key == "katrinad":
         # Hourly-rate interpretation: all KatrinaD offers are priced per hour.
         # The minimum_rate in settings is already set to the hourly floor ($150/hr).
         # GPT receives a SPECIAL RATE NOTE (injected by triage_email) instructing it
@@ -130,7 +131,7 @@ def _apply_special_routing(
             "KatrinaD hourly-rate triage: proposed_rate=%s (per hour)", proposed_rate
         )
 
-    if talent_key == "Michaela":
+    if key == "michaela":
         if proposed_rate > 0 and proposed_rate < 1000:
             logger.info("Michaela floor override ($%s < $1000) → Score 1", proposed_rate)
             return 1
@@ -171,7 +172,7 @@ def triage_email(
     # Build a per-hour rate note for talents whose rate unit is not "per video".
     # This is critical for KatrinaD (per hour) so GPT interprets offered amounts correctly.
     talent_cfg = next(
-        (t for t in settings.app_config.get("talents", []) if t.get("key") == talent_key),
+        (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),
         {},
     )
     rate_unit = talent_cfg.get("rate_unit", "per video")
