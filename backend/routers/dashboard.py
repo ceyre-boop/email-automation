@@ -244,7 +244,7 @@ def talent_emails(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(ProcessedEmail)
-        .filter(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
+        .filter(ProcessedEmail.talent_key.ilike(talent_key))
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(250)
         .all()
@@ -257,7 +257,7 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
     _validate_talent(talent_key)
     return (
         db.query(Draft)
-        .filter(func.lower(Draft.talent_key) == talent_key.lower(), Draft.status == DraftStatus.pending)
+        .filter(Draft.talent_key.ilike(talent_key), Draft.status == DraftStatus.pending)
         .order_by(Draft.created_at.desc())
         .all()
     )
@@ -325,7 +325,7 @@ def poll_log(talent_key: str, limit: int = 20, db: Session = Depends(get_db)):
     """Recent poll history for a talent — shows errors and durations."""
     rows = (
         db.query(PollHealth)
-        .filter(PollHealth.talent_key == talent_key)
+        .filter(PollHealth.talent_key.ilike(talent_key))
         .order_by(PollHealth.polled_at.desc())
         .limit(limit)
         .all()
@@ -409,7 +409,7 @@ def talent_sent_emails(talent_key: str, limit: int = 50, db: Session = Depends(g
     """Emails where a reply was sent — the missing 'Sent' tab."""
     rows = (
         db.query(ProcessedEmail)
-        .filter(func.lower(ProcessedEmail.talent_key) == talent_key.lower(), ProcessedEmail.status == EmailStatus.sent)
+        .filter(ProcessedEmail.talent_key.ilike(talent_key), ProcessedEmail.status == EmailStatus.sent)
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(limit)
         .all()
@@ -554,7 +554,7 @@ def process_batch(
     processed_ids = {
         row[0] for row in db.execute(
             select(ProcessedEmail.gmail_message_id).where(
-                func.lower(ProcessedEmail.talent_key) == talent_key.lower()
+                ProcessedEmail.talent_key.ilike(talent_key)
             )
         ).fetchall()
     }
@@ -600,16 +600,18 @@ def _run_process_batch(talent_key: str, msg_ids: list):
         talent_cfg = talent_map.get(talent_key.lower(), {})
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 
-        # Each thread gets its own DB session — SQLAlchemy sessions are not thread-safe
-        def _process_in_thread(msg_id: str):
+        # Each thread gets its own DB session AND summary — SQLAlchemy sessions are not
+        # thread-safe, and sharing a mutable dict across threads causes race conditions.
+        def _process_in_thread(msg_id: str) -> dict:
             thread_db = SessionLocal()
+            thread_summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
             try:
                 thread_token = thread_db.query(TalentToken).filter(
                     TalentToken.talent_key.ilike(talent_key),
                     TalentToken.active == True,  # noqa: E712
                 ).first()
                 if not thread_token:
-                    return
+                    return thread_summary
                 _process_one_message(
                     db=thread_db,
                     token_row=thread_token,
@@ -618,10 +620,11 @@ def _run_process_batch(talent_key: str, msg_ids: list):
                     talent_name=talent_cfg.get("full_name", talent_key),
                     minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
                     draft_mode=draft_mode,
-                    summary=summary,
+                    summary=thread_summary,
                 )
             finally:
                 thread_db.close()
+            return thread_summary
 
         from concurrent.futures import ThreadPoolExecutor
         unqueued = [m for m in msg_ids if not _already_processed(_db, m)]
@@ -629,7 +632,9 @@ def _run_process_batch(talent_key: str, msg_ids: list):
             futures = [executor.submit(_process_in_thread, mid) for mid in unqueued]
             for f in futures:
                 try:
-                    f.result()
+                    result = f.result()
+                    for k, v in result.items():
+                        summary[k] += v
                 except Exception as exc:
                     logger.warning("Batch error on %s: %s", talent_key, exc)
                     summary["errors"] += 1
@@ -801,12 +806,11 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
 
     try:
-        gmail_drafts = gmail_svc.list_gmail_drafts(token, max_results=25)
+        gmail_drafts = gmail_svc.list_gmail_drafts(token, max_results=25, db=db)
     except Exception as e:
         logger.error(f"Live drafts fetch failed: {e}")
         raise HTTPException(status_code=503, detail="Gmail API is currently unavailable. Please try again in a few minutes.")
-    db.add(token)
-    db.commit()
+    # token refresh already persisted by _gmail_service inside list_gmail_drafts
 
     # Build lookup: gmail_draft_id → DB Draft row
     gmail_draft_ids = [d["gmail_draft_id"] for d in gmail_drafts]
@@ -1010,7 +1014,7 @@ def start_backfill(
     """Start a background backfill of the last N days of Gmail history."""
     _validate_talent(talent_key)
     token = db.query(TalentToken).filter(
-        TalentToken.talent_key == talent_key.lower(),
+        TalentToken.talent_key.ilike(talent_key),
         TalentToken.active == True,  # noqa: E712
     ).first()
     if not token:
@@ -1020,18 +1024,23 @@ def start_backfill(
 
 
 def _run_triage_unscored(talent_key: str, batch_size: int = 20):
-    """Background job: triage InboxEmail rows that haven't been processed yet, in batches.
+    """Background job: sync inbox then triage all unscored emails in batches.
 
-    Each email is processed in its own thread with its own DB session — mirroring the
-    safe pattern used by _run_process_batch.  The main session is read-only (querying
-    candidates); writes happen only inside per-thread sessions so SQLAlchemy's
-    session-not-thread-safe constraint is respected.
+    Steps:
+      1. Sync the Gmail inbox → inbox_emails cache (picks up read *and* unread messages).
+      2. Fetch body text for any cached emails that don't have it yet.
+      3. Delete ProcessedEmail stubs with score=NULL (created by backfill, never actually
+         triaged) so they are reprocessed properly here.
+      4. Iterate inbox_emails in batches, skipping only those already in processed_emails,
+         and run full triage + reply on each one.
+
+    Each email runs in its own thread with its own DB session — mirrors _run_process_batch.
     """
     from concurrent.futures import ThreadPoolExecutor
-    from sqlalchemy import select as sa_select
 
     from backend.core.config import get_settings as _gs
     from backend.models.db import ProcessedEmail, get_session_factory
+    from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
     from backend.services.poller import _already_processed, _process_one_message
 
     settings = _gs()
@@ -1044,20 +1053,59 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
     _db = SessionLocal()
     total = 0
     try:
-        while True:
-            # Exclude emails already in processed_emails so the loop terminates
-            # and we never hit a UniqueConstraint error on re-processing.
-            processed_subq = (
-                sa_select(ProcessedEmail.gmail_message_id)
-                .where(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
-                .scalar_subquery()
+        # ── Step 1: Resolve Gmail token ───────────────────────────────────────
+        # ilike so we match regardless of how the talent_key was stored (e.g. "Katrina" vs "katrina")
+        token = _db.query(TalentToken).filter(
+            TalentToken.talent_key.ilike(talent_key),
+            TalentToken.active == True,  # noqa: E712
+        ).first()
+        if not token:
+            logger.error("Triage-unscored: no active token for %s", talent_key)
+            return
+
+        # ── Step 2: Sync inbox cache (all inbox messages, read + unread) ──────
+        try:
+            sync_inbox_for_talent(token, _db)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Triage-unscored: inbox sync failed for %s (continuing): %s", talent_key, exc)
+
+        # ── Step 3: Fetch body text for any emails that don't have it yet ─────
+        try:
+            fetched = fetch_pending_bodies(token, _db, limit=200)
+            if fetched:
+                logger.info("Triage-unscored: fetched %d email bodies for %s", fetched, talent_key)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Triage-unscored: body fetch failed for %s (continuing): %s", talent_key, exc)
+
+        # ── Step 4: Reset ProcessedEmail stubs with score=NULL ─────────────────
+        # Backfill creates rows with score=NULL/status=flagged to log history, but
+        # GPT never actually ran. Deleting them lets this job re-triage them properly.
+        stubs_deleted = _db.query(ProcessedEmail).filter(
+            ProcessedEmail.talent_key.ilike(talent_key),
+            ProcessedEmail.score == None,  # noqa: E711
+        ).delete(synchronize_session=False)
+        if stubs_deleted:
+            _db.commit()
+            logger.info(
+                "Triage-unscored: cleared %d unscored ProcessedEmail stubs for %s — will re-triage",
+                stubs_deleted, talent_key,
             )
+
+        # ── Step 5: Process emails not yet in processed_emails ────────────────
+        while True:
+            # LEFT JOIN is more efficient than NOT IN for large tables
             rows = (
                 _db.query(InboxEmail)
+                .outerjoin(
+                    ProcessedEmail,
+                    # func.lower() required for case-insensitive join ON clause;
+                    # SQLAlchemy's .ilike() cannot be used in join conditions.
+                    (ProcessedEmail.gmail_message_id == InboxEmail.gmail_message_id)
+                    & (func.lower(ProcessedEmail.talent_key) == talent_key.lower()),
+                )
                 .filter(
-                    InboxEmail.talent_key == talent_key.lower(),
-                    InboxEmail.body_text != None,  # noqa: E711
-                    InboxEmail.gmail_message_id.not_in(processed_subq),
+                    InboxEmail.talent_key.ilike(talent_key),
+                    ProcessedEmail.id == None,  # noqa: E711 — LEFT JOIN null means not processed
                 )
                 .limit(batch_size)
                 .all()
@@ -1065,20 +1113,22 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
             if not rows:
                 break
 
-            summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+            summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
 
-            # Give each thread its own session + token row — sessions are not thread-safe.
-            def _process_in_thread(msg_id: str) -> None:
+            # Give each thread its own session + summary dict — sessions are not thread-safe
+            # and sharing a mutable dict across threads causes race conditions.
+            def _process_in_thread(msg_id: str) -> dict:
                 thread_db = SessionLocal()
+                thread_summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
                 try:
                     thread_token = thread_db.query(TalentToken).filter(
-                        TalentToken.talent_key == talent_key.lower(),
+                        TalentToken.talent_key.ilike(talent_key),
                         TalentToken.active == True,  # noqa: E712
                     ).first()
                     if not thread_token:
-                        return
+                        return thread_summary
                     if _already_processed(thread_db, msg_id):
-                        return
+                        return thread_summary
                     _process_one_message(
                         db=thread_db,
                         token_row=thread_token,
@@ -1087,23 +1137,26 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                         talent_name=talent_name,
                         minimum_rate=minimum_rate,
                         draft_mode=_gs().app_config.get("reply", {}).get("draft_mode", True),
-                        summary=summary,
+                        summary=thread_summary,
                     )
                 finally:
                     thread_db.close()
+                return thread_summary
 
-            # 10 workers mirrors _run_process_batch; each thread holds its own connection.
             with ThreadPoolExecutor(max_workers=10) as executor:
                 futures = [executor.submit(_process_in_thread, r.gmail_message_id) for r in rows]
                 for f in futures:
                     try:
-                        f.result()
-                    except Exception as exc:
+                        result = f.result()
+                        for k, v in result.items():
+                            summary[k] += v
+                    except Exception as exc:  # noqa: BLE001
                         logger.warning("Triage-unscored thread error for %s: %s", talent_key, exc)
                         summary["errors"] += 1
 
             total += summary.get("processed", 0)
-    except Exception as exc:
+            logger.info("Triage-unscored batch complete for %s: %s", talent_key, summary)
+    except Exception as exc:  # noqa: BLE001
         logger.error("Triage-unscored job failed for %s: %s", talent_key, exc)
     finally:
         _db.close()
@@ -1116,27 +1169,31 @@ def triage_unscored(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    """Triage all InboxEmail rows that have body text but haven't been processed yet. Runs in background."""
-    from sqlalchemy import select as sa_select
+    """
+    Sync inbox then triage all unscored emails for a talent. Runs fully in background.
 
-    processed_subq = (
-        sa_select(ProcessedEmail.gmail_message_id)
-        .where(func.lower(ProcessedEmail.talent_key) == talent_key.lower())
-        .scalar_subquery()
-    )
-    unscored_count = (
-        db.query(InboxEmail)
-        .filter(
-            InboxEmail.talent_key == talent_key.lower(),
-            InboxEmail.body_text != None,  # noqa: E711
-            InboxEmail.gmail_message_id.not_in(processed_subq),
+    Called by the 'Run AI Draft' button in the dashboard. Always starts the background
+    job as long as the talent has an active Gmail token — the job handles its own
+    empty-inbox case gracefully.
+    """
+    _validate_talent(talent_key)
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key.ilike(talent_key),
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Gmail not connected for {talent_key}. Connect their inbox first.",
         )
-        .count()
-    )
-    if unscored_count == 0:
-        return {"ok": True, "message": "No unprocessed emails with body text found."}
     background_tasks.add_task(_run_triage_unscored, talent_key)
-    return {"ok": True, "message": f"Triaging {unscored_count} unscored emails for {talent_key} in background."}
+    return {
+        "ok": True,
+        "message": (
+            f"AI pipeline started for {talent_key} — syncing inbox and triaging emails. "
+            "Drafts will appear in Gmail within ~30 seconds."
+        ),
+    }
 
 
 @router.post("/triage-all-unscored")

@@ -12,6 +12,7 @@ Iterates over every connected talent, processes unread emails end-to-end:
 from __future__ import annotations
 
 import logging
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 
 from sqlalchemy.orm import Session
@@ -30,6 +31,10 @@ from backend.services.oauth import TokenRefreshError
 logger = logging.getLogger(__name__)
 
 BODY_FETCH_BATCH = 20
+
+# Concurrency: process this many emails per talent in parallel.
+# Each worker opens its own DB session and makes independent Gmail + OpenAI calls.
+MAX_CONCURRENT_EMAILS = 10
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
@@ -157,44 +162,49 @@ def poll_all_inboxes(db: Session) -> dict:
             if not settings.app_config.get("ai_enabled", True):
                 logger.info("AI disabled — inbox synced for %s but triage skipped (ai_enabled=false)", talent_key)
             else:
-                for msg_stub in messages:
-                    message_id = msg_stub["id"]
-                    # Deep Sweep: Process IF unread OR IF it has no score in our DB yet
-                    if _already_processed(db, message_id):
-                        # Even if processed, check if it's unscored in InboxEmail
-                        # (This is the 'Dig' logic) 
-                        continue
+                # Filter out already-processed messages before submitting concurrent work
+                pending_ids = [
+                    msg_stub["id"]
+                    for msg_stub in messages
+                    if not _already_processed(db, msg_stub["id"])
+                ]
+                logger.info(
+                    "%s: %d unread, %d new to process (concurrent workers=%d)",
+                    talent_key, emails_found, len(pending_ids), MAX_CONCURRENT_EMAILS,
+                )
 
-                    try:
-                        _process_one_message(
-                            db=db,
-                            token_row=token_row,
-                            message_id=message_id,
-                            talent_key=talent_key,
-                            talent_name=talent_name,
-                            minimum_rate=minimum_rate,
-                            draft_mode=draft_mode,
-                            summary=summary,
+                # Process new messages concurrently — each worker owns its own DB session
+                futures: dict[Future, str] = {}
+                with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
+                    for message_id in pending_ids:
+                        future = executor.submit(
+                            _process_message_in_thread,
+                            token_row.id,
+                            message_id,
+                            talent_key,
+                            talent_name,
+                            minimum_rate,
+                            draft_mode,
                         )
-                        emails_processed_count += 1
-                    except Exception as exc:  # noqa: BLE001
-                        logger.error("Error processing %s / %s: %s", talent_key, message_id, exc)
-                        summary["errors"] += 1
-                        _record_processed(
-                            db=db,
-                            talent_key=talent_key,
-                            message_id=message_id,
-                            thread_id="",
-                            sender="",
-                            subject="",
-                            score=2,
-                            brand_name="",
-                            proposed_rate=0,
-                            offer_type="Unknown",
-                            reason=f"Error: {exc}",
-                            status=EmailStatus.error,
-                            email_date=None,
-                        )
+                        futures[future] = message_id
+
+                    for future in as_completed(futures):
+                        message_id = futures[future]
+                        try:
+                            result = future.result()
+                            emails_processed_count += 1
+                            if result["status"] == "ok":
+                                for k, v in result.get("summary", {}).items():
+                                    summary[k] += v
+                            else:
+                                logger.error(
+                                    "Worker error for %s / %s: %s",
+                                    talent_key, message_id, result.get("reason"),
+                                )
+                                summary["errors"] += 1
+                        except Exception as exc:  # noqa: BLE001
+                            logger.error("Future error for %s / %s: %s", talent_key, message_id, exc)
+                            summary["errors"] += 1
 
             # Success — reset failure counters, record last_poll_at
             token_row.consecutive_failures = 0
@@ -215,6 +225,42 @@ def poll_all_inboxes(db: Session) -> dict:
 
     logger.info("Poll complete: %s", summary)
     return summary
+
+
+def _process_message_in_thread(
+    token_row_id: int,
+    message_id: str,
+    talent_key: str,
+    talent_name: str,
+    minimum_rate: float,
+    draft_mode: bool,
+) -> dict:
+    """Process one email in a worker thread with its own DB session and TalentToken."""
+    from backend.models.db import get_session_factory  # avoid circular at module level
+
+    Session = get_session_factory()
+    db = Session()
+    try:
+        token_row = db.query(TalentToken).filter(TalentToken.id == token_row_id).first()
+        if not token_row:
+            return {"status": "error", "reason": f"TalentToken not found for {talent_key} (id={token_row_id})"}
+        summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+        _process_one_message(
+            db=db,
+            token_row=token_row,
+            message_id=message_id,
+            talent_key=talent_key,
+            talent_name=talent_name,
+            minimum_rate=minimum_rate,
+            draft_mode=draft_mode,
+            summary=summary,
+        )
+        return {"status": "ok", "summary": summary}
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Thread error for %s / %s: %s", talent_key, message_id, exc)
+        return {"status": "error", "reason": str(exc)}
+    finally:
+        db.close()
 
 
 def _process_one_message(
@@ -311,6 +357,7 @@ def _process_one_message(
             offer_type=offer_type,
             draft_text=draft_text,
             gmail_draft_id=gmail_draft_id,
+            message_id_header=message_id_header or None,  # stored for In-Reply-To on approve
             status=DraftStatus.pending,
             is_escalate=is_escalate,
             escalate_reason=escalate_reason,

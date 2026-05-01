@@ -16,7 +16,9 @@ from backend.tests.conftest import make_draft, make_token
 def test_health_returns_ok(client):
     resp = client.get("/health")
     assert resp.status_code == 200
-    assert resp.json() == {"status": "ok"}
+    data = resp.json()
+    assert data["status"] == "ok"
+    # deployed_at is also present but we don't assert its exact value
 
 
 # ── GET /api/status ───────────────────────────────────────────────────────────
@@ -80,19 +82,17 @@ def test_cron_poll_success(mock_poll, client):
     assert resp.status_code == 200
     data = resp.json()
     assert data["ok"] is True
-    assert data["summary"]["processed"] == 3
+    # Poll runs in the background; the response confirms it was queued
+    assert data["status"] == "poll started in background"
 
 
 @patch("backend.routers.cron.poll_all_inboxes", side_effect=Exception("DB down"))
 def test_cron_poll_exception_does_not_crash(mock_poll, client):
-    """Cron must return a JSON error, never a 500, so Railway cron stays alive."""
+    """Cron endpoint returns 200 immediately (poll runs in background); never raises 500."""
     resp = client.get("/cron/poll-inboxes")
     assert resp.status_code == 200
-    data = resp.json()
-    assert data["ok"] is False
-    assert "error" in data
-    # Must NOT expose the raw exception message
-    assert "DB down" not in data.get("error", "")
+    # Background task errors are logged but the HTTP response is always ok=True
+    assert resp.json()["ok"] is True
 
 
 @patch("backend.routers.cron.poll_all_inboxes")
@@ -100,4 +100,4 @@ def test_cron_poll_no_tokens_returns_empty_summary(mock_poll, client):
     mock_poll.return_value = {"processed": 0, "skipped": 0, "errors": []}
     resp = client.get("/cron/poll-inboxes")
     assert resp.status_code == 200
-    assert resp.json()["summary"]["processed"] == 0
+    assert resp.json()["ok"] is True

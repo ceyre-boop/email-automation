@@ -195,6 +195,17 @@
       "rate_unit": "per video"
     },
     {
+      "key": "KatrinaD",
+      "full_name": "Katrina D",
+      "gmail_connection_name": "Gmail - KatrinaD",
+      "sop_tab_name": "KatrinaD",
+      "manager": "Chenni",
+      "category": "Fashion",
+      "minimum_rate_usd": 150,
+      "rate_unit": "per hour",
+      "_note": "Hourly rate model — activate in batch_4_special after all standard inboxes are stable."
+    },
+    {
       "key": "colineyre222",
       "full_name": "Colin Eyre",
       "inbox_email": "colineyre222@gmail.com",

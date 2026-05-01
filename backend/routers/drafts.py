@@ -73,7 +73,7 @@ def _get_draft_or_404(db: Session, draft_id: int) -> Draft:
 def _get_token_or_404(db: Session, talent_key: str) -> TalentToken:
     token = (
         db.query(TalentToken)
-        .filter(TalentToken.talent_key == talent_key, TalentToken.active == True)  # noqa: E712
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
         .first()
     )
     if not token:
@@ -100,7 +100,7 @@ def list_drafts(
     else:
         q = q.filter(Draft.status == DraftStatus.pending)
     if talent_key:
-        q = q.filter(Draft.talent_key == talent_key)
+        q = q.filter(Draft.talent_key.ilike(talent_key))
     return q.order_by(Draft.created_at.desc()).all()
 
 
@@ -128,6 +128,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
             subject=draft.subject or "",
             body=draft.draft_text,
             db=db,
+            in_reply_to=getattr(draft, "message_id_header", None),
         )
     except TokenRefreshError:
         token.active = False
@@ -146,6 +147,16 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
     draft.reviewed_at = datetime.utcnow()
     draft.reviewed_by = body.reviewed_by
     db.add(draft)
+
+    # Sync status on the ProcessedEmail record so the Sent tab shows this email
+    from backend.models.db import EmailStatus, ProcessedEmail
+    pe = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == draft.gmail_message_id
+    ).first()
+    if pe:
+        pe.status = EmailStatus.sent
+        db.add(pe)
+
     db.commit()
     logger.info("Draft %s approved and sent by %s", draft_id, body.reviewed_by)
     return {"ok": True, "message": "Reply sent successfully."}
@@ -196,8 +207,7 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
 
     if draft.gmail_draft_id:
         token = _get_token_or_404(db, draft.talent_key)
-        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id)
-        db.add(token)
+        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
 
     draft.status = DraftStatus.discarded
     draft.reviewed_at = datetime.utcnow()

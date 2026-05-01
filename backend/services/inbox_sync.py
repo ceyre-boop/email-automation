@@ -132,6 +132,27 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
             summary["upserted"] += 1
 
     db.commit()
+
+    # ── Prune stale rows (emails no longer in inbox) ──────────────────────────
+    # Only prune when Gmail returned a complete result set smaller than MAX_INBOX_RESULTS,
+    # meaning we definitively know the full inbox contents. If we got a full page
+    # (len == MAX_INBOX_RESULTS) there could be more messages we didn't fetch, so
+    # we leave older cached rows alone to avoid false deletions.
+    # Guard: never prune if current_ids is empty (would delete all cached rows).
+    if current_ids and len(stubs) < MAX_INBOX_RESULTS:
+        pruned = (
+            db.query(InboxEmail)
+            .filter(
+                InboxEmail.talent_key == talent_key,
+                InboxEmail.gmail_message_id.not_in(current_ids),
+            )
+            .delete(synchronize_session=False)
+        )
+        if pruned:
+            db.commit()
+            logger.info("Inbox sync %s: pruned %d stale cache rows", talent_key, pruned)
+            summary["pruned"] = pruned
+
     return summary
 
 
@@ -173,11 +194,16 @@ def fetch_pending_bodies(token_row, db: Session, limit: int = BODY_FETCH_BATCH) 
                 detail = future.result()
                 row.body_text = detail.get("body_text") or "" if detail else ""
                 row.body_fetched_at = datetime.utcnow()
+                row.body_fetch_attempts = (row.body_fetch_attempts or 0) + 1
                 if detail:
                     fetched += 1
+                else:
+                    row.body_fetch_failed = True
             except Exception as exc:
                 logger.warning("Body fetch failed for %s / %s: %s", talent_key, mid, exc)
                 row.body_fetched_at = datetime.utcnow()
+                row.body_fetch_attempts = (row.body_fetch_attempts or 0) + 1
+                row.body_fetch_failed = True
 
     db.commit()
     return fetched

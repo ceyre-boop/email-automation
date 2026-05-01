@@ -83,7 +83,7 @@ def list_inbox_messages(token_row, max_results: int = 50, db=None) -> list[dict]
     return result.get("messages", [])
 
 
-def list_unread_inbox_messages(token_row, db=None, max_results: int = 30) -> list[dict]:
+def list_unread_inbox_messages(token_row, db=None, max_results: int = 100) -> list[dict]:
     """
     Return a list of unread INBOX messages for the talent.
     Each item: {"id": <gmail_message_id>, "threadId": <thread_id>}
@@ -324,7 +324,8 @@ def create_gmail_draft(
         return None
 
 
-def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str, db=None) -> bool:
+def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str, db=None,
+               in_reply_to: str | None = None) -> bool:
     """
     Send a reply email as the talent.
     Used when an agency reviewer approves a draft.
@@ -333,6 +334,9 @@ def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str
     mime_msg = MIMEText(body, "plain")
     mime_msg["To"] = reply_to
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
+    if in_reply_to:
+        mime_msg["In-Reply-To"] = in_reply_to
+        mime_msg["References"] = in_reply_to
     raw = base64.urlsafe_b64encode(mime_msg.as_bytes()).decode()
     try:
         service.users().messages().send(
@@ -370,12 +374,12 @@ def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
         logger.error("Draft delete failed for %s / %s: %s", token_row.talent_key, gmail_draft_id, exc)
 
 
-def list_gmail_drafts(token_row, max_results: int = 25) -> list[dict]:
+def list_gmail_drafts(token_row, max_results: int = 25, db=None) -> list[dict]:
     """
     Fetch the talent's actual Gmail drafts folder, newest first.
     Returns a list of dicts with draft content parsed out.
     """
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         result = service.users().drafts().list(userId="me", maxResults=max_results).execute()
     except HttpError as exc:
@@ -413,13 +417,12 @@ def list_gmail_drafts(token_row, max_results: int = 25) -> list[dict]:
     return drafts
 
 
-def send_gmail_draft(token_row, gmail_draft_id: str) -> bool:
+def send_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
     """Send an existing Gmail draft by its draft ID."""
-    service = _gmail_service(token_row)
+    service = _gmail_service(token_row, db)
     try:
         service.users().drafts().send(userId="me", body={"id": gmail_draft_id}).execute()
         return True
     except HttpError as exc:
         logger.error("Draft send failed for %s / %s: %s", token_row.talent_key, gmail_draft_id, exc)
-        return False
         return False
