@@ -12,6 +12,7 @@ Iterates over every connected talent, processes unread emails end-to-end:
 from __future__ import annotations
 
 import logging
+import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime
 
@@ -30,14 +31,35 @@ from backend.services.oauth import TokenRefreshError
 
 logger = logging.getLogger(__name__)
 
-BODY_FETCH_BATCH = 20
+BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle (was 20)
 
 # Concurrency: process this many emails per talent in parallel.
 # Each worker opens its own DB session and makes independent Gmail + OpenAI calls.
+# Keep at 3 to stay within Supabase connection pool limits (MAX_TALENT_WORKERS×3=12 max).
 MAX_CONCURRENT_EMAILS = 3
+
+# Concurrency: process this many talents in parallel.
+# 4 concurrent talents × 3 email workers = 12 max DB connections — safe for Supabase.
+MAX_TALENT_WORKERS = 4
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
+
+# Module-level session factory — created once and reused by all worker threads.
+# Avoids the cost of building a fresh SQLAlchemy engine on every _process_message_in_thread call.
+_session_factory = None
+_session_factory_lock = threading.Lock()
+
+
+def _get_session_factory():
+    """Return the module-level session factory, creating it on first call."""
+    global _session_factory
+    if _session_factory is None:
+        with _session_factory_lock:
+            if _session_factory is None:
+                from backend.models.db import get_session_factory
+                _session_factory = get_session_factory()
+    return _session_factory
 
 
 def _talent_config_map(settings) -> dict[str, dict]:
@@ -48,13 +70,16 @@ def _talent_config_map(settings) -> dict[str, dict]:
     return {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
 
 
-def _already_processed(db: Session, message_id: str) -> bool:
-    return (
-        db.query(ProcessedEmail)
-        .filter(ProcessedEmail.gmail_message_id == message_id)
-        .first()
-        is not None
+def _batch_already_processed_ids(db: Session, message_ids: list[str]) -> set[str]:
+    """Return the subset of message_ids already present in ProcessedEmail (single query)."""
+    if not message_ids:
+        return set()
+    rows = (
+        db.query(ProcessedEmail.gmail_message_id)
+        .filter(ProcessedEmail.gmail_message_id.in_(message_ids))
+        .all()
     )
+    return {r.gmail_message_id for r in rows}
 
 
 def _record_poll_health(db: Session, talent_key: str, emails_found: int, emails_processed: int,
@@ -75,7 +100,7 @@ def _record_poll_health(db: Session, talent_key: str, emails_found: int, emails_
 
 def poll_all_inboxes(db: Session) -> dict:
     """
-    Main polling function. Processes all active connected talents.
+    Main polling function. Processes all active connected talents concurrently.
     Returns a summary dict for logging/monitoring.
     """
     settings = get_settings()
@@ -86,22 +111,69 @@ def poll_all_inboxes(db: Session) -> dict:
 
     summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
 
-    for idx, token_row in enumerate(active_tokens):
-        talent_key = token_row.talent_key
+    if not active_tokens:
+        logger.info("No active tokens — nothing to poll")
+        return summary
 
-        # Stagger: 1 second between talents to maximize speed without hitting rate limits
-        if idx > 0:
-            time.sleep(1)
-
-        # Skip if a previous poll cycle is still running for this talent
-        if _poll_locks.get(talent_key):
-            logger.info("Poll still running for %s — skipping cycle", talent_key)
-            continue
-
-        talent_cfg = talent_map.get(talent_key.lower())
+    # Build per-talent job list, skipping talents with no config
+    jobs: list[tuple[int, dict, bool]] = []
+    for token_row in active_tokens:
+        talent_cfg = talent_map.get(token_row.talent_key.lower())
         if not talent_cfg:
-            logger.warning("No config for talent_key=%s — skipping", talent_key)
+            logger.warning("No config for talent_key=%s — skipping", token_row.talent_key)
             continue
+        jobs.append((token_row.id, talent_cfg, draft_mode))
+
+    if not jobs:
+        return summary
+
+    summary_lock = threading.Lock()
+
+    # Process all talents concurrently — each gets its own DB session via _poll_one_talent
+    with ThreadPoolExecutor(max_workers=min(len(jobs), MAX_TALENT_WORKERS)) as executor:
+        future_to_key = {
+            executor.submit(_poll_one_talent, tid, cfg, dm): cfg["key"]
+            for tid, cfg, dm in jobs
+        }
+        for future in as_completed(future_to_key):
+            talent_key = future_to_key[future]
+            try:
+                result = future.result()
+                if result:
+                    with summary_lock:
+                        for k, v in result.items():
+                            if k in summary:
+                                summary[k] += v
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Talent poll future error for %s: %s", talent_key, exc)
+                with summary_lock:
+                    summary["errors"] += 1
+
+    logger.info("Poll complete: %s", summary)
+    return summary
+
+
+def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> dict:
+    """Process one talent's inbox in its own DB session. Returns per-talent summary."""
+    talent_key = talent_cfg["key"]
+
+    if _poll_locks.get(talent_key):
+        logger.info("Poll still running for %s — skipping cycle", talent_key)
+        return {}
+
+    Session = _get_session_factory()
+    db = Session()
+    _poll_locks[talent_key] = True
+    poll_start = time.monotonic()
+    emails_found = 0
+    emails_processed_count = 0
+    summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+
+    try:
+        token_row = db.query(TalentToken).filter(TalentToken.id == token_row_id).first()
+        if not token_row:
+            logger.error("TalentToken not found for id=%s (key=%s)", token_row_id, talent_key)
+            return {}
 
         talent_name = talent_cfg.get("full_name", talent_key)
         minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
@@ -116,115 +188,107 @@ def poll_all_inboxes(db: Session) -> dict:
             )
             if existing_drafts >= max_drafts:
                 logger.info("Draft cap (%d) reached for %s — skipping poll", max_drafts, talent_key)
-                continue
+                return {}
 
-        _poll_locks[talent_key] = True
-        poll_start = time.monotonic()
-        emails_found = 0
-        emails_processed_count = 0
+        # ── Inbox cache sync ──────────────────────────────────────────────────
         try:
-            # ── Inbox cache sync (runs before triage) ─────────────────────────
-            try:
-                sync_result = sync_inbox_for_talent(token_row, db)
-                logger.info("Inbox sync %s: %s", talent_key, sync_result)
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Inbox sync failed for %s (non-fatal): %s", talent_key, exc)
+            sync_result = sync_inbox_for_talent(token_row, db)
+            logger.info("Inbox sync %s: %s", talent_key, sync_result)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Inbox sync failed for %s (non-fatal): %s", talent_key, exc)
 
-            try:
-                fetch_pending_bodies(token_row, db, limit=BODY_FETCH_BATCH)
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("Body fetch failed for %s (non-fatal): %s", talent_key, exc)
+        try:
+            fetch_pending_bodies(token_row, db, limit=BODY_FETCH_BATCH)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Body fetch failed for %s (non-fatal): %s", talent_key, exc)
 
-            try:
-                messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
-            except TokenRefreshError as exc:
-                logger.error("Token refresh rejected for %s — marking inactive: %s", talent_key, exc)
-                token_row.active = False
-                token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
-                token_row.last_error = str(exc)
-                db.add(token_row)
-                db.commit()
-                summary["errors"] += 1
-                _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
-                continue
-            except Exception as exc:  # noqa: BLE001
-                logger.error("Gmail list failed for %s: %s", talent_key, exc)
-                token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
-                token_row.last_error = str(exc)
-                db.add(token_row)
-                db.commit()
-                summary["errors"] += 1
-                _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
-                continue
-
-            emails_found = len(messages)
-
-            if not settings.app_config.get("ai_enabled", True):
-                logger.info("AI disabled — inbox synced for %s but triage skipped (ai_enabled=false)", talent_key)
-            else:
-                # Filter out already-processed messages before submitting concurrent work
-                pending_ids = [
-                    msg_stub["id"]
-                    for msg_stub in messages
-                    if not _already_processed(db, msg_stub["id"])
-                ]
-                logger.info(
-                    "%s: %d unread, %d new to process (concurrent workers=%d)",
-                    talent_key, emails_found, len(pending_ids), MAX_CONCURRENT_EMAILS,
-                )
-
-                # Process new messages concurrently — each worker owns its own DB session
-                futures: dict[Future, str] = {}
-                with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
-                    for message_id in pending_ids:
-                        future = executor.submit(
-                            _process_message_in_thread,
-                            token_row.id,
-                            message_id,
-                            talent_key,
-                            talent_name,
-                            minimum_rate,
-                            draft_mode,
-                        )
-                        futures[future] = message_id
-
-                    for future in as_completed(futures):
-                        message_id = futures[future]
-                        try:
-                            result = future.result()
-                            emails_processed_count += 1
-                            if result["status"] == "ok":
-                                for k, v in result.get("summary", {}).items():
-                                    summary[k] += v
-                            else:
-                                logger.error(
-                                    "Worker error for %s / %s: %s",
-                                    talent_key, message_id, result.get("reason"),
-                                )
-                                summary["errors"] += 1
-                        except Exception as exc:  # noqa: BLE001
-                            logger.error("Future error for %s / %s: %s", talent_key, message_id, exc)
-                            summary["errors"] += 1
-
-            # Success — reset failure counters, record last_poll_at
-            token_row.consecutive_failures = 0
-            token_row.last_error = None
-            token_row.last_poll_at = datetime.utcnow()
+        try:
+            messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
+        except TokenRefreshError as exc:
+            logger.error("Token refresh rejected for %s — marking inactive: %s", talent_key, exc)
+            token_row.active = False
+            token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
+            token_row.last_error = str(exc)
             db.add(token_row)
             db.commit()
-            _record_poll_health(db, talent_key, emails_found, emails_processed_count, None,
-                                int((time.monotonic() - poll_start) * 1000))
-
-        except Exception as exc:  # noqa: BLE001
-            logger.error("Unhandled poll error for %s: %s", talent_key, exc)
             summary["errors"] += 1
-            _record_poll_health(db, talent_key, emails_found, emails_processed_count, str(exc),
-                                int((time.monotonic() - poll_start) * 1000))
-        finally:
-            _poll_locks[talent_key] = False
+            _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
+            return summary
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Gmail list failed for %s: %s", talent_key, exc)
+            token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
+            token_row.last_error = str(exc)
+            db.add(token_row)
+            db.commit()
+            summary["errors"] += 1
+            _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
+            return summary
 
-    logger.info("Poll complete: %s", summary)
-    return summary
+        emails_found = len(messages)
+
+        if not get_settings().app_config.get("ai_enabled", True):
+            logger.info("AI disabled — inbox synced for %s but triage skipped (ai_enabled=false)", talent_key)
+        else:
+            # Batch dedup: one IN query instead of N individual queries
+            all_ids = [m["id"] for m in messages]
+            already_done = _batch_already_processed_ids(db, all_ids)
+            pending_ids = [mid for mid in all_ids if mid not in already_done]
+            logger.info(
+                "%s: %d unread, %d new to process (concurrent workers=%d)",
+                talent_key, emails_found, len(pending_ids), MAX_CONCURRENT_EMAILS,
+            )
+
+            futures: dict[Future, str] = {}
+            with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
+                for message_id in pending_ids:
+                    future = executor.submit(
+                        _process_message_in_thread,
+                        token_row.id,
+                        message_id,
+                        talent_key,
+                        talent_name,
+                        minimum_rate,
+                        draft_mode,
+                    )
+                    futures[future] = message_id
+
+                for future in as_completed(futures):
+                    message_id = futures[future]
+                    try:
+                        result = future.result()
+                        emails_processed_count += 1
+                        if result["status"] == "ok":
+                            for k, v in result.get("summary", {}).items():
+                                summary[k] += v
+                        else:
+                            logger.error(
+                                "Worker error for %s / %s: %s",
+                                talent_key, message_id, result.get("reason"),
+                            )
+                            summary["errors"] += 1
+                    except Exception as exc:  # noqa: BLE001
+                        logger.error("Future error for %s / %s: %s", talent_key, message_id, exc)
+                        summary["errors"] += 1
+
+        # Success — reset failure counters, record last_poll_at
+        token_row.consecutive_failures = 0
+        token_row.last_error = None
+        token_row.last_poll_at = datetime.utcnow()
+        db.add(token_row)
+        db.commit()
+        _record_poll_health(db, talent_key, emails_found, emails_processed_count, None,
+                            int((time.monotonic() - poll_start) * 1000))
+        return summary
+
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Unhandled poll error for %s: %s", talent_key, exc)
+        summary["errors"] += 1
+        _record_poll_health(db, talent_key, emails_found, emails_processed_count, str(exc),
+                            int((time.monotonic() - poll_start) * 1000))
+        return summary
+    finally:
+        _poll_locks[talent_key] = False
+        db.close()
 
 
 def _process_message_in_thread(
@@ -236,18 +300,25 @@ def _process_message_in_thread(
     draft_mode: bool,
 ) -> dict:
     """Process one email in a worker thread with its own DB session and TalentToken."""
-    from backend.models.db import get_session_factory  # avoid circular at module level
-
-    Session = get_session_factory()
+    Session = _get_session_factory()
     db = Session()
     try:
         token_row = db.query(TalentToken).filter(TalentToken.id == token_row_id).first()
         if not token_row:
             return {"status": "error", "reason": f"TalentToken not found for {talent_key} (id={token_row_id})"}
+
+        # Build the Gmail service once for this message's entire processing chain.
+        # Subsequent gmail calls receive it directly — avoids two extra build() roundtrips.
+        try:
+            service = gmail_svc.build_service(token_row, db)
+        except Exception as exc:  # noqa: BLE001
+            return {"status": "error", "reason": f"Gmail service build failed: {exc}"}
+
         summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
         _process_one_message(
             db=db,
             token_row=token_row,
+            service=service,
             message_id=message_id,
             talent_key=talent_key,
             talent_name=talent_name,
@@ -266,6 +337,7 @@ def _process_message_in_thread(
 def _process_one_message(
     db: Session,
     token_row,
+    service,
     message_id: str,
     talent_key: str,
     talent_name: str,
@@ -273,7 +345,7 @@ def _process_one_message(
     draft_mode: bool,
     summary: dict,
 ):
-    detail = gmail_svc.get_message_detail(token_row, message_id, db=db)
+    detail = gmail_svc.get_message_detail(token_row, message_id, db=db, service=service)
     if not detail:
         logger.warning("Empty detail for %s / %s — skipping", talent_key, message_id)
         return
@@ -304,7 +376,7 @@ def _process_one_message(
 
     # ── Score 1 → Archive ────────────────────────────────────────────────────
     if score == 1:
-        gmail_svc.archive_message(token_row, message_id, db=db)
+        gmail_svc.archive_message(token_row, message_id, db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
@@ -316,6 +388,35 @@ def _process_one_message(
 
     # ── Score 2 or 3 → Draft reply ──────────────────────────────────────────────
     elif score >= 2:
+        # Guard against duplicate drafts (e.g. if a previous poll cycle's DB commit
+        # failed after the Gmail draft was saved, leaving the email unprocessed).
+        existing_draft = (
+            db.query(Draft)
+            .filter(Draft.gmail_message_id == message_id)
+            .first()
+        )
+        if existing_draft:
+            logger.info(
+                "Draft already exists for %s / %s (draft_id=%s) — recording processed to prevent re-evaluation",
+                talent_key, message_id, existing_draft.id,
+            )
+            # Record a ProcessedEmail so _batch_already_processed_ids excludes this message
+            # on the next poll cycle; without this the email would be re-evaluated forever.
+            processed_already = (
+                db.query(ProcessedEmail)
+                .filter(ProcessedEmail.gmail_message_id == message_id)
+                .first()
+            )
+            if not processed_already:
+                _record_processed(
+                    db, talent_key, message_id, thread_id, sender, subject,
+                    score, brand_name, proposed_rate, offer_type, reason,
+                    EmailStatus.draft_saved, body_text=body, email_date=email_date,
+                )
+                db.commit()
+            summary["processed"] += 1
+            return
+
         reply_result = reply_svc.draft_reply(
             talent_key=talent_key,
             talent_name=talent_name,
@@ -343,6 +444,7 @@ def _process_one_message(
                 body=draft_text,
                 db=db,
                 in_reply_to=message_id_header or None,
+                service=service,
             )
 
         # Persist draft + processed record together, then commit once

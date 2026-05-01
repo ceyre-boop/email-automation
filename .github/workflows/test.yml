@@ -35,7 +35,7 @@ jobs:
           GOOGLE_CLIENT_SECRET: test-client-secret
           GOOGLE_REDIRECT_URI: http://localhost/auth/callback
           OPENAI_API_KEY: test-openai-key
-          DATABASE_URL: sqlite:///:memory:
+          DATABASE_URL: "sqlite:///:memory:"
           GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON: '{"type":"service_account","project_id":"test"}'
           AGENCY_SECRET_KEY: test-secret
         run: PYTHONPATH=. pytest -q --tb=short

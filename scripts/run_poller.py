@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import logging
 import sys
+import time
 
 from backend.models.db import create_tables, get_session_factory
 from backend.services.poller import poll_all_inboxes
@@ -23,10 +24,25 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+_DB_INIT_RETRIES = 3
+_DB_INIT_BACKOFF = 5  # seconds between retries
+
 
 def main() -> None:
     logger.info("Initialising database tables…")
-    create_tables()
+    for attempt in range(1, _DB_INIT_RETRIES + 1):
+        try:
+            create_tables()
+            break
+        except Exception as exc:
+            if attempt == _DB_INIT_RETRIES:
+                logger.error("DB init failed after %d attempts — aborting: %s", attempt, exc)
+                sys.exit(1)
+            logger.warning(
+                "DB init attempt %d/%d failed (%s) — retrying in %ds…",
+                attempt, _DB_INIT_RETRIES, exc, _DB_INIT_BACKOFF,
+            )
+            time.sleep(_DB_INIT_BACKOFF)
 
     Session = get_session_factory()
     db = Session()

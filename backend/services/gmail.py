@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 def _gmail_service(token_row, db=None):
     """Return an authenticated Gmail API service. Persists refreshed token to DB if db is given."""
-    from datetime import timezone as _tz
     creds = credentials_from_token_row(token_row)
     creds = refresh_if_needed(creds)  # raises TokenRefreshError if Google rejects it
     token_row.access_token = creds.token
@@ -34,6 +33,16 @@ def _gmail_service(token_row, db=None):
         db.add(token_row)
         db.commit()
     return build("gmail", "v1", credentials=creds, cache_discovery=False)
+
+
+def build_service(token_row, db=None):
+    """Public helper: build and return an authenticated Gmail service.
+
+    Call this once at the start of a message processing chain and pass the
+    returned service to subsequent gmail functions via the ``service=`` param
+    to avoid rebuilding (and re-authenticating) for every API call.
+    """
+    return _gmail_service(token_row, db)
 
 
 # ── Reading ──────────────────────────────────────────────────────────────────
@@ -138,7 +147,7 @@ def get_message_headers(token_row, message_id: str, db=None) -> dict[str, Any]:
     }
 
 
-def get_message_detail(token_row, message_id: str, db=None) -> dict[str, Any]:
+def get_message_detail(token_row, message_id: str, db=None, service=None) -> dict[str, Any]:
     """
     Fetch full message detail and parse it into a flat dict:
     {
@@ -146,8 +155,11 @@ def get_message_detail(token_row, message_id: str, db=None) -> dict[str, Any]:
         body_text, snippet, label_ids
     }
     Retries once on transient failure.
+    Pass a pre-built ``service`` to avoid an extra build() call when processing
+    multiple API calls in the same chain.
     """
-    service = _gmail_service(token_row, db)
+    if service is None:
+        service = _gmail_service(token_row, db)
     for attempt in range(2):
         try:
             msg = (
@@ -160,7 +172,7 @@ def get_message_detail(token_row, message_id: str, db=None) -> dict[str, Any]:
         except HttpError as exc:
             if attempt == 0 and exc.resp.status in (429, 500, 503):
                 logger.warning("Gmail get transient error for %s (retrying): %s", message_id, exc)
-                service = _gmail_service(token_row, db)
+                service = _gmail_service(token_row, db)  # rebuild fresh service on retry
                 continue
             logger.error("Gmail get error for message %s: %s", message_id, exc)
             return {}
@@ -254,9 +266,10 @@ def _extract_body(payload: dict) -> str:
 # ── Labelling / archiving ─────────────────────────────────────────────────────
 
 
-def archive_message(token_row, message_id: str, db=None) -> bool:
+def archive_message(token_row, message_id: str, db=None, service=None) -> bool:
     """Remove INBOX and UNREAD labels (archives the message)."""
-    service = _gmail_service(token_row, db)
+    if service is None:
+        service = _gmail_service(token_row, db)
     try:
         service.users().messages().modify(
             userId="me",
@@ -269,9 +282,10 @@ def archive_message(token_row, message_id: str, db=None) -> bool:
         return False
 
 
-def mark_as_read(token_row, message_id: str, db=None) -> bool:
+def mark_as_read(token_row, message_id: str, db=None, service=None) -> bool:
     """Remove UNREAD label only."""
-    service = _gmail_service(token_row, db)
+    if service is None:
+        service = _gmail_service(token_row, db)
     try:
         service.users().messages().modify(
             userId="me",
@@ -295,12 +309,15 @@ def create_gmail_draft(
     body: str,
     db=None,
     in_reply_to: str | None = None,
+    service=None,
 ) -> str | None:
     """
     Save a draft reply in the talent's Gmail account, threaded correctly.
     Returns the Gmail draft ID, or None on failure.
+    Pass a pre-built ``service`` to skip an extra build() call.
     """
-    service = _gmail_service(token_row, db)
+    if service is None:
+        service = _gmail_service(token_row, db)
     mime_msg = MIMEText(body, "plain")
     mime_msg["To"] = reply_to
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"

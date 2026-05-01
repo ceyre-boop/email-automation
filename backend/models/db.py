@@ -108,6 +108,9 @@ class Draft(Base):
     """AI-generated reply drafts awaiting human approval."""
 
     __tablename__ = "drafts"
+    __table_args__ = (
+        UniqueConstraint("gmail_message_id", name="uq_drafts_gmail_message_id"),
+    )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     talent_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
@@ -273,3 +276,12 @@ def create_tables():
                 conn.commit()
             except Exception:
                 pass
+        # Unique index on drafts.gmail_message_id — prevents duplicate drafts across poll cycles
+        try:
+            conn.execute(text(
+                "CREATE UNIQUE INDEX IF NOT EXISTS uq_drafts_gmail_message_id "
+                "ON drafts (gmail_message_id)"
+            ))
+            conn.commit()
+        except Exception:
+            pass
