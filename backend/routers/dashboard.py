@@ -1081,7 +1081,7 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
         # Backfill creates rows with score=NULL/status=flagged to log history, but
         # GPT never actually ran. Deleting them lets this job re-triage them properly.
         stubs_deleted = _db.query(ProcessedEmail).filter(
-            func.lower(ProcessedEmail.talent_key) == talent_key.lower(),
+            ProcessedEmail.talent_key.ilike(talent_key),
             ProcessedEmail.score == None,  # noqa: E711
         ).delete(synchronize_session=False)
         if stubs_deleted:
@@ -1098,6 +1098,8 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                 _db.query(InboxEmail)
                 .outerjoin(
                     ProcessedEmail,
+                    # func.lower() required for case-insensitive join ON clause;
+                    # SQLAlchemy's .ilike() cannot be used in join conditions.
                     (ProcessedEmail.gmail_message_id == InboxEmail.gmail_message_id)
                     & (func.lower(ProcessedEmail.talent_key) == talent_key.lower()),
                 )
