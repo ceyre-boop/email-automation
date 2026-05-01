@@ -2,7 +2,7 @@
 # Used in: Make Phase 2 scenario → OpenAI module (reply drafting step)
 # Model: gpt-4o (always — do NOT substitute gpt-4o-mini for replies)
 # Temperature: 0.7
-# Max tokens: 800
+# Max tokens: 1000
 
 ---
 
@@ -44,6 +44,11 @@ Offer type (detected by AI triage): {{OFFER_TYPE}}
 Brand name: {{BRAND_NAME}}
 Proposed rate from email (USD): {{PROPOSED_RATE}}
 AI triage summary: {{TRIAGE_NOTES}}
+
+Original email body:
+---
+{{EMAIL_BODY}}
+---
 
 SOP rules for this talent (trigger → response):
 ---
