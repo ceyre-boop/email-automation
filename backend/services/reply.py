@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 _ESCALATE_PREFIX = "ESCALATE:"
 
+# Maximum characters of the original email body included in the reply prompt.
+# Keeps token usage reasonable while giving GPT enough context for a targeted reply.
+_MAX_EMAIL_BODY_CHARS = 3000
+
 # ── Prompt section cache ──────────────────────────────────────────────────────
 # Parsing the reply.md file (regex over ~3 KB) on every draft_reply call is wasteful.
 # Cache the parsed (system_text, user_template) pair — it doesn't change at runtime.
@@ -139,6 +143,7 @@ def _build_reply_messages(
     triage_reason: str,
     voice_profile: str = "",
     manager_context_text: str = "",
+    body_text: str = "",
 ) -> list[dict]:
     """Fill reply.md template variables and return chat messages."""
     system_text, user_template = _get_reply_sections()
@@ -163,6 +168,10 @@ def _build_reply_messages(
 
     sop_rules = _build_sop_rules_text(talent_key)
 
+    # Truncate the email body to avoid excessive token usage while still giving
+    # GPT enough context to write a well-targeted reply.
+    body_snippet = (body_text or "").strip()[:_MAX_EMAIL_BODY_CHARS]
+
     user_text = (
         user_template
         .replace("{{TALENT_NAME}}", talent_name)
@@ -173,6 +182,7 @@ def _build_reply_messages(
         .replace("{{BRAND_NAME}}", brand_name)
         .replace("{{PROPOSED_RATE}}", str(int(proposed_rate)))
         .replace("{{TRIAGE_NOTES}}", triage_reason)
+        .replace("{{EMAIL_BODY}}", body_snippet or "(not available)")
         .replace("{{SOP_RULES}}", sop_rules)
     )
 
@@ -193,6 +203,7 @@ def draft_reply(
     proposed_rate: float,
     triage_reason: str,
     db=None,
+    body_text: str = "",
 ) -> dict:
     """
     Generate a reply draft using GPT-4o.
@@ -225,6 +236,7 @@ def draft_reply(
         voice_profile=voice_profile,
         triage_reason=triage_reason,
         manager_context_text=manager_context_text,
+        body_text=body_text,
     )
 
     try:

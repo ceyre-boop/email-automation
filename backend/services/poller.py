@@ -428,6 +428,7 @@ def _process_one_message(
             proposed_rate=proposed_rate,
             triage_reason=reason,
             db=db,
+            body_text=body,
         )
         draft_text = reply_result["draft_text"]
         is_escalate = reply_result["is_escalate"]
