@@ -147,3 +147,31 @@ Write individual files per memory, link from `MEMORY.md` index. See global memor
 **What to save:** decisions future Claude can't infer from code (e.g. why OpenAI stays), corrections to approaches, new talents added, new env vars required, non-obvious bug root causes.
 
 **What not to save:** anything already in this file, git history, or directly readable from code.
+
+---
+
+## Session End Protocol
+
+At the end of EVERY session — before your final message — write a session note to the Obsidian vault using the `obsidian-vault` MCP tool (`write_file`).
+
+**File path:** `C:\Users\Admin\clawdbot-vault\Projects\email-automation\Sessions\YYYY-MM-DD-[topic].md`
+
+**Template:**
+```
+# Session: [topic] — YYYY-MM-DD
+
+## What we did
+[What was discussed or built]
+
+## What changed
+[Files modified, logic updated, talents connected]
+
+## Decisions made
+[Any non-obvious decisions and why]
+
+## System state
+[How many talents connected, any OpenAI/DB issues, poller status]
+
+## Next
+[Open tasks, what to pick up next session]
+```

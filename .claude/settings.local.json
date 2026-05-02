@@ -1,17 +1,17 @@
 {
-  "permissions": {
-    "allow": [
-      "Bash(git rebase *)",
-      "Bash(git pull *)",
-      "Bash(git checkout *)",
-      "Bash(git add *)",
-      "Bash(git commit *)",
-      "Bash(git push *)",
-      "Bash(gh run *)"
+  "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 'C:\Users\Admin\clawdbot-vault\Systems\check-session-note.py' 'email-automation'",
+            "shell": "powershell",
+            "asyncRewake": true,
+            "statusMessage": "Checking session notes..."
+          }
+        ]
+      }
     ]
-  },
-  "enabledMcpjsonServers": [
-    "supabase"
-  ],
-  "enableAllProjectMcpServers": true
+  }
 }
