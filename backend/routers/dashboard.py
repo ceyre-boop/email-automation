@@ -577,6 +577,120 @@ def process_batch(
     return {"ok": True, "message": f"Processing {len(batch)} emails in background.", "queued": len(batch)}
 
 
+@router.post("/talents/{talent_key}/force-blast")
+def force_blast(
+    talent_key: str,
+    background_tasks: BackgroundTasks,
+    limit: int = 1000,
+    db: Session = Depends(get_db),
+):
+    """
+    Fetch up to `limit` inbox messages from Gmail directly, then run full
+    triage + reply on every one that doesn't already have a draft.
+    Ignores 'already processed' status — treats everything as fresh.
+    Returns immediately; all work happens in the background.
+    """
+    from backend.services import gmail as gmail_svc
+    _validate_talent(talent_key)
+
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key.ilike(talent_key),
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
+
+    # Fetch up to limit message stubs directly from Gmail (bypasses inbox cache)
+    stubs = gmail_svc.list_inbox_messages(token, max_results=limit, db=db)
+    if not stubs:
+        return {"ok": True, "message": "No inbox messages found.", "queued": 0}
+
+    # Skip any that already have a draft — don't regenerate what's already done
+    drafted_ids = {d.gmail_message_id for d in db.query(Draft.gmail_message_id).filter(
+        Draft.talent_key.ilike(talent_key)
+    ).all()}
+
+    msg_ids = [s["id"] for s in stubs if s["id"] not in drafted_ids]
+
+    logger.info("Force blast for %s: %d total stubs, %d already drafted, %d to process",
+                talent_key, len(stubs), len(stubs) - len(msg_ids), len(msg_ids))
+
+    background_tasks.add_task(_run_force_blast, talent_key, msg_ids)
+    return {
+        "ok": True,
+        "message": f"Blast queued: {len(msg_ids)} emails to process ({len(stubs) - len(msg_ids)} already drafted).",
+        "queued": len(msg_ids),
+        "already_drafted": len(stubs) - len(msg_ids),
+    }
+
+
+def _run_force_blast(talent_key: str, msg_ids: list):
+    """
+    Background worker for force-blast. Processes every message ID with full
+    triage + reply, 15 workers in parallel, logging progress every 50 emails.
+    """
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    from backend.models.db import get_session_factory, Draft, TalentToken
+    from backend.services.poller import _process_one_message
+    from backend.core.config import get_settings as _gs
+
+    settings = _gs()
+    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_cfg = talent_map.get(talent_key.lower(), {})
+    talent_name = talent_cfg.get("full_name", talent_key)
+    minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
+    draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
+
+    SessionLocal = get_session_factory()
+    summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+
+    def _process_one(msg_id: str):
+        thread_db = SessionLocal()
+        try:
+            # Re-check — another worker may have drafted this while we were waiting
+            already = thread_db.query(Draft).filter(Draft.gmail_message_id == msg_id).first()
+            if already:
+                return
+            thread_token = thread_db.query(TalentToken).filter(
+                TalentToken.talent_key.ilike(talent_key),
+                TalentToken.active == True,  # noqa: E712
+            ).first()
+            if not thread_token:
+                return
+            _process_one_message(
+                db=thread_db,
+                token_row=thread_token,
+                message_id=msg_id,
+                talent_key=talent_key,
+                talent_name=talent_name,
+                minimum_rate=minimum_rate,
+                draft_mode=draft_mode,
+                summary=summary,
+            )
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Force blast error on %s: %s", msg_id, exc)
+            summary["errors"] += 1
+        finally:
+            thread_db.close()
+
+    total = len(msg_ids)
+    logger.info("Force blast START for %s: %d emails, 15 workers", talent_key, total)
+
+    with ThreadPoolExecutor(max_workers=15) as executor:
+        futures = {executor.submit(_process_one, mid): mid for mid in msg_ids}
+        done = 0
+        for future in as_completed(futures):
+            done += 1
+            try:
+                future.result()
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Force blast future error: %s", exc)
+            if done % 50 == 0 or done == total:
+                logger.info("Force blast %s: %d/%d done — %s", talent_key, done, total, summary)
+
+    logger.info("Force blast COMPLETE for %s: %d/%d — %s", talent_key, done, total, summary)
+
+
 def _run_process_batch(talent_key: str, msg_ids: list):
     """Background task: run full triage + reply on a list of message IDs."""
     from backend.models.db import get_session_factory, TalentToken
