@@ -272,11 +272,12 @@ def on_startup():
     # Auto-poll every 60 seconds + proactive token refresh every 10 minutes
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll, _run_proactive_refresh
+        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue
         scheduler = BackgroundScheduler(daemon=True)
         scheduler.add_job(_run_poll, "interval", seconds=180, id="auto_poll", replace_existing=True)
+        scheduler.add_job(_run_draft_queue, "interval", seconds=180, id="draft_queue", replace_existing=True, max_instances=1)
         scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
         scheduler.start()
-        logger.info("Scheduler started — polling every 60s, token refresh every 10 min.")
+        logger.info("Scheduler started — poll every 3 min, draft queue every 3 min, token refresh every 10 min.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")

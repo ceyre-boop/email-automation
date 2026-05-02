@@ -105,13 +105,21 @@ def _build_sop_rules_text(talent_key: str) -> str:
     rules = talent_data.get("rules", [])
     if not rules:
         return "No SOP rules found for this talent."
+    # Action-only keywords — these are internal routing instructions, not email templates.
+    # Sending them to GPT causes false ESCALATEs because GPT can't match "Move to folder".
+    _ACTION_KEYWORDS = ("move to", "cc ", "delete", "ask for consult", "tagged email", "marked a initial")
     lines = []
     for rule in rules:
         trigger = rule.get("trigger", "").replace("\n", " ").strip()
         response = rule.get("response", "").replace("\n", " ").strip()
+        # Skip pure action rules — they have no email text to send
+        if any(response.lower().startswith(kw) for kw in _ACTION_KEYWORDS):
+            continue
+        if any(kw in response.lower() for kw in ("move to ", "cc cara", "cc chenni", "cc nicole", "move it to")):
+            continue
         response = _redact_pii(response)
         lines.append(f"TRIGGER: {trigger}\nRESPONSE: {response}")
-    return "\n\n".join(lines)
+    return "\n\n".join(lines) if lines else "No email-reply rules found — ESCALATE all."
 
 
 def _parse_prompt_sections(raw: str) -> tuple[str, str]:

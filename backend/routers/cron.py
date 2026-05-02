@@ -47,6 +47,106 @@ def _run_poll():
         db.close()
 
 
+def _run_draft_queue():
+    """
+    Continuous drafting worker — finds all Score-3 inbox emails that have no draft yet
+    and processes them. Runs every 3 minutes alongside the poll.
+    This is the core automation loop: email comes in → gets triaged → gets drafted automatically.
+    """
+    from backend.models.db import get_session_factory, Draft, InboxEmail, ProcessedEmail, TalentToken
+    from backend.services.poller import _process_one_message
+    from backend.core.config import get_settings as _gs
+    from concurrent.futures import ThreadPoolExecutor
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        settings = _gs()
+        if not settings.app_config.get("ai_enabled", True):
+            return
+        draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
+        talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+
+        # Find emails that are Score 3 in processed_emails but have no draft
+        drafted_msg_ids = {d.gmail_message_id for d in db.query(Draft.gmail_message_id).all()}
+        candidates = (
+            db.query(ProcessedEmail)
+            .filter(
+                ProcessedEmail.score == 3,
+                ProcessedEmail.status != "archived",
+            )
+            .all()
+        )
+        pending = [c for c in candidates if c.gmail_message_id not in drafted_msg_ids]
+
+        if not pending:
+            return
+
+        logger.info("Draft queue: %d Score-3 emails have no draft — processing now", len(pending))
+
+        # Group by talent so we can fetch one token per talent
+        from collections import defaultdict
+        by_talent: dict[str, list] = defaultdict(list)
+        for row in pending:
+            by_talent[row.talent_key.lower()].append(row)
+
+        for talent_key, rows in by_talent.items():
+            talent_cfg = talent_map.get(talent_key, {})
+            talent_name = talent_cfg.get("full_name", talent_key)
+            minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
+
+            token = db.query(TalentToken).filter(
+                TalentToken.talent_key.ilike(talent_key),
+                TalentToken.active == True,  # noqa: E712
+            ).first()
+            if not token:
+                continue
+
+            def _draft_one(row, _token=token, _talent_key=talent_key, _talent_name=talent_name, _min_rate=minimum_rate):
+                thread_db = SessionLocal()
+                try:
+                    thread_token = thread_db.query(TalentToken).filter(
+                        TalentToken.talent_key.ilike(_talent_key),
+                        TalentToken.active == True,  # noqa: E712
+                    ).first()
+                    if not thread_token:
+                        return
+                    # Re-check no draft was created since we queried
+                    already = thread_db.query(Draft).filter(
+                        Draft.gmail_message_id == row.gmail_message_id
+                    ).first()
+                    if already:
+                        return
+                    _process_one_message(
+                        db=thread_db,
+                        token_row=thread_token,
+                        message_id=row.gmail_message_id,
+                        talent_key=_talent_key,
+                        talent_name=_talent_name,
+                        minimum_rate=_min_rate,
+                        draft_mode=draft_mode,
+                        summary={},
+                    )
+                except Exception as exc:  # noqa: BLE001
+                    logger.warning("Draft queue error on %s/%s: %s", _talent_key, row.gmail_message_id, exc)
+                finally:
+                    thread_db.close()
+
+            with ThreadPoolExecutor(max_workers=3) as executor:
+                futures = [executor.submit(_draft_one, row) for row in rows]
+                for f in futures:
+                    try:
+                        f.result()
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("Draft queue thread error: %s", exc)
+
+        logger.info("Draft queue run complete")
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Draft queue worker failed: %s", exc)
+    finally:
+        db.close()
+
+
 def _run_proactive_refresh():
     """Proactively refresh tokens expiring within 30 minutes. Runs every 10 min."""
     from backend.models.db import get_session_factory
