@@ -17,6 +17,10 @@ logger = logging.getLogger(__name__)
 
 _ESCALATE_PREFIX = "ESCALATE:"
 
+# Maximum characters of the original email body included in the reply prompt.
+# Keeps token usage reasonable while giving GPT enough context for a targeted reply.
+_MAX_EMAIL_BODY_CHARS = 3000
+
 # ── Prompt section cache ──────────────────────────────────────────────────────
 # Parsing the reply.md file (regex over ~3 KB) on every draft_reply call is wasteful.
 # Cache the parsed (system_text, user_template) pair — it doesn't change at runtime.
@@ -166,7 +170,7 @@ def _build_reply_messages(
 
     # Truncate the email body to avoid excessive token usage while still giving
     # GPT enough context to write a well-targeted reply.
-    body_snippet = (body_text or "").strip()[:3000]
+    body_snippet = (body_text or "").strip()[:_MAX_EMAIL_BODY_CHARS]
 
     user_text = (
         user_template
