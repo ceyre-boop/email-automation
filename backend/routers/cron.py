@@ -132,7 +132,7 @@ def _run_draft_queue():
                 finally:
                     thread_db.close()
 
-            with ThreadPoolExecutor(max_workers=3) as executor:
+            with ThreadPoolExecutor(max_workers=15) as executor:
                 futures = [executor.submit(_draft_one, row) for row in rows]
                 for f in futures:
                     try:

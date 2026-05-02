@@ -33,14 +33,9 @@ logger = logging.getLogger(__name__)
 
 BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle (was 20)
 
-# Concurrency: process this many emails per talent in parallel.
-# Each worker opens its own DB session and makes independent Gmail + OpenAI calls.
-# Keep at 3 to stay within Supabase connection pool limits (MAX_TALENT_WORKERS×3=12 max).
-MAX_CONCURRENT_EMAILS = 3
-
-# Concurrency: process this many talents in parallel.
-# 4 concurrent talents × 3 email workers = 12 max DB connections — safe for Supabase.
-MAX_TALENT_WORKERS = 4
+# Concurrency: Transaction Pooler (port 6543) supports hundreds of connections.
+MAX_CONCURRENT_EMAILS = 15
+MAX_TALENT_WORKERS = 8
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
