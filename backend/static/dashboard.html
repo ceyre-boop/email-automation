@@ -1252,7 +1252,7 @@ function renderEmailList() {
       div.className = 'email-row fade-up';
       div.dataset.draftId = String(draft.id);
       const metaContent = draft.is_escalate
-        ? '<span class="pill filtered" style="font-size:9px;">⚠ Review</span>'
+        ? (draft.brand_name ? esc(draft.brand_name) + ' · ' : '') + '<span class="pill filtered" style="font-size:9px;">⚠ Review</span>'
         : esc(draft.brand_name || '');
       div.innerHTML = `
         <div class="er-top">
@@ -1332,11 +1332,13 @@ function renderDraftOnlyPane(draft) {
     <div class="ai-composer fade-up">
       <div class="ai-head">
         <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT</div>
-        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
+        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATE' : 'READY TO SEND'}</span>
       </div>
       ${isEscalate ? `<div class="escalate-notice">⚠ ${esc(draft.escalate_reason || 'Manual review required before sending.')}</div>` : ''}
       <div class="ai-to">To: <span>${esc(draft.sender || '')}</span></div>
-      ${isEscalate ? '' : `<textarea class="ai-textarea" id="at-${draft.id}">${esc(draft.draft_text || '')}</textarea>`}
+      ${isEscalate
+        ? `<textarea class="ai-textarea" id="at-${draft.id}" readonly style="opacity:0.5;cursor:default;">${esc(draft.escalate_reason || draft.draft_text || '')}</textarea>`
+        : `<textarea class="ai-textarea" id="at-${draft.id}">${esc(draft.draft_text || '')}</textarea>`}
       <div class="ai-footer">
         <button class="btn btn-ghost" onclick="resetReadingPane()">Close</button>
         ${isEscalate ? '' : `<button class="btn btn-primary" id="bs-${draft.id}">Send Reply ✉</button>`}
