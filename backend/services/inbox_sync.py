@@ -18,7 +18,7 @@ from backend.services import gmail as gmail_svc
 
 logger = logging.getLogger(__name__)
 
-MAX_INBOX_RESULTS = 100   # sync up to 100 messages per cycle (was 50)
+MAX_INBOX_RESULTS = 500   # sync up to 500 messages per cycle
 BODY_FETCH_BATCH = 20
 HEADER_WORKERS = 20       # parallel header fetches (was 10)
 BODY_WORKERS = 20         # parallel body fetches (was 10)

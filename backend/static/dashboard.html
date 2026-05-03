@@ -967,7 +967,7 @@ async function refreshData() {
 async function bootstrap() {
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
-  setInterval(refreshData, 30000);
+  setInterval(refreshData, 60000);
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
@@ -1004,7 +1004,7 @@ function renderSidebar() {
   const ul = document.getElementById('talent-list');
   ul.innerHTML = '';
   const pendingMap = {};
-  state.report?.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_drafts; });
+  state.report?.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_real_drafts ?? c.pending_drafts; });
   state.talents.forEach(t => {
     const pending = pendingMap[t.key] || 0;
     const li = document.createElement('li');
@@ -1055,7 +1055,7 @@ function renderTalentCards() {
         <span class="pill good">${card.count_good} Deals</span>
         <span class="pill misc">${card.count_uncertain} Review</span>
         <span class="pill filtered">${card.count_trash} Filtered</span>
-        ${card.pending_drafts > 0 ? `<span class="pill red">${card.pending_drafts} Draft${card.pending_drafts > 1 ? 's' : ''}</span>` : ''}
+        ${(card.pending_real_drafts ?? card.pending_drafts) > 0 ? `<span class="pill red">${card.pending_real_drafts ?? card.pending_drafts} Draft${(card.pending_real_drafts ?? card.pending_drafts) > 1 ? 's' : ''}</span>` : ''}
       </div>
       <div class="tc-deal">Top: ${bestDeal}</div>
     `;
@@ -1198,9 +1198,10 @@ async function loadTalentData(talent, silent = false) {
   }
   try {
     if (nav === 'drafts') {
-      const liveDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts/live`);
+      // Read from DB (all pending drafts) instead of Gmail live folder (limited to 25)
+      const dbDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts`);
       state.emails = [];
-      state.drafts = liveDrafts;
+      state.drafts = dbDrafts;
     } else {
       const [emails, drafts] = await Promise.all([
         api('GET', `/api/dashboard/talents/${talent.key}/inbox/live`),
@@ -1255,7 +1256,7 @@ function renderEmailList() {
       div.innerHTML = `
         <div class="er-top">
           <span class="er-sender">To: ${esc(shortSender(draft.to || draft.sender || ''))}</span>
-          <span class="pill ${draft.is_escalate ? 'filtered' : 'red'}" style="font-size:9px;">${draft.is_escalate ? 'ESCALATE' : 'AI DRAFT'}</span>
+          <span class="pill ${draft.is_escalate ? 'filtered' : 'red'}" style="font-size:9px;">${draft.is_escalate ? '⚠ Review' : 'AI DRAFT'}</span>
         </div>
         <div class="er-subject">${esc(draft.subject || '(no subject)')}</div>
         <div class="er-meta">${esc(draft.snippet || draft.brand_name || '')}</div>
@@ -1617,7 +1618,7 @@ async function checkDeploy() {
   } catch (_) {}
 }
 checkDeploy();
-setInterval(checkDeploy, 30000);
+setInterval(checkDeploy, 120000);
 
 // ── Init ───────────────────────────────────────────────────────────────────
 bootstrap();

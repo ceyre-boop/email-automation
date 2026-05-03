@@ -57,6 +57,7 @@ class TalentReportCard(BaseModel):
     best_deal_brand: Optional[str] = None
     best_deal_rate: Optional[float] = None
     pending_drafts: int
+    pending_real_drafts: int
 
 
 class DailyReportOut(BaseModel):
@@ -165,6 +166,15 @@ def daily_report(db: Session = Depends(get_db)):
     )
     pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in pending_query}
 
+    # Separate count: only real (non-escalate) pending drafts — used for the sidebar badge
+    real_pending_query = (
+        db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
+        .filter(Draft.status == DraftStatus.pending, Draft.is_escalate == False)  # noqa: E712
+        .group_by(Draft.talent_key)
+        .all()
+    )
+    real_pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in real_pending_query}
+
     total_good = total_uncertain = total_trash = 0
     cards: list[TalentReportCard] = []
 
@@ -193,6 +203,7 @@ def daily_report(db: Session = Depends(get_db)):
             best_deal_brand=best.brand_name if best else None,
             best_deal_rate=best.proposed_rate if best else None,
             pending_drafts=pending_map.get(key.lower(), 0),
+            pending_real_drafts=real_pending_map.get(key.lower(), 0),
         ))
 
     return DailyReportOut(
