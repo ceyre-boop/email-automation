@@ -967,7 +967,7 @@ async function refreshData() {
 async function bootstrap() {
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
-  setInterval(refreshData, 30000);
+  setInterval(refreshData, 60000);
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
@@ -1198,9 +1198,9 @@ async function loadTalentData(talent, silent = false) {
   }
   try {
     if (nav === 'drafts') {
-      const liveDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts/live`);
+      const dbDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts`);
       state.emails = [];
-      state.drafts = liveDrafts;
+      state.drafts = dbDrafts;
     } else {
       const [emails, drafts] = await Promise.all([
         api('GET', `/api/dashboard/talents/${talent.key}/inbox/live`),
@@ -1248,17 +1248,19 @@ function renderEmailList() {
       return;
     }
     state.drafts.forEach(draft => {
-      const isAi = !!draft.is_escalate !== undefined && draft.db_draft_id != null;
       const div = document.createElement('div');
       div.className = 'email-row fade-up';
-      div.dataset.draftGmailId = draft.gmail_draft_id;
+      div.dataset.draftId = String(draft.id);
+      const metaContent = draft.is_escalate
+        ? '<span class="pill filtered" style="font-size:9px;">⚠ Review</span>'
+        : esc(draft.brand_name || '');
       div.innerHTML = `
         <div class="er-top">
-          <span class="er-sender">To: ${esc(shortSender(draft.to || draft.sender || ''))}</span>
+          <span class="er-sender">To: ${esc(shortSender(draft.sender || ''))}</span>
           <span class="pill ${draft.is_escalate ? 'filtered' : 'red'}" style="font-size:9px;">${draft.is_escalate ? 'ESCALATE' : 'AI DRAFT'}</span>
         </div>
         <div class="er-subject">${esc(draft.subject || '(no subject)')}</div>
-        <div class="er-meta">${esc(draft.snippet || draft.brand_name || '')}</div>
+        <div class="er-meta">${metaContent}</div>
       `;
       div.addEventListener('click', () => selectDraft(draft));
       rows.appendChild(div);
@@ -1316,7 +1318,7 @@ function selectDraft(draft) {
   state.selectedDraft = draft;
   state.selectedEmail = null;
   document.querySelectorAll('.email-row').forEach(r =>
-    r.classList.toggle('active', r.dataset.draftGmailId === draft.gmail_draft_id));
+    r.classList.toggle('active', r.dataset.draftId === String(draft.id)));
   renderDraftOnlyPane(draft);
 }
 
@@ -1329,20 +1331,20 @@ function renderDraftOnlyPane(draft) {
     </div>
     <div class="ai-composer fade-up">
       <div class="ai-head">
-        <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT — LIVE GMAIL</div>
+        <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT</div>
         <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
       </div>
       ${isEscalate ? `<div class="escalate-notice">⚠ ${esc(draft.escalate_reason || 'Manual review required before sending.')}</div>` : ''}
-      <div class="ai-to">To: <span>${esc(draft.to || draft.sender || '')}</span></div>
-      <textarea class="ai-textarea" id="at-${draft.gmail_draft_id}">${esc(draft.body_text || '')}</textarea>
+      <div class="ai-to">To: <span>${esc(draft.sender || '')}</span></div>
+      ${isEscalate ? '' : `<textarea class="ai-textarea" id="at-${draft.id}">${esc(draft.draft_text || '')}</textarea>`}
       <div class="ai-footer">
         <button class="btn btn-ghost" onclick="resetReadingPane()">Close</button>
-        <button class="btn btn-primary" id="bs-${draft.gmail_draft_id}" ${isEscalate ? 'disabled' : ''}>Send Reply ✉</button>
+        ${isEscalate ? '' : `<button class="btn btn-primary" id="bs-${draft.id}">Send Reply ✉</button>`}
       </div>
     </div>
   `;
-  if (draft.db_draft_id) {
-    document.getElementById(`bs-${draft.gmail_draft_id}`)?.addEventListener('click', () => sendDraft(draft.db_draft_id));
+  if (!isEscalate && draft.id) {
+    document.getElementById(`bs-${draft.id}`)?.addEventListener('click', () => sendDraft(draft.id));
   }
 }
 
@@ -1617,7 +1619,7 @@ async function checkDeploy() {
   } catch (_) {}
 }
 checkDeploy();
-setInterval(checkDeploy, 30000);
+setInterval(checkDeploy, 120000);
 
 // ── Init ───────────────────────────────────────────────────────────────────
 bootstrap();

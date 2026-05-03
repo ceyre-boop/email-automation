@@ -159,7 +159,7 @@ def daily_report(db: Session = Depends(get_db)):
 
     pending_query = (
         db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
-        .filter(Draft.status == DraftStatus.pending)
+        .filter(Draft.status == DraftStatus.pending, Draft.is_escalate == False)  # noqa: E712
         .group_by(Draft.talent_key)
         .all()
     )
