@@ -1201,7 +1201,15 @@ async function loadTalentData(talent, silent = false) {
       // Read from DB (all pending drafts) instead of Gmail live folder (limited to 25)
       const dbDrafts = await api('GET', `/api/dashboard/talents/${talent.key}/drafts`);
       state.emails = [];
-      state.drafts = dbDrafts;
+      // Normalize DB field names to match what renderDraftOnlyPane expects
+      state.drafts = dbDrafts.map(d => ({
+        ...d,
+        db_draft_id: d.id,
+        gmail_draft_id: d.gmail_message_id,
+        to: d.sender,
+        body_text: d.draft_text,
+        snippet: d.brand_name || d.offer_type || '',
+      }));
     } else {
       const [emails, drafts] = await Promise.all([
         api('GET', `/api/dashboard/talents/${talent.key}/inbox/live`),
