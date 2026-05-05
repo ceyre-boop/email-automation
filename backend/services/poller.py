@@ -117,6 +117,9 @@ def poll_all_inboxes(db: Session) -> dict:
         if not talent_cfg:
             logger.warning("No config for talent_key=%s — skipping", token_row.talent_key)
             continue
+        if talent_cfg.get("paused"):
+            logger.info("Skipping %s — paused in settings.json", token_row.talent_key)
+            continue
         jobs.append((token_row.id, talent_cfg, draft_mode))
 
     if not jobs:

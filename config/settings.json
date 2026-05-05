@@ -79,7 +79,8 @@
       "manager": "Cara",
       "category": "Home/Living",
       "minimum_rate_usd": 700,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "paused": true
     },
     {
       "key": "Britt",
@@ -89,7 +90,8 @@
       "manager": "Chenni",
       "category": "Home/Living",
       "minimum_rate_usd": 900,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "paused": true
     },
     {
       "key": "Allee",
@@ -109,7 +111,8 @@
       "manager": "Chenni",
       "category": "Fashion",
       "minimum_rate_usd": 600,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "paused": true
     },
     {
       "key": "Katrina",
