@@ -13,7 +13,7 @@
     "max_tokens_reply": 1000,
     "temperature_triage": 0.1,
     "_temperature_comment": "Low temperature for triage = consistent, deterministic scoring.",
-    "temperature_reply": 0.7
+    "temperature_reply": 0.0
   },
 
   "triage": {
