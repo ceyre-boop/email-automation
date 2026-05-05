@@ -751,6 +751,7 @@ body {
           <button class="filter-tab active" id="tab-all" onclick="setScoreFilter(null)">All</button>
           <div class="feed-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</div>
           <div class="feed-tab" id="tab-uncert" onclick="setScoreFilter(2)">Review</div>
+          <div class="feed-tab" id="tab-nodraft" onclick="setScoreFilter('nodraft')" title="Emails with no AI draft — including trash. Use this to audit what the AI skipped.">No Draft</div>
         </div>
         <div id="email-rows" style="flex:1; overflow-y:auto; min-height: 0;"></div>
       </div>
@@ -1151,7 +1152,7 @@ function setGmailNav(nav) {
 function setScoreFilter(score) {
   state.scoreFilter = score;
   document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-  const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert' };
+  const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert', nodraft: 'tab-nodraft' };
   const el = document.getElementById(ids[score]);
   if (el) el.classList.add('active');
   renderEmailList();
@@ -1242,8 +1243,13 @@ async function loadTalentData(talent, silent = false) {
 // ── Email list ─────────────────────────────────────────────────────────────
 function getVisibleEmails() {
   let v = state.emails;
-  if (state.scoreFilter != null && state.gmailNav === 'inbox')
+  if (state.gmailNav !== 'inbox') return v;
+  if (state.scoreFilter === 'nodraft') {
+    const draftedIds = new Set(state.drafts.map(d => d.gmail_message_id).filter(Boolean));
+    v = v.filter(e => !draftedIds.has(e.gmail_message_id));
+  } else if (state.scoreFilter != null) {
     v = v.filter(e => e.score === state.scoreFilter);
+  }
   return v;
 }
 
@@ -1430,9 +1436,18 @@ function renderReadingPane(email, draft) {
 
   if (draft) {
     renderDraftCompose(draft, email);
-  } else if (email.score === 3) {
+  } else {
+    // No draft exists — show override button for every email (lets team catch AI misses)
+    const hint = email.score === 3
+      ? 'AI drafting in progress — check back in a moment.'
+      : email.score === 1
+        ? 'AI marked this as junk. If it looks legit, click below to force a draft.'
+        : 'No draft written yet. Click below to generate one now.';
     document.getElementById('draft-compose-area').innerHTML = `
-      <div class="draft-pending-hint">AI drafting in progress — check back in a moment.</div>`;
+      <div class="draft-pending-hint" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;">
+        <span>${esc(hint)}</span>
+        <button class="btn btn-ghost" style="font-size:12px;" onclick="forceDraftEmail('${esc(email.gmail_message_id)}')">✍ Draft This Email</button>
+      </div>`;
   }
 }
 
@@ -1459,6 +1474,18 @@ function renderDraftCompose(draft, email) {
   document.getElementById(`btn-send-${draft.id}`)?.addEventListener('click', () => sendDraft(draft.id));
   document.getElementById(`btn-save-${draft.id}`)?.addEventListener('click', () => saveDraft(draft.id));
   document.getElementById(`btn-discard-${draft.id}`)?.addEventListener('click', () => discardDraft(draft.id));
+}
+
+// ── Manual draft override ──────────────────────────────────────────────────
+async function forceDraftEmail(gmailMsgId) {
+  if (!state.selectedTalent) return;
+  const area = document.getElementById('draft-compose-area');
+  if (area) area.innerHTML = `<div class="draft-pending-hint"><span class="spinner"></span> Asking GPT to draft this…</div>`;
+  try {
+    await api('POST', `/api/dashboard/talents/${state.selectedTalent.key}/force-draft/${gmailMsgId}`);
+    showToast('Draft queued — reloading in 5s…');
+    setTimeout(() => loadTalentData(state.selectedTalent, true), 5000);
+  } catch (e) { showToast('Draft failed — ' + e.message); }
 }
 
 // ── Archive ────────────────────────────────────────────────────────────────

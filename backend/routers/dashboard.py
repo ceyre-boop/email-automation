@@ -970,6 +970,27 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
 
 # ── Archive email ─────────────────────────────────────────────────────────────
 
+@router.post("/talents/{talent_key}/force-draft/{gmail_message_id}")
+def force_draft_email(
+    talent_key: str,
+    gmail_message_id: str,
+    background_tasks: BackgroundTasks,
+    db: Session = Depends(get_db),
+):
+    """
+    Manual override: force GPT to write a draft for any email regardless of its score.
+    Used when the team spots a missed opportunity in the No Draft or trash view.
+    """
+    _validate_talent(talent_key)
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key.ilike(talent_key), TalentToken.active == True  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
+    background_tasks.add_task(_run_force_blast, talent_key, [gmail_message_id])
+    return {"ok": True, "queued": gmail_message_id}
+
+
 @router.post("/talents/{talent_key}/emails/{gmail_message_id}/archive")
 def archive_email(talent_key: str, gmail_message_id: str, db: Session = Depends(get_db)):
     """Archive a specific email in the talent's Gmail account and mark it in DB."""
