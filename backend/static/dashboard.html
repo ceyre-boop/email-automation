@@ -31,6 +31,59 @@
   --sidebar-w:   248px;
 }
 
+/* ─── Light mode (scoped to #main only — sidebar always stays dark) ─────── */
+#main[data-theme="light"] {
+  --bg:        #ffffff;
+  --surface:   #f6f6f8;
+  --surface-2: #eeeef1;
+  --surface-3: #e2e2e6;
+  --border:    rgba(0,0,0,0.08);
+  --border-2:  rgba(0,0,0,0.15);
+  --text:      #111114;
+  --text-2:    #55555f;
+  --text-3:    #9a9aa8;
+  --green-dim: rgba(0,180,120,0.12);
+  --amber-dim: rgba(200,140,0,0.12);
+  background: var(--bg);
+  color: var(--text);
+}
+
+/* Fix elements with hardcoded #fff text that appear in the inbox reading pane */
+#main[data-theme="light"] .thread-subject,
+#main[data-theme="light"] .msg-from,
+#main[data-theme="light"] .gmail-talent-id { color: var(--text); }
+
+#main[data-theme="light"] .msg-av { color: var(--text-2); }
+
+#main[data-theme="light"] .topbar-search {
+  background: var(--surface-2);
+  color: var(--text);
+}
+#main[data-theme="light"] .topbar-search::placeholder { color: var(--text-3); }
+
+/* ─── Theme toggle button ───────────────────────────────────────────────── */
+.btn-theme {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 12px; border-radius: 8px;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  color: var(--text-2); font-family: var(--sans); font-size: 12px;
+  font-weight: 600; cursor: pointer; transition: var(--r);
+  white-space: nowrap;
+}
+.btn-theme:hover { background: var(--surface-3); color: var(--text); }
+.btn-theme .theme-icon { font-size: 13px; line-height: 1; }
+
+/* Sidebar theme toggle */
+.sidebar-theme-row {
+  padding: 0 0 8px;
+  display: flex;
+}
+.sidebar-theme-row .btn-theme {
+  width: 100%; justify-content: center;
+  background: var(--surface-2); border-color: var(--border-2);
+  color: var(--text-2);
+}
+
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 body {
@@ -660,6 +713,12 @@ body {
   <ul id="talent-list" style="list-style:none;"></ul>
 
   <div class="sidebar-footer">
+    <div class="sidebar-theme-row">
+      <button class="btn-theme" id="sidebar-theme-toggle">
+        <span class="theme-icon" id="sidebar-theme-icon">☀️</span>
+        <span id="sidebar-theme-label">Light Mode</span>
+      </button>
+    </div>
     <button class="btn-sync" id="btn-refresh">↻ &nbsp;Synchronize</button>
   </div>
 </aside>
@@ -725,6 +784,7 @@ body {
       </div>
       <input type="text" class="topbar-search" id="gmail-search" placeholder="Search emails...">
       <div class="topbar-actions">
+        <button class="btn btn-ghost" id="topbar-theme-toggle" title="Toggle light/dark mode"><span class="theme-icon" id="topbar-theme-icon">☀️</span></button>
         <button class="btn btn-ghost" onclick="openRealGmail()">Open Gmail ↗</button>
         <button class="btn btn-ghost" onclick="openSettings()" title="AI Settings for this talent">⚙ AI Settings</button>
         <button class="btn btn-primary" id="btn-run-ai" onclick="runAiDraft()">✦ Run AI Draft</button>
@@ -825,6 +885,59 @@ const state = {
   drafts: [],
   context: [],
 };
+
+// ── Theme ──────────────────────────────────────────────────────────────────
+// 'auto': inbox→light, overview→dark  |  'light': always light  |  'dark': always dark
+const THEME_MODE_KEY = 'inbox_theme_mode';
+let _themeMode = localStorage.getItem(THEME_MODE_KEY) || 'auto';
+
+function _updateThemeButtons(isLight) {
+  const icon  = isLight ? '🌙' : '☀️';
+  const label = isLight ? 'Dark Mode' : 'Light Mode';
+  const si = document.getElementById('sidebar-theme-icon');
+  const sl = document.getElementById('sidebar-theme-label');
+  const ti = document.getElementById('topbar-theme-icon');
+  if (si) si.textContent = icon;
+  if (sl) sl.textContent = label;
+  if (ti) ti.textContent = icon;
+}
+
+function setMainTheme(mode) {
+  const main = document.getElementById('main');
+  const isLight = mode === 'light';
+  if (isLight) {
+    main.setAttribute('data-theme', 'light');
+  } else {
+    main.removeAttribute('data-theme');
+  }
+  _updateThemeButtons(isLight);
+}
+
+function autoTheme(viewName) {
+  if (_themeMode === 'light') { setMainTheme('light'); return; }
+  if (_themeMode === 'dark')  { setMainTheme('dark');  return; }
+  // auto: inbox = light, overview = dark
+  setMainTheme(viewName === 'gmail' ? 'light' : 'dark');
+}
+
+function _handleThemeToggle() {
+  const main = document.getElementById('main');
+  const isLight = main.getAttribute('data-theme') === 'light';
+  // Cycle: light → dark → auto (which then applies the view-based default)
+  if (_themeMode === 'light') {
+    _themeMode = 'dark';
+  } else if (_themeMode === 'dark') {
+    _themeMode = 'auto';
+  } else {
+    // auto → force opposite of current view default
+    _themeMode = isLight ? 'dark' : 'light';
+  }
+  localStorage.setItem(THEME_MODE_KEY, _themeMode);
+  autoTheme(state.view);
+}
+
+document.getElementById('sidebar-theme-toggle').addEventListener('click', _handleThemeToggle);
+document.getElementById('topbar-theme-toggle').addEventListener('click', _handleThemeToggle);
 
 // ── API ────────────────────────────────────────────────────────────────────
 async function api(method, path, body = null) {
@@ -998,6 +1111,7 @@ function showView(name) {
   document.getElementById('nav-overview').classList.toggle('active', name === 'overview');
   document.querySelectorAll('.talent-item').forEach(el =>
     el.classList.toggle('active', el.dataset.key === state.selectedTalent?.key && name === 'gmail'));
+  autoTheme(name);
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -1656,6 +1770,8 @@ checkDeploy();
 setInterval(checkDeploy, 120000);
 
 // ── Init ───────────────────────────────────────────────────────────────────
+// Apply initial theme before first render (default: overview → dark)
+autoTheme('overview');
 bootstrap();
 </script>
 </body>
