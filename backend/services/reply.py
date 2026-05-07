@@ -262,7 +262,6 @@ def draft_reply(
     if not settings.app_config.get("ai_enabled", True):
         raise RuntimeError("AI is disabled (ai_enabled=false in settings.json) — reply drafting skipped")
     cfg = settings.app_config.get("openai", {})
-    client = OpenAI(api_key=settings.openai_api_key)
 
     voice_profile, manager_context_text = _load_talent_context(db, talent_key)
 
@@ -277,6 +276,8 @@ def draft_reply(
             "is_escalate": False,
             "escalate_reason": None,
         }
+
+    client = OpenAI(api_key=settings.openai_api_key)
 
     messages = _build_reply_messages(
         talent_key=talent_key,

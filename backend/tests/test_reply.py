@@ -166,7 +166,7 @@ def test_draft_reply_gpt_escalates(mock_openai_cls):
         talent_key="Sylvia", talent_name="Sylvia", minimum_rate=1000,
         subject="Partnership", sender="brand@promo.com",
         offer_type="Sponsored Post", brand_name="PromoBrand",
-        proposed_rate=50.0, triage_reason="Score 3 forced",
+        proposed_rate=1500.0, triage_reason="Score 3 forced",
     )
     assert result["is_escalate"] is True
     assert result["escalate_reason"] is not None
@@ -201,6 +201,6 @@ def test_draft_reply_escalate_case_insensitive(mock_openai_cls):
         talent_key="Sylvia", talent_name="Sylvia", minimum_rate=1000,
         subject="Subj", sender="a@b.com",
         offer_type="Sponsored Post", brand_name="Nike",
-        proposed_rate=500.0, triage_reason="reason",
+        proposed_rate=1500.0, triage_reason="reason",
     )
     assert result["is_escalate"] is True
