@@ -27,11 +27,15 @@ logger = logging.getLogger(__name__)
 def _plain_to_html(body: str) -> str:
     escaped = html.escape(body or "")
     escaped = re.sub(
-        r"(https?://[^\s<]+)",
+        r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])",
         r'<a href="\1">\1</a>',
         escaped,
     )
     return f"<div>{escaped.replace(chr(10), '<br>')}</div>"
+
+
+def parse_cc_recipients(raw: str | None) -> list[str]:
+    return [c.strip() for c in (raw or "").split(",") if c.strip()]
 
 
 def _gmail_service(token_row, db=None):

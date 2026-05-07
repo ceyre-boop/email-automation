@@ -383,7 +383,7 @@ def n8n_approve_draft(
     from backend.services.oauth import TokenRefreshError
 
     try:
-        cc = [c.strip() for c in (draft.cc_recipients or "").split(",") if c.strip()]
+        cc = gmail_svc.parse_cc_recipients(draft.cc_recipients)
         success = gmail_svc.send_reply(
             token_row=token,
             thread_id=draft.thread_id or "",

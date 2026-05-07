@@ -36,6 +36,7 @@ BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle (was 20)
 # Concurrency: Transaction Pooler (port 6543) supports hundreds of connections.
 MAX_CONCURRENT_EMAILS = 15
 MAX_TALENT_WORKERS = 8
+_MANAGER_CC_TRIGGER_PHRASE = "looping her in management team"
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
@@ -476,7 +477,7 @@ def _process_one_message(
         is_escalate = reply_result["is_escalate"]
         escalate_reason = reply_result.get("escalate_reason")
         cc_recipients: list[str] = []
-        if not is_escalate and "looping her in management team" in (draft_text or "").lower():
+        if not is_escalate and _MANAGER_CC_TRIGGER_PHRASE in (draft_text or "").lower():
             settings = get_settings()
             talent_cfg = next(
                 (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),

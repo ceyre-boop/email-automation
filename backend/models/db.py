@@ -269,10 +269,10 @@ def create_tables():
             # Manager context scoping + voice profiles
             "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS talent_key TEXT",
             "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS voice_profile TEXT",
-             # Email threading: store original Message-ID header so approved replies thread correctly
-             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
-             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS cc_recipients TEXT",
-         ]:
+            # Email threading: store original Message-ID header so approved replies thread correctly
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS cc_recipients TEXT",
+        ]:
             try:
                 conn.execute(text(stmt))
                 conn.commit()
