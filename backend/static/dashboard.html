@@ -19,8 +19,8 @@
   --red-glow:    rgba(227,28,37,0.35);
   --red-line:    rgba(227,28,37,0.5);
   --text:        #f2f2f3;
-  --text-2:      #9a9aa8;
-  --text-3:      #55555f;
+  --text-2:      #c0c0cc;
+  --text-3:      #888896;
   --green:       #00d68f;
   --green-dim:   rgba(0,214,143,0.12);
   --amber:       #ffb300;
@@ -811,7 +811,8 @@ body {
           <button class="filter-tab active" id="tab-all" onclick="setScoreFilter(null)">All</button>
           <div class="feed-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</div>
           <div class="feed-tab" id="tab-uncert" onclick="setScoreFilter(2)">Review</div>
-          <div class="feed-tab" id="tab-nodraft" onclick="setScoreFilter('nodraft')" title="Emails with no AI draft — including trash. Use this to audit what the AI skipped.">No Draft</div>
+          <div class="feed-tab" id="tab-trash" onclick="setScoreFilter(1)">Trash</div>
+          <div class="feed-tab" id="tab-nodraft" onclick="setScoreFilter('nodraft')" title="Emails the AI skipped — audit for missed opportunities.">No Draft</div>
         </div>
         <div id="email-rows" style="flex:1; overflow-y:auto; min-height: 0;"></div>
       </div>
@@ -1266,7 +1267,7 @@ function setGmailNav(nav) {
 function setScoreFilter(score) {
   state.scoreFilter = score;
   document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-  const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert', nodraft: 'tab-nodraft' };
+  const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert', 1: 'tab-trash', nodraft: 'tab-nodraft' };
   const el = document.getElementById(ids[score]);
   if (el) el.classList.add('active');
   renderEmailList();

@@ -279,6 +279,31 @@ def _extract_body(payload: dict) -> str:
     return ""
 
 
+# ── Thread guard ─────────────────────────────────────────────────────────────
+
+
+def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
+    """
+    Return True if this Gmail thread already has a SENT message in it.
+
+    Catches threads where a human already replied (no DB record exists because
+    the conversation predates this system). Uses format='minimal' to keep the
+    API call cheap — we only need labels, not full message content.
+    Returns False on any API error so a failure never silently blocks a draft.
+    """
+    try:
+        thread = service.users().threads().get(
+            userId="me", id=thread_id, format="minimal"
+        ).execute()
+        for msg in thread.get("messages", []):
+            if "SENT" in msg.get("labelIds", []):
+                return True
+        return False
+    except HttpError as exc:
+        logger.warning("thread_has_prior_sent_reply failed for %s (non-fatal): %s", thread_id, exc)
+        return False
+
+
 # ── Labelling / archiving ─────────────────────────────────────────────────────
 
 

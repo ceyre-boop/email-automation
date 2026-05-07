@@ -16,7 +16,7 @@ Score 2 = UNCERTAIN — Do not reply. Flag for human review.
 Score 3 = RESPOND — A real business opportunity. Draft a reply.
 
 Return ONLY a JSON object. No explanation, no extra text. Format:
-{"score": <1|2|3>, "reason": "<one sentence>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|Event Appearance|Other|Unknown>", "proposed_rate_usd": <number or 0 if not mentioned>, "brand_name": "<brand name or empty string>"}
+{"score": <1|2|3>, "reason": "<one sentence>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|PR Request|Event Appearance|Other|Unknown>", "proposed_rate_usd": <number or 0 if not mentioned>, "brand_name": "<brand name or empty string>"}
 
 ---
 
@@ -38,6 +38,13 @@ Return ONLY a JSON object. No explanation, no extra text. Format:
 - Email is professional but missing key details (no rate, no deliverables, no timeline)
 - Company is unfamiliar but email quality is high
 - Any edge case where you are not confident
+
+### proposed_rate_usd field — critical rules:
+- Set to 0 if the brand is asking for the talent's rates (a rate inquiry), even if they mention a budget range
+- Set to 0 if no specific dollar amount is stated in the email
+- Set to 0 if the email only asks "what are your rates?" or similar phrasing
+- Only set a non-zero value if the brand explicitly states a concrete offer amount (e.g. "we'd like to offer $500 per video")
+- When in doubt, set to 0 — a false 0 is safe; a hallucinated non-zero rate causes the wrong reply template to fire
 
 ### Score 3 (Respond) — ALL of the following must be true:
 - Email is from a real, identifiable brand or company

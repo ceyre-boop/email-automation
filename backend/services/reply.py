@@ -17,12 +17,17 @@ logger = logging.getLogger(__name__)
 
 _ESCALATE_PREFIX = "ESCALATE:"
 
-# Secondary signals used in _deterministic_initial_or_counter_reply to detect
-# inquiry emails where the brand is asking for rates rather than making an offer.
+# Keywords in the triage reason that indicate the brand is *asking* for rates,
+# not making a concrete offer. When these appear, GPT must use the initial-rates
+# template rather than the counter-offer template — even if it hallucinated a rate.
 _INQUIRY_SIGNALS = (
-    "asking for rates", "requesting rates", "no rate", "no offer",
-    "rate inquiry", "asking about", "no specific", "not mentioned",
-    "what are your", "rate request", "asking for a quote",
+    "asking for rates", "requesting rates", "rate inquiry", "asking for a quote",
+    "no rate", "no offer", "no rate mentioned", "rate not mentioned",
+    "no specific offer", "no dollar", "no amount", "no proposed rate",
+    "asking about", "not mentioned", "what are your", "rate request",
+    "inquiring about rates", "seeking collaboration", "interested in working",
+    "would love to work", "open to collab", "open to collaboration",
+    "exploring partnership",
 )
 
 # Maximum characters of the original email body included in the reply prompt.

@@ -94,9 +94,38 @@ def _apply_special_routing(
     offer_type: str,
     proposed_rate: float,
     policy: dict,
+    brand_name: str = "",
 ) -> int:
     """Apply per-talent overrides from confidence_policy.json special_talent_routing."""
     key = talent_key.lower()
+
+    if key == "britt":
+        offer_lower = offer_type.lower()
+        # PR requests from any identifiable brand → always draft a reply (Score 3).
+        # Britt's SOP has a canned PR response; missing one is worse than sending it.
+        if "pr" in offer_lower or "pr request" in offer_lower:
+            if brand_name:
+                logger.info("Britt PR request from brand '%s' → Score 3", brand_name)
+                return 3
+        # Event / panel / TikTok invites → always flag for human review, never trash.
+        if "event" in offer_lower or "panel" in offer_lower or "appearance" in offer_lower:
+            if score == 1:
+                logger.info("Britt event/panel invite → upgrading Score 1 → Score 2")
+                return 2
+        # Commission-only (Affiliate, no flat fee) → flag for review, never trash.
+        # A real brand offering affiliate-only is worth a human look even if we can't auto-reply.
+        if "affiliate" in offer_lower and proposed_rate == 0:
+            if score == 1:
+                logger.info("Britt commission-only offer → upgrading Score 1 → Score 2")
+                return 2
+        # Any email from an identifiable brand should never be trashed outright.
+        # Bias toward drafting: a draft we don't send costs nothing; a missed deal costs revenue.
+        if score == 1 and brand_name:
+            logger.info(
+                "Britt real-brand safety net: brand='%s' offer_type='%s' → upgrading Score 1 → Score 2",
+                brand_name, offer_type,
+            )
+            return 2
 
     if key == "trin":
         if "affiliate" in offer_type.lower() and proposed_rate == 0:
@@ -201,6 +230,8 @@ def triage_email(
     never_reply = triage_cfg.get("never_reply", {}) if isinstance(triage_cfg, dict) else {}
     blocked_domains = {str(d).strip().lower() for d in never_reply.get("domains", []) if str(d).strip()}
     blocked_senders = {str(s).strip().lower() for s in never_reply.get("senders", []) if str(s).strip()}
+    # also support legacy "emails" key from older config versions
+    blocked_senders |= {str(s).strip().lower() for s in never_reply.get("emails", []) if str(s).strip()}
     blocked_subject_keywords = [str(k).strip().lower() for k in never_reply.get("subject_keywords", []) if str(k).strip()]
     blocked_body_keywords = [str(k).strip().lower() for k in never_reply.get("body_keywords", []) if str(k).strip()]
 
@@ -292,9 +323,10 @@ def triage_email(
 
     proposed_rate = float(result.get("proposed_rate_usd", 0) or 0)
     offer_type = str(result.get("offer_type", "Unknown"))
+    brand_name = str(result.get("brand_name", "") or "")
 
     # Apply special per-talent overrides
-    score = _apply_special_routing(talent_key, score, offer_type, proposed_rate, policy)
+    score = _apply_special_routing(talent_key, score, offer_type, proposed_rate, policy, brand_name)
 
     return {
         "score": score,

@@ -435,13 +435,30 @@ def _process_one_message(
 
     # ── Score 3 → Draft reply ───────────────────────────────────────────────────
     elif score == 3:
-        # Guard against duplicate drafts (e.g. if a previous poll cycle's DB commit
-        # failed after the Gmail draft was saved, leaving the email unprocessed).
+        # Guard 1: duplicate draft in DB
         existing_draft = (
             db.query(Draft)
             .filter(Draft.gmail_message_id == message_id)
             .first()
         )
+        # Guard 2: thread already has a human-sent reply in Gmail (covers conversations
+        # the system never saw — no DB records exist for manually-handled threads).
+        thread_already_replied = gmail_svc.thread_has_prior_sent_reply(service, thread_id)
+        if thread_already_replied:
+            logger.info(
+                "Thread %s for %s already has a sent reply — skipping draft to avoid "
+                "interrupting an active human-managed conversation",
+                thread_id, talent_key,
+            )
+            _record_processed(
+                db, talent_key, message_id, thread_id, sender, subject,
+                score, brand_name, proposed_rate, offer_type, reason,
+                EmailStatus.archived, body_text=body, email_date=email_date,
+            )
+            db.commit()
+            summary["processed"] += 1
+            return
+
         if existing_draft:
             logger.info(
                 "Draft already exists for %s / %s (draft_id=%s) — recording processed to prevent re-evaluation",
