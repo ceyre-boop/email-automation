@@ -383,6 +383,7 @@ def n8n_approve_draft(
     from backend.services.oauth import TokenRefreshError
 
     try:
+        cc = gmail_svc.parse_cc_recipients(draft.cc_recipients)
         success = gmail_svc.send_reply(
             token_row=token,
             thread_id=draft.thread_id or "",
@@ -391,6 +392,7 @@ def n8n_approve_draft(
             body=draft.draft_text,
             db=db,
             in_reply_to=getattr(draft, "message_id_header", None),
+            cc=cc or None,
         )
     except TokenRefreshError:
         token.active = False

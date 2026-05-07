@@ -45,6 +45,12 @@ Return ONLY a JSON object. No explanation, no extra text. Format:
 - Purpose is clearly a collaboration, sponsorship, partnership, or paid opportunity
 - IMPORTANT: If the sender is a recognizable major or mid-tier brand name, score as 3 REGARDLESS of the proposed rate — even low offers from real brands are worth a polite reply because rates can be negotiated up
 
+### proposed_rate_usd — CRITICAL RULES:
+- Set to **0** if the sender is asking "what are your rates?" or requesting a quote — that is an INQUIRY, not an offer
+- Set to **0** if no specific dollar amount is explicitly stated in the email
+- Set to **0** if the email only says "we'd love to collaborate" or "we're interested" with no number attached
+- Only set a non-zero value when the sender explicitly states a specific payment amount they are willing to pay
+
 ---
 
 ## USER PROMPT TEMPLATE

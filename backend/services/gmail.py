@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import base64
 import email as email_lib
+import html
 import logging
 import re
 from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -20,6 +22,20 @@ from googleapiclient.errors import HttpError
 from backend.services.oauth import TokenRefreshError, credentials_from_token_row, refresh_if_needed
 
 logger = logging.getLogger(__name__)
+
+
+def _plain_to_html(body: str) -> str:
+    escaped = html.escape(body or "")
+    escaped = re.sub(
+        r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])",
+        r'<a href="\1">\1</a>',
+        escaped,
+    )
+    return f"<div>{escaped.replace('\n', '<br>')}</div>"
+
+
+def parse_cc_recipients(raw: str | None) -> list[str]:
+    return [c.strip() for c in (raw or "").split(",") if c.strip()]
 
 
 def _gmail_service(token_row, db=None):
@@ -309,6 +325,7 @@ def create_gmail_draft(
     body: str,
     db=None,
     in_reply_to: str | None = None,
+    cc: list[str] | None = None,
     service=None,
 ) -> str | None:
     """
@@ -318,8 +335,12 @@ def create_gmail_draft(
     """
     if service is None:
         service = _gmail_service(token_row, db)
-    mime_msg = MIMEText(body, "plain")
+    mime_msg = MIMEMultipart("alternative")
+    mime_msg.attach(MIMEText(body or "", "plain"))
+    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
     mime_msg["To"] = reply_to
+    if cc:
+        mime_msg["Cc"] = ", ".join(cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
@@ -341,15 +362,27 @@ def create_gmail_draft(
         return None
 
 
-def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str, db=None,
-               in_reply_to: str | None = None) -> bool:
+def send_reply(
+    token_row,
+    thread_id: str,
+    reply_to: str,
+    subject: str,
+    body: str,
+    db=None,
+    in_reply_to: str | None = None,
+    cc: list[str] | None = None,
+) -> bool:
     """
     Send a reply email as the talent.
     Used when an agency reviewer approves a draft.
     """
     service = _gmail_service(token_row, db)
-    mime_msg = MIMEText(body, "plain")
+    mime_msg = MIMEMultipart("alternative")
+    mime_msg.attach(MIMEText(body or "", "plain"))
+    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
     mime_msg["To"] = reply_to
+    if cc:
+        mime_msg["Cc"] = ", ".join(cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
@@ -379,6 +412,31 @@ def send_standalone_message(token_row, to: str, subject: str, body: str, db=None
     except HttpError as exc:
         logger.error("Standalone send failed for %s: %s", token_row.talent_key, exc)
         return False
+
+
+def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
+    """
+    Return True if the Gmail thread contains any message with the SENT label,
+    meaning the talent (or a manager) has already manually replied.
+
+    This catches ongoing deal threads that were handled before the system was
+    set up and therefore have no ProcessedEmail / Draft DB records.
+    Uses format="minimal" to fetch only label IDs — fast and cheap.
+    """
+    try:
+        thread = (
+            service.users()
+            .threads()
+            .get(userId="me", id=thread_id, format="minimal")
+            .execute()
+        )
+        return any(
+            "SENT" in msg.get("labelIds", [])
+            for msg in thread.get("messages", [])
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("thread_has_prior_sent_reply failed for %s: %s", thread_id, exc)
+        return False  # conservative: don't block on API failure
 
 
 def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:

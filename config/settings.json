@@ -21,7 +21,26 @@
     "_global_minimum_rate_comment": "Set to 0 to use per-talent minimums only. Override here to enforce a global floor across all inboxes.",
     "score_1_label": "trash",
     "score_2_label": "uncertain",
-    "score_3_label": "respond"
+    "score_3_label": "respond",
+    "never_reply": {
+      "_comment": "Emails matching any rule here are immediately archived (Score 1) without calling GPT. Add senders/domains/keywords that should NEVER receive an auto-reply.",
+      "domains": [
+        "taboost.me",
+        "notifications.google.com",
+        "mail.google.com"
+      ],
+      "senders": [],
+      "_senders_comment": "Exact sender email addresses to block (e.g. specific manager emails on other platforms).",
+      "subject_keywords": [
+        "unsubscribe",
+        "out of office",
+        "auto-reply",
+        "automatic reply",
+        "delivery status notification",
+        "mailer-daemon"
+      ],
+      "body_keywords": []
+    }
   },
 
   "reply": {
@@ -29,7 +48,14 @@
     "_draft_mode_comment": "true = Phase 2 saves replies as Gmail Drafts for supervisor review instead of sending. Set to false only after Marco approves full autonomous send (~1 month trial). When draft_mode is false, send_delay_minutes applies.",
     "send_delay_minutes": 15,
     "_send_delay_comment": "Minutes to wait after drafting before sending. Only applies when draft_mode is false. Set to 0 to disable. Keep at 15 during Phase 2 testing.",
-    "send_delay_enabled": true
+    "send_delay_enabled": true,
+    "manager_emails": {
+      "_comment": "Map manager first names (as used in settings.json talents[].manager) to their email addresses. Used to CC the right manager when a draft contains the looping-in phrase.",
+      "Cara": "cara@taboost.me",
+      "Chenni": "chenni@taboost.me",
+      "Nicole": "nicole@taboost.me",
+      "Colin": "colineyre222@gmail.com"
+    }
   },
 
   "digest": {

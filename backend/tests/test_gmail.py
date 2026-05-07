@@ -161,6 +161,33 @@ def test_create_draft_sets_in_reply_to(mock_build, mock_creds, mock_refresh):
 @patch("backend.services.gmail.refresh_if_needed")
 @patch("backend.services.gmail.credentials_from_token_row")
 @patch("backend.services.gmail.build")
+def test_create_draft_sets_cc_header(mock_build, mock_creds, mock_refresh):
+    from backend.services.gmail import create_gmail_draft
+
+    fake_svc = _mock_service()
+    mock_build.return_value = fake_svc
+    mock_creds.return_value = MagicMock(token="t", expiry=None)
+    mock_refresh.return_value = MagicMock(token="t", expiry=None)
+    fake_svc.users().drafts().create().execute.return_value = {"id": "d"}
+
+    create_gmail_draft(
+        token_row=_make_token(),
+        thread_id="t1",
+        reply_to="x@brand.com",
+        subject="Re: Hello",
+        body="Body",
+        cc=["manager@taboost.me"],
+    )
+
+    create_call = fake_svc.users().drafts().create
+    body_arg = create_call.call_args[1]["body"]
+    raw = _decode_raw(body_arg["message"]["raw"])
+    assert raw["Cc"] == "manager@taboost.me"
+
+
+@patch("backend.services.gmail.refresh_if_needed")
+@patch("backend.services.gmail.credentials_from_token_row")
+@patch("backend.services.gmail.build")
 def test_create_draft_threads_correctly(mock_build, mock_creds, mock_refresh):
     """The threadId in the API payload must match the supplied thread_id."""
     from backend.services.gmail import create_gmail_draft
@@ -465,3 +492,43 @@ def test_token_refresh_persisted_when_db_provided(mock_build, mock_creds, mock_r
     assert token.access_token == "new-access-token"
     db.add.assert_called_with(token)
     db.commit.assert_called()
+
+
+# ── thread_has_prior_sent_reply ───────────────────────────────────────────────
+
+
+def test_thread_has_prior_sent_reply_returns_true_when_sent_label_present():
+    from backend.services.gmail import thread_has_prior_sent_reply
+
+    fake_svc = MagicMock()
+    fake_svc.users().threads().get().execute.return_value = {
+        "messages": [
+            {"id": "m1", "labelIds": ["INBOX", "UNREAD"]},
+            {"id": "m2", "labelIds": ["SENT"]},  # talent already replied
+        ]
+    }
+
+    assert thread_has_prior_sent_reply(fake_svc, "thread-123") is True
+
+
+def test_thread_has_prior_sent_reply_returns_false_when_no_sent_label():
+    from backend.services.gmail import thread_has_prior_sent_reply
+
+    fake_svc = MagicMock()
+    fake_svc.users().threads().get().execute.return_value = {
+        "messages": [
+            {"id": "m1", "labelIds": ["INBOX", "UNREAD"]},
+        ]
+    }
+
+    assert thread_has_prior_sent_reply(fake_svc, "thread-xyz") is False
+
+
+def test_thread_has_prior_sent_reply_returns_false_on_api_error():
+    """API failure must be conservative — return False, do not block processing."""
+    from backend.services.gmail import thread_has_prior_sent_reply
+
+    fake_svc = MagicMock()
+    fake_svc.users().threads().get().execute.side_effect = Exception("Connection refused")
+
+    assert thread_has_prior_sent_reply(fake_svc, "thread-err") is False

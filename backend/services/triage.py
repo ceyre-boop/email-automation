@@ -179,6 +179,7 @@ def triage_email(
         raise RuntimeError("AI is disabled (ai_enabled=false in settings.json) — triage skipped")
     cfg = settings.app_config.get("openai", {})
     policy = settings.confidence_policy
+    triage_cfg = settings.app_config.get("triage", {})
 
     # Build a per-hour rate note for talents whose rate unit is not "per video".
     # This is critical for KatrinaD (per hour) so GPT interprets offered amounts correctly.
@@ -196,6 +197,35 @@ def triage_email(
         else ""
     )
 
+    # ── Pre-filter: explicit never-reply rules → Score 1, no GPT call ───────────
+    never_reply = triage_cfg.get("never_reply", {}) if isinstance(triage_cfg, dict) else {}
+    blocked_domains = {str(d).strip().lower() for d in never_reply.get("domains", []) if str(d).strip()}
+    blocked_senders = {str(s).strip().lower() for s in never_reply.get("senders", []) if str(s).strip()}
+    blocked_subject_keywords = [str(k).strip().lower() for k in never_reply.get("subject_keywords", []) if str(k).strip()]
+    blocked_body_keywords = [str(k).strip().lower() for k in never_reply.get("body_keywords", []) if str(k).strip()]
+
+    sender_lower = sender.lower()
+    subject_lower = subject.lower()
+    body_lower = (body or "").lower()
+
+    if (
+        sender_domain.lower() in blocked_domains
+        or sender_lower in blocked_senders
+        or any(kw in subject_lower for kw in blocked_subject_keywords)
+        or any(kw in body_lower for kw in blocked_body_keywords)
+    ):
+        logger.info(
+            "Pre-filter: never-reply rule matched for %s (%s / %s) → Score 1",
+            talent_key, sender, subject,
+        )
+        return {
+            "score": 1,
+            "reason": "Matched never-reply rule (sender/domain/keyword blocklist).",
+            "offer_type": "Blocked",
+            "proposed_rate_usd": 0.0,
+            "brand_name": "",
+        }
+
     # ── Pre-filter: known automated / non-human senders → Score 1, no GPT call ──
     _AUTO_DOMAINS = {
         "shop.tiktok.com", "tiktok.com", "notifications.tiktok.com",
@@ -207,11 +237,12 @@ def triage_email(
         "password reset", "verify your email", "email verification",
         "account alert", "security alert", "invoice #", "receipt for",
     ]
-    sender_lower = sender.lower()
-    subject_lower = subject.lower()
     is_auto_domain = sender_domain in _AUTO_DOMAINS
     is_auto_subject = any(kw in subject_lower for kw in _AUTO_SUBJECT_KEYWORDS)
-    is_collab = "collab" in subject_lower or "partner" in subject_lower or "sample" in subject_lower or "order" in subject_lower
+    is_collab = any(
+        kw in subject_lower
+        for kw in ("collab", "collaboration", "partner", "partnership", "campaign")
+    )
     if (is_auto_domain or is_auto_subject) and not is_collab:
         logger.info(
             "Pre-filter: automated sender/subject for %s (%s / %s) → Score 1",
