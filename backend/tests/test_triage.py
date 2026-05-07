@@ -305,6 +305,34 @@ def test_triage_standard_talent_no_rate_note(mock_openai_cls):
 
 @patch("backend.services.triage.OpenAI")
 @patch("backend.services.triage.get_settings")
+def test_triage_taboost_domain_blocked(mock_settings, mock_openai_cls):
+    """Emails from taboost.me (internal staff) must be blocked without a GPT call."""
+    s = MagicMock()
+    s.app_config = {
+        "ai_enabled": True,
+        "triage": {"never_reply": {"domains": ["taboost.me"]}},
+        "openai": {},
+    }
+    s.confidence_policy = {}
+    s.openai_api_key = "test-key"
+    mock_settings.return_value = s
+
+    result = triage_email(
+        "Lizz",
+        "Lizz Freixas",
+        600,
+        "Re: collab with brand",
+        "cara@taboost.me",
+        "taboost.me",
+        "Hey, checking in on this deal",
+    )
+    assert result["score"] == 1
+    assert result["offer_type"] == "Blocked"
+    mock_openai_cls.assert_not_called()
+
+
+@patch("backend.services.triage.OpenAI")
+@patch("backend.services.triage.get_settings")
 def test_triage_never_reply_domain_blocklist_short_circuits(mock_settings, mock_openai_cls):
     s = MagicMock()
     s.app_config = {

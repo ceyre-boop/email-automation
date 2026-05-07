@@ -377,7 +377,11 @@ def _process_one_message(
             )
             .first()
         )
-        if existing_thread_activity or existing_thread_draft:
+        # Also check Gmail directly: if the thread has any SENT message the talent
+        # or a manager already replied manually (no DB record exists for those threads).
+        thread_manually_handled = gmail_svc.thread_has_prior_sent_reply(service, thread_id)
+
+        if existing_thread_activity or existing_thread_draft or thread_manually_handled:
             reason = "Ongoing thread already has active deal context — routed to manual review."
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,

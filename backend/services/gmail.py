@@ -31,7 +31,7 @@ def _plain_to_html(body: str) -> str:
         r'<a href="\1">\1</a>',
         escaped,
     )
-    return f"<div>{escaped.replace(chr(10), '<br>')}</div>"
+    return f"<div>{escaped.replace('\n', '<br>')}</div>"
 
 
 def parse_cc_recipients(raw: str | None) -> list[str]:
@@ -412,6 +412,31 @@ def send_standalone_message(token_row, to: str, subject: str, body: str, db=None
     except HttpError as exc:
         logger.error("Standalone send failed for %s: %s", token_row.talent_key, exc)
         return False
+
+
+def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
+    """
+    Return True if the Gmail thread contains any message with the SENT label,
+    meaning the talent (or a manager) has already manually replied.
+
+    This catches ongoing deal threads that were handled before the system was
+    set up and therefore have no ProcessedEmail / Draft DB records.
+    Uses format="minimal" to fetch only label IDs — fast and cheap.
+    """
+    try:
+        thread = (
+            service.users()
+            .threads()
+            .get(userId="me", id=thread_id, format="minimal")
+            .execute()
+        )
+        return any(
+            "SENT" in msg.get("labelIds", [])
+            for msg in thread.get("messages", [])
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("thread_has_prior_sent_reply failed for %s: %s", thread_id, exc)
+        return False  # conservative: don't block on API failure
 
 
 def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:

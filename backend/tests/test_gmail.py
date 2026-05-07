@@ -492,3 +492,43 @@ def test_token_refresh_persisted_when_db_provided(mock_build, mock_creds, mock_r
     assert token.access_token == "new-access-token"
     db.add.assert_called_with(token)
     db.commit.assert_called()
+
+
+# ── thread_has_prior_sent_reply ───────────────────────────────────────────────
+
+
+def test_thread_has_prior_sent_reply_returns_true_when_sent_label_present():
+    from backend.services.gmail import thread_has_prior_sent_reply
+
+    fake_svc = MagicMock()
+    fake_svc.users().threads().get().execute.return_value = {
+        "messages": [
+            {"id": "m1", "labelIds": ["INBOX", "UNREAD"]},
+            {"id": "m2", "labelIds": ["SENT"]},  # talent already replied
+        ]
+    }
+
+    assert thread_has_prior_sent_reply(fake_svc, "thread-123") is True
+
+
+def test_thread_has_prior_sent_reply_returns_false_when_no_sent_label():
+    from backend.services.gmail import thread_has_prior_sent_reply
+
+    fake_svc = MagicMock()
+    fake_svc.users().threads().get().execute.return_value = {
+        "messages": [
+            {"id": "m1", "labelIds": ["INBOX", "UNREAD"]},
+        ]
+    }
+
+    assert thread_has_prior_sent_reply(fake_svc, "thread-xyz") is False
+
+
+def test_thread_has_prior_sent_reply_returns_false_on_api_error():
+    """API failure must be conservative — return False, do not block processing."""
+    from backend.services.gmail import thread_has_prior_sent_reply
+
+    fake_svc = MagicMock()
+    fake_svc.users().threads().get().execute.side_effect = Exception("Connection refused")
+
+    assert thread_has_prior_sent_reply(fake_svc, "thread-err") is False

@@ -118,6 +118,30 @@ def test_draft_reply_normal(mock_openai_cls):
 
 
 @patch("backend.services.reply.OpenAI")
+def test_draft_reply_inquiry_triage_reason_uses_initial_despite_gpt_rate(mock_openai_cls):
+    """
+    Even if GPT triage mistakenly extracted a low rate, when the triage_reason
+    contains 'asking for rates' language the initial-inquiry template must be used,
+    not the 'however your offer is low' counter template.
+    """
+    result = draft_reply(
+        talent_key="Sylvia",
+        talent_name="Sylvia",
+        minimum_rate=1000,
+        subject="What are your rates?",
+        sender="brand@lightsaber.com",
+        offer_type="Unknown",
+        brand_name="LightsaberCo",
+        proposed_rate=200.0,  # GPT guessed wrong — email was actually asking for rates
+        triage_reason="Brand asking for rates, no specific offer mentioned.",
+    )
+    assert result["is_escalate"] is False
+    assert "However her rates are higher than your offer" not in result["draft_text"]
+    assert "potential partnership" in result["draft_text"]
+    mock_openai_cls.assert_not_called()
+
+
+@patch("backend.services.reply.OpenAI")
 def test_draft_reply_no_offer_uses_initial_rule_without_openai(mock_openai_cls):
     result = draft_reply(
         talent_key="Sylvia",

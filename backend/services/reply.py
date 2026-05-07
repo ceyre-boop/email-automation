@@ -17,6 +17,14 @@ logger = logging.getLogger(__name__)
 
 _ESCALATE_PREFIX = "ESCALATE:"
 
+# Secondary signals used in _deterministic_initial_or_counter_reply to detect
+# inquiry emails where the brand is asking for rates rather than making an offer.
+_INQUIRY_SIGNALS = (
+    "asking for rates", "requesting rates", "no rate", "no offer",
+    "rate inquiry", "asking about", "no specific", "not mentioned",
+    "what are your", "rate request", "asking for a quote",
+)
+
 # Maximum characters of the original email body included in the reply prompt.
 # Keeps token usage reasonable while giving GPT enough context for a targeted reply.
 _MAX_EMAIL_BODY_CHARS = 3000
@@ -126,10 +134,18 @@ def _deterministic_initial_or_counter_reply(
     talent_key: str,
     minimum_rate: int | float,
     proposed_rate: float,
+    triage_reason: str = "",
 ) -> str | None:
     """
     Deterministically choose between the "initial inquiry" and "below minimum" SOP
     templates when the offer context is clear enough to avoid model drift.
+
+    Selects the initial-rates template when:
+      - proposed_rate is 0/unset, OR
+      - triage_reason indicates the brand is asking for rates (not offering them)
+
+    Selects the counter-offer template when:
+      - proposed_rate > 0 AND < minimum_rate AND triage_reason does NOT suggest an inquiry
     """
     sop = get_settings().sop_data
     sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
@@ -149,9 +165,13 @@ def _deterministic_initial_or_counter_reply(
         if "initially offered a rate below" in trigger:
             below_min_reply = response
 
-    if proposed_rate <= 0 and initial_reply:
+    # Secondary signal: if triage_reason mentions inquiry/asking keywords, treat as no-offer
+    reason_lower = triage_reason.lower()
+    is_inquiry = any(kw in reason_lower for kw in _INQUIRY_SIGNALS)
+
+    if (proposed_rate <= 0 or is_inquiry) and initial_reply:
         return _redact_pii(initial_reply)
-    if proposed_rate > 0 and proposed_rate < float(minimum_rate) and below_min_reply:
+    if proposed_rate > 0 and proposed_rate < float(minimum_rate) and not is_inquiry and below_min_reply:
         return _redact_pii(below_min_reply)
     return None
 
@@ -269,6 +289,7 @@ def draft_reply(
         talent_key=talent_key,
         minimum_rate=minimum_rate,
         proposed_rate=proposed_rate,
+        triage_reason=triage_reason,
     )
     if deterministic:
         return {
