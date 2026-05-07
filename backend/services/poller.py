@@ -356,6 +356,39 @@ def _process_one_message(
     email_date = detail.get("email_date")
     message_id_header = detail.get("message_id_header", "")
 
+    # ── Guardrail: ongoing thread with existing draft/sent work → manual only ──
+    if thread_id:
+        existing_thread_activity = (
+            db.query(ProcessedEmail)
+            .filter(
+                ProcessedEmail.thread_id == thread_id,
+                ProcessedEmail.gmail_message_id != message_id,
+                ProcessedEmail.status.in_([EmailStatus.draft_saved, EmailStatus.sent]),
+            )
+            .first()
+        )
+        existing_thread_draft = (
+            db.query(Draft)
+            .filter(
+                Draft.thread_id == thread_id,
+                Draft.gmail_message_id != message_id,
+                Draft.status.in_([DraftStatus.pending, DraftStatus.sent, DraftStatus.approved]),
+            )
+            .first()
+        )
+        if existing_thread_activity or existing_thread_draft:
+            reason = "Ongoing thread already has active deal context — routed to manual review."
+            _record_processed(
+                db, talent_key, message_id, thread_id, sender, subject,
+                2, "", 0.0, "Ongoing Thread", reason, EmailStatus.flagged,
+                body_text=body, email_date=email_date,
+            )
+            db.commit()
+            _safe_log_sheet(talent_key, sender, subject, 2, "", 0.0, "Ongoing Thread", "flagged", reason)
+            summary["flagged"] += 1
+            summary["processed"] += 1
+            return
+
     # ── Triage ───────────────────────────────────────────────────────────────
     triage_result = triage_svc.triage_email(
         talent_key=talent_key,
@@ -384,8 +417,19 @@ def _process_one_message(
         _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason)
         summary["archived"] += 1
 
-    # ── Score 2 or 3 → Draft reply ──────────────────────────────────────────────
-    elif score >= 2:
+    # ── Score 2 → Flag for review (no draft) ────────────────────────────────────
+    elif score == 2:
+        _record_processed(
+            db, talent_key, message_id, thread_id, sender, subject,
+            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
+            body_text=body, email_date=email_date,
+        )
+        db.commit()
+        _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason)
+        summary["flagged"] += 1
+
+    # ── Score 3 → Draft reply ───────────────────────────────────────────────────
+    elif score == 3:
         # Guard against duplicate drafts (e.g. if a previous poll cycle's DB commit
         # failed after the Gmail draft was saved, leaving the email unprocessed).
         existing_draft = (
@@ -431,6 +475,18 @@ def _process_one_message(
         draft_text = reply_result["draft_text"]
         is_escalate = reply_result["is_escalate"]
         escalate_reason = reply_result.get("escalate_reason")
+        cc_recipients: list[str] = []
+        if not is_escalate and "looping her in management team" in (draft_text or "").lower():
+            settings = get_settings()
+            talent_cfg = next(
+                (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),
+                {},
+            )
+            manager_name = talent_cfg.get("manager", "")
+            manager_email_map = settings.app_config.get("reply", {}).get("manager_emails", {})
+            manager_email = manager_email_map.get(manager_name) if isinstance(manager_email_map, dict) else None
+            if manager_email:
+                cc_recipients = [manager_email]
 
         # Save as Gmail Draft in the talent's inbox (unless GPT escalated)
         gmail_draft_id: str | None = None
@@ -443,6 +499,7 @@ def _process_one_message(
                 body=draft_text,
                 db=db,
                 in_reply_to=message_id_header or None,
+                cc=cc_recipients or None,
                 service=service,
             )
 
@@ -457,6 +514,7 @@ def _process_one_message(
             proposed_rate=proposed_rate,
             offer_type=offer_type,
             draft_text=draft_text,
+            cc_recipients=",".join(cc_recipients) if cc_recipients else None,
             gmail_draft_id=gmail_draft_id,
             message_id_header=message_id_header or None,  # stored for In-Reply-To on approve
             status=DraftStatus.pending,

@@ -110,8 +110,8 @@ def _build_sop_rules_text(talent_key: str) -> str:
     _ACTION_KEYWORDS = ("move to", "cc ", "delete", "ask for consult", "tagged email", "marked a initial")
     lines = []
     for rule in rules:
-        trigger = rule.get("trigger", "").replace("\n", " ").strip()
-        response = rule.get("response", "").replace("\n", " ").strip()
+        trigger = rule.get("trigger", "").replace("\r\n", "\n").strip()
+        response = rule.get("response", "").replace("\r\n", "\n").strip()
         # Skip pure action rules — they have no email text to send
         if any(response.lower().startswith(kw) for kw in _ACTION_KEYWORDS):
             continue
@@ -120,6 +120,40 @@ def _build_sop_rules_text(talent_key: str) -> str:
         response = _redact_pii(response)
         lines.append(f"TRIGGER: {trigger}\nRESPONSE: {response}")
     return "\n\n".join(lines) if lines else "No email-reply rules found — ESCALATE all."
+
+
+def _deterministic_initial_or_counter_reply(
+    talent_key: str,
+    minimum_rate: int | float,
+    proposed_rate: float,
+) -> str | None:
+    """
+    Deterministically choose between the "initial inquiry" and "below minimum" SOP
+    templates when the offer context is clear enough to avoid model drift.
+    """
+    sop = get_settings().sop_data
+    sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
+    if not sop_key:
+        return None
+    rules = sop.get(sop_key, {}).get("rules", []) or []
+
+    initial_reply = None
+    below_min_reply = None
+    for rule in rules:
+        trigger = str(rule.get("trigger", "") or "").lower()
+        response = str(rule.get("response", "") or "").strip()
+        if not response:
+            continue
+        if "asking for rates" in trigger or "potential to collab" in trigger:
+            initial_reply = response
+        if "initially offered a rate below" in trigger:
+            below_min_reply = response
+
+    if proposed_rate <= 0 and initial_reply:
+        return _redact_pii(initial_reply)
+    if proposed_rate > 0 and proposed_rate < float(minimum_rate) and below_min_reply:
+        return _redact_pii(below_min_reply)
+    return None
 
 
 def _parse_prompt_sections(raw: str) -> tuple[str, str]:
@@ -231,6 +265,18 @@ def draft_reply(
     client = OpenAI(api_key=settings.openai_api_key)
 
     voice_profile, manager_context_text = _load_talent_context(db, talent_key)
+
+    deterministic = _deterministic_initial_or_counter_reply(
+        talent_key=talent_key,
+        minimum_rate=minimum_rate,
+        proposed_rate=proposed_rate,
+    )
+    if deterministic:
+        return {
+            "draft_text": deterministic,
+            "is_escalate": False,
+            "escalate_reason": None,
+        }
 
     messages = _build_reply_messages(
         talent_key=talent_key,

@@ -7,9 +7,11 @@ from __future__ import annotations
 
 import base64
 import email as email_lib
+import html
 import logging
 import re
 from datetime import datetime, timezone
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.utils import parsedate_to_datetime
 from typing import Any
@@ -20,6 +22,16 @@ from googleapiclient.errors import HttpError
 from backend.services.oauth import TokenRefreshError, credentials_from_token_row, refresh_if_needed
 
 logger = logging.getLogger(__name__)
+
+
+def _plain_to_html(body: str) -> str:
+    escaped = html.escape(body or "")
+    escaped = re.sub(
+        r"(https?://[^\s<]+)",
+        r'<a href="\1">\1</a>',
+        escaped,
+    )
+    return f"<div>{escaped.replace(chr(10), '<br>')}</div>"
 
 
 def _gmail_service(token_row, db=None):
@@ -309,6 +321,7 @@ def create_gmail_draft(
     body: str,
     db=None,
     in_reply_to: str | None = None,
+    cc: list[str] | None = None,
     service=None,
 ) -> str | None:
     """
@@ -318,8 +331,12 @@ def create_gmail_draft(
     """
     if service is None:
         service = _gmail_service(token_row, db)
-    mime_msg = MIMEText(body, "plain")
+    mime_msg = MIMEMultipart("alternative")
+    mime_msg.attach(MIMEText(body or "", "plain"))
+    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
     mime_msg["To"] = reply_to
+    if cc:
+        mime_msg["Cc"] = ", ".join(cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
@@ -341,15 +358,27 @@ def create_gmail_draft(
         return None
 
 
-def send_reply(token_row, thread_id: str, reply_to: str, subject: str, body: str, db=None,
-               in_reply_to: str | None = None) -> bool:
+def send_reply(
+    token_row,
+    thread_id: str,
+    reply_to: str,
+    subject: str,
+    body: str,
+    db=None,
+    in_reply_to: str | None = None,
+    cc: list[str] | None = None,
+) -> bool:
     """
     Send a reply email as the talent.
     Used when an agency reviewer approves a draft.
     """
     service = _gmail_service(token_row, db)
-    mime_msg = MIMEText(body, "plain")
+    mime_msg = MIMEMultipart("alternative")
+    mime_msg.attach(MIMEText(body or "", "plain"))
+    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
     mime_msg["To"] = reply_to
+    if cc:
+        mime_msg["Cc"] = ", ".join(cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to

@@ -121,6 +121,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
     token = _get_token_or_404(db, draft.talent_key)
 
     try:
+        cc = [c.strip() for c in (draft.cc_recipients or "").split(",") if c.strip()]
         success = gmail_svc.send_reply(
             token_row=token,
             thread_id=draft.thread_id or "",
@@ -129,6 +130,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
             body=draft.draft_text,
             db=db,
             in_reply_to=getattr(draft, "message_id_header", None),
+            cc=cc or None,
         )
     except TokenRefreshError:
         token.active = False
@@ -188,6 +190,7 @@ def edit_draft(draft_id: int, body: EditBody, db: Session = Depends(get_db)):
             subject=draft.subject or "",
             body=body.draft_text,
             db=db,
+            cc=[c.strip() for c in (draft.cc_recipients or "").split(",") if c.strip()] or None,
         )
         draft.gmail_draft_id = new_gmail_draft_id
 

@@ -118,6 +118,43 @@ def test_draft_reply_normal(mock_openai_cls):
 
 
 @patch("backend.services.reply.OpenAI")
+def test_draft_reply_no_offer_uses_initial_rule_without_openai(mock_openai_cls):
+    result = draft_reply(
+        talent_key="Sylvia",
+        talent_name="Sylvia",
+        minimum_rate=1000,
+        subject="Partnership inquiry",
+        sender="brand@nike.com",
+        offer_type="Unknown",
+        brand_name="Nike",
+        proposed_rate=0.0,
+        triage_reason="No firm offer shared.",
+    )
+    assert result["is_escalate"] is False
+    assert "However her rates are higher than your offer" not in result["draft_text"]
+    assert "potential partnership" in result["draft_text"]
+    mock_openai_cls.assert_not_called()
+
+
+@patch("backend.services.reply.OpenAI")
+def test_draft_reply_below_minimum_uses_counter_rule_without_openai(mock_openai_cls):
+    result = draft_reply(
+        talent_key="Sylvia",
+        talent_name="Sylvia",
+        minimum_rate=1000,
+        subject="Offer",
+        sender="brand@nike.com",
+        offer_type="Sponsored Post",
+        brand_name="Nike",
+        proposed_rate=250.0,
+        triage_reason="Low offer.",
+    )
+    assert result["is_escalate"] is False
+    assert "However her rates are higher than your offer" in result["draft_text"]
+    mock_openai_cls.assert_not_called()
+
+
+@patch("backend.services.reply.OpenAI")
 def test_draft_reply_gpt_escalates(mock_openai_cls):
     mock_client = MagicMock()
     mock_openai_cls.return_value = mock_client

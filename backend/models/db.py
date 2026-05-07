@@ -122,6 +122,7 @@ class Draft(Base):
     proposed_rate: Mapped[float | None] = mapped_column(Float)
     offer_type: Mapped[str | None] = mapped_column(String(128))
     draft_text: Mapped[str] = mapped_column(Text, nullable=False)
+    cc_recipients: Mapped[str | None] = mapped_column(Text)
     # ID of the draft saved inside the talent's Gmail account (if saved)
     gmail_draft_id: Mapped[str | None] = mapped_column(String(128))
     message_id_header: Mapped[str | None] = mapped_column(String(512))  # for In-Reply-To threading on approve
@@ -268,9 +269,10 @@ def create_tables():
             # Manager context scoping + voice profiles
             "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS talent_key TEXT",
             "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS voice_profile TEXT",
-            # Email threading: store original Message-ID header so approved replies thread correctly
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
-        ]:
+             # Email threading: store original Message-ID header so approved replies thread correctly
+             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
+             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS cc_recipients TEXT",
+         ]:
             try:
                 conn.execute(text(stmt))
                 conn.commit()
