@@ -439,6 +439,8 @@ body {
   font-family: var(--sans); font-size: 12px; font-weight: 600;
   color: var(--text-3); cursor: pointer; transition: var(--r);
 }
+.feed-tab:hover { color: var(--text-2); }
+.feed-tab.active { background: var(--surface-2); color: var(--text); border: 1px solid var(--border-2); }
 
 .email-row {
   padding: 14px 16px; border-bottom: 1px solid var(--border);
@@ -1266,7 +1268,7 @@ function setGmailNav(nav) {
 
 function setScoreFilter(score) {
   state.scoreFilter = score;
-  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-tab, .feed-tab').forEach(b => b.classList.remove('active'));
   const ids = { null: 'tab-all', 3: 'tab-good', 2: 'tab-uncert', 1: 'tab-trash', nodraft: 'tab-nodraft' };
   const el = document.getElementById(ids[score]);
   if (el) el.classList.add('active');
@@ -1293,7 +1295,7 @@ async function openTalentView(talent) {
   });
   const fb = document.getElementById('filter-bar');
   if (fb) fb.style.display = '';
-  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.filter-tab, .feed-tab').forEach(b => b.classList.remove('active'));
   document.getElementById('tab-all').classList.add('active');
 
   showView('gmail');
