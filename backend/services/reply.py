@@ -29,6 +29,10 @@ _INQUIRY_SIGNALS = (
     "would love to work", "open to collab", "open to collaboration",
     "exploring partnership",
 )
+_INQUIRY_EMAIL_SIGNALS = (
+    "what are your rates", "rate card", "media kit", "pricing", "share rates",
+    "send rates", "quote", "budget range", "can you send your rates",
+)
 
 # Maximum characters of the original email body included in the reply prompt.
 # Keeps token usage reasonable while giving GPT enough context for a targeted reply.
@@ -140,6 +144,8 @@ def _deterministic_initial_or_counter_reply(
     minimum_rate: int | float,
     proposed_rate: float,
     triage_reason: str = "",
+    subject: str = "",
+    body_text: str = "",
 ) -> str | None:
     """
     Deterministically choose between the "initial inquiry" and "below minimum" SOP
@@ -170,9 +176,13 @@ def _deterministic_initial_or_counter_reply(
         if "initially offered a rate below" in trigger:
             below_min_reply = response
 
-    # Secondary signal: if triage_reason mentions inquiry/asking keywords, treat as no-offer
+    # Secondary signal: if triage_reason or raw email text indicates a rate inquiry,
+    # treat as no-offer and return the generic rates response.
     reason_lower = triage_reason.lower()
-    is_inquiry = any(kw in reason_lower for kw in _INQUIRY_SIGNALS)
+    raw_text = f"{subject}\n{body_text}".lower()
+    is_inquiry = any(kw in reason_lower for kw in _INQUIRY_SIGNALS) or any(
+        kw in raw_text for kw in _INQUIRY_EMAIL_SIGNALS
+    )
 
     if (proposed_rate <= 0 or is_inquiry) and initial_reply:
         return _redact_pii(initial_reply)
@@ -295,6 +305,8 @@ def draft_reply(
         minimum_rate=minimum_rate,
         proposed_rate=proposed_rate,
         triage_reason=triage_reason,
+        subject=subject,
+        body_text=body_text,
     )
     if deterministic:
         return {
