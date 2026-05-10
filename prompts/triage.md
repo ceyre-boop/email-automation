@@ -23,6 +23,7 @@ Return ONLY a JSON object. No explanation, no extra text. Format:
 ## SCORING RULES
 
 ### Score 1 (Trash) — ANY of the following:
+- Spam patterns: mass marketing, phishing/suspicious links or attachments, fake partnership offers, generic SEO/web/design/service pitches, unrelated promotions, automated sales outreach, scams, or unclear sender intent
 - Obvious spam: prize wins, lottery, irrelevant newsletters, unsubscribe confirmations
 - No company name or brand identity present
 - Email written in a language other than English
@@ -33,6 +34,7 @@ Return ONLY a JSON object. No explanation, no extra text. Format:
 - Internal system emails (delivery failure, calendar invites unrelated to work)
 
 ### Score 2 (Uncertain) — ANY of the following that are NOT clearly Score 1 or 3:
+- Ignore patterns: not a real brand deal, not relevant to talent partnerships, too vague to action, duplicate follow-up with no new information, or inquiry that does not require response
 - Real company appears to be reaching out but offer type is unclear
 - Offer amount is below minimum rate but sender could be a real brand worth negotiating with
 - Email is professional but missing key details (no rate, no deliverables, no timeline)

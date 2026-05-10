@@ -161,6 +161,26 @@ def test_draft_reply_no_offer_uses_initial_rule_without_openai(mock_openai_cls):
 
 
 @patch("backend.services.reply.OpenAI")
+def test_draft_reply_rate_inquiry_subject_body_uses_initial_without_openai(mock_openai_cls):
+    result = draft_reply(
+        talent_key="Sylvia",
+        talent_name="Sylvia",
+        minimum_rate=1000,
+        subject="Can you share your rates and media kit?",
+        sender="brand@nike.com",
+        offer_type="Unknown",
+        brand_name="Nike",
+        proposed_rate=300.0,  # intentionally noisy extraction; email is still just a rate inquiry
+        triage_reason="Partnership inquiry from brand.",
+        body_text="Hi! We'd love to collab. Please send your rates.",
+    )
+    assert result["is_escalate"] is False
+    assert "However her rates are higher than your offer" not in result["draft_text"]
+    assert "potential partnership" in result["draft_text"]
+    mock_openai_cls.assert_not_called()
+
+
+@patch("backend.services.reply.OpenAI")
 def test_draft_reply_below_minimum_uses_counter_rule_without_openai(mock_openai_cls):
     result = draft_reply(
         talent_key="Sylvia",
