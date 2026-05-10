@@ -179,9 +179,10 @@ def _deterministic_initial_or_counter_reply(
     # Secondary signal: if triage_reason or raw email text indicates a rate inquiry,
     # treat as no-offer and return the generic rates response.
     reason_lower = triage_reason.lower()
-    raw_text = f"{subject}\n{body_text}".lower()
+    subject_lower = (subject or "").lower()
+    body_lower = (body_text or "").lower()
     is_inquiry = any(kw in reason_lower for kw in _INQUIRY_SIGNALS) or any(
-        kw in raw_text for kw in _INQUIRY_EMAIL_SIGNALS
+        kw in subject_lower or kw in body_lower for kw in _INQUIRY_EMAIL_SIGNALS
     )
 
     if (proposed_rate <= 0 or is_inquiry) and initial_reply:

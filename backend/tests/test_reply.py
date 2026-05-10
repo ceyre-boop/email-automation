@@ -170,7 +170,7 @@ def test_draft_reply_rate_inquiry_subject_body_uses_initial_without_openai(mock_
         sender="brand@nike.com",
         offer_type="Unknown",
         brand_name="Nike",
-        proposed_rate=300.0,  # bad extraction
+        proposed_rate=300.0,  # intentionally noisy extraction; email is still just a rate inquiry
         triage_reason="Partnership inquiry from brand.",
         body_text="Hi! We'd love to collab. Please send your rates.",
     )
