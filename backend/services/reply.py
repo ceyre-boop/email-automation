@@ -181,8 +181,10 @@ def _deterministic_initial_or_counter_reply(
     reason_lower = triage_reason.lower()
     subject_lower = (subject or "").lower()
     body_lower = (body_text or "").lower()
-    is_inquiry = any(kw in reason_lower for kw in _INQUIRY_SIGNALS) or any(
-        kw in subject_lower or kw in body_lower for kw in _INQUIRY_EMAIL_SIGNALS
+    is_inquiry = (
+        any(kw in reason_lower for kw in _INQUIRY_SIGNALS)
+        or any(kw in subject_lower for kw in _INQUIRY_EMAIL_SIGNALS)
+        or any(kw in body_lower for kw in _INQUIRY_EMAIL_SIGNALS)
     )
 
     if (proposed_rate <= 0 or is_inquiry) and initial_reply:

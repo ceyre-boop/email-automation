@@ -23,7 +23,7 @@ Return ONLY a JSON object. No explanation, no extra text. Format:
 ## SCORING RULES
 
 ### Score 1 (Trash) — ANY of the following:
-- Spam patterns: mass marketing, phishing/suspicious links or attachments, fake partnership offers, generic SEO/web/design/service pitches, unrelated promotions, automated sales outreach, scams or unclear sender intent
+- Spam patterns: mass marketing, phishing/suspicious links or attachments, fake partnership offers, generic SEO/web/design/service pitches, unrelated promotions, automated sales outreach, scams, or unclear sender intent
 - Obvious spam: prize wins, lottery, irrelevant newsletters, unsubscribe confirmations
 - No company name or brand identity present
 - Email written in a language other than English
