@@ -1363,34 +1363,88 @@ def triage_all_unscored(background_tasks: BackgroundTasks, db: Session = Depends
 
 @router.get("/sop-html")
 def get_sop_html():
-    """Parse sheets/sop.docx and return its contents as HTML for the dashboard SOP modal."""
-    import pathlib
-    try:
-        from docx import Document
-    except ImportError:
-        return {"html": "<p><em>python-docx not installed. Run: pip install python-docx</em></p>"}
+    """Build SOP HTML from sop_data.json — no file-parsing dependencies needed."""
+    import html as html_lib
 
-    path = pathlib.Path("sheets/sop.docx")
-    if not path.exists():
-        return {"html": "<p><em>SOP document not found. Run: python -m backend.scripts.generate_sop_docx</em></p>"}
+    def esc(s: str) -> str:
+        return html_lib.escape(str(s or ""))
 
-    doc = Document(path)
-    parts = []
-    for para in doc.paragraphs:
-        style = para.style.name
-        text = para.text
-        if not text.strip():
+    parts: list[str] = []
+
+    # ── Global Rules ─────────────────────────────────────────────────────────
+    parts.append("<h2>Global Rules — Mandatory</h2>")
+    global_rules = [
+        ("1. Follow the SOP explicitly",
+         "Do not deviate from approved responses. Do not rewrite, improve, shorten, expand, or personalize approved responses unless specifically instructed by an admin."),
+        ("2. Talent matching is mandatory",
+         "Each talent has different rates, terms, and response language. Always identify the correct talent before selecting a response. Never use one talent's response for another talent."),
+        ("3. Initial inbound emails only",
+         "Draft responses only for first-time inbound emails or new deal inquiries. If the email is part of an ongoing thread, follow-up, or negotiation — do not draft. Return: Classification: Human Admin Required."),
+        ("4. Default to the Initial Approved Response",
+         "Each talent has a default Initial Approved Response. Use it for all valid inbound opportunities unless the email clearly matches a more specific scenario."),
+        ("5. Err on the side of responding",
+         "Only classify as Spam/Trash if the email is clearly and truly spam. If there is any reasonable chance it is a real brand, agency, PR, event, collab, gifting, or paid inquiry — use the Initial Approved Response. It is better to reply to a questionable email than to miss a real opportunity."),
+        ("6. Spam handling must be conservative",
+         "Do not classify as Spam because an email is vague, low-budget, poorly written, or from an unfamiliar sender. Non-English emails (e.g. Chinese market) are NOT spam. Classify Spam only for: phishing, scams, suspicious links, SEO/web/design pitches, fake invoices, malware, adult/illegal content. Known spam senders: Superordinary, Grail, Nextwave."),
+        ("7. Output must clearly state the action",
+         "Use exactly one of: Approved Response / Human Admin Required / Spam / Ignore"),
+        ("8. Return approved responses verbatim",
+         "Return the exact approved response only. Do not modify, combine, or add commentary."),
+    ]
+    for title, body in global_rules:
+        parts.append(f"<p><strong>{esc(title)}</strong><br>{esc(body)}</p>")
+
+    # ── SOP Status index ──────────────────────────────────────────────────────
+    sop = get_settings().sop_data
+    approved_names = [v.get("full_name", k) for k, v in sop.items() if v.get("sop_status") == "approved"]
+    pending_names  = [v.get("full_name", k) for k, v in sop.items() if v.get("sop_status") != "approved"]
+
+    parts.append("<h2>SOP Status</h2>")
+    parts.append(f"<p><strong>✅ AI will draft ({len(approved_names)}):</strong> {esc(', '.join(approved_names))}</p>")
+    parts.append(f"<p><strong>⏳ Pending — Human Admin Required ({len(pending_names)}):</strong> {esc(', '.join(pending_names))}</p>")
+
+    # ── Per-talent approved SOPs ──────────────────────────────────────────────
+    parts.append("<h2>Talent SOPs</h2>")
+    for talent_key, talent_data in sop.items():
+        status = talent_data.get("sop_status", "pending")
+        full_name = talent_data.get("full_name", talent_key)
+        manager = talent_data.get("manager", "")
+        manager_email = talent_data.get("manager_email", "")
+        mgr_str = f"{manager} ({manager_email})" if manager_email else manager
+        rules = talent_data.get("rules", [])
+
+        if status != "approved":
+            parts.append(f"<h3>{esc(full_name)} <span style='color:#888;font-weight:400;font-size:12px;'>⏳ SOP Pending</span></h3>")
             continue
-        if style == "Heading 1" or style == "Title":
-            parts.append(f"<h2>{text}</h2>")
-        elif style == "Heading 2":
-            parts.append(f"<h3>{text}</h3>")
-        elif style == "Heading 3":
-            parts.append(f"<h4>{text}</h4>")
-        else:
-            inner = "".join(
-                f"<strong>{run.text}</strong>" if run.bold else run.text
-                for run in para.runs
+
+        parts.append(f"<h3>{esc(full_name)}</h3>")
+        parts.append(f"<p style='color:#888;font-size:12px;margin-top:-8px;margin-bottom:12px;'>Manager: {esc(mgr_str)}</p>")
+
+        for rule in rules:
+            scenario = rule.get("scenario", "")
+            label = rule.get("label", "")
+            is_default = rule.get("is_default", False)
+            default_tag = " &nbsp;<span style='background:#1a3a1a;color:#00d68f;font-size:10px;padding:2px 6px;border-radius:4px;'>DEFAULT</span>" if is_default else ""
+            parts.append(f"<h4>Scenario {esc(scenario)}: {esc(label)}{default_tag}</h4>")
+
+            use_when = rule.get("use_when", [])
+            if use_when:
+                parts.append(f"<p><strong>Use when:</strong> {esc(' · '.join(use_when))}</p>")
+
+            do_not = rule.get("do_not_use_when", [])
+            if do_not:
+                parts.append(f"<p><strong>Do not use when:</strong> {esc(' · '.join(do_not))}</p>")
+
+            cc = rule.get("cc")
+            if cc:
+                parts.append(f"<p><strong>CC:</strong> {esc(cc)}</p>")
+
+            response = rule.get("response", "")
+            response_html = esc(response).replace("\n", "<br>")
+            parts.append(
+                f"<div style='background:#0d1a0d;border:1px solid #1a3a1a;border-radius:8px;"
+                f"padding:12px 14px;margin:8px 0 16px;font-size:12px;line-height:1.7;'>"
+                f"{response_html}</div>"
             )
-            parts.append(f"<p>{inner}</p>")
+
     return {"html": "\n".join(parts)}
