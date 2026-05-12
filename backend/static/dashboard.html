@@ -1548,11 +1548,7 @@ if (_gmailSearch) _gmailSearch.addEventListener('input', e => {
 
 // ── Open real Gmail ────────────────────────────────────────────────────────
 function openRealGmail(talent) {
-  const t = talent || state.selectedTalent;
-  const email = t?.email || t?.inbox_email;
-  window.open(email
-    ? `https://mail.google.com/mail/u/${encodeURIComponent(email)}/#inbox`
-    : 'https://mail.google.com/', '_blank');
+  window.open('https://mail.google.com/', '_blank');
 }
 
 // ── Run AI Draft ───────────────────────────────────────────────────────────
