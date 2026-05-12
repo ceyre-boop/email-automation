@@ -1539,7 +1539,8 @@ async function discardDraft(draftId) {
 }
 
 // ── Search ─────────────────────────────────────────────────────────────────
-document.getElementById('gmail-search').addEventListener('input', e => {
+const _gmailSearch = document.getElementById('gmail-search');
+if (_gmailSearch) _gmailSearch.addEventListener('input', e => {
   const q = e.target.value.toLowerCase().trim();
   document.querySelectorAll('.email-row').forEach(row =>
     row.style.display = (!q || row.textContent.toLowerCase().includes(q)) ? '' : 'none');
