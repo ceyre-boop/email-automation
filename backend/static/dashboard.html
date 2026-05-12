@@ -864,7 +864,8 @@ function _handleThemeToggle() {
 }
 
 document.getElementById('sidebar-theme-toggle').addEventListener('click', _handleThemeToggle);
-document.getElementById('topbar-theme-toggle').addEventListener('click', _handleThemeToggle);
+const _topbarThemeToggle = document.getElementById('topbar-theme-toggle');
+if (_topbarThemeToggle) _topbarThemeToggle.addEventListener('click', _handleThemeToggle);
 
 // ── API ────────────────────────────────────────────────────────────────────
 async function api(method, path, body = null) {
@@ -1160,7 +1161,8 @@ document.getElementById('btn-refresh').addEventListener('click', async () => {
   else await loadOverview();
   showToast('Refreshed.');
 });
-document.getElementById('gmail-back').addEventListener('click', async () => {
+const _gmailBack = document.getElementById('gmail-back');
+if (_gmailBack) _gmailBack.addEventListener('click', async () => {
   state.selectedTalent = null;
   currentTalentKey = null;
   await loadOverview();
@@ -1193,32 +1195,8 @@ function setScoreFilter(score) {
 
 // ── Talent view ────────────────────────────────────────────────────────────
 async function openTalentView(talent) {
-  state.selectedTalent = talent;
-  currentTalentKey = talent.key;
-  state.selectedEmail = null;
-  state.selectedDraft = null;
-  state.gmailNav = 'inbox';
-  state.scoreFilter = null;
-
-  document.getElementById('gmail-avatar').textContent = initial(talent.full_name);
-  document.getElementById('gmail-talent-label').textContent = talent.email || talent.full_name;
-  document.getElementById('gmail-search').value = '';
-  resetReadingPane();
-
-  ['inbox','drafts'].forEach(n => {
-    const el = document.getElementById('gnav-' + n);
-    if (el) el.classList.toggle('active', n === 'inbox');
-  });
-  const fb = document.getElementById('filter-bar');
-  if (fb) fb.style.display = '';
-  document.querySelectorAll('.filter-tab').forEach(b => b.classList.remove('active'));
-  document.getElementById('tab-all').classList.add('active');
-
-  showView('gmail');
-  document.querySelectorAll('.talent-item').forEach(el =>
-    el.classList.toggle('active', el.dataset.key === talent.key));
-
-  await loadTalentData(talent);
+  // Gmail portal removed — open Gmail directly instead
+  openRealGmail(talent);
 }
 
 async function loadTalentData(talent, silent = false) {
