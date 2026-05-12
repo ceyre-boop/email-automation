@@ -131,6 +131,17 @@ def main() -> None:
     title = doc.add_heading("TABOOST — Talent Inbox SOP", level=0)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
+    # ── SOP Status Index ──
+    doc.add_heading("SOP STATUS — WHO IS READY", level=1)
+    approved = [k for k, v in sop_data.items() if v.get("sop_status") == "approved"]
+    pending  = [k for k, v in sop_data.items() if v.get("sop_status") != "approved"]
+    p = doc.add_paragraph()
+    p.add_run("✅ APPROVED (AI may draft): ").bold = True
+    p.add_run(", ".join(v.get("full_name", k) for k, v in sop_data.items() if k in approved))
+    p2 = doc.add_paragraph()
+    p2.add_run("⏳ PENDING (AI will NOT draft — Human Admin Required): ").bold = True
+    p2.add_run(", ".join(v.get("full_name", k) for k, v in sop_data.items() if k in pending))
+
     # ── Global Rules ──
     doc.add_heading("GLOBAL RULES — MANDATORY", level=1)
     for i, rule in enumerate(GLOBAL_RULES, 1):
@@ -148,25 +159,63 @@ def main() -> None:
     for talent_key, talent_data in sop_data.items():
         full_name = talent_data.get("full_name", talent_key)
         manager = talent_data.get("manager", "")
+        manager_email = talent_data.get("manager_email", "")
         min_rate = talent_data.get("min_rate_usd", 0)
         rate_unit = talent_data.get("rate_unit", "per video")
         rules = talent_data.get("rules", [])
+        status = talent_data.get("sop_status", "pending")
 
         doc.add_heading(full_name.upper(), level=1)
 
-        # Talent metadata paragraph
-        meta = doc.add_paragraph()
-        meta.add_run(f"Manager: {manager}  |  Minimum Rate: ${min_rate} {rate_unit}")
+        # Status banner
+        status_p = doc.add_paragraph()
+        if status == "approved":
+            status_p.add_run("✅ SOP APPROVED — AI may draft for this talent").bold = True
+        else:
+            status_p.add_run("⏳ SOP PENDING — AI will NOT draft. All emails routed to Human Admin Required.").bold = True
 
+        # Talent metadata
+        meta = doc.add_paragraph()
+        mgr_str = f"{manager} ({manager_email})" if manager_email else manager
+        meta.add_run(f"Manager: {mgr_str}  |  Minimum Rate: ${min_rate} {rate_unit}")
+
+        if status != "approved":
+            doc.add_paragraph("(Add approved scenarios below when ready.)")
+            continue
+
+        # ── New scenario format ──
+        if rules and "scenario" in rules[0]:
+            for rule in rules:
+                scenario = rule.get("scenario", "")
+                label = rule.get("label", "")
+                is_default = rule.get("is_default", False)
+                default_tag = " — DEFAULT RESPONSE" if is_default else ""
+                doc.add_heading(f"Scenario {scenario}: {label}{default_tag}", level=2)
+
+                _add_bold_label(doc, "Use when:")
+                for uw in rule.get("use_when", []):
+                    doc.add_paragraph(f"• {uw}")
+
+                _add_bold_label(doc, "Do not use when:")
+                for dnuw in rule.get("do_not_use_when", []):
+                    doc.add_paragraph(f"• {dnuw}")
+
+                cc = rule.get("cc")
+                if cc:
+                    _add_bold_label(doc, f"CC: {cc}")
+
+                _add_bold_label(doc, "Approved Response:")
+                _add_response_paragraphs(doc, rule.get("response", ""))
+            continue
+
+        # ── Legacy format fallback ──
         scenario_num = 0
         for idx, rule in enumerate(rules):
             trigger = rule.get("trigger", "").replace("\r\n", "\n").strip()
             response = rule.get("response", "").replace("\r\n", "\n").strip()
 
-            # Skip pure action rules — they have no email text to send
             if _is_action_rule(response):
                 continue
-            # Skip header-only rows (e.g. "SYLVIA\nManager: Cara")
             if len(response) < 20 and "manager:" in response.lower():
                 continue
 

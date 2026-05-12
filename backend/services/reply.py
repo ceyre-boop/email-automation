@@ -113,30 +113,63 @@ def _redact_pii(text: str) -> str:
 
 
 def _build_sop_rules_text(talent_key: str) -> str:
-    """Return a formatted string of the talent's SOP rules from sop_data.json."""
+    """Return a formatted string of the talent's SOP rules for the GPT prompt."""
     sop = get_settings().sop_data
-    # SOP data is keyed by the config key (title-case, e.g. "Katrina") but talent_key
-    # from the DB is often stored lowercase — do a case-insensitive lookup.
     sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
     talent_data = sop.get(sop_key, {}) if sop_key else {}
     rules = talent_data.get("rules", [])
     if not rules:
         return "No SOP rules found for this talent."
-    # Action-only keywords — these are internal routing instructions, not email templates.
-    # Sending them to GPT causes false ESCALATEs because GPT can't match "Move to folder".
-    _ACTION_KEYWORDS = ("move to", "cc ", "delete", "ask for consult", "tagged email", "marked a initial")
     lines = []
     for rule in rules:
-        trigger = rule.get("trigger", "").replace("\r\n", "\n").strip()
-        response = rule.get("response", "").replace("\r\n", "\n").strip()
-        # Skip pure action rules — they have no email text to send
-        if any(response.lower().startswith(kw) for kw in _ACTION_KEYWORDS):
-            continue
-        if any(kw in response.lower() for kw in ("move to ", "cc cara", "cc chenni", "cc nicole", "move it to")):
-            continue
-        response = _redact_pii(response)
-        lines.append(f"TRIGGER: {trigger}\nRESPONSE: {response}")
+        # New format: scenario-based with explicit fields
+        if "scenario" in rule:
+            scenario = rule.get("scenario", "")
+            label = rule.get("label", "")
+            trigger = rule.get("trigger", "").strip()
+            response = rule.get("response", "").strip()
+            cc = rule.get("cc")
+            is_default = rule.get("is_default", False)
+            if not response:
+                continue
+            response = _redact_pii(response)
+            cc_note = f"\nCC: {cc}" if cc else ""
+            default_note = " [DEFAULT — use when no other scenario matches]" if is_default else ""
+            lines.append(f"SCENARIO {scenario}{default_note}: {label}\nTRIGGER: {trigger}\nRESPONSE: {response}{cc_note}")
+        else:
+            # Legacy format: plain trigger/response pairs
+            trigger = rule.get("trigger", "").replace("\r\n", "\n").strip()
+            response = rule.get("response", "").replace("\r\n", "\n").strip()
+            _ACTION_KEYWORDS = ("move to", "cc ", "delete", "ask for consult", "tagged email", "marked a initial")
+            if any(response.lower().startswith(kw) for kw in _ACTION_KEYWORDS):
+                continue
+            if any(kw in response.lower() for kw in ("move to ", "cc cara", "cc chenni", "cc nicole", "move it to")):
+                continue
+            response = _redact_pii(response)
+            lines.append(f"TRIGGER: {trigger}\nRESPONSE: {response}")
     return "\n\n".join(lines) if lines else "No email-reply rules found — ESCALATE all."
+
+
+def _get_cc_for_reply(talent_key: str, proposed_rate: float) -> str | None:
+    """Return a CC email address if the matched SOP scenario requires one."""
+    sop = get_settings().sop_data
+    sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
+    if not sop_key:
+        return None
+    rules = sop.get(sop_key, {}).get("rules", [])
+    for rule in rules:
+        if "scenario" not in rule or not rule.get("cc"):
+            continue
+        # Scenario C fires when proposed_rate > 1500 for Sylvia
+        trigger = rule.get("trigger", "").lower()
+        if "over" in trigger and proposed_rate > 0:
+            try:
+                threshold = float(''.join(c for c in trigger.split("over")[1][:10] if c.isdigit()))
+                if proposed_rate > threshold:
+                    return rule["cc"]
+            except (ValueError, IndexError):
+                pass
+    return None
 
 
 def _deterministic_initial_or_counter_reply(
@@ -171,7 +204,10 @@ def _deterministic_initial_or_counter_reply(
         response = str(rule.get("response", "") or "").strip()
         if not response:
             continue
-        if "asking for rates" in trigger or "potential to collab" in trigger:
+        # New format: use is_default flag for the initial/default response
+        if rule.get("is_default"):
+            initial_reply = response
+        elif "asking for rates" in trigger or "potential to collab" in trigger:
             initial_reply = response
         if "initially offered a rate below" in trigger:
             below_min_reply = response
@@ -300,6 +336,19 @@ def draft_reply(
     if not settings.app_config.get("ai_enabled", True):
         raise RuntimeError("AI is disabled (ai_enabled=false in settings.json) — reply drafting skipped")
     cfg = settings.app_config.get("openai", {})
+
+    # ── SOP status gate — never draft for a talent without an approved SOP ──────
+    # This is a hard block. Mixing up talent responses is a business-critical error.
+    sop = settings.sop_data
+    sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
+    sop_status = sop.get(sop_key, {}).get("sop_status", "pending") if sop_key else "pending"
+    if sop_status != "approved":
+        logger.warning("SOP not approved for %s — routing to Human Admin Required", talent_key)
+        return {
+            "draft_text": "ESCALATE: SOP not yet approved for this talent — human admin required.",
+            "is_escalate": True,
+            "escalate_reason": f"SOP pending for {talent_key}. No approved responses loaded yet.",
+        }
 
     voice_profile, manager_context_text = _load_talent_context(db, talent_key)
 
