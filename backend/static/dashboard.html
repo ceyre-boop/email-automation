@@ -758,112 +758,38 @@ body {
         <div id="talent-cards-grid"></div>
       </div>
       <div>
-        <div class="section-head">Global AI Instructions</div>
+        <div class="section-head">Standard Operating Procedures</div>
         <div class="ctx-panel">
-          <div id="context-list"></div>
-          <div class="ctx-add-area">
-            <textarea id="context-input" class="ctx-textarea" rows="3" placeholder="Update AI strategy — e.g. always reply within 24h, push for exclusivity..."></textarea>
-            <button class="btn btn-primary" id="btn-add-context" style="width:100%; margin-top:10px; justify-content:center;">Save Instruction</button>
+          <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; margin-bottom:10px;">📄 Open SOP Document</button>
+          <div style="font-size:12px; color:var(--text-2); line-height:1.5;">
+            The SOP document defines approved responses for every talent and scenario.
+            The AI reads this document to draft replies — it is the single source of truth.
           </div>
         </div>
       </div>
     </div>
   </div>
 
-  <!-- ── Gmail view ────────────────────────────────────────────────────── -->
-  <div id="view-gmail" style="display:none; flex-direction:column;">
-
-    <header class="gmail-topbar">
-      <button class="back-btn" id="gmail-back">
-        <svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
-        Hub
-      </button>
-      <div class="gmail-talent-id">
-        <div class="gmail-av" id="gmail-avatar">—</div>
-        <span id="gmail-talent-label">—</span>
-      </div>
-      <input type="text" class="topbar-search" id="gmail-search" placeholder="Search emails...">
-      <div class="topbar-actions">
-        <button class="btn btn-ghost" id="topbar-theme-toggle" title="Toggle light/dark mode"><span class="theme-icon" id="topbar-theme-icon">☀️</span></button>
-        <button class="btn btn-ghost" onclick="openRealGmail()">Open Gmail ↗</button>
-        <button class="btn btn-ghost" onclick="openSettings()" title="AI Settings for this talent">⚙ AI Settings</button>
-        <button class="btn btn-primary" id="btn-run-ai" onclick="runAiDraft()">✦ Run AI Draft</button>
-      </div>
-    </header>
-
-    <div class="gmail-split">
-
-      <!-- Narrow nav: Inbox + Drafts only -->
-      <nav class="gmail-nav">
-        <div class="gnav-btn active" id="gnav-inbox" onclick="setGmailNav('inbox')">
-          <span class="gnav-icon">📥</span>
-          <span>Inbox</span>
-        </div>
-        <div class="gnav-btn" id="gnav-drafts" onclick="setGmailNav('drafts')">
-          <span class="gnav-icon">✏️</span>
-          <span>Drafts</span>
-        </div>
-      </nav>
-
-      <!-- Email list -->
-      <div class="email-col">
-        <div class="email-col-header" id="filter-bar">
-          <button class="filter-tab active" id="tab-all" onclick="setScoreFilter(null)">All</button>
-          <div class="feed-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</div>
-          <div class="feed-tab" id="tab-uncert" onclick="setScoreFilter(2)">Review</div>
-          <div class="feed-tab" id="tab-trash" onclick="setScoreFilter(1)">Trash</div>
-          <div class="feed-tab" id="tab-nodraft" onclick="setScoreFilter('nodraft')" title="Emails the AI skipped — audit for missed opportunities.">No Draft</div>
-        </div>
-        <div id="email-rows" style="flex:1; overflow-y:auto; min-height: 0;"></div>
-      </div>
-
-      <!-- Reading pane -->
-      <div class="reader-pane" id="gmail-reading-pane">
-        <div class="reading-placeholder">
-          <div class="rp-icon">📂</div>
-          <div class="rp-text">Select an email to read it</div>
-        </div>
-      </div>
-
-    </div>
-  </div>
-
 </main>
 
-<!-- Settings drawer -->
-<div id="settings-overlay" onclick="closeSettings()"></div>
-<div id="settings-drawer">
-  <div class="drawer-head">
-    <div>
-      <div class="drawer-title" id="drawer-talent-name">AI Settings</div>
-      <div class="drawer-sub">Controls how GPT writes replies for this talent</div>
+<!-- SOP Modal -->
+<div id="sop-modal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center;">
+  <div id="sop-modal-overlay" onclick="closeSopModal()"
+       style="position:absolute; inset:0; background:rgba(0,0,0,0.75);"></div>
+  <div id="sop-modal-content" style="
+    position:relative; z-index:1;
+    background:var(--surface); border:1px solid var(--border-2);
+    border-radius:14px; width:min(860px,94vw); max-height:88vh;
+    display:flex; flex-direction:column; overflow:hidden;
+    box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+    <div style="display:flex; align-items:center; justify-content:space-between;
+                padding:18px 22px; border-bottom:1px solid var(--border); flex-shrink:0;">
+      <span style="font-size:15px; font-weight:700; color:var(--text);">📄 Standard Operating Procedures</span>
+      <button onclick="closeSopModal()" style="background:none; border:none; color:var(--text-2);
+              font-size:22px; cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
     </div>
-    <button class="drawer-close" onclick="closeSettings()">×</button>
-  </div>
-  <div class="drawer-body">
-
-    <div>
-      <div class="drawer-section-label">Voice & Tone</div>
-      <div class="drawer-hint">Describe how GPT should sound when writing for this talent. Examples: "Enthusiastic, uses exclamation points, always mentions her GMV stats" or "Professional but warm, keep it short, push for the higher rate confidently."</div>
-      <textarea class="drawer-textarea" id="drawer-voice" rows="4" placeholder="e.g. Friendly and direct. Always reference her conversion rate. End with an open question."></textarea>
-    </div>
-
-    <div>
-      <div class="drawer-section-label">Manager Instructions</div>
-      <div class="drawer-hint">Override or add rules on top of the SOP. GPT treats these as highest priority. Examples: "Never accept under $400. Always mention the bundle discount. CC Cara on anything over $600."</div>
-      <textarea class="drawer-textarea" id="drawer-instructions" rows="4" placeholder="e.g. If a brand mentions TikTok Shop, always ask about commission structure before agreeing."></textarea>
-    </div>
-
-    <div>
-      <div class="drawer-section-label">SOP Rules (read-only — from Excel)</div>
-      <div class="drawer-hint">These trigger/response rules are loaded from the SOP spreadsheet and fed to GPT on every draft.</div>
-      <div id="drawer-sop-rules"></div>
-    </div>
-
-  </div>
-  <div class="drawer-footer">
-    <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
-    <button class="btn btn-primary" id="drawer-save-btn" onclick="saveSettings()">Save & Apply</button>
+    <div id="sop-modal-body" style="overflow-y:auto; padding:24px 28px; color:var(--text);
+         font-size:13px; line-height:1.7;">Loading…</div>
   </div>
 </div>
 
@@ -1088,32 +1014,50 @@ async function bootstrap() {
 // ── Overview ───────────────────────────────────────────────────────────────
 async function loadOverview() {
   try {
-    const [report, talents, context] = await Promise.all([
+    const [report, talents] = await Promise.all([
       api('GET', '/api/dashboard/report'),
       api('GET', '/api/dashboard/talents'),
-      api('GET', '/api/dashboard/context'),
     ]);
     state.report = report;
     state.talents = talents;
-    state.context = context;
     renderSidebar();
     renderSummaryBar();
     renderTalentCards();
-    renderContextPanel();
-    showView('overview'); // only called when explicitly navigating to overview
+    showView('overview');
   } catch (_) {}
 }
 
 function showView(name) {
   state.view = name;
   document.getElementById('view-overview').style.display = name === 'overview' ? '' : 'none';
-  const gv = document.getElementById('view-gmail');
-  gv.style.display = name === 'gmail' ? 'flex' : 'none';
   document.getElementById('nav-overview').classList.toggle('active', name === 'overview');
-  document.querySelectorAll('.talent-item').forEach(el =>
-    el.classList.toggle('active', el.dataset.key === state.selectedTalent?.key && name === 'gmail'));
   autoTheme(name);
 }
+
+// ── SOP Modal ──────────────────────────────────────────────────────────────
+let _sopLoaded = false;
+async function openSopModal() {
+  const modal = document.getElementById('sop-modal');
+  modal.style.display = 'flex';
+  if (_sopLoaded) return;
+  try {
+    const r = await api('GET', '/api/dashboard/sop-html');
+    const body = document.getElementById('sop-modal-body');
+    body.innerHTML = r.html || '<p><em>No SOP content found.</em></p>';
+    // Style headings inside modal to match dark theme
+    body.querySelectorAll('h2').forEach(h => Object.assign(h.style, {fontSize:'16px', fontWeight:'700', color:'var(--text)', marginTop:'24px', marginBottom:'6px', borderBottom:'1px solid var(--border)', paddingBottom:'6px'}));
+    body.querySelectorAll('h3').forEach(h => Object.assign(h.style, {fontSize:'13px', fontWeight:'700', color:'var(--red)', marginTop:'18px', marginBottom:'4px'}));
+    body.querySelectorAll('h4').forEach(h => Object.assign(h.style, {fontSize:'12px', fontWeight:'600', color:'var(--text-2)', marginTop:'10px'}));
+    body.querySelectorAll('p').forEach(p => Object.assign(p.style, {marginBottom:'4px', color:'var(--text)'}));
+    _sopLoaded = true;
+  } catch (e) {
+    document.getElementById('sop-modal-body').innerHTML = '<p><em>Could not load SOP document.</em></p>';
+  }
+}
+function closeSopModal() {
+  document.getElementById('sop-modal').style.display = 'none';
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
 function renderSidebar() {
@@ -1132,7 +1076,7 @@ function renderSidebar() {
       ${pending > 0 ? `<span class="t-badge">${pending}</span>` : ''}
       <div class="t-dot ${t.connected ? 'online' : 'offline'}"></div>
     `;
-    li.addEventListener('click', () => openTalentView(t));
+    li.addEventListener('click', () => openRealGmail(t));
     ul.appendChild(li);
   });
 }
@@ -1176,7 +1120,7 @@ function renderTalentCards() {
       <div class="tc-deal">Top: ${bestDeal}</div>
     `;
     const talentObj = state.talents.find(t => t.key === card.talent_key);
-    div.addEventListener('click', () => { if (talentObj) openTalentView(talentObj); });
+    div.addEventListener('click', () => { if (talentObj) openRealGmail(talentObj); });
     grid.appendChild(div);
   });
 }
@@ -1204,32 +1148,6 @@ function renderContextPanel() {
   });
 }
 
-document.getElementById('btn-add-context').addEventListener('click', addContext);
-document.getElementById('context-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter' && e.metaKey) addContext();
-});
-
-async function addContext() {
-  const input = document.getElementById('context-input');
-  const text = input.value.trim();
-  if (!text) return;
-  try {
-    await api('POST', '/api/dashboard/context', { text, added_by: 'manager' });
-    input.value = '';
-    state.context = await api('GET', '/api/dashboard/context');
-    renderContextPanel();
-    showToast('Instruction saved — takes effect on next poll.');
-  } catch (_) {}
-}
-
-async function removeContext(id) {
-  try {
-    await api('DELETE', `/api/dashboard/context/${id}`);
-    state.context = await api('GET', '/api/dashboard/context');
-    renderContextPanel();
-    showToast('Instruction removed.');
-  } catch (_) {}
-}
 
 // ── Nav buttons ────────────────────────────────────────────────────────────
 document.getElementById('nav-overview').addEventListener('click', async () => {
@@ -1650,8 +1568,9 @@ document.getElementById('gmail-search').addEventListener('input', e => {
 });
 
 // ── Open real Gmail ────────────────────────────────────────────────────────
-function openRealGmail() {
-  const email = state.selectedTalent?.email || state.selectedTalent?.inbox_email;
+function openRealGmail(talent) {
+  const t = talent || state.selectedTalent;
+  const email = t?.email || t?.inbox_email;
   window.open(email
     ? `https://mail.google.com/mail/u/${encodeURIComponent(email)}/#inbox`
     : 'https://mail.google.com/', '_blank');

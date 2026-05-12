@@ -1,0 +1,98 @@
+<!-- ARCHIVED: Gmail portal UI — removed in Phase 2 rebuild. Restore here to re-enable. -->
+
+<!-- ===== #view-gmail (original lines 773-829) ===== -->
+  <!-- ── Gmail view ────────────────────────────────────────────────────── -->
+  <div id="view-gmail" style="display:none; flex-direction:column;">
+
+    <header class="gmail-topbar">
+      <button class="back-btn" id="gmail-back">
+        <svg viewBox="0 0 16 16"><path d="M10 3L5 8l5 5" stroke="currentColor" stroke-width="1.5" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Hub
+      </button>
+      <div class="gmail-talent-id">
+        <div class="gmail-av" id="gmail-avatar">—</div>
+        <span id="gmail-talent-label">—</span>
+      </div>
+      <input type="text" class="topbar-search" id="gmail-search" placeholder="Search emails...">
+      <div class="topbar-actions">
+        <button class="btn btn-ghost" id="topbar-theme-toggle" title="Toggle light/dark mode"><span class="theme-icon" id="topbar-theme-icon">☀️</span></button>
+        <button class="btn btn-ghost" onclick="openRealGmail()">Open Gmail ↗</button>
+        <button class="btn btn-ghost" onclick="openSettings()" title="AI Settings for this talent">⚙ AI Settings</button>
+        <button class="btn btn-primary" id="btn-run-ai" onclick="runAiDraft()">✦ Run AI Draft</button>
+      </div>
+    </header>
+
+    <div class="gmail-split">
+
+      <!-- Narrow nav: Inbox + Drafts only -->
+      <nav class="gmail-nav">
+        <div class="gnav-btn active" id="gnav-inbox" onclick="setGmailNav('inbox')">
+          <span class="gnav-icon">📥</span>
+          <span>Inbox</span>
+        </div>
+        <div class="gnav-btn" id="gnav-drafts" onclick="setGmailNav('drafts')">
+          <span class="gnav-icon">✏️</span>
+          <span>Drafts</span>
+        </div>
+      </nav>
+
+      <!-- Email list -->
+      <div class="email-col">
+        <div class="email-col-header" id="filter-bar">
+          <button class="filter-tab active" id="tab-all" onclick="setScoreFilter(null)">All</button>
+          <div class="feed-tab" id="tab-good" onclick="setScoreFilter(3)">Deals</div>
+          <div class="feed-tab" id="tab-uncert" onclick="setScoreFilter(2)">Review</div>
+          <div class="feed-tab" id="tab-trash" onclick="setScoreFilter(1)">Trash</div>
+          <div class="feed-tab" id="tab-nodraft" onclick="setScoreFilter('nodraft')" title="Emails the AI skipped — audit for missed opportunities.">No Draft</div>
+        </div>
+        <div id="email-rows" style="flex:1; overflow-y:auto; min-height: 0;"></div>
+      </div>
+
+      <!-- Reading pane -->
+      <div class="reader-pane" id="gmail-reading-pane">
+        <div class="reading-placeholder">
+          <div class="rp-icon">📂</div>
+          <div class="rp-text">Select an email to read it</div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+<!-- ===== Settings drawer (original lines 833-868) ===== -->
+<!-- Settings drawer -->
+<div id="settings-overlay" onclick="closeSettings()"></div>
+<div id="settings-drawer">
+  <div class="drawer-head">
+    <div>
+      <div class="drawer-title" id="drawer-talent-name">AI Settings</div>
+      <div class="drawer-sub">Controls how GPT writes replies for this talent</div>
+    </div>
+    <button class="drawer-close" onclick="closeSettings()">×</button>
+  </div>
+  <div class="drawer-body">
+
+    <div>
+      <div class="drawer-section-label">Voice & Tone</div>
+      <div class="drawer-hint">Describe how GPT should sound when writing for this talent. Examples: "Enthusiastic, uses exclamation points, always mentions her GMV stats" or "Professional but warm, keep it short, push for the higher rate confidently."</div>
+      <textarea class="drawer-textarea" id="drawer-voice" rows="4" placeholder="e.g. Friendly and direct. Always reference her conversion rate. End with an open question."></textarea>
+    </div>
+
+    <div>
+      <div class="drawer-section-label">Manager Instructions</div>
+      <div class="drawer-hint">Override or add rules on top of the SOP. GPT treats these as highest priority. Examples: "Never accept under $400. Always mention the bundle discount. CC Cara on anything over $600."</div>
+      <textarea class="drawer-textarea" id="drawer-instructions" rows="4" placeholder="e.g. If a brand mentions TikTok Shop, always ask about commission structure before agreeing."></textarea>
+    </div>
+
+    <div>
+      <div class="drawer-section-label">SOP Rules (read-only — from Excel)</div>
+      <div class="drawer-hint">These trigger/response rules are loaded from the SOP spreadsheet and fed to GPT on every draft.</div>
+      <div id="drawer-sop-rules"></div>
+    </div>
+
+  </div>
+  <div class="drawer-footer">
+    <button class="btn btn-ghost" onclick="closeSettings()">Cancel</button>
+    <button class="btn btn-primary" id="drawer-save-btn" onclick="saveSettings()">Save & Apply</button>
+  </div>
+</div>

@@ -243,6 +243,18 @@
       "_note": "Hourly rate model — activate in batch_4_special after all standard inboxes are stable."
     },
     {
+      "key": "Skyler",
+      "full_name": "Skyler Clark",
+      "gmail_connection_name": "Gmail - Skyler",
+      "sop_tab_name": "Skyler",
+      "manager": "TBD",
+      "category": "TBD",
+      "minimum_rate_usd": 0,
+      "rate_unit": "per video",
+      "paused": true,
+      "_note": "New talent — paused until SOP entry is populated and Gmail connected."
+    },
+    {
       "key": "colineyre222",
       "full_name": "Colin Eyre",
       "inbox_email": "colineyre222@gmail.com",

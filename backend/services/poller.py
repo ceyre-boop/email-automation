@@ -382,14 +382,14 @@ def _process_one_message(
         thread_manually_handled = gmail_svc.thread_has_prior_sent_reply(service, thread_id)
 
         if existing_thread_activity or existing_thread_draft or thread_manually_handled:
-            reason = "Ongoing thread already has active deal context — routed to manual review."
+            reason = "Ongoing thread — prior sent activity detected. Human review required."
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
-                2, "", 0.0, "Ongoing Thread", reason, EmailStatus.flagged,
+                2, "", 0.0, "Human Admin Required", reason, EmailStatus.flagged,
                 body_text=body, email_date=email_date,
             )
             db.commit()
-            _safe_log_sheet(talent_key, sender, subject, 2, "", 0.0, "Ongoing Thread", "flagged", reason)
+            _safe_log_sheet(talent_key, sender, subject, 2, "", 0.0, "Human Admin Required", "flagged", reason)
             summary["flagged"] += 1
             summary["processed"] += 1
             return

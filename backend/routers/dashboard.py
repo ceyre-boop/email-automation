@@ -1359,3 +1359,38 @@ def triage_all_unscored(background_tasks: BackgroundTasks, db: Session = Depends
     for key in keys:
         background_tasks.add_task(_run_triage_unscored, key)
     return {"ok": True, "talents": keys, "message": f"Triage started for {len(keys)} talent(s)"}
+
+
+@router.get("/sop-html")
+def get_sop_html():
+    """Parse sheets/sop.docx and return its contents as HTML for the dashboard SOP modal."""
+    import pathlib
+    try:
+        from docx import Document
+    except ImportError:
+        return {"html": "<p><em>python-docx not installed. Run: pip install python-docx</em></p>"}
+
+    path = pathlib.Path("sheets/sop.docx")
+    if not path.exists():
+        return {"html": "<p><em>SOP document not found. Run: python -m backend.scripts.generate_sop_docx</em></p>"}
+
+    doc = Document(path)
+    parts = []
+    for para in doc.paragraphs:
+        style = para.style.name
+        text = para.text
+        if not text.strip():
+            continue
+        if style == "Heading 1" or style == "Title":
+            parts.append(f"<h2>{text}</h2>")
+        elif style == "Heading 2":
+            parts.append(f"<h3>{text}</h3>")
+        elif style == "Heading 3":
+            parts.append(f"<h4>{text}</h4>")
+        else:
+            inner = "".join(
+                f"<strong>{run.text}</strong>" if run.bold else run.text
+                for run in para.runs
+            )
+            parts.append(f"<p>{inner}</p>")
+    return {"html": "\n".join(parts)}

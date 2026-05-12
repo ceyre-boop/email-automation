@@ -26,15 +26,15 @@ Return ONLY a JSON object. No explanation, no extra text. Format:
 - Spam patterns: mass marketing, phishing/suspicious links or attachments, fake partnership offers, generic SEO/web/design/service pitches, unrelated promotions, automated sales outreach, scams, or unclear sender intent
 - Obvious spam: prize wins, lottery, irrelevant newsletters, unsubscribe confirmations
 - No company name or brand identity present
-- Email written in a language other than English
 - Offer amount is mentioned AND is below the talent's minimum rate (provided below) AND the sender is not a recognizable major brand
-- Clear grammar/spelling quality indicating bot or scam
+- Clear phishing or scam indicators: fake prize notifications, lottery wins, impersonation, suspicious external links with no brand identity, adult/illegal content, malware
 - Sender domain is a free personal email (gmail.com, yahoo.com, hotmail.com, outlook.com) with no company name in the email body
 - Auto-reply or out-of-office notifications
 - Internal system emails (delivery failure, calendar invites unrelated to work)
 
 ### Score 2 (Uncertain) — ANY of the following that are NOT clearly Score 1 or 3:
 - Ignore patterns: not a real brand deal, not relevant to talent partnerships, too vague to action, duplicate follow-up with no new information, or inquiry that does not require response
+- Email is in a non-English language but references a recognizable brand, product, or TikTok/Instagram collaboration context — likely a legitimate Chinese market partnership email; do NOT score as 1
 - Real company appears to be reaching out but offer type is unclear
 - Offer amount is below minimum rate but sender could be a real brand worth negotiating with
 - Email is professional but missing key details (no rate, no deliverables, no timeline)
