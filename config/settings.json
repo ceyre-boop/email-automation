@@ -112,8 +112,7 @@
       "manager": "Chenni",
       "category": "Home/Living",
       "minimum_rate_usd": 900,
-      "rate_unit": "per video",
-      "paused": true
+      "rate_unit": "per video"
     },
     {
       "key": "Allee",
@@ -217,17 +216,6 @@
       "category": "Fashion/Beauty",
       "minimum_rate_usd": 600,
       "rate_unit": "per video"
-    },
-    {
-      "key": "KatrinaD",
-      "full_name": "Katrina D",
-      "gmail_connection_name": "Gmail - KatrinaD",
-      "sop_tab_name": "KatrinaD",
-      "manager": "Chenni",
-      "category": "Fashion",
-      "minimum_rate_usd": 150,
-      "rate_unit": "per hour",
-      "_note": "Hourly rate model \u2014 activate in batch_4_special after all standard inboxes are stable."
     },
     {
       "key": "Skyler",
