@@ -1,21 +1,18 @@
 {
   "_comment": "Global configuration for the Talent Inbox Automation system. Fill in all TODO values before deploying.",
-
   "ai_enabled": true,
-  "_ai_enabled_comment": "HARD BLOCKER — set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
-
+  "_ai_enabled_comment": "HARD BLOCKER \u2014 set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
   "openai": {
     "triage_model": "gpt-4o-mini",
     "_triage_model_comment": "Use gpt-4o-mini for triage (cheaper, nearly as accurate). Switch to gpt-4o only if quality drops.",
     "reply_model": "gpt-4o",
-    "_reply_model_comment": "Always use gpt-4o for reply drafting — quality matters here.",
+    "_reply_model_comment": "Always use gpt-4o for reply drafting \u2014 quality matters here.",
     "max_tokens_triage": 200,
     "max_tokens_reply": 1000,
     "temperature_triage": 0.1,
     "_temperature_comment": "Low temperature for triage = consistent, deterministic scoring.",
     "temperature_reply": 0.0
   },
-
   "triage": {
     "global_minimum_rate_usd": 0,
     "_global_minimum_rate_comment": "Set to 0 to use per-talent minimums only. Override here to enforce a global floor across all inboxes.",
@@ -30,7 +27,9 @@
         "mail.google.com"
       ],
       "senders": [],
-      "emails": ["colineyre222@gmail.com"],
+      "emails": [
+        "colineyre222@gmail.com"
+      ],
       "_senders_comment": "Exact sender email addresses to block.",
       "subject_keywords": [
         "unsubscribe",
@@ -43,10 +42,10 @@
       "body_keywords": []
     }
   },
-
   "reply": {
     "draft_mode": true,
     "manager_emails": {
+      "_comment": "Map manager first names (as used in settings.json talents[].manager) to their email addresses. Used to CC the right manager when a draft contains the looping-in phrase.",
       "Cara": "cara@taboost.me",
       "Chenni": "chenni@taboost.me",
       "Nicole": "nicole@taboost.me",
@@ -56,16 +55,8 @@
     "_draft_mode_comment": "true = Phase 2 saves replies as Gmail Drafts for supervisor review instead of sending. Set to false only after Marco approves full autonomous send (~1 month trial). When draft_mode is false, send_delay_minutes applies.",
     "send_delay_minutes": 15,
     "_send_delay_comment": "Minutes to wait after drafting before sending. Only applies when draft_mode is false. Set to 0 to disable. Keep at 15 during Phase 2 testing.",
-    "send_delay_enabled": true,
-    "manager_emails": {
-      "_comment": "Map manager first names (as used in settings.json talents[].manager) to their email addresses. Used to CC the right manager when a draft contains the looping-in phrase.",
-      "Cara": "cara@taboost.me",
-      "Chenni": "chenni@taboost.me",
-      "Nicole": "nicole@taboost.me",
-      "Colin": "colineyre222@gmail.com"
-    }
+    "send_delay_enabled": true
   },
-
   "digest": {
     "send_time": "08:00",
     "_send_time_comment": "TODO: Confirm exact time with supervisor.",
@@ -73,9 +64,8 @@
     "_timezone_comment": "TODO: Confirm supervisor timezone.",
     "recipient_email": "talent@taboost.me",
     "_recipient_email_comment": "TODO: Fill in supervisor email address (or comma-separated list for multiple recipients).",
-    "subject_template": "Daily Inbox Report — {{DATE}} — {{TOTAL}} emails processed, {{NEEDS_REVIEW}} need review"
+    "subject_template": "Daily Inbox Report \u2014 {{DATE}} \u2014 {{TOTAL}} emails processed, {{NEEDS_REVIEW}} need review"
   },
-
   "google_sheets": {
     "master_log_sheet_id": "14dJ5H1elMjkfWi4FoLGxG3wmuBANTIQ0QiHp3kXetv8",
     "_master_log_sheet_id_comment": "Master Activity Log Google Sheet (provided 2026-04-17). Tab name: 'Master Log'.",
@@ -83,7 +73,6 @@
     "sop_matrix_sheet_id": "1NCH4BClugnuGwvDX3NR0cyw5kP1XElyvpjmvEjEnAyQ",
     "_sop_matrix_sheet_id_comment": "TODO: Paste the Google Sheet ID for the SOP matrix. See sheets/sop_data.json for the full SOP data already extracted from the uploaded XLSX."
   },
-
   "talents": [
     {
       "key": "Sylvia",
@@ -113,8 +102,7 @@
       "manager": "Cara",
       "category": "Home/Living",
       "minimum_rate_usd": 700,
-      "rate_unit": "per video",
-      "paused": true
+      "rate_unit": "per video"
     },
     {
       "key": "Britt",
@@ -145,8 +133,7 @@
       "manager": "Chenni",
       "category": "Fashion",
       "minimum_rate_usd": 600,
-      "rate_unit": "per video",
-      "paused": true
+      "rate_unit": "per video"
     },
     {
       "key": "Katrina",
@@ -240,7 +227,7 @@
       "category": "Fashion",
       "minimum_rate_usd": 150,
       "rate_unit": "per hour",
-      "_note": "Hourly rate model — activate in batch_4_special after all standard inboxes are stable."
+      "_note": "Hourly rate model \u2014 activate in batch_4_special after all standard inboxes are stable."
     },
     {
       "key": "Skyler",
@@ -252,7 +239,7 @@
       "minimum_rate_usd": 0,
       "rate_unit": "per video",
       "paused": true,
-      "_note": "New talent — paused until SOP entry is populated and Gmail connected."
+      "_note": "New talent \u2014 paused until SOP entry is populated and Gmail connected."
     },
     {
       "key": "colineyre222",
@@ -263,10 +250,9 @@
       "minimum_rate_usd": 0,
       "rate_unit": "per video",
       "max_drafts": 30,
-      "_note": "Owner test account — capped at 30 drafts. Used to verify GPT triage and draft flow before rolling out to talent accounts."
+      "_note": "Owner test account \u2014 capped at 30 drafts. Used to verify GPT triage and draft flow before rolling out to talent accounts."
     }
   ],
-
   "make": {
     "workspace_zone": "us1.make.com",
     "_workspace_zone_comment": "TODO: Confirm your Make workspace zone (us1, eu1, etc.).",
