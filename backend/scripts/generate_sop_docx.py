@@ -242,6 +242,10 @@ def main() -> None:
     print(f"✓ SOP document written to {OUT_DOCX}")
     print(f"  Talents: {len(sop_data)}")
 
+    # Always regenerate the markdown in sync
+    from backend.scripts.generate_sop_md import main as gen_md
+    gen_md()
+
 
 if __name__ == "__main__":
     main()

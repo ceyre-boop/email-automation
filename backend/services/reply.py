@@ -7,11 +7,31 @@ from __future__ import annotations
 
 import json
 import logging
+import pathlib
 import re
 
 from openai import OpenAI
 
 from backend.core.config import get_settings
+
+# ── SOP markdown loader ───────────────────────────────────────────────────────
+_SOP_MD_PATH = pathlib.Path(__file__).resolve().parents[2] / "sheets" / "sop.md"
+_sop_md_cache: str | None = None
+
+def _load_sop_md() -> str:
+    """Load sop.md — the AI's source of truth. Cached after first read."""
+    global _sop_md_cache
+    if _sop_md_cache is None:
+        if _SOP_MD_PATH.exists():
+            _sop_md_cache = _SOP_MD_PATH.read_text(encoding="utf-8")
+        else:
+            _sop_md_cache = "# SOP\nNo SOP document found."
+    return _sop_md_cache
+
+def clear_sop_cache() -> None:
+    """Force reload of sop.md on next draft call. Call after updating the SOP."""
+    global _sop_md_cache
+    _sop_md_cache = None
 
 logger = logging.getLogger(__name__)
 
@@ -261,45 +281,37 @@ def _build_reply_messages(
     manager_context_text: str = "",
     body_text: str = "",
 ) -> list[dict]:
-    """Fill reply.md template variables and return chat messages."""
-    system_text, user_template = _get_reply_sections()
-
-    # Replace {{TALENT_NAME}} in the system prompt — new reply.md writes the persona
-    # directly into the system message so GPT adopts the talent's voice from the start.
-    system_text = system_text.replace("{{TALENT_NAME}}", talent_name)
-
-    if voice_profile.strip():
-        system_text += (
-            "\n\n## TALENT VOICE & TONE\n"
-            "Write all replies in this voice/style:\n"
-            + voice_profile
-        )
-
-    if manager_context_text.strip():
-        system_text += (
-            "\n\n## MANAGER INSTRUCTIONS\n"
-            "Apply these with highest priority — they override SOP defaults:\n"
-            + manager_context_text
-        )
-
-    sop_rules = _build_sop_rules_text(talent_key)
-
-    # Truncate the email body to avoid excessive token usage while still giving
-    # GPT enough context to write a well-targeted reply.
+    """Build GPT messages using sop.md as the system context — the single source of truth."""
+    sop_md = _load_sop_md()
     body_snippet = (body_text or "").strip()[:_MAX_EMAIL_BODY_CHARS]
 
+    system_text = (
+        f"{sop_md}\n\n"
+        "---\n\n"
+        "You are the email drafting agent for TABOOST talent management.\n"
+        "Read the full SOP document above before responding.\n"
+        f"You are drafting a reply for: **{talent_name}**\n\n"
+        "Rules:\n"
+        "- Find the correct talent section above. Use ONLY that talent's scenarios.\n"
+        "- Match the inbound email to the best scenario.\n"
+        "- Return the Approved Response VERBATIM — no rewrites, no changes, no additions.\n"
+        "- If no scenario matches, return: ESCALATE: No matching approved response — human review required.\n"
+        "- If the talent's SOP status is PENDING, return: ESCALATE: SOP pending for this talent — human admin required.\n"
+    )
+
+    if manager_context_text.strip():
+        system_text += f"\n\nMANAGER OVERRIDE INSTRUCTIONS (highest priority):\n{manager_context_text}"
+
     user_text = (
-        user_template
-        .replace("{{TALENT_NAME}}", talent_name)
-        .replace("{{MINIMUM_RATE}}", str(int(minimum_rate)))
-        .replace("{{EMAIL_SUBJECT}}", subject)
-        .replace("{{SENDER_EMAIL}}", sender)
-        .replace("{{OFFER_TYPE}}", offer_type)
-        .replace("{{BRAND_NAME}}", brand_name)
-        .replace("{{PROPOSED_RATE}}", str(int(proposed_rate)))
-        .replace("{{TRIAGE_NOTES}}", triage_reason)
-        .replace("{{EMAIL_BODY}}", body_snippet or "(not available)")
-        .replace("{{SOP_RULES}}", sop_rules)
+        f"Talent: {talent_name}\n"
+        f"Email subject: {subject}\n"
+        f"Email sender: {sender}\n"
+        f"Offer type: {offer_type}\n"
+        f"Brand name: {brand_name}\n"
+        f"Proposed rate (USD): {int(proposed_rate) if proposed_rate else 0}\n"
+        f"Triage notes: {triage_reason}\n\n"
+        f"Original email body:\n---\n{body_snippet or '(not available)'}\n---\n\n"
+        f"Find the matching scenario for {talent_name} and return the Approved Response exactly as written."
     )
 
     return [
