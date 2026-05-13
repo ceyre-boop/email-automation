@@ -46,6 +46,16 @@ def _decode_raw(raw_b64: str) -> email_lib.message.Message:
     return email_lib.message_from_bytes(raw_bytes)
 
 
+def _extract_mime_parts(msg: email_lib.message.Message) -> dict[str, str]:
+    parts: dict[str, str] = {}
+    for part in msg.walk():
+        ctype = part.get_content_type()
+        if ctype in ("text/plain", "text/html"):
+            payload = part.get_payload(decode=True) or b""
+            parts[ctype] = payload.decode(part.get_content_charset() or "utf-8", errors="replace")
+    return parts
+
+
 # ── create_gmail_draft ────────────────────────────────────────────────────────
 
 
@@ -71,6 +81,17 @@ def test_create_draft_returns_draft_id(mock_build, mock_creds, mock_refresh):
     )
 
     assert result == "draft-xyz"
+
+
+def test_render_email_body_converts_internal_link_format():
+    from backend.services.gmail import _render_email_body
+
+    plain, html = _render_email_body("See media kit HERE [https://taboost.my.canva.site/sylvia].")
+    assert plain == "See media kit HERE."
+    assert "[https://taboost.my.canva.site/sylvia]" not in plain
+    assert "See media kit HERE" in html
+    assert 'href="https://taboost.my.canva.site/sylvia"' in html
+    assert "[https://taboost.my.canva.site/sylvia]" not in html
 
 
 @patch("backend.services.gmail.refresh_if_needed")
@@ -99,6 +120,37 @@ def test_create_draft_adds_re_prefix(mock_build, mock_creds, mock_refresh):
     body_arg = create_call.call_args[1]["body"]
     raw = _decode_raw(body_arg["message"]["raw"])
     assert raw["Subject"].startswith("Re:")
+
+
+@patch("backend.services.gmail.refresh_if_needed")
+@patch("backend.services.gmail.credentials_from_token_row")
+@patch("backend.services.gmail.build")
+def test_create_draft_renders_internal_links_as_anchor_text(mock_build, mock_creds, mock_refresh):
+    from backend.services.gmail import create_gmail_draft
+
+    fake_svc = _mock_service()
+    mock_build.return_value = fake_svc
+    mock_creds.return_value = MagicMock(token="t", expiry=None)
+    mock_refresh.return_value = MagicMock(token="t", expiry=None)
+    fake_svc.users().drafts().create().execute.return_value = {"id": "d"}
+
+    create_gmail_draft(
+        token_row=_make_token(),
+        thread_id="t1",
+        reply_to="x@brand.com",
+        subject="Partnership",
+        body="Media kit HERE [https://taboost.my.canva.site/sylvia]",
+    )
+
+    create_call = fake_svc.users().drafts().create
+    body_arg = create_call.call_args[1]["body"]
+    raw = _decode_raw(body_arg["message"]["raw"])
+    parts = _extract_mime_parts(raw)
+
+    assert "[https://taboost.my.canva.site/sylvia]" not in parts["text/plain"]
+    assert parts["text/plain"].strip() == "Media kit HERE"
+    assert 'href="https://taboost.my.canva.site/sylvia"' in parts["text/html"]
+    assert "Media kit HERE" in parts["text/html"]
 
 
 @patch("backend.services.gmail.refresh_if_needed")

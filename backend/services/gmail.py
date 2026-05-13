@@ -23,15 +23,43 @@ from backend.services.oauth import TokenRefreshError, credentials_from_token_row
 
 logger = logging.getLogger(__name__)
 
+_RAW_URL_RE = re.compile(r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])")
+_INTERNAL_LINK_RE = re.compile(r"(?P<anchor>[^\n\[]+?)\s*\[(?P<url>https?://[^\]\s]+)\]")
+
+
+def _escape_and_autolink(segment: str) -> str:
+    escaped = html.escape(segment or "")
+    return _RAW_URL_RE.sub(r'<a href="\1">\1</a>', escaped)
+
+
+def _render_email_body(body: str) -> tuple[str, str]:
+    """
+    Render body into (plain_text, html_text).
+
+    Supports internal SOP link format:
+      Anchor Text [https://example.com]
+    Plain text keeps only anchor text.
+    HTML renders anchor text as a clickable hyperlink.
+    """
+    source = body or ""
+    plain = _INTERNAL_LINK_RE.sub(lambda m: m.group("anchor").rstrip(), source)
+
+    html_chunks: list[str] = []
+    cursor = 0
+    for match in _INTERNAL_LINK_RE.finditer(source):
+        html_chunks.append(_escape_and_autolink(source[cursor:match.start()]))
+        anchor = html.escape(match.group("anchor").rstrip())
+        url = html.escape(match.group("url"), quote=True)
+        html_chunks.append(f'<a href="{url}">{anchor}</a>')
+        cursor = match.end()
+    html_chunks.append(_escape_and_autolink(source[cursor:]))
+    html_body = "".join(html_chunks)
+    return plain, f"<div>{html_body.replace('\n', '<br>')}</div>"
+
 
 def _plain_to_html(body: str) -> str:
-    escaped = html.escape(body or "")
-    escaped = re.sub(
-        r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])",
-        r'<a href="\1">\1</a>',
-        escaped,
-    )
-    return f"<div>{escaped.replace('\n', '<br>')}</div>"
+    _, html_text = _render_email_body(body)
+    return html_text
 
 
 def parse_cc_recipients(raw: str | None) -> list[str]:
@@ -360,9 +388,10 @@ def create_gmail_draft(
     """
     if service is None:
         service = _gmail_service(token_row, db)
+    plain_body, html_body = _render_email_body(body or "")
     mime_msg = MIMEMultipart("alternative")
-    mime_msg.attach(MIMEText(body or "", "plain"))
-    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
+    mime_msg.attach(MIMEText(plain_body, "plain"))
+    mime_msg.attach(MIMEText(html_body, "html"))
     mime_msg["To"] = reply_to
     if cc:
         mime_msg["Cc"] = ", ".join(cc)
@@ -402,9 +431,10 @@ def send_reply(
     Used when an agency reviewer approves a draft.
     """
     service = _gmail_service(token_row, db)
+    plain_body, html_body = _render_email_body(body or "")
     mime_msg = MIMEMultipart("alternative")
-    mime_msg.attach(MIMEText(body or "", "plain"))
-    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
+    mime_msg.attach(MIMEText(plain_body, "plain"))
+    mime_msg.attach(MIMEText(html_body, "html"))
     mime_msg["To"] = reply_to
     if cc:
         mime_msg["Cc"] = ", ".join(cc)

@@ -92,11 +92,16 @@ GLOBAL_RULES = [
     "services, mass SEO/web/design pitches, fake invoices, malware, adult/illegal content.",
 
     "Output must clearly state the action taken: Approved Response / Human Admin Required "
-    "/ Spam / Ignore.",
+    "/ Spam/Trash.",
 
     "If using an approved response: return the exact approved response only. Do not modify "
     "the response text. Do not combine multiple approved responses. Do not add extra "
     "commentary inside the email draft.",
+
+    "Approved hyperlinks preserved + rendering behavior. The format Anchor Text [URL] "
+    "is an internal formatting instruction, not final output text. In drafted emails, "
+    "render only the Anchor Text visibly, attach the URL as hyperlink destination, and "
+    "do not display the bracketed URL in visible email copy.",
 ]
 
 KEY_TERMS = {
@@ -108,13 +113,9 @@ KEY_TERMS = {
         "Classification for emails that are part of an ongoing conversation, follow-up, "
         "or negotiation. The AI does NOT draft a reply — a human manager handles it."
     ),
-    "Spam": (
+    "Spam/Trash": (
         "Emails that are clearly junk: phishing, scams, unrelated service pitches, fake "
         "prizes, malware. Conservative threshold — when in doubt, do not classify as Spam."
-    ),
-    "Ignore": (
-        "Emails that are not real brand deals, are fan mail, or require no response. "
-        "Trinity receives fan mail which is classified as Ignore."
     ),
     "Score 1 / Archive": "Email is definitively trash — archived immediately, no reply.",
     "Score 2 / Flag": "Email is uncertain or a follow-up — flagged for human review, no draft.",
