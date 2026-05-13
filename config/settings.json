@@ -209,7 +209,7 @@
     },
     {
       "key": "Anastasiya",
-      "full_name": "Anastasiya",
+      "full_name": "Anastasiya Ray",
       "gmail_connection_name": "Gmail - Anastasiya",
       "sop_tab_name": "Anastasiya",
       "manager": "Cara",
@@ -230,15 +230,16 @@
       "_note": "New talent \u2014 paused until SOP entry is populated and Gmail connected."
     },
     {
-      "key": "colineyre222",
-      "full_name": "Colin Eyre",
-      "inbox_email": "colineyre222@gmail.com",
-      "manager": "Colin",
-      "category": "Test",
+      "key": "Wesley",
+      "full_name": "Wesley Barker",
+      "gmail_connection_name": "Gmail - Wesley",
+      "sop_tab_name": "Wesley",
+      "manager": "TBD",
+      "category": "TBD",
       "minimum_rate_usd": 0,
       "rate_unit": "per video",
-      "max_drafts": 30,
-      "_note": "Owner test account \u2014 capped at 30 drafts. Used to verify GPT triage and draft flow before rolling out to talent accounts."
+      "paused": true,
+      "_note": "New talent \u2014 paused until Gmail connected and SOP approved."
     }
   ],
   "make": {

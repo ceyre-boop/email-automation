@@ -838,7 +838,7 @@
     "sop_status": "pending"
   },
   "Anastasiya": {
-    "full_name": "Anastasiya",
+    "full_name": "Anastasiya Ray",
     "manager": "Cara",
     "category": "Fashion/Beauty",
     "min_rate_usd": 600,
@@ -989,5 +989,14 @@
     "rate_unit": "per video",
     "rules": [],
     "sop_status": "pending"
+  },
+  "Wesley": {
+    "full_name": "Wesley Barker",
+    "manager": "",
+    "category": "TBD",
+    "min_rate_usd": 0,
+    "rate_unit": "per video",
+    "sop_status": "pending",
+    "rules": []
   }
 }
