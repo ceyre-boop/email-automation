@@ -34,10 +34,14 @@ GLOBAL_RULES = """# Talent Email AI Guidelines
 7. **Output must clearly state the action.** Use exactly one of:
    - `Approved Response`
    - `Human Admin Required`
-   - `Spam`
-   - `Ignore`
+   - `Spam/Trash`
 
 8. **Return approved responses verbatim.** Return the exact approved response only. Do not modify, combine, shorten, expand, or add commentary of any kind.
+
+8a. **Approved hyperlinks preserved + rendering behavior.**
+   - The format `Anchor Text [URL]` is an internal formatting instruction, not final output text.
+   - In drafted emails, render only the Anchor Text visibly and attach the URL as the hyperlink destination.
+   - Do not display bracketed URLs in the visible email copy.
 
 ---
 """

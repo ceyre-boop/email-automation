@@ -23,15 +23,90 @@ from backend.services.oauth import TokenRefreshError, credentials_from_token_row
 
 logger = logging.getLogger(__name__)
 
+_RAW_URL_RE = re.compile(r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])")
+
+
+def _escape_and_autolink(segment: str) -> str:
+    escaped = html.escape(segment or "")
+    return _RAW_URL_RE.sub(r'<a href="\1">\1</a>', escaped)
+
+
+def _iter_internal_link_spans(text: str):
+    """
+    Yield (start, end, anchor, url) spans for `Anchor [https://url]` patterns.
+
+    This parser is linear-time and avoids regex backtracking on large inputs.
+    """
+    i = 0
+    n = len(text)
+    while i < n:
+        lb = text.find("[", i)
+        if lb == -1:
+            return
+        rb = text.find("]", lb + 1)
+        if rb == -1:
+            return
+        raw_url = text[lb + 1:rb].strip()
+        if not raw_url.startswith(("http://", "https://")):
+            i = lb + 1
+            continue
+
+        anchor_end = lb
+        while anchor_end > 0 and text[anchor_end - 1].isspace():
+            anchor_end -= 1
+        anchor_start = text.rfind("\n", 0, anchor_end) + 1
+        while anchor_start < anchor_end and text[anchor_start].isspace():
+            anchor_start += 1
+        if anchor_start < anchor_end and text[anchor_start] == "•":
+            anchor_start += 1
+            while anchor_start < anchor_end and text[anchor_start].isspace():
+                anchor_start += 1
+
+        anchor = text[anchor_start:anchor_end].strip()
+        if not anchor:
+            i = rb + 1
+            continue
+
+        yield anchor_start, rb + 1, anchor, raw_url
+        i = rb + 1
+
+
+def _render_email_body(body: str) -> tuple[str, str]:
+    """
+    Render body into (plain_text, html_text).
+
+    Supports internal SOP link format:
+      Anchor Text [https://example.com]
+    Plain text keeps only anchor text.
+    HTML renders anchor text as a clickable hyperlink.
+    """
+    source = body or ""
+    spans = list(_iter_internal_link_spans(source))
+    if not spans:
+        return source, f"<div>{_escape_and_autolink(source).replace('\n', '<br>')}</div>"
+
+    plain_chunks: list[str] = []
+    html_chunks: list[str] = []
+    cursor = 0
+    for start, end, anchor, url in spans:
+        plain_chunks.append(source[cursor:start])
+        plain_chunks.append(anchor)
+        html_chunks.append(_escape_and_autolink(source[cursor:start]))
+        anchor_text = html.escape(anchor)
+        url = html.escape(url, quote=True)
+        html_chunks.append(f'<a href="{url}">{anchor_text}</a>')
+        cursor = end
+
+    plain_chunks.append(source[cursor:])
+    plain = "".join(plain_chunks)
+    html_chunks.append(_escape_and_autolink(source[cursor:]))
+    html_body = "".join(html_chunks)
+    return plain, f"<div>{html_body.replace('\n', '<br>')}</div>"
+
 
 def _plain_to_html(body: str) -> str:
-    escaped = html.escape(body or "")
-    escaped = re.sub(
-        r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])",
-        r'<a href="\1">\1</a>',
-        escaped,
-    )
-    return f"<div>{escaped.replace('\n', '<br>')}</div>"
+    _, html_text = _render_email_body(body)
+    return html_text
 
 
 def parse_cc_recipients(raw: str | None) -> list[str]:
@@ -360,9 +435,10 @@ def create_gmail_draft(
     """
     if service is None:
         service = _gmail_service(token_row, db)
+    plain_body, html_body = _render_email_body(body or "")
     mime_msg = MIMEMultipart("alternative")
-    mime_msg.attach(MIMEText(body or "", "plain"))
-    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
+    mime_msg.attach(MIMEText(plain_body, "plain"))
+    mime_msg.attach(MIMEText(html_body, "html"))
     mime_msg["To"] = reply_to
     if cc:
         mime_msg["Cc"] = ", ".join(cc)
@@ -402,9 +478,10 @@ def send_reply(
     Used when an agency reviewer approves a draft.
     """
     service = _gmail_service(token_row, db)
+    plain_body, html_body = _render_email_body(body or "")
     mime_msg = MIMEMultipart("alternative")
-    mime_msg.attach(MIMEText(body or "", "plain"))
-    mime_msg.attach(MIMEText(_plain_to_html(body or ""), "html"))
+    mime_msg.attach(MIMEText(plain_body, "plain"))
+    mime_msg.attach(MIMEText(html_body, "html"))
     mime_msg["To"] = reply_to
     if cc:
         mime_msg["Cc"] = ", ".join(cc)
