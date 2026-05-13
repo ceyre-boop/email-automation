@@ -47,16 +47,20 @@ def _iter_internal_link_spans(text: str):
         if rb == -1:
             return
         raw_url = text[lb + 1:rb].strip()
-        if not (raw_url.startswith("http://") or raw_url.startswith("https://")):
+        if not raw_url.startswith(("http://", "https://")):
             i = lb + 1
             continue
 
         anchor_end = lb
         while anchor_end > 0 and text[anchor_end - 1].isspace():
             anchor_end -= 1
-        anchor_start = anchor_end
-        while anchor_start > 0 and not text[anchor_start - 1].isspace():
-            anchor_start -= 1
+        anchor_start = text.rfind("\n", 0, anchor_end) + 1
+        while anchor_start < anchor_end and text[anchor_start].isspace():
+            anchor_start += 1
+        if anchor_start < anchor_end and text[anchor_start] == "•":
+            anchor_start += 1
+            while anchor_start < anchor_end and text[anchor_start].isspace():
+                anchor_start += 1
 
         anchor = text[anchor_start:anchor_end].strip()
         if not anchor:
