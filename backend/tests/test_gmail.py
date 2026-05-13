@@ -89,7 +89,7 @@ def test_render_email_body_converts_internal_link_format():
     plain, html = _render_email_body("See media kit HERE [https://taboost.my.canva.site/sylvia].")
     assert plain == "See media kit HERE."
     assert "[https://taboost.my.canva.site/sylvia]" not in plain
-    assert "See media kit HERE" in html
+    assert '>HERE<' in html
     assert 'href="https://taboost.my.canva.site/sylvia"' in html
     assert "[https://taboost.my.canva.site/sylvia]" not in html
 
@@ -150,7 +150,7 @@ def test_create_draft_renders_internal_links_as_anchor_text(mock_build, mock_cre
     assert "[https://taboost.my.canva.site/sylvia]" not in parts["text/plain"]
     assert parts["text/plain"].strip() == "Media kit HERE"
     assert 'href="https://taboost.my.canva.site/sylvia"' in parts["text/html"]
-    assert "Media kit HERE" in parts["text/html"]
+    assert ">HERE<" in parts["text/html"]
 
 
 @patch("backend.services.gmail.refresh_if_needed")
