@@ -192,61 +192,9 @@ def _get_cc_for_reply(talent_key: str, proposed_rate: float) -> str | None:
     return None
 
 
-def _deterministic_initial_or_counter_reply(
-    talent_key: str,
-    minimum_rate: int | float,
-    proposed_rate: float,
-    triage_reason: str = "",
-    subject: str = "",
-    body_text: str = "",
-) -> str | None:
-    """
-    Deterministically choose between the "initial inquiry" and "below minimum" SOP
-    templates when the offer context is clear enough to avoid model drift.
-
-    Selects the initial-rates template when:
-      - proposed_rate is 0/unset, OR
-      - triage_reason indicates the brand is asking for rates (not offering them)
-
-    Selects the counter-offer template when:
-      - proposed_rate > 0 AND < minimum_rate AND triage_reason does NOT suggest an inquiry
-    """
-    sop = get_settings().sop_data
-    sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
-    if not sop_key:
-        return None
-    rules = sop.get(sop_key, {}).get("rules", []) or []
-
-    initial_reply = None
-    below_min_reply = None
-    for rule in rules:
-        trigger = str(rule.get("trigger", "") or "").lower()
-        response = str(rule.get("response", "") or "").strip()
-        if not response:
-            continue
-        # New format: use is_default flag for the initial/default response
-        if rule.get("is_default"):
-            initial_reply = response
-        elif "asking for rates" in trigger or "potential to collab" in trigger:
-            initial_reply = response
-        if "initially offered a rate below" in trigger:
-            below_min_reply = response
-
-    # Secondary signal: if triage_reason or raw email text indicates a rate inquiry,
-    # treat as no-offer and return the generic rates response.
-    reason_lower = triage_reason.lower()
-    subject_lower = (subject or "").lower()
-    body_lower = (body_text or "").lower()
-    is_inquiry = (
-        any(kw in reason_lower for kw in _INQUIRY_SIGNALS)
-        or any(kw in subject_lower for kw in _INQUIRY_EMAIL_SIGNALS)
-        or any(kw in body_lower for kw in _INQUIRY_EMAIL_SIGNALS)
-    )
-
-    if (proposed_rate <= 0 or is_inquiry) and initial_reply:
-        return _redact_pii(initial_reply)
-    if proposed_rate > 0 and proposed_rate < float(minimum_rate) and not is_inquiry and below_min_reply:
-        return _redact_pii(below_min_reply)
+def _deterministic_initial_or_counter_reply(*args, **kwargs) -> None:
+    # Disabled — sop.md is the single source of truth now.
+    # GPT reads the full SOP document and returns the correct response verbatim.
     return None
 
 
