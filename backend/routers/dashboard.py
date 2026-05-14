@@ -139,6 +139,7 @@ class ContextIn(BaseModel):
 
 
 def _get_dashboard_reset_at(db: Session) -> datetime | None:
+    """Return the stored dashboard reset baseline from app_state as an ISO timestamp."""
     row = db.query(AppState).filter(AppState.key == _DASHBOARD_RESET_KEY).first()
     if not row or not row.value_text:
         return None
@@ -170,11 +171,11 @@ def daily_report(db: Session = Depends(get_db)):
     today_utc = datetime.utcnow().date()
     window_start = datetime.combine(today_utc, datetime.min.time()) - timedelta(days=7)
     reset_at = _get_dashboard_reset_at(db)
-    effective_start = max(window_start, reset_at) if reset_at else window_start
+    report_window_start = max(window_start, reset_at) if reset_at else window_start
 
     rows = (
         db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= effective_start)
+        .filter(ProcessedEmail.processed_at >= report_window_start)
         .all()
     )
 
@@ -183,8 +184,9 @@ def daily_report(db: Session = Depends(get_db)):
     for row in rows:
         talent_emails[row.talent_key.lower()].append(row)
 
-    pending_query = db.query(Draft.talent_key, func.count(Draft.id).label("cnt")).filter(
-        Draft.status == DraftStatus.pending
+    pending_query = (
+        db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
+        .filter(Draft.status == DraftStatus.pending)
     )
     if reset_at:
         pending_query = pending_query.filter(Draft.created_at >= reset_at)
@@ -192,9 +194,12 @@ def daily_report(db: Session = Depends(get_db)):
     pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in pending_query}
 
     # Separate count: only real (non-escalate) pending drafts — used for the sidebar badge
-    real_pending_query = db.query(Draft.talent_key, func.count(Draft.id).label("cnt")).filter(
-        Draft.status == DraftStatus.pending,
-        Draft.is_escalate == False,  # noqa: E712
+    real_pending_query = (
+        db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
+        .filter(
+            Draft.status == DraftStatus.pending,
+            Draft.is_escalate == False,  # noqa: E712
+        )
     )
     if reset_at:
         real_pending_query = real_pending_query.filter(Draft.created_at >= reset_at)
@@ -298,7 +303,6 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
         .order_by(Draft.created_at.desc())
         .all()
     )
-
 
 @router.post("/reset-badges")
 def reset_dashboard_badges(db: Session = Depends(get_db)):

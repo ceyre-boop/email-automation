@@ -1062,7 +1062,10 @@ function closeSopModal() {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
 
 async function resetDashboardBadges() {
-  const ok = confirm('Reset all dashboard badges to zero? This will discard pending dashboard drafts and clear existing inbox labels so new activity starts from a clean slate.');
+  const ok = confirm(
+    'Reset all dashboard badges to zero?\n\n' +
+    'This discards pending dashboard drafts and clears inbox triage badges so new activity starts from a clean slate.'
+  );
   if (!ok) return;
   try {
     const result = await api('POST', '/api/dashboard/reset-badges');

@@ -112,6 +112,8 @@ def test_report_counts_new_activity_after_reset(client, db_session):
     data = report.json()
     sylvia = next(t for t in data["talents"] if t["talent_key"] == "Sylvia")
     assert data["total_good"] == 1
+    assert data["total_uncertain"] == 0
+    assert data["total_trash"] == 0
     assert data["total_emails"] == 1
     assert sylvia["count_good"] == 1
     assert sylvia["pending_drafts"] == 1
