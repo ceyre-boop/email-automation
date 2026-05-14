@@ -23,6 +23,7 @@ from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
 from backend.models.db import (
+    AppState,
     Draft,
     DraftStatus,
     EmailStatus,
@@ -41,6 +42,8 @@ router = APIRouter(
     dependencies=[Depends(verify_api_key)],
 )
 logger = logging.getLogger(__name__)
+
+_DASHBOARD_RESET_KEY = "dashboard_reset_started_at"
 
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
@@ -135,6 +138,26 @@ class ContextIn(BaseModel):
     added_by: Optional[str] = None
 
 
+def _get_dashboard_reset_at(db: Session) -> datetime | None:
+    row = db.query(AppState).filter(AppState.key == _DASHBOARD_RESET_KEY).first()
+    if not row or not row.value_text:
+        return None
+    try:
+        return datetime.fromisoformat(row.value_text)
+    except ValueError:
+        logger.warning("Invalid dashboard reset timestamp stored: %r", row.value_text)
+        return None
+
+
+def _set_dashboard_reset_at(db: Session, when: datetime) -> None:
+    row = db.query(AppState).filter(AppState.key == _DASHBOARD_RESET_KEY).first()
+    if not row:
+        row = AppState(key=_DASHBOARD_RESET_KEY)
+    row.value_text = when.isoformat()
+    row.updated_at = when
+    db.add(row)
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 
@@ -146,10 +169,12 @@ def daily_report(db: Session = Depends(get_db)):
 
     today_utc = datetime.utcnow().date()
     window_start = datetime.combine(today_utc, datetime.min.time()) - timedelta(days=7)
+    reset_at = _get_dashboard_reset_at(db)
+    effective_start = max(window_start, reset_at) if reset_at else window_start
 
     rows = (
         db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= window_start)
+        .filter(ProcessedEmail.processed_at >= effective_start)
         .all()
     )
 
@@ -164,6 +189,13 @@ def daily_report(db: Session = Depends(get_db)):
         .group_by(Draft.talent_key)
         .all()
     )
+    if reset_at:
+        pending_query = (
+            db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
+            .filter(Draft.status == DraftStatus.pending, Draft.created_at >= reset_at)
+            .group_by(Draft.talent_key)
+            .all()
+        )
     pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in pending_query}
 
     # Separate count: only real (non-escalate) pending drafts — used for the sidebar badge
@@ -173,6 +205,17 @@ def daily_report(db: Session = Depends(get_db)):
         .group_by(Draft.talent_key)
         .all()
     )
+    if reset_at:
+        real_pending_query = (
+            db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
+            .filter(
+                Draft.status == DraftStatus.pending,
+                Draft.is_escalate == False,  # noqa: E712
+                Draft.created_at >= reset_at,
+            )
+            .group_by(Draft.talent_key)
+            .all()
+        )
     real_pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in real_pending_query}
 
     total_good = total_uncertain = total_trash = 0
@@ -272,6 +315,56 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
         .order_by(Draft.created_at.desc())
         .all()
     )
+
+
+@router.post("/reset-badges")
+def reset_dashboard_badges(db: Session = Depends(get_db)):
+    """
+    Clear dashboard counts and pending draft badges so the team can restart from
+    a clean baseline without deleting historical records.
+    """
+    reset_at = datetime.utcnow()
+
+    discarded_drafts = (
+        db.query(Draft)
+        .filter(Draft.status == DraftStatus.pending)
+        .update(
+            {
+                Draft.status: DraftStatus.discarded,
+                Draft.reviewed_at: reset_at,
+                Draft.reviewed_by: "dashboard-reset",
+            },
+            synchronize_session=False,
+        )
+    )
+    cleared_inbox_badges = (
+        db.query(InboxEmail)
+        .update(
+            {
+                InboxEmail.score: None,
+                InboxEmail.brand_name: None,
+                InboxEmail.proposed_rate: None,
+                InboxEmail.offer_type: None,
+                InboxEmail.triage_reason: None,
+                InboxEmail.triage_status: None,
+            },
+            synchronize_session=False,
+        )
+    )
+    _set_dashboard_reset_at(db, reset_at)
+    db.commit()
+    logger.info(
+        "Dashboard reset at %s — discarded %d pending drafts, cleared %d inbox badge rows",
+        reset_at.isoformat(),
+        discarded_drafts,
+        cleared_inbox_badges,
+    )
+    return {
+        "ok": True,
+        "reset_at": reset_at.isoformat(),
+        "discarded_drafts": discarded_drafts,
+        "cleared_inbox_badges": cleared_inbox_badges,
+    }
 
 
 @router.get("/context", response_model=list[ContextOut])

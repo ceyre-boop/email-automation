@@ -761,6 +761,7 @@ body {
         <div class="section-head">Standard Operating Procedures</div>
         <div class="ctx-panel">
           <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; margin-bottom:10px;">📄 Open SOP Document</button>
+          <button class="btn btn-ghost" onclick="resetDashboardBadges()" style="width:100%; justify-content:center; margin-bottom:10px;">↺ Reset Dashboard Badges</button>
           <div style="font-size:12px; color:var(--text-2); line-height:1.5;">
             The SOP document defines approved responses for every talent and scenario.
             The AI reads this document to draft replies — it is the single source of truth.
@@ -1059,6 +1060,18 @@ function closeSopModal() {
   document.getElementById('sop-modal').style.display = 'none';
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
+
+async function resetDashboardBadges() {
+  const ok = confirm('Reset all dashboard badges to zero? This will discard pending dashboard drafts and clear existing inbox labels so new activity starts from a clean slate.');
+  if (!ok) return;
+  try {
+    const result = await api('POST', '/api/dashboard/reset-badges');
+    await loadOverview();
+    showToast(`Dashboard reset. Cleared ${result.discarded_drafts || 0} drafts.`);
+  } catch (e) {
+    showToast('Reset failed — ' + e.message);
+  }
+}
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
 function renderSidebar() {

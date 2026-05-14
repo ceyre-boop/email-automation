@@ -217,6 +217,21 @@ class TriageAudit(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AppState(Base):
+    """Small key/value store for persistent dashboard state."""
+
+    __tablename__ = "app_state"
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    value_text: Mapped[str | None] = mapped_column(Text)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        onupdate=datetime.utcnow,
+    )
+
+
 # ── Engine / session factory ─────────────────────────────────────────────────
 # These are created lazily so tests can override DATABASE_URL before import.
 
