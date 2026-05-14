@@ -22,7 +22,7 @@ def test_reset_badges_clears_dashboard_counts(client, db_session):
         processed_at=datetime.utcnow() - timedelta(hours=1),
     )
     inbox = InboxEmail(
-        talent_key="sylvia",
+        talent_key="Sylvia",
         gmail_message_id="inbox-msg-001",
         sender="brand@nike.com",
         subject="Partnership",

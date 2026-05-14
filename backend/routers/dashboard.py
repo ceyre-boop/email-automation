@@ -183,39 +183,22 @@ def daily_report(db: Session = Depends(get_db)):
     for row in rows:
         talent_emails[row.talent_key.lower()].append(row)
 
-    pending_query = (
-        db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
-        .filter(Draft.status == DraftStatus.pending)
-        .group_by(Draft.talent_key)
-        .all()
+    pending_query = db.query(Draft.talent_key, func.count(Draft.id).label("cnt")).filter(
+        Draft.status == DraftStatus.pending
     )
     if reset_at:
-        pending_query = (
-            db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
-            .filter(Draft.status == DraftStatus.pending, Draft.created_at >= reset_at)
-            .group_by(Draft.talent_key)
-            .all()
-        )
+        pending_query = pending_query.filter(Draft.created_at >= reset_at)
+    pending_query = pending_query.group_by(Draft.talent_key).all()
     pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in pending_query}
 
     # Separate count: only real (non-escalate) pending drafts — used for the sidebar badge
-    real_pending_query = (
-        db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
-        .filter(Draft.status == DraftStatus.pending, Draft.is_escalate == False)  # noqa: E712
-        .group_by(Draft.talent_key)
-        .all()
+    real_pending_query = db.query(Draft.talent_key, func.count(Draft.id).label("cnt")).filter(
+        Draft.status == DraftStatus.pending,
+        Draft.is_escalate == False,  # noqa: E712
     )
     if reset_at:
-        real_pending_query = (
-            db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
-            .filter(
-                Draft.status == DraftStatus.pending,
-                Draft.is_escalate == False,  # noqa: E712
-                Draft.created_at >= reset_at,
-            )
-            .group_by(Draft.talent_key)
-            .all()
-        )
+        real_pending_query = real_pending_query.filter(Draft.created_at >= reset_at)
+    real_pending_query = real_pending_query.group_by(Draft.talent_key).all()
     real_pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in real_pending_query}
 
     total_good = total_uncertain = total_trash = 0
