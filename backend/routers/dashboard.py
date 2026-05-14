@@ -139,7 +139,7 @@ class ContextIn(BaseModel):
 
 
 def _get_dashboard_reset_at(db: Session) -> datetime | None:
-    """Return the stored dashboard reset baseline from app_state as an ISO timestamp."""
+    """Return the stored dashboard reset baseline from app_state as a datetime."""
     row = db.query(AppState).filter(AppState.key == _DASHBOARD_RESET_KEY).first()
     if not row or not row.value_text:
         return None
@@ -326,6 +326,14 @@ def reset_dashboard_badges(db: Session = Depends(get_db)):
     )
     cleared_inbox_badges = (
         db.query(InboxEmail)
+        .filter(
+            (InboxEmail.score != None)  # noqa: E711
+            | (InboxEmail.brand_name != None)  # noqa: E711
+            | (InboxEmail.proposed_rate != None)  # noqa: E711
+            | (InboxEmail.offer_type != None)  # noqa: E711
+            | (InboxEmail.triage_reason != None)  # noqa: E711
+            | (InboxEmail.triage_status != None)  # noqa: E711
+        )
         .update(
             {
                 InboxEmail.score: None,
