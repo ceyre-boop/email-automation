@@ -155,7 +155,6 @@ def _set_dashboard_reset_at(db: Session, when: datetime) -> None:
     if not row:
         row = AppState(key=_DASHBOARD_RESET_KEY)
     row.value_text = when.isoformat()
-    row.updated_at = when
     db.add(row)
 
 
@@ -327,12 +326,12 @@ def reset_dashboard_badges(db: Session = Depends(get_db)):
     cleared_inbox_badges = (
         db.query(InboxEmail)
         .filter(
-            (InboxEmail.score != None)  # noqa: E711
-            | (InboxEmail.brand_name != None)  # noqa: E711
-            | (InboxEmail.proposed_rate != None)  # noqa: E711
-            | (InboxEmail.offer_type != None)  # noqa: E711
-            | (InboxEmail.triage_reason != None)  # noqa: E711
-            | (InboxEmail.triage_status != None)  # noqa: E711
+            InboxEmail.score.is_not(None)
+            | InboxEmail.brand_name.is_not(None)
+            | InboxEmail.proposed_rate.is_not(None)
+            | InboxEmail.offer_type.is_not(None)
+            | InboxEmail.triage_reason.is_not(None)
+            | InboxEmail.triage_status.is_not(None)
         )
         .update(
             {
