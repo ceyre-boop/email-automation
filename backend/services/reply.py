@@ -19,19 +19,52 @@ _SOP_MD_PATH = pathlib.Path(__file__).resolve().parents[2] / "sheets" / "sop.md"
 _sop_md_cache: str | None = None
 
 def _load_sop_md() -> str:
-    """Load sop.md — the AI's source of truth. Cached after first read."""
+    """Load sop.md — cached after first read."""
     global _sop_md_cache
     if _sop_md_cache is None:
         if _SOP_MD_PATH.exists():
             _sop_md_cache = _SOP_MD_PATH.read_text(encoding="utf-8")
         else:
-            _sop_md_cache = "# SOP\nNo SOP document found."
+            _sop_md_cache = ""
     return _sop_md_cache
 
 def clear_sop_cache() -> None:
-    """Force reload of sop.md on next draft call. Call after updating the SOP."""
     global _sop_md_cache
     _sop_md_cache = None
+
+def _get_talent_sop_section(talent_name: str) -> str:
+    """
+    Extract just the relevant talent section from sop.md.
+    Sends only global rules + the one talent block to GPT — keeps tokens minimal.
+    """
+    md = _load_sop_md()
+    if not md:
+        return ""
+
+    # Extract global rules (everything before the first ## Talent: heading)
+    talent_heading_match = re.search(r"\n## Talent: ", md)
+    global_rules = md[:talent_heading_match.start()].strip() if talent_heading_match else md
+
+    # Find this talent's section
+    pattern = rf"\n## Talent: {re.escape(talent_name)}\n"
+    start = re.search(pattern, md)
+    if not start:
+        # Try partial match (first name only)
+        first_name = talent_name.split()[0]
+        pattern = rf"\n## Talent: {re.escape(first_name)}"
+        start = re.search(pattern, md)
+
+    if not start:
+        return global_rules  # talent section not found — GPT will escalate
+
+    # Find the next talent section to know where this one ends
+    next_talent = re.search(r"\n## Talent: ", md[start.end():])
+    if next_talent:
+        talent_section = md[start.start():start.end() + next_talent.start()]
+    else:
+        talent_section = md[start.start():]
+
+    return f"{global_rules}\n\n{talent_section.strip()}"
 
 logger = logging.getLogger(__name__)
 
@@ -229,37 +262,31 @@ def _build_reply_messages(
     manager_context_text: str = "",
     body_text: str = "",
 ) -> list[dict]:
-    """Build GPT messages using sop.md as the system context — the single source of truth."""
-    sop_md = _load_sop_md()
+    """Build GPT messages — global rules + this talent's SOP section only."""
+    sop_context = _get_talent_sop_section(talent_name)
     body_snippet = (body_text or "").strip()[:_MAX_EMAIL_BODY_CHARS]
 
     system_text = (
-        f"{sop_md}\n\n"
-        "---\n\n"
-        "You are the email drafting agent for TABOOST talent management.\n"
-        "Read the full SOP document above before responding.\n"
-        f"You are drafting a reply for: **{talent_name}**\n\n"
-        "Rules:\n"
-        "- Find the correct talent section above. Use ONLY that talent's scenarios.\n"
-        "- Match the inbound email to the best scenario.\n"
-        "- Return the Approved Response VERBATIM — no rewrites, no changes, no additions.\n"
-        "- If no scenario matches, return: ESCALATE: No matching approved response — human review required.\n"
-        "- If the talent's SOP status is PENDING, return: ESCALATE: SOP pending for this talent — human admin required.\n"
+        f"{sop_context}\n\n"
+        "---\n"
+        f"You are drafting a reply for: {talent_name}\n"
+        "Match the inbound email to the correct scenario above.\n"
+        "Return the Approved Response VERBATIM — no rewrites, no changes, no additions.\n"
+        "If no scenario matches: ESCALATE: No matching approved response — human review required."
     )
 
     if manager_context_text.strip():
-        system_text += f"\n\nMANAGER OVERRIDE INSTRUCTIONS (highest priority):\n{manager_context_text}"
+        system_text += f"\n\nMANAGER OVERRIDE (highest priority):\n{manager_context_text}"
 
     user_text = (
         f"Talent: {talent_name}\n"
-        f"Email subject: {subject}\n"
-        f"Email sender: {sender}\n"
-        f"Offer type: {offer_type}\n"
-        f"Brand name: {brand_name}\n"
-        f"Proposed rate (USD): {int(proposed_rate) if proposed_rate else 0}\n"
+        f"Subject: {subject}\n"
+        f"Sender: {sender}\n"
+        f"Brand: {brand_name}\n"
+        f"Proposed rate: ${int(proposed_rate) if proposed_rate else 0}\n"
         f"Triage notes: {triage_reason}\n\n"
-        f"Original email body:\n---\n{body_snippet or '(not available)'}\n---\n\n"
-        f"Find the matching scenario for {talent_name} and return the Approved Response exactly as written."
+        f"Email:\n---\n{body_snippet or '(not available)'}\n---\n\n"
+        f"Return the matching Approved Response for {talent_name} exactly as written."
     )
 
     return [
