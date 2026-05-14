@@ -1070,7 +1070,9 @@ async function resetDashboardBadges() {
   try {
     const result = await api('POST', '/api/dashboard/reset-badges');
     await loadOverview();
-    showToast(`Dashboard reset. Cleared ${result.discarded_drafts || 0} drafts.`);
+    showToast(
+      `Dashboard reset. Cleared ${result.discarded_drafts || 0} drafts and ${result.cleared_inbox_badges || 0} inbox badges.`
+    );
   } catch (e) {
     showToast('Reset failed — ' + e.message);
   }

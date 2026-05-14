@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 
 from backend.models.db import AppState, Draft, DraftStatus, EmailStatus, InboxEmail, ProcessedEmail
+from backend.routers.dashboard import _DASHBOARD_RESET_KEY
 from backend.tests.conftest import make_draft, make_token
 
 
@@ -55,7 +56,7 @@ def test_reset_badges_clears_dashboard_counts(client, db_session):
     assert inbox.triage_reason is None
     assert inbox.triage_status is None
 
-    reset_row = db_session.query(AppState).filter(AppState.key == "dashboard_reset_started_at").first()
+    reset_row = db_session.query(AppState).filter(AppState.key == _DASHBOARD_RESET_KEY).first()
     assert reset_row is not None
     assert reset_row.value_text
 
