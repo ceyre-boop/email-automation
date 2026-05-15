@@ -220,3 +220,31 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
     db.commit()
     logger.info("Draft %s discarded by %s", draft_id, body.reviewed_by)
     return {"ok": True, "message": "Draft discarded."}
+
+
+@router.post("/discard-all")
+def discard_all_pending(db: Session = Depends(get_db)):
+    """Discard every pending draft — wipes the badge counts to zero for a clean start."""
+    from backend.services import gmail as gmail_svc
+    from backend.models.db import TalentToken
+
+    pending = db.query(Draft).filter(Draft.status == DraftStatus.pending).all()
+    cleared = 0
+    for draft in pending:
+        # Delete the Gmail draft copy if one exists
+        if draft.gmail_draft_id:
+            token = db.query(TalentToken).filter(
+                TalentToken.talent_key == draft.talent_key,
+                TalentToken.active == True,  # noqa: E712
+            ).first()
+            if token:
+                try:
+                    gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
+                except Exception:
+                    pass
+        draft.status = DraftStatus.discarded
+        db.add(draft)
+        cleared += 1
+
+    db.commit()
+    return {"ok": True, "cleared": cleared, "message": f"{cleared} pending drafts discarded."}

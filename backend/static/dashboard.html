@@ -720,6 +720,7 @@ body {
       </button>
     </div>
     <button class="btn-sync" id="btn-refresh">↻ &nbsp;Synchronize</button>
+    <button class="btn-sync" id="btn-clear-drafts" style="margin-top:6px; color:var(--red);" onclick="clearAllDrafts()">🗑 &nbsp;Clear All Drafts</button>
   </div>
 </aside>
 
@@ -1056,6 +1057,17 @@ async function openSopModal() {
     document.getElementById('sop-modal-body').innerHTML = '<p><em>Could not load SOP document.</em></p>';
   }
 }
+async function clearAllDrafts() {
+  if (!confirm('Discard ALL pending drafts and reset badges to zero?')) return;
+  try {
+    const r = await api('POST', '/api/drafts/discard-all');
+    showToast(`Cleared ${r.cleared} drafts — badges reset to zero.`);
+    await loadOverview();
+  } catch (e) {
+    showToast('Failed to clear drafts.');
+  }
+}
+
 function closeSopModal() {
   document.getElementById('sop-modal').style.display = 'none';
 }
