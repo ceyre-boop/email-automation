@@ -36,7 +36,6 @@ BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle (was 20)
 # Concurrency: Transaction Pooler (port 6543) supports hundreds of connections.
 MAX_CONCURRENT_EMAILS = 25
 MAX_TALENT_WORKERS = 8
-_MANAGER_CC_TRIGGER_PHRASE = "looping her in management team"
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
@@ -497,18 +496,6 @@ def _process_one_message(
         draft_text = reply_result["draft_text"]
         is_escalate = reply_result["is_escalate"]
         escalate_reason = reply_result.get("escalate_reason")
-        cc_recipients: list[str] = []
-        if not is_escalate and _MANAGER_CC_TRIGGER_PHRASE in (draft_text or "").lower():
-            settings = get_settings()
-            talent_cfg = next(
-                (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),
-                {},
-            )
-            manager_name = talent_cfg.get("manager", "")
-            manager_email_map = settings.app_config.get("reply", {}).get("manager_emails", {})
-            manager_email = manager_email_map.get(manager_name) if isinstance(manager_email_map, dict) else None
-            if manager_email:
-                cc_recipients = [manager_email]
 
         # Save as Gmail Draft in the talent's inbox (unless GPT escalated)
         gmail_draft_id: str | None = None
@@ -521,7 +508,6 @@ def _process_one_message(
                 body=draft_text,
                 db=db,
                 in_reply_to=message_id_header or None,
-                cc=cc_recipients or None,
                 service=service,
             )
 
@@ -536,7 +522,7 @@ def _process_one_message(
             proposed_rate=proposed_rate,
             offer_type=offer_type,
             draft_text=draft_text,
-            cc_recipients=",".join(cc_recipients) if cc_recipients else None,
+            cc_recipients=None,
             gmail_draft_id=gmail_draft_id,
             message_id_header=message_id_header or None,  # stored for In-Reply-To on approve
             status=DraftStatus.pending,
