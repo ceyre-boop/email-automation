@@ -1535,3 +1535,12 @@ def get_sop_html():
             )
 
     return {"html": "\n".join(parts)}
+
+
+@router.post("/reset-counters")
+def reset_counters(db: Session = Depends(get_db)):
+    """Set the dashboard baseline to now — badges reset to 0, old data preserved."""
+    now = datetime.utcnow()
+    _set_dashboard_reset_at(db, now)
+    db.commit()
+    return {"ok": True, "reset_at": now.isoformat(), "message": "Counters reset. Badges now count from this moment forward."}
