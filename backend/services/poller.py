@@ -423,6 +423,7 @@ def _process_one_message(
 
     # ── Score 2 → Flag for review (no draft) ────────────────────────────────────
     elif score == 2:
+        gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
@@ -537,6 +538,7 @@ def _process_one_message(
         )
         db.commit()
 
+        gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
         status_label = "escalated" if is_escalate else "draft_saved"
         _safe_log_sheet(
             talent_key, sender, subject, score, brand_name, proposed_rate,
