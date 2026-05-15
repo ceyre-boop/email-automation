@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle (was 20)
 
 # Concurrency: Transaction Pooler (port 6543) supports hundreds of connections.
-MAX_CONCURRENT_EMAILS = 15
+MAX_CONCURRENT_EMAILS = 25
 MAX_TALENT_WORKERS = 8
 _MANAGER_CC_TRIGGER_PHRASE = "looping her in management team"
 
