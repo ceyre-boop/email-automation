@@ -32,19 +32,17 @@
 
 ## SOP Status
 
-**✅ AI may draft (5):** Sylvia Van Hoeven, Trinity Blair, Sam Jones, Lizz Freixas, Katrina Moore
+**✅ AI may draft:** Sylvia Van Hoeven, Lizz Freixas, Sam Jones, Katrina Moore, Trinity Blair
 
-**⏳ Pending — Human Admin Required (12):** Brittanie Hammer, Allee Baray, Jenn Lyles, Angela Callisto, Colleen Fusco, Alana Calviello, Grayson Finks, Kylika Miller, Anastasiya Ray, Michaela, Skyler Clark, Wesley Barker
-
+**⏳ Pending — Human Admin Required:** All other talents
 
 ---
 
 ## Talent: Sylvia Van Hoeven
 
-**Manager:** Cara Best (cara@taboost.me)  
+**Manager:** Cara Best (cara@taboost.me)
 
 **SOP Status:** ✅ APPROVED
-
 
 ### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
 
@@ -57,7 +55,7 @@
 
 **Approved Response:**
 ```
-Thank you so much for reaching out about a potential partnership with Sylvia!! I’m happy to share her media kit HERE [https://taboost.my.canva.site/sylvia] + rates below:
+Thank you so much for reaching out about a potential partnership with Sylvia!! I'm happy to share her media kit HERE [https://taboost.my.canva.site/sylvia] + rates below:
 • 1 TikTok [https://www.tiktok.com/@sylviavanhoevenbeauty] (beauty): $2,000
 • 1 TikTok [https://www.tiktok.com/@sylviavanhoeven] (fashion): $1,000
 • 1 IG Reel [https://www.instagram.com/sylviavanhoeven]: $850
@@ -65,7 +63,7 @@ Thank you so much for reaching out about a potential partnership with Sylvia!! I
 
 Sylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers!
 
-Please let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We'd love to explore working together!
 ```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
@@ -84,7 +82,7 @@ Sylvia's standard rate is $2,000 per video! HERE [https://taboost.my.canva.site/
 5 videos (85%) → $8,500
 10 videos (75%) → $15,000
 
-We’ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
+We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
 ```
 
 ### Scenario C: Initial Inbound (Adequate Offer)
@@ -95,11 +93,8 @@ We’ve found bundles usually perform better since multiple posts make the produ
 **Do not use when:**
 - An explicit offer of the above rate is not specified
 
-**CC:** cara@taboost.me
-
 **Approved Response:**
 ```
-Email Draft: CC cara@taboost.me
 Hi,
 
 Thank you for the offer! I think this collab could be a good fit for Sylvia [https://www.tiktok.com/@sylviavanhoevenbeauty]. Looping in her management team who can move forward with this convo!
@@ -107,165 +102,11 @@ Thank you for the offer! I think this collab could be a good fit for Sylvia [htt
 
 ---
 
-## Talent: Trinity Blair
-
-**Manager:** Chenni Li (chenni@taboost.me)  
-
-**SOP Status:** ✅ APPROVED
-
-
-### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
-
-**Use when:**
-- Asking for rates or a potential to collab
-- All other general inquiries
-
-**Do not use when:**
-- An exact match from scenario below
-
-**Approved Response:**
-```
-Thank you so much for reaching out about a potential partnership with Trinity!! I’m happy to share her media kit HERE [https://taboost.my.canva.site/trinity] + rates below:
-• 1 TikTok [https://www.tiktok.com/@trinity.blair]: $4,000
-• 1 IG Reel [https://www.instagram.com/trinyxo]: $2,000
-• Podcast [https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf] Feature: $1,500
-• 1 UGC Video: $1,500 (usage to be negotiated)
-
-Trinity's pricing reflects her 3.4M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!
-
-Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!
-```
-
-### Scenario B: Initial Inbound (Bundle Rate Requested)
-
-**Use when:**
-- Asking for bundle rates
-
-**Do not use when:**
-- Multiple post rate is not asked for
-
-**Approved Response:**
-```
-Trinity's standard rate is $4,000 per video! HERE [https://taboost.my.canva.site/trinity] is her media kit. Below is her bundle pricing:
-
-3 videos (85%) → $10,000
-5 videos (80%) → $16,000
-10 videos (70%) → $28,000
-
-We’ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
-```
-
-### Scenario C: Initial Inbound (Adequate Offer)
-
-**Use when:**
-- Initially offered a rate that is OVER $600 for one post
-
-**Do not use when:**
-- An explicit offer of the above rate is not specified
-
-**CC:** chenni@taboost.me
-
-**Approved Response:**
-```
-Email Draft: CC chenni@taboost.me
-Hi,
-
-Thank you for the offer! I think this collab could be a good fit for Trinity [https://www.tiktok.com/@trinity.blair]. Looping in her management team who can move forward with this convo!
-```
-
----
-
-## Talent: Sam Jones
-
-**Manager:** Cara Best (cara@taboost.me)  
-
-**SOP Status:** ✅ APPROVED
-
-
-### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
-
-**Use when:**
-- Asking for rates or a potential to collab
-- All other general inquiries
-
-**Do not use when:**
-- An exact match from scenario below
-
-**Approved Response:**
-```
-Thank you so much for reaching out about a potential partnership with Sam!! I’m happy to share her rates below:
-• 1 TikTok [https://www.tiktok.com/@sam_joness_]: $900
-• 1 IG Reel [https://www.instagram.com/its_samjones_/reels/]: $600
-• 1 UGC Video [https://samjonesugc.my.canva.site/]: $1,500 (usage can be added on for an additional cost)
-
-Sam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over $150k!
-
-Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!
-```
-
-### Scenario B: Initial Inbound (Bundle Rate Requested)
-
-**Use when:**
-- Asking for bundle rates
-
-**Do not use when:**
-- Multiple post rate is not asked for
-
-**Approved Response:**
-```
-Her standard rate is $900 per video! Below is her bundle pricing:
-
-3 videos (90%) → $2,400
-5 videos (85%) → $3,800
-10 videos (75%) → $6,750
-
-We’ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
-```
-
-### Scenario C: Initial Inbound (Adequate Offer)
-
-**Use when:**
-- Initially offered a rate that is OVER $900 for one post
-
-**Do not use when:**
-- An explicit offer of the above rate is not specified
-
-**CC:** cara@taboost.me
-
-**Approved Response:**
-```
-Email Draft: CC cara@taboost.me
-Hi,
-
-Thank you for the offer! I think this collab could be a good fit for Sam [https://www.tiktok.com/@sam_joness_]. Looping in her management team who can move forward with this convo!
-```
-
----
-
-## Talent: Brittanie Hammer
-
-**Manager:** Chenni  
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
-
----
-
-## Talent: Allee Baray
-
-**Manager:** Chenni  
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
-
----
-
 ## Talent: Lizz Freixas
 
-**Manager:** Chenni Li (chenni@taboost.me)  
+**Manager:** Chenni Li (chenni@taboost.me)
 
 **SOP Status:** ✅ APPROVED
-
 
 ### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
 
@@ -278,13 +119,13 @@ Thank you for the offer! I think this collab could be a good fit for Sam [https:
 
 **Approved Response:**
 ```
-Thank you so much for reaching out about a potential partnership with Lizz!! I’m happy to share her rates below:
+Thank you so much for reaching out about a potential partnership with Lizz!! I'm happy to share her rates below:
 • 1 TikTok [https://www.tiktok.com/@lizzmi45]: $750
 • 1 UGC Video: $900 (usage to be negotiated)
 
 Lizz's pricing reflects her extremely high conversion rate from content that truly sells. Her monthly GMV is $550k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super high for a shop creator which is ideal for brand collabs.
 
-Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!
 ```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
@@ -303,7 +144,7 @@ Lizz's [https://www.tiktok.com/@lizzmi45] standard rate is $750 per video! Below
 5 videos (85%) → $3,100
 10 videos (75%) → $5,600
 
-We’ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
+We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
 ```
 
 ### Scenario C: Initial Inbound (Adequate Offer)
@@ -314,11 +155,8 @@ We’ve found bundles usually perform better since multiple posts make the produ
 **Do not use when:**
 - An explicit offer of the above rate is not specified
 
-**CC:** chenni@taboost.me
-
 **Approved Response:**
 ```
-Email Draft: CC chenni@taboost.me
 Hi,
 
 Thank you for the offer! I think this collab could be a good fit for Lizz [https://www.tiktok.com/@lizzmi45]. Looping in her management team who can move forward with this convo!
@@ -326,12 +164,11 @@ Thank you for the offer! I think this collab could be a good fit for Lizz [https
 
 ---
 
-## Talent: Katrina Moore
+## Talent: Sam Jones
 
-**Manager:** Chenni Li (chenni@taboost.me)  
+**Manager:** Cara Best (cara@taboost.me)
 
 **SOP Status:** ✅ APPROVED
-
 
 ### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
 
@@ -344,14 +181,77 @@ Thank you for the offer! I think this collab could be a good fit for Lizz [https
 
 **Approved Response:**
 ```
-Thank you so much for reaching out about a potential partnership with Katrina!! I’m happy to share her rates below:
+Thank you so much for reaching out about a potential partnership with Sam!! I'm happy to share her rates below:
+• 1 TikTok [https://www.tiktok.com/@sam_joness_]: $900
+• 1 IG Reel [https://www.instagram.com/its_samjones_/reels/]: $600
+• 1 UGC Video [https://samjonesugc.my.canva.site/]: $1,500 (usage can be added on for an additional cost)
+
+Sam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over $150k!
+
+Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!
+```
+
+### Scenario B: Initial Inbound (Bundle Rate Requested)
+
+**Use when:**
+- Asking for bundle rates
+
+**Do not use when:**
+- Multiple post rate is not asked for
+
+**Approved Response:**
+```
+Her standard rate is $900 per video! Below is her bundle pricing:
+
+3 videos (90%) → $2,400
+5 videos (85%) → $3,800
+10 videos (75%) → $6,750
+
+We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
+```
+
+### Scenario C: Initial Inbound (Adequate Offer)
+
+**Use when:**
+- Initially offered a rate that is OVER $900 for one post
+
+**Do not use when:**
+- An explicit offer of the above rate is not specified
+
+**Approved Response:**
+```
+Hi,
+
+Thank you for the offer! I think this collab could be a good fit for Sam [https://www.tiktok.com/@sam_joness_]. Looping in her management team who can move forward with this convo!
+```
+
+---
+
+## Talent: Katrina Moore
+
+**Manager:** Chenni Li (chenni@taboost.me)
+
+**SOP Status:** ✅ APPROVED
+
+### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
+
+**Use when:**
+- Asking for rates or a potential to collab
+- All other general inquiries
+
+**Do not use when:**
+- An exact match from scenario below
+
+**Approved Response:**
+```
+Thank you so much for reaching out about a potential partnership with Katrina!! I'm happy to share her rates below:
 • 1 TikTok [https://www.tiktok.com/@katrinagmoore]: $500
 • Cross posting to IG Reels [https://www.instagram.com/katrinamoore621/reels/]: + $150
 • 1 UGC Video: $400 (usage to be negotiated)
 
 Katrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.
 
-Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!
 ```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
@@ -370,7 +270,7 @@ Katrina's [https://www.tiktok.com/@katrinagmoore] standard rate is $500 per vide
 5 videos (85%) → $2,100
 10 videos (75%) → $3,750
 
-We’ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
+We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
 ```
 
 ### Scenario C: Initial Inbound (Adequate Offer)
@@ -381,11 +281,8 @@ We’ve found bundles usually perform better since multiple posts make the produ
 **Do not use when:**
 - An explicit offer of the above rate is not specified
 
-**CC:** chenni@taboost.me
-
 **Approved Response:**
 ```
-Email Draft: CC chenni@taboost.me
 Hi,
 
 Thank you for the offer! I think this collab could be a good fit for Katrina [https://www.tiktok.com/@katrinagmoore]. Looping in her management team who can move forward with this convo!
@@ -393,92 +290,66 @@ Thank you for the offer! I think this collab could be a good fit for Katrina [ht
 
 ---
 
-## Talent: Jenn Lyles
+## Talent: Trinity Blair
 
-**Manager:** Chenni  
+**Manager:** Chenni Li (chenni@taboost.me)
 
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
+**SOP Status:** ✅ APPROVED
 
+### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
 
----
+**Use when:**
+- Asking for rates or a potential to collab
+- All other general inquiries
 
-## Talent: Angela Callisto
+**Do not use when:**
+- An exact match from scenario below
 
-**Manager:** Chenni  
+**Approved Response:**
+```
+Thank you so much for reaching out about a potential partnership with Trinity!! I'm happy to share her media kit HERE [https://taboost.my.canva.site/trinity] + rates below:
+• 1 TikTok [https://www.tiktok.com/@trinity.blair]: $4,000
+• 1 IG Reel [https://www.instagram.com/trinyxo]: $2,000
+• Podcast [https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf] Feature: $1,500
+• 1 UGC Video: $1,500 (usage to be negotiated)
 
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
+Trinity's pricing reflects her 3.4M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!
 
+Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!
+```
 
----
+### Scenario B: Initial Inbound (Bundle Rate Requested)
 
-## Talent: Colleen Fusco
+**Use when:**
+- Asking for bundle rates
 
-**Manager:** Cara  
+**Do not use when:**
+- Multiple post rate is not asked for
 
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
+**Approved Response:**
+```
+Trinity's standard rate is $4,000 per video! HERE [https://taboost.my.canva.site/trinity] is her media kit. Below is her bundle pricing:
 
+3 videos (85%) → $10,000
+5 videos (80%) → $16,000
+10 videos (70%) → $28,000
 
----
+We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
+```
 
-## Talent: Alana Calviello
+### Scenario C: Initial Inbound (Adequate Offer)
 
-**Manager:** Nicole  
+**Use when:**
+- Initially offered a rate that is OVER $600 for one post
 
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
+**Do not use when:**
+- An explicit offer of the above rate is not specified
 
+**Approved Response:**
+```
+Hi,
 
----
-
-## Talent: Grayson Finks
-
-**Manager:** Nicole  
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
-
----
-
-## Talent: Kylika Miller
-
-**Manager:** Nicole  
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
-
----
-
-## Talent: Anastasiya Ray
-
-**Manager:** Cara  
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
-
----
-
-## Talent: Michaela
-
-**Manager:** Cara  
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
-
----
-
-## Talent: Skyler Clark
-
-**Manager:**   
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
-
----
-
-## Talent: Wesley Barker
-
-**Manager:**   
-
-**SOP Status:** ⏳ PENDING — do not draft, return Human Admin Required
-
+Thank you for the offer! I think this collab could be a good fit for Trinity [https://www.tiktok.com/@trinity.blair]. Looping in her management team who can move forward with this convo!
+```
 
 ---
