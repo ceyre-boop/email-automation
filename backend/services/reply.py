@@ -271,9 +271,13 @@ def _build_reply_messages(
         "---\n"
         f"You are drafting a reply for: {talent_name}\n"
         "Match the inbound email to the correct scenario above.\n"
-        "Return the Approved Response VERBATIM — no rewrites, no changes, no additions.\n"
+        "Return ONLY the email body text of the Approved Response VERBATIM — no rewrites, no changes, no additions.\n"
+        "Do NOT include any meta-instruction lines such as 'Email Draft:', 'CC:', or similar headers. Start directly with the greeting.\n"
         "If no scenario matches: ESCALATE: No matching approved response — human review required."
     )
+
+    if voice_profile.strip():
+        system_text += f"\n\nTALENT VOICE PROFILE:\n{voice_profile}"
 
     if manager_context_text.strip():
         system_text += f"\n\nMANAGER OVERRIDE (highest priority):\n{manager_context_text}"
@@ -382,6 +386,14 @@ def draft_reply(
     except Exception as exc:  # noqa: BLE001
         logger.error("Reply API error for %s: %s", talent_key, exc)
         return _escalate_result(f"OpenAI API error: {exc}")
+
+    # Strip any residual meta-instruction prefix GPT may have included despite instructions.
+    # e.g. "Email Draft: CC cara@taboost.me\nHi," → "Hi,"
+    _META_PREFIXES = ("email draft:", "draft:", "cc:")
+    lines = text.splitlines()
+    while lines and any(lines[0].strip().lower().startswith(p) for p in _META_PREFIXES):
+        lines.pop(0)
+    text = "\n".join(lines).strip()
 
     # Check if GPT decided to escalate
     if text.upper().startswith(_ESCALATE_PREFIX.upper()):

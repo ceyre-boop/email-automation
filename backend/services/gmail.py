@@ -54,13 +54,31 @@ def _iter_internal_link_spans(text: str):
         anchor_end = lb
         while anchor_end > 0 and text[anchor_end - 1].isspace():
             anchor_end -= 1
-        anchor_start = text.rfind("\n", 0, anchor_end) + 1
-        while anchor_start < anchor_end and text[anchor_start].isspace():
-            anchor_start += 1
-        if anchor_start < anchor_end and text[anchor_start] == "•":
-            anchor_start += 1
+
+        # Walk back to find the start of the anchor word/phrase.
+        # For bullet-list lines (e.g. "• 1 TikTok [url]"), take the whole
+        # line after stripping the bullet so the anchor is "1 TikTok".
+        # For inline usage (e.g. "… media kit HERE [url]"), stop at the
+        # nearest preceding whitespace so only the last word(s) become the
+        # anchor — not the entire sentence.
+        line_start = text.rfind("\n", 0, anchor_end) + 1
+        line_prefix = text[line_start:anchor_end].lstrip()
+        is_bullet_line = line_prefix.startswith("•") or line_prefix.startswith("-")
+
+        if is_bullet_line:
+            anchor_start = line_start
             while anchor_start < anchor_end and text[anchor_start].isspace():
                 anchor_start += 1
+            if anchor_start < anchor_end and text[anchor_start] in ("•", "-"):
+                anchor_start += 1
+                while anchor_start < anchor_end and text[anchor_start].isspace():
+                    anchor_start += 1
+        else:
+            # Inline: anchor is the last contiguous non-space word(s) before [
+            # Walk back from anchor_end to the previous whitespace character.
+            anchor_start = anchor_end
+            while anchor_start > line_start and not text[anchor_start - 1].isspace():
+                anchor_start -= 1
 
         anchor = text[anchor_start:anchor_end].strip()
         if not anchor:
