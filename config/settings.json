@@ -24,7 +24,10 @@
       "domains": [
         "taboost.me",
         "notifications.google.com",
-        "mail.google.com"
+        "mail.google.com",
+        "superordinary.com",
+        "grail-talent.com",
+        "nextwave.com"
       ],
       "senders": [],
       "emails": [
@@ -37,9 +40,14 @@
         "auto-reply",
         "automatic reply",
         "delivery status notification",
-        "mailer-daemon"
+        "mailer-daemon",
+        "weekly newsletter",
+        "newsletter"
       ],
-      "body_keywords": []
+      "body_keywords": [
+        "unsubscribe from this list",
+        "view in browser"
+      ]
     }
   },
   "reply": {
