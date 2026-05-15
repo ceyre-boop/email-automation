@@ -33,9 +33,11 @@ def _escape_and_autolink(segment: str) -> str:
 
 def _iter_internal_link_spans(text: str):
     """
-    Yield (start, end, anchor, url) spans for `Anchor [https://url]` patterns.
+    Yield (start, end, anchor, url) spans for SOP Markdown link format:
+      [Anchor Text] (https://url)
 
-    This parser is linear-time and avoids regex backtracking on large inputs.
+    start/end cover the full `[Anchor] (URL)` span including any space
+    between ] and ( so the renderer can replace it cleanly.
     """
     i = 0
     n = len(text)
@@ -46,56 +48,41 @@ def _iter_internal_link_spans(text: str):
         rb = text.find("]", lb + 1)
         if rb == -1:
             return
-        raw_url = text[lb + 1:rb].strip()
-        if not raw_url.startswith(("http://", "https://")):
+
+        anchor = text[lb + 1:rb].strip()
+        if not anchor:
             i = lb + 1
             continue
 
-        anchor_end = lb
-        while anchor_end > 0 and text[anchor_end - 1].isspace():
-            anchor_end -= 1
-
-        # Walk back to find the start of the anchor word/phrase.
-        # For bullet-list lines (e.g. "• 1 TikTok [url]"), take the whole
-        # line after stripping the bullet so the anchor is "1 TikTok".
-        # For inline usage (e.g. "… media kit HERE [url]"), stop at the
-        # nearest preceding whitespace so only the last word(s) become the
-        # anchor — not the entire sentence.
-        line_start = text.rfind("\n", 0, anchor_end) + 1
-        line_prefix = text[line_start:anchor_end].lstrip()
-        is_bullet_line = line_prefix.startswith("•") or line_prefix.startswith("-")
-
-        if is_bullet_line:
-            anchor_start = line_start
-            while anchor_start < anchor_end and text[anchor_start].isspace():
-                anchor_start += 1
-            if anchor_start < anchor_end and text[anchor_start] in ("•", "-"):
-                anchor_start += 1
-                while anchor_start < anchor_end and text[anchor_start].isspace():
-                    anchor_start += 1
-        else:
-            # Inline: anchor is the last contiguous non-space word(s) before [
-            # Walk back from anchor_end to the previous whitespace character.
-            anchor_start = anchor_end
-            while anchor_start > line_start and not text[anchor_start - 1].isspace():
-                anchor_start -= 1
-
-        anchor = text[anchor_start:anchor_end].strip()
-        if not anchor:
+        # Expect `(URL)` immediately after `]`, optionally separated by one space
+        after_rb = rb + 1
+        if after_rb < n and text[after_rb] == " ":
+            after_rb += 1
+        if after_rb >= n or text[after_rb] != "(":
             i = rb + 1
             continue
 
-        yield anchor_start, rb + 1, anchor, raw_url
-        i = rb + 1
+        rp = text.find(")", after_rb + 1)
+        if rp == -1:
+            i = rb + 1
+            continue
+
+        raw_url = text[after_rb + 1:rp].strip()
+        if not raw_url.startswith(("http://", "https://")):
+            i = rb + 1
+            continue
+
+        yield lb, rp + 1, anchor, raw_url
+        i = rp + 1
 
 
 def _render_email_body(body: str) -> tuple[str, str]:
     """
     Render body into (plain_text, html_text).
 
-    Supports internal SOP link format:
-      Anchor Text [https://example.com]
-    Plain text keeps only anchor text.
+    Supports SOP Markdown link format:
+      [Anchor Text] (https://example.com)
+    Plain text keeps only anchor text (no URL).
     HTML renders anchor text as a clickable hyperlink.
     """
     source = body or ""
