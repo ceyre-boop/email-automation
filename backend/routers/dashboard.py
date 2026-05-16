@@ -56,6 +56,9 @@ class TalentReportCard(BaseModel):
     count_good: int
     count_uncertain: int
     count_trash: int
+    count_sent: int
+    count_drafts: int
+    count_ignore: int
     total: int
     best_deal_brand: Optional[str] = None
     best_deal_rate: Optional[float] = None
@@ -69,6 +72,9 @@ class DailyReportOut(BaseModel):
     total_uncertain: int
     total_trash: int
     total_emails: int
+    total_sent: int
+    total_drafts: int
+    total_ignore: int
     talents: list[TalentReportCard]
 
 
@@ -138,24 +144,38 @@ class ContextIn(BaseModel):
     added_by: Optional[str] = None
 
 
+def _get_reset_at(db: Session, talent_key: str | None = None) -> datetime | None:
+    """Return the stored reset baseline. Per-talent key takes priority over global."""
+    keys_to_try = []
+    if talent_key:
+        keys_to_try.append(f"reset_at_{talent_key.lower()}")
+    keys_to_try.append(_DASHBOARD_RESET_KEY)
+    for k in keys_to_try:
+        row = db.query(AppState).filter(AppState.key == k).first()
+        if row and row.value_text:
+            try:
+                return datetime.fromisoformat(row.value_text)
+            except ValueError:
+                pass
+    return None
+
+
+def _set_reset_at(db: Session, when: datetime, talent_key: str | None = None) -> None:
+    key = f"reset_at_{talent_key.lower()}" if talent_key else _DASHBOARD_RESET_KEY
+    row = db.query(AppState).filter(AppState.key == key).first()
+    if not row:
+        row = AppState(key=key)
+    row.value_text = when.isoformat()
+    db.add(row)
+
+
+# Keep old names as aliases so existing callers don't break
 def _get_dashboard_reset_at(db: Session) -> datetime | None:
-    """Return the stored dashboard reset baseline from app_state as a datetime."""
-    row = db.query(AppState).filter(AppState.key == _DASHBOARD_RESET_KEY).first()
-    if not row or not row.value_text:
-        return None
-    try:
-        return datetime.fromisoformat(row.value_text)
-    except ValueError:
-        logger.warning("Invalid dashboard reset timestamp stored: %r", row.value_text)
-        return None
+    return _get_reset_at(db)
 
 
 def _set_dashboard_reset_at(db: Session, when: datetime) -> None:
-    row = db.query(AppState).filter(AppState.key == _DASHBOARD_RESET_KEY).first()
-    if not row:
-        row = AppState(key=_DASHBOARD_RESET_KEY)
-    row.value_text = when.isoformat()
-    db.add(row)
+    _set_reset_at(db, when)
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
@@ -163,61 +183,103 @@ def _set_dashboard_reset_at(db: Session, when: datetime) -> None:
 
 @router.get("/report", response_model=DailyReportOut)
 def daily_report(db: Session = Depends(get_db)):
-    """Report — shows last 7 days so data is always visible regardless of time zone."""
+    """Report — today's activity only. Badges auto-reset at midnight UTC."""
     settings = get_settings()
     talent_configs = settings.app_config.get("talents", [])
 
     today_utc = datetime.utcnow().date()
-    window_start = datetime.combine(today_utc, datetime.min.time()) - timedelta(days=7)
-    reset_at = _get_dashboard_reset_at(db)
-    report_window_start = max(window_start, reset_at) if reset_at else window_start
+    today_start = datetime.combine(today_utc, datetime.min.time())
 
-    rows = (
+    # Per-talent reset baselines — use the later of today's midnight or the manual reset
+    talent_keys_lower = [t["key"].lower() for t in talent_configs]
+    reset_rows = db.query(AppState).filter(
+        AppState.key.in_(
+            [_DASHBOARD_RESET_KEY] + [f"reset_at_{k}" for k in talent_keys_lower]
+        )
+    ).all()
+    reset_map: dict[str, datetime] = {}
+    global_reset: datetime | None = None
+    for row in reset_rows:
+        if not row.value_text:
+            continue
+        try:
+            ts = datetime.fromisoformat(row.value_text)
+        except ValueError:
+            continue
+        if row.key == _DASHBOARD_RESET_KEY:
+            global_reset = ts
+        else:
+            k = row.key.replace("reset_at_", "")
+            reset_map[k] = ts
+
+    def _window_for(talent_key: str) -> datetime:
+        """Latest of: today midnight, global reset, per-talent reset."""
+        candidates = [today_start]
+        if global_reset:
+            candidates.append(global_reset)
+        if talent_key in reset_map:
+            candidates.append(reset_map[talent_key])
+        return max(candidates)
+
+    # Load all processed emails since the earliest window we need
+    earliest = min(_window_for(k) for k in talent_keys_lower) if talent_keys_lower else today_start
+    all_emails = (
         db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= report_window_start)
+        .filter(ProcessedEmail.processed_at >= earliest)
         .all()
     )
+    emails_by_talent: dict[str, list] = defaultdict(list)
+    for e in all_emails:
+        emails_by_talent[e.talent_key.lower()].append(e)
 
-    # group by lowercase key so 'katrina' matches config key 'Katrina'
-    talent_emails: dict[str, list] = defaultdict(list)
-    for row in rows:
-        talent_emails[row.talent_key.lower()].append(row)
+    # Sent drafts per talent (status='sent') — since today or reset
+    sent_drafts = db.query(Draft).filter(
+        Draft.status == DraftStatus.sent,
+        Draft.reviewed_at >= earliest,
+    ).all()
+    sent_by_talent: dict[str, int] = defaultdict(int)
+    for d in sent_drafts:
+        sent_by_talent[d.talent_key.lower()] += 1
 
-    pending_query = (
-        db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
-        .filter(Draft.status == DraftStatus.pending)
-    )
-    if reset_at:
-        pending_query = pending_query.filter(Draft.created_at >= reset_at)
-    pending_query = pending_query.group_by(Draft.talent_key).all()
-    pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in pending_query}
+    # Pending drafts (all time — not date-windowed; pending = not yet acted on)
+    pending_all = db.query(Draft).filter(
+        Draft.status == DraftStatus.pending,
+        Draft.is_escalate == False,  # noqa: E712
+    ).all()
+    pending_by_talent: dict[str, int] = defaultdict(int)
+    for d in pending_all:
+        pending_by_talent[d.talent_key.lower()] += 1
 
-    # Separate count: only real (non-escalate) pending drafts — used for the sidebar badge
-    real_pending_query = (
-        db.query(Draft.talent_key, func.count(Draft.id).label("cnt"))
-        .filter(
-            Draft.status == DraftStatus.pending,
-            Draft.is_escalate == False,  # noqa: E712
-        )
-    )
-    if reset_at:
-        real_pending_query = real_pending_query.filter(Draft.created_at >= reset_at)
-    real_pending_query = real_pending_query.group_by(Draft.talent_key).all()
-    real_pending_map: dict[str, int] = {r.talent_key.lower(): r.cnt for r in real_pending_query}
+    pending_all_incl_escalate = db.query(Draft).filter(
+        Draft.status == DraftStatus.pending,
+    ).all()
+    pending_all_map: dict[str, int] = defaultdict(int)
+    for d in pending_all_incl_escalate:
+        pending_all_map[d.talent_key.lower()] += 1
 
     total_good = total_uncertain = total_trash = 0
+    total_sent = total_drafts = total_ignore = 0
     cards: list[TalentReportCard] = []
 
     for t_cfg in talent_configs:
         key = t_cfg["key"]
-        emails = talent_emails.get(key.lower(), [])
+        lkey = key.lower()
+        window = _window_for(lkey)
+        emails = [e for e in emails_by_talent.get(lkey, []) if e.processed_at >= window]
 
         count_good = sum(1 for e in emails if e.score == 3)
         count_uncertain = sum(1 for e in emails if e.score == 2)
         count_trash = sum(1 for e in emails if e.score == 1)
+        count_sent = sent_by_talent.get(lkey, 0)
+        count_drafts = pending_by_talent.get(lkey, 0)
+        count_ignore = count_trash  # Score 1 = Ignore
+
         total_good += count_good
         total_uncertain += count_uncertain
         total_trash += count_trash
+        total_sent += count_sent
+        total_drafts += count_drafts
+        total_ignore += count_ignore
 
         good_with_rate = [e for e in emails if e.score == 3 and e.proposed_rate]
         best = max(good_with_rate, key=lambda e: e.proposed_rate, default=None)
@@ -229,11 +291,14 @@ def daily_report(db: Session = Depends(get_db)):
             count_good=count_good,
             count_uncertain=count_uncertain,
             count_trash=count_trash,
+            count_sent=count_sent,
+            count_drafts=count_drafts,
+            count_ignore=count_ignore,
             total=len(emails),
             best_deal_brand=best.brand_name if best else None,
             best_deal_rate=best.proposed_rate if best else None,
-            pending_drafts=pending_map.get(key.lower(), 0),
-            pending_real_drafts=real_pending_map.get(key.lower(), 0),
+            pending_drafts=pending_all_map.get(lkey, 0),
+            pending_real_drafts=count_drafts,
         ))
 
     return DailyReportOut(
@@ -242,6 +307,9 @@ def daily_report(db: Session = Depends(get_db)):
         total_uncertain=total_uncertain,
         total_trash=total_trash,
         total_emails=total_good + total_uncertain + total_trash,
+        total_sent=total_sent,
+        total_drafts=total_drafts,
+        total_ignore=total_ignore,
         talents=cards,
     )
 
@@ -304,61 +372,24 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
     )
 
 @router.post("/reset-badges")
-def reset_dashboard_badges(db: Session = Depends(get_db)):
-    """
-    Clear dashboard counts and pending draft badges so the team can restart from
-    a clean baseline without deleting historical records.
-    """
-    reset_at = datetime.utcnow()
-
-    discarded_drafts = (
-        db.query(Draft)
-        .filter(Draft.status == DraftStatus.pending)
-        .update(
-            {
-                Draft.status: DraftStatus.discarded,
-                Draft.reviewed_at: reset_at,
-                Draft.reviewed_by: "dashboard-reset",
-            },
-            synchronize_session=False,
-        )
-    )
-    cleared_inbox_badges = (
-        db.query(InboxEmail)
-        .filter(
-            InboxEmail.score.is_not(None)
-            | InboxEmail.brand_name.is_not(None)
-            | InboxEmail.proposed_rate.is_not(None)
-            | InboxEmail.offer_type.is_not(None)
-            | InboxEmail.triage_reason.is_not(None)
-            | InboxEmail.triage_status.is_not(None)
-        )
-        .update(
-            {
-                InboxEmail.score: None,
-                InboxEmail.brand_name: None,
-                InboxEmail.proposed_rate: None,
-                InboxEmail.offer_type: None,
-                InboxEmail.triage_reason: None,
-                InboxEmail.triage_status: None,
-            },
-            synchronize_session=False,
-        )
-    )
-    _set_dashboard_reset_at(db, reset_at)
+def reset_all_badges(db: Session = Depends(get_db)):
+    """Zero out all badge counts from now — no drafts touched, no data deleted."""
+    now = datetime.utcnow()
+    _set_reset_at(db, now)
     db.commit()
-    logger.info(
-        "Dashboard reset at %s — discarded %d pending drafts, cleared %d inbox badge rows",
-        reset_at.isoformat(),
-        discarded_drafts,
-        cleared_inbox_badges,
-    )
-    return {
-        "ok": True,
-        "reset_at": reset_at.isoformat(),
-        "discarded_drafts": discarded_drafts,
-        "cleared_inbox_badges": cleared_inbox_badges,
-    }
+    logger.info("Global badge reset at %s", now.isoformat())
+    return {"ok": True, "reset_at": now.isoformat()}
+
+
+@router.post("/talents/{talent_key}/reset-badges")
+def reset_talent_badges(talent_key: str, db: Session = Depends(get_db)):
+    """Zero out badge counts for a single talent — no drafts touched, no data deleted."""
+    _validate_talent(talent_key)
+    now = datetime.utcnow()
+    _set_reset_at(db, now, talent_key=talent_key)
+    db.commit()
+    logger.info("Badge reset for %s at %s", talent_key, now.isoformat())
+    return {"ok": True, "talent_key": talent_key, "reset_at": now.isoformat()}
 
 
 @router.get("/context", response_model=list[ContextOut])

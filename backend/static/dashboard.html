@@ -720,7 +720,6 @@ body {
       </button>
     </div>
     <button class="btn-sync" id="btn-refresh">↻ &nbsp;Synchronize</button>
-    <button class="btn-sync" id="btn-reset-counters" style="margin-top:6px;" onclick="resetCounters()">⬜ &nbsp;Reset Counters</button>
   </div>
 </aside>
 
@@ -735,21 +734,21 @@ body {
     </div>
 
     <div class="stat-row fade-up">
-      <div class="stat-card">
-        <div class="stat-label">Total Managed</div>
-        <div class="stat-value" id="total-all">—</div>
-      </div>
       <div class="stat-card s-green">
-        <div class="stat-label">High Value Deals</div>
-        <div class="stat-value" id="total-good">—</div>
+        <div class="stat-label">Sent Today</div>
+        <div class="stat-value" id="total-sent">—</div>
       </div>
       <div class="stat-card s-amber">
-        <div class="stat-label">Needs Review</div>
-        <div class="stat-value" id="total-uncert">—</div>
+        <div class="stat-label">Drafts Pending</div>
+        <div class="stat-value" id="total-drafts">—</div>
       </div>
-      <div class="stat-card s-red">
-        <div class="stat-label">AI Filtered</div>
-        <div class="stat-value" id="total-trash">—</div>
+      <div class="stat-card">
+        <div class="stat-label">Ignored Today</div>
+        <div class="stat-value" id="total-ignore">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Total Processed</div>
+        <div class="stat-value" id="total-all">—</div>
       </div>
     </div>
 
@@ -766,7 +765,7 @@ body {
         <div class="section-head">Standard Operating Procedures</div>
         <div class="ctx-panel">
           <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; margin-bottom:10px;">📄 Open SOP Document</button>
-          <button class="btn btn-ghost" onclick="resetDashboardBadges()" style="width:100%; justify-content:center; margin-bottom:10px;">↺ Reset Dashboard Badges</button>
+          <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; margin-bottom:10px;">↺ Reset All Badge Counts</button>
           <div style="font-size:12px; color:var(--text-2); line-height:1.5;">
             The SOP document defines approved responses for every talent and scenario.
             The AI reads this document to draft replies — it is the single source of truth.
@@ -1100,14 +1099,26 @@ async function openSopModal() {
     document.getElementById('sop-modal-body').innerHTML = '<p><em>Could not load SOP document.</em></p>';
   }
 }
-async function resetCounters() {
-  if (!confirm('Reset all badges to zero? Old drafts are kept — counters just start fresh from now.')) return;
+async function resetAllBadges() {
+  if (!confirm('Reset all badge counts to zero?\n\nDrafts and emails are untouched — only the counters reset.')) return;
   try {
-    await api('POST', '/api/dashboard/reset-counters');
-    showToast('Counters reset — badges now count from this moment forward.');
+    await api('POST', '/api/dashboard/reset-badges');
     await loadOverview();
+    showToast('All badge counts reset to zero.');
   } catch (e) {
-    showToast('Failed to reset counters.');
+    showToast('Reset failed — ' + e.message);
+  }
+}
+
+async function resetTalentBadges(talentKey, btn) {
+  try {
+    btn.textContent = '…';
+    await api('POST', `/api/dashboard/talents/${talentKey}/reset-badges`);
+    await loadOverview();
+    showToast('Badges reset for ' + talentKey + '.');
+  } catch (e) {
+    btn.textContent = '↺ Reset';
+    showToast('Reset failed — ' + e.message);
   }
 }
 
@@ -1115,23 +1126,6 @@ function closeSopModal() {
   document.getElementById('sop-modal').style.display = 'none';
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
-
-async function resetDashboardBadges() {
-  const ok = confirm(
-    'Reset all dashboard badges to zero?\n\n' +
-    'This discards pending dashboard drafts and clears inbox triage badges so new activity starts from a clean slate.'
-  );
-  if (!ok) return;
-  try {
-    const result = await api('POST', '/api/dashboard/reset-badges');
-    await loadOverview();
-    showToast(
-      `Dashboard reset. Cleared ${result.discarded_drafts || 0} drafts and ${result.cleared_inbox_badges || 0} inbox badges.`
-    );
-  } catch (e) {
-    showToast('Reset failed — ' + e.message);
-  }
-}
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
 function renderSidebar() {
@@ -1159,10 +1153,10 @@ function renderSidebar() {
 function renderSummaryBar() {
   const r = state.report;
   if (!r) return;
-  document.getElementById('total-good').textContent  = r.total_good;
-  document.getElementById('total-uncert').textContent = r.total_uncertain;
-  document.getElementById('total-trash').textContent  = r.total_trash;
-  document.getElementById('total-all').textContent   = r.total_emails;
+  document.getElementById('total-sent').textContent   = r.total_sent ?? 0;
+  document.getElementById('total-drafts').textContent = r.total_drafts ?? 0;
+  document.getElementById('total-ignore').textContent = r.total_ignore ?? 0;
+  document.getElementById('total-all').textContent    = r.total_emails;
   document.getElementById('report-date').textContent  = r.report_date;
 }
 
@@ -1741,24 +1735,38 @@ async function loadAnalytics() {
         <div class="stat-value">${val}</div>
       </div>`).join('');
 
-    // Talent health
+    // Talent health — pull badge counts from report (today-scoped) merged with analytics (risk)
     const th = document.getElementById('analytics-talent-health');
-    th.innerHTML = (talent || []).filter(t => t.total_emails > 0).map(t => {
-      const pct = t.total_emails ? ((t.score3_deals / t.total_emails) * 100).toFixed(0) : 0;
-      const riskColor = t.avg_risk_score >= 5 ? 'var(--red)' : t.avg_risk_score >= 3 ? 'var(--amber)' : 'var(--green)';
-      return `<div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 12px;">
-        <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:13px; font-weight:600;">${t.full_name}</span>
-          <span style="font-size:11px; color:var(--text-3);">${t.total_emails} emails</span>
+    // Build a map of analytics talent data by key for risk scores
+    const analyticsMap = {};
+    (talent || []).forEach(t => { analyticsMap[t.talent_key] = t; });
+    // Render from report cards which have today's Sent/Drafts/Ignore
+    const reportCards = state.report?.talents || [];
+    const activeCards = reportCards.filter(c =>
+      (c.count_sent || 0) + (c.count_drafts || 0) + (c.count_ignore || 0) + (c.count_good || 0) + (c.count_uncertain || 0) > 0
+    );
+    const displayCards = activeCards.length ? activeCards : reportCards.slice(0, 8);
+    th.innerHTML = displayCards.map(c => {
+      const an = analyticsMap[c.talent_key] || {};
+      const riskScore = an.avg_risk_score || 0;
+      const riskColor = riskScore >= 5 ? 'var(--red)' : riskScore >= 3 ? 'var(--amber)' : 'var(--text-3)';
+      const sentBadge = c.count_sent > 0 ? `<span style="background:rgba(0,214,143,0.12); color:var(--green); border:1px solid rgba(0,214,143,0.25); border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600;">${c.count_sent} Sent</span>` : '';
+      const draftBadge = c.count_drafts > 0 ? `<span style="background:var(--amber-dim); color:var(--amber); border:1px solid rgba(255,179,0,0.25); border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600;">${c.count_drafts} Draft${c.count_drafts !== 1 ? 's' : ''}</span>` : '';
+      const ignoreBadge = c.count_ignore > 0 ? `<span style="background:var(--surface-3); color:var(--text-3); border:1px solid var(--border); border-radius:5px; padding:2px 8px; font-size:11px;">${c.count_ignore} Ignored</span>` : '';
+      const noBadges = !sentBadge && !draftBadge && !ignoreBadge;
+      return `<div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 14px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
+          <span style="font-size:13px; font-weight:600;">${esc(c.full_name)}</span>
+          <div style="display:flex; align-items:center; gap:8px;">
+            ${riskScore > 0 ? `<span style="font-size:10px; color:${riskColor};">⚡ risk ${riskScore}</span>` : ''}
+            <button onclick="resetTalentBadges('${c.talent_key}', this)" style="background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-3); font-size:10px; padding:2px 7px; cursor:pointer; line-height:1.4;" title="Reset badges for ${esc(c.full_name)}">↺ Reset</button>
+          </div>
         </div>
-        <div style="display:flex; gap:12px; margin-top:6px; font-size:11px; color:var(--text-3);">
-          <span style="color:var(--green);">●&nbsp;${t.score3_deals} deals</span>
-          <span style="color:var(--amber);">●&nbsp;${t.score2_review} review</span>
-          <span style="color:var(--red);">●&nbsp;${t.score1_spam} spam</span>
-          <span style="color:${riskColor};">⚡ risk ${t.avg_risk_score}</span>
+        <div style="display:flex; gap:6px; flex-wrap:wrap;">
+          ${noBadges ? `<span style="font-size:11px; color:var(--text-3);">No activity today</span>` : sentBadge + draftBadge + ignoreBadge}
         </div>
       </div>`;
-    }).join('') || '<div style="color:var(--text-3); font-size:12px;">No data yet.</div>';
+    }).join('') || '<div style="color:var(--text-3); font-size:12px; padding:12px 0;">No talent data yet.</div>';
 
     // Anomalies
     const an = document.getElementById('analytics-anomalies');
