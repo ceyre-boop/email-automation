@@ -343,6 +343,7 @@ def _process_one_message(
     draft_mode: bool,
     summary: dict,
 ):
+    import time as _time
     detail = gmail_svc.get_message_detail(token_row, message_id, db=db, service=service)
     if not detail:
         logger.warning("Empty detail for %s / %s — skipping", talent_key, message_id)
@@ -355,6 +356,11 @@ def _process_one_message(
     body = detail.get("body_text", "")
     email_date = detail.get("email_date")
     message_id_header = detail.get("message_id_header", "")
+
+    # Computed context fields
+    email_length = len(body) if body else 0
+    has_links = bool(body and ("http://" in body or "https://" in body))
+    has_attachments = bool(detail.get("has_attachments", False))
 
     # ── Guardrail: ongoing thread with existing draft/sent work → manual only ──
     if thread_id:
@@ -394,6 +400,7 @@ def _process_one_message(
             return
 
     # ── Triage ───────────────────────────────────────────────────────────────
+    _triage_start = _time.monotonic()
     triage_result = triage_svc.triage_email(
         talent_key=talent_key,
         talent_name=talent_name,
@@ -403,11 +410,29 @@ def _process_one_message(
         sender_domain=sender_domain,
         body=body,
     )
+    time_to_classify_ms = int((_time.monotonic() - _triage_start) * 1000)
     score = triage_result["score"]
     reason = triage_result["reason"]
     offer_type = triage_result["offer_type"]
     proposed_rate = triage_result["proposed_rate_usd"]
     brand_name = triage_result["brand_name"]
+    sentiment_score = triage_result.get("sentiment_score")
+    urgency_score = triage_result.get("urgency_score")
+    risk_score = triage_result.get("risk_score")
+    alternatives_considered = triage_result.get("alternatives_considered", "")
+
+    _extra = dict(
+        sender_domain=sender_domain,
+        email_length=email_length,
+        sentiment_score=sentiment_score,
+        urgency_score=urgency_score,
+        risk_score=risk_score,
+        is_thread=bool(thread_id),
+        has_attachments=has_attachments,
+        has_links=has_links,
+        alternatives_considered=alternatives_considered,
+        time_to_classify_ms=time_to_classify_ms,
+    )
 
     # ── Score 1 → Archive ────────────────────────────────────────────────────
     if score == 1:
@@ -415,7 +440,7 @@ def _process_one_message(
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
-            body_text=body, email_date=email_date,
+            body_text=body, email_date=email_date, **_extra,
         )
         db.commit()
         _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason)
@@ -427,7 +452,7 @@ def _process_one_message(
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
-            body_text=body, email_date=email_date,
+            body_text=body, email_date=email_date, **_extra,
         )
         db.commit()
         _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason)
@@ -481,6 +506,7 @@ def _process_one_message(
             summary["processed"] += 1
             return
 
+        _draft_start = _time.monotonic()
         reply_result = reply_svc.draft_reply(
             talent_key=talent_key,
             talent_name=talent_name,
@@ -494,6 +520,7 @@ def _process_one_message(
             db=db,
             body_text=body,
         )
+        time_to_draft_ms = int((_time.monotonic() - _draft_start) * 1000)
         draft_text = reply_result["draft_text"]
         is_escalate = reply_result["is_escalate"]
         escalate_reason = reply_result.get("escalate_reason")
@@ -535,6 +562,7 @@ def _process_one_message(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved,
             body_text=body, email_date=email_date,
+            time_to_draft_ms=time_to_draft_ms, **_extra,
         )
         db.commit()
 
@@ -572,6 +600,18 @@ def _record_processed(
     status: EmailStatus,
     body_text: str = "",
     email_date=None,
+    sender_domain: str | None = None,
+    email_length: int | None = None,
+    sentiment_score: int | None = None,
+    urgency_score: int | None = None,
+    risk_score: int | None = None,
+    is_thread: bool | None = None,
+    has_attachments: bool | None = None,
+    has_links: bool | None = None,
+    alternatives_considered: str | None = None,
+    time_to_classify_ms: int | None = None,
+    time_to_draft_ms: int | None = None,
+    human_override_occurred: bool = False,
 ):
     row = ProcessedEmail(
         talent_key=talent_key,
@@ -588,6 +628,18 @@ def _record_processed(
         email_date=email_date,
         processed_at=datetime.utcnow(),
         status=status,
+        sender_domain=sender_domain,
+        email_length=email_length,
+        sentiment_score=sentiment_score,
+        urgency_score=urgency_score,
+        risk_score=risk_score,
+        is_thread=is_thread,
+        has_attachments=has_attachments,
+        has_links=has_links,
+        alternatives_considered=alternatives_considered or None,
+        time_to_classify_ms=time_to_classify_ms,
+        time_to_draft_ms=time_to_draft_ms,
+        human_override_occurred=human_override_occurred,
     )
     try:
         db.add(row)

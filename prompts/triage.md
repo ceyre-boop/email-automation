@@ -16,7 +16,7 @@ Score 2 = UNCERTAIN — Do not reply. Flag for human review.
 Score 3 = RESPOND — A real business opportunity. Draft a reply.
 
 Return ONLY a JSON object. No explanation, no extra text. Format:
-{"score": <1|2|3>, "reason": "<one sentence>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|PR Request|Event Appearance|Other|Unknown>", "proposed_rate_usd": <number or 0 if not mentioned>, "brand_name": "<brand name or empty string>"}
+{"score": <1|2|3>, "reason": "<one sentence>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|PR Request|Event Appearance|Other|Unknown>", "proposed_rate_usd": <number or 0 if not mentioned>, "brand_name": "<brand name or empty string>", "sentiment_score": <0-10 integer, 0=hostile/cold 10=warm/enthusiastic>, "urgency_score": <0-10 integer, 0=no urgency 10=extremely urgent>, "risk_score": <0-10 integer, 0=totally safe 10=phishing/scam>, "alternatives_considered": "<one sentence on other scores considered and why rejected>"}
 
 ---
 

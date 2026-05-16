@@ -92,6 +92,20 @@ class ProcessedEmail(Base):
     status: Mapped[str] = mapped_column(
         Enum(EmailStatus), default=EmailStatus.flagged, nullable=False
     )
+    # ── Extended log schema ───────────────────────────────────────────────────
+    sender_domain: Mapped[str | None] = mapped_column(String(256))
+    email_length: Mapped[int | None] = mapped_column(Integer)
+    sentiment_score: Mapped[int | None] = mapped_column(Integer)   # 0-10
+    urgency_score: Mapped[int | None] = mapped_column(Integer)     # 0-10
+    risk_score: Mapped[int | None] = mapped_column(Integer)        # 0-10
+    is_thread: Mapped[bool | None] = mapped_column(Boolean)
+    has_attachments: Mapped[bool | None] = mapped_column(Boolean)
+    has_links: Mapped[bool | None] = mapped_column(Boolean)
+    alternatives_considered: Mapped[str | None] = mapped_column(Text)
+    time_to_classify_ms: Mapped[int | None] = mapped_column(Integer)
+    time_to_draft_ms: Mapped[int | None] = mapped_column(Integer)
+    human_override_occurred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    scenario_needs_improvement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
 
 class OAuthState(Base):
@@ -232,6 +246,21 @@ class AppState(Base):
     )
 
 
+class MarcoMessage(Base):
+    """AI-generated system narrative messages surfaced to the manager (Marco)."""
+
+    __tablename__ = "marco_messages"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    message: Mapped[str] = mapped_column(Text, nullable=False)
+    category: Mapped[str] = mapped_column(String(64), nullable=False)  # volume|quality|spam|escalation|health
+    talent_key: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    severity: Mapped[str] = mapped_column(String(16), default="info", nullable=False)  # info|warning|critical
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+
+
 # ── Engine / session factory ─────────────────────────────────────────────────
 # These are created lazily so tests can override DATABASE_URL before import.
 
@@ -302,3 +331,24 @@ def create_tables():
             conn.commit()
         except Exception:
             pass
+        # Extended log schema columns on processed_emails
+        for stmt in [
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS sender_domain VARCHAR(256)",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS email_length INTEGER",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS sentiment_score INTEGER",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS urgency_score INTEGER",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS risk_score INTEGER",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS is_thread BOOLEAN",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS has_attachments BOOLEAN",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS has_links BOOLEAN",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS alternatives_considered TEXT",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_classify_ms INTEGER",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_draft_ms INTEGER",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
+        ]:
+            try:
+                conn.execute(text(stmt))
+                conn.commit()
+            except Exception:
+                pass

@@ -255,6 +255,10 @@ def triage_email(
             "offer_type": "Blocked",
             "proposed_rate_usd": 0.0,
             "brand_name": "",
+            "sentiment_score": 0,
+            "urgency_score": 0,
+            "risk_score": 8,
+            "alternatives_considered": "Pre-filter blocklist match — no GPT call made.",
         }
 
     # ── Pre-filter: known automated / non-human senders → Score 1, no GPT call ──
@@ -285,6 +289,10 @@ def triage_email(
             "offer_type": "Automated",
             "proposed_rate_usd": 0.0,
             "brand_name": "",
+            "sentiment_score": 5,
+            "urgency_score": 0,
+            "risk_score": 0,
+            "alternatives_considered": "Auto-sender pre-filter — no GPT call made.",
         }
 
     messages = _build_triage_messages(
@@ -302,7 +310,7 @@ def triage_email(
         response = client.chat.completions.create(
             model=cfg.get("triage_model", "gpt-4o-mini"),
             messages=messages,
-            max_tokens=cfg.get("max_tokens_triage", 200),
+            max_tokens=cfg.get("max_tokens_triage", 350),
             temperature=cfg.get("temperature_triage", 0.1),
             response_format={"type": "json_object"},
         )
@@ -325,6 +333,12 @@ def triage_email(
     offer_type = str(result.get("offer_type", "Unknown"))
     brand_name = str(result.get("brand_name", "") or "")
 
+    def _clamp_score(val, default=5):
+        try:
+            return max(0, min(10, int(val)))
+        except (TypeError, ValueError):
+            return default
+
     # Apply special per-talent overrides
     score = _apply_special_routing(talent_key, score, offer_type, proposed_rate, policy, brand_name)
 
@@ -333,7 +347,11 @@ def triage_email(
         "reason": result.get("reason", ""),
         "offer_type": offer_type,
         "proposed_rate_usd": proposed_rate,
-        "brand_name": str(result.get("brand_name", "") or ""),
+        "brand_name": brand_name,
+        "sentiment_score": _clamp_score(result.get("sentiment_score"), 5),
+        "urgency_score": _clamp_score(result.get("urgency_score"), 0),
+        "risk_score": _clamp_score(result.get("risk_score"), 0),
+        "alternatives_considered": str(result.get("alternatives_considered", "") or ""),
     }
 
 
@@ -344,4 +362,8 @@ def _fallback(talent_key: str, note: str) -> dict:
         "offer_type": "Unknown",
         "proposed_rate_usd": 0.0,
         "brand_name": "",
+        "sentiment_score": 5,
+        "urgency_score": 0,
+        "risk_score": 0,
+        "alternatives_considered": "",
     }
