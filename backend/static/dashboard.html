@@ -753,10 +753,14 @@ body {
       </div>
     </div>
 
+    <!-- ── Main grid: Talent Health (primary) + SOP panel ────────────────── -->
     <div class="ov-grid fade-up">
       <div>
-        <div class="section-head">Talent Performance</div>
-        <div id="talent-cards-grid"></div>
+        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+          <div class="section-head" style="margin-bottom:0;">Talent Health</div>
+          <button class="btn btn-ghost" onclick="loadAnalytics()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+        </div>
+        <div id="analytics-talent-health" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
       <div>
         <div class="section-head">Standard Operating Procedures</div>
@@ -771,43 +775,22 @@ body {
       </div>
     </div>
 
-    <!-- ── Analytics sections ──────────────────────────────────────────── -->
-    <div class="fade-up" style="margin-top:36px; padding-top:28px; border-top:1px solid var(--border);">
-
-      <!-- Section header -->
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+    <!-- ── Operational stats + Anomalies ──────────────────────────────────── -->
+    <div class="fade-up" style="margin-top:28px;">
+      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px;" id="analytics-load-strip"></div>
+      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px;">
         <div>
-          <div style="font-size:18px; font-weight:800; letter-spacing:-0.01em;">Analytics</div>
-          <div style="font-size:11px; color:var(--text-3); margin-top:2px;">Last 7 days · All talent inboxes</div>
-        </div>
-        <button class="btn btn-ghost" onclick="loadAnalytics()" style="font-size:11px;">↻ Refresh</button>
-      </div>
-
-      <!-- Operational stats strip -->
-      <div id="analytics-load-strip" style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px;"></div>
-
-      <!-- Talent Health + Anomaly Detection side by side -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:24px;">
-        <div>
-          <div class="section-head" style="margin-bottom:12px;">Talent Health</div>
-          <div id="analytics-talent-health" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="section-head" style="margin-bottom:12px;">Scenario Performance</div>
+          <div id="analytics-scenarios" style="display:flex; flex-direction:column; gap:0;"></div>
         </div>
         <div>
           <div class="section-head" style="margin-bottom:12px;">Anomaly Detection</div>
           <div id="analytics-anomalies" style="display:flex; flex-direction:column; gap:8px;"></div>
         </div>
       </div>
-
-      <!-- Scenario Performance + Daily Volume side by side -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:36px;">
-        <div>
-          <div class="section-head" style="margin-bottom:12px;">Scenario Performance</div>
-          <div id="analytics-scenarios" style="display:flex; flex-direction:column; gap:6px;"></div>
-        </div>
-        <div>
-          <div class="section-head" style="margin-bottom:12px;">Daily Email Volume</div>
-          <div id="analytics-daily" style="display:flex; align-items:flex-end; gap:3px; height:96px;"></div>
-        </div>
+      <div style="margin-bottom:32px;">
+        <div class="section-head" style="margin-bottom:12px;">Daily Email Volume</div>
+        <div id="analytics-daily" style="display:flex; align-items:flex-end; gap:3px; height:96px;"></div>
       </div>
     </div>
 
@@ -1083,7 +1066,6 @@ async function loadOverview() {
     state.talents = talents;
     renderSidebar();
     renderSummaryBar();
-    renderTalentCards();
     showView('overview');
     // Load analytics + Marco in background after main overview renders
     loadAnalytics().catch(() => {});
@@ -1786,20 +1768,24 @@ async function loadAnalytics() {
         ${a.talent_key ? `<strong>${a.talent_key}:</strong> ` : ''}${a.message}
       </div>`).join('') || '<div style="color:var(--text-3); font-size:12px;">No anomalies detected.</div>';
 
-    // Scenarios
+    // Scenarios — bar fill = share of total volume; right side shows deal% + avg rate
     const sc = document.getElementById('analytics-scenarios');
-    sc.innerHTML = (scenarios || []).slice(0, 10).map(s => {
-      const w = Math.max(4, Math.round((s.score3_pct || 0) * 100));
-      return `<div style="display:flex; align-items:center; gap:10px; font-size:12px;">
-        <span style="width:140px; color:var(--text-2); flex-shrink:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${s.offer_type}">${s.offer_type}</span>
-        <span style="width:36px; text-align:right; color:var(--text-3);">${s.count}</span>
-        <div style="flex:1; background:var(--surface-3); border-radius:3px; height:6px; overflow:hidden;">
-          <div style="width:${w}%; height:100%; background:var(--green); border-radius:3px;"></div>
+    const scList = (scenarios || []).slice(0, 12);
+    const scMax = scList.length ? Math.max(...scList.map(s => s.count), 1) : 1;
+    sc.innerHTML = scList.map(s => {
+      const barW = Math.max(2, Math.round((s.count / scMax) * 100));
+      const dealPct = Math.round((s.score3_pct || 0) * 100);
+      const rateStr = s.avg_rate_usd >= 1 ? ` · $${Math.round(s.avg_rate_usd).toLocaleString()}` : '';
+      const dealColor = dealPct >= 30 ? 'var(--green)' : dealPct >= 10 ? 'var(--amber)' : 'var(--text-3)';
+      return `<div style="display:grid; grid-template-columns:130px 40px 1fr 80px; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border);">
+        <span style="font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${s.offer_type}">${s.offer_type}</span>
+        <span style="font-size:11px; color:var(--text-3); text-align:right;">${s.count}</span>
+        <div style="background:var(--surface-3); border-radius:3px; height:5px; overflow:hidden;">
+          <div style="width:${barW}%; height:100%; background:var(--green); opacity:0.7; border-radius:3px;"></div>
         </div>
-        <span style="width:36px; font-size:11px; color:var(--green);">${w}%</span>
-        ${s.avg_rate_usd ? `<span style="color:var(--text-3); font-size:11px;">$${s.avg_rate_usd}</span>` : ''}
+        <span style="font-size:11px; color:${dealColor}; text-align:right; white-space:nowrap;">${dealPct}%${rateStr}</span>
       </div>`;
-    }).join('') || '<div style="color:var(--text-3); font-size:12px;">No data yet.</div>';
+    }).join('') || '<div style="color:var(--text-3); font-size:12px; padding:12px 0;">No data yet.</div>';
 
     // Daily chart
     const daily = load.daily_volume || [];
