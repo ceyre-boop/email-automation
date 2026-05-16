@@ -1735,38 +1735,23 @@ async function loadAnalytics() {
         <div class="stat-value">${val}</div>
       </div>`).join('');
 
-    // Talent health — pull badge counts from report (today-scoped) merged with analytics (risk)
+    // Talent health — dots style: deals / review / spam / risk
     const th = document.getElementById('analytics-talent-health');
-    // Build a map of analytics talent data by key for risk scores
-    const analyticsMap = {};
-    (talent || []).forEach(t => { analyticsMap[t.talent_key] = t; });
-    // Render from report cards which have today's Sent/Drafts/Ignore
-    const reportCards = state.report?.talents || [];
-    const activeCards = reportCards.filter(c =>
-      (c.count_sent || 0) + (c.count_drafts || 0) + (c.count_ignore || 0) + (c.count_good || 0) + (c.count_uncertain || 0) > 0
-    );
-    const displayCards = activeCards.length ? activeCards : reportCards.slice(0, 8);
-    th.innerHTML = displayCards.map(c => {
-      const an = analyticsMap[c.talent_key] || {};
-      const riskScore = an.avg_risk_score || 0;
-      const riskColor = riskScore >= 5 ? 'var(--red)' : riskScore >= 3 ? 'var(--amber)' : 'var(--text-3)';
-      const sentBadge = c.count_sent > 0 ? `<span style="background:rgba(0,214,143,0.12); color:var(--green); border:1px solid rgba(0,214,143,0.25); border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600;">${c.count_sent} Sent</span>` : '';
-      const draftBadge = c.count_drafts > 0 ? `<span style="background:var(--amber-dim); color:var(--amber); border:1px solid rgba(255,179,0,0.25); border-radius:5px; padding:2px 8px; font-size:11px; font-weight:600;">${c.count_drafts} Draft${c.count_drafts !== 1 ? 's' : ''}</span>` : '';
-      const ignoreBadge = c.count_ignore > 0 ? `<span style="background:var(--surface-3); color:var(--text-3); border:1px solid var(--border); border-radius:5px; padding:2px 8px; font-size:11px;">${c.count_ignore} Ignored</span>` : '';
-      const noBadges = !sentBadge && !draftBadge && !ignoreBadge;
+    th.innerHTML = (talent || []).filter(t => t.total_emails > 0).map(t => {
+      const riskColor = t.avg_risk_score >= 5 ? 'var(--red)' : t.avg_risk_score >= 3 ? 'var(--amber)' : 'var(--text-3)';
       return `<div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 14px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:7px;">
-          <span style="font-size:13px; font-weight:600;">${esc(c.full_name)}</span>
-          <div style="display:flex; align-items:center; gap:8px;">
-            ${riskScore > 0 ? `<span style="font-size:10px; color:${riskColor};">⚡ risk ${riskScore}</span>` : ''}
-            <button onclick="resetTalentBadges('${c.talent_key}', this)" style="background:none; border:1px solid var(--border); border-radius:5px; color:var(--text-3); font-size:10px; padding:2px 7px; cursor:pointer; line-height:1.4;" title="Reset badges for ${esc(c.full_name)}">↺ Reset</button>
-          </div>
+        <div style="display:flex; justify-content:space-between; align-items:center;">
+          <span style="font-size:13px; font-weight:600;">${esc(t.full_name)}</span>
+          <span style="font-size:11px; color:var(--text-3);">${t.total_emails} emails</span>
         </div>
-        <div style="display:flex; gap:6px; flex-wrap:wrap;">
-          ${noBadges ? `<span style="font-size:11px; color:var(--text-3);">No activity today</span>` : sentBadge + draftBadge + ignoreBadge}
+        <div style="display:flex; gap:14px; margin-top:6px; font-size:12px;">
+          <span style="color:var(--green);">● ${t.score3_deals} deals</span>
+          <span style="color:var(--amber);">● ${t.score2_review} review</span>
+          <span style="color:var(--red);">● ${t.score1_spam} spam</span>
+          <span style="color:${riskColor};">⚡ risk ${t.avg_risk_score}</span>
         </div>
       </div>`;
-    }).join('') || '<div style="color:var(--text-3); font-size:12px; padding:12px 0;">No talent data yet.</div>';
+    }).join('') || '<div style="color:var(--text-3); font-size:12px; padding:12px 0;">No data yet.</div>';
 
     // Anomalies
     const an = document.getElementById('analytics-anomalies');
