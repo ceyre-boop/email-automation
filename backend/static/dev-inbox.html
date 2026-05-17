@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Dev Inbox</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg:        #080809;
+  --surface:   #101013;
+  --surface-2: #17171c;
+  --surface-3: #1e1e25;
+  --border:    rgba(255,255,255,0.07);
+  --border-2:  rgba(255,255,255,0.12);
+  --red:       #e31c25;
+  --red-dim:   rgba(227,28,37,0.18);
+  --red-line:  rgba(227,28,37,0.5);
+  --text:      #f2f2f3;
+  --text-2:    #c0c0cc;
+  --text-3:    #888896;
+  --green:     #00d68f;
+  --amber:     #ffb300;
+  --sans:      'Inter', system-ui, sans-serif;
+  --mono:      'JetBrains Mono', monospace;
+  --sidebar-w: 220px;
+}
+*,*::before,*::after { box-sizing:border-box; margin:0; padding:0; }
+body { font-family:var(--sans); background:var(--bg); color:var(--text); height:100vh; display:flex; overflow:hidden; -webkit-font-smoothing:antialiased; }
+::-webkit-scrollbar { width:4px; } ::-webkit-scrollbar-track { background:transparent; } ::-webkit-scrollbar-thumb { background:var(--surface-3); border-radius:2px; }
+
+/* ── Sidebar ── */
+#sidebar { width:var(--sidebar-w); background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; flex-shrink:0; }
+.sb-brand { padding:18px 16px 14px; border-bottom:1px solid var(--border); display:flex; align-items:center; gap:10px; }
+.sb-brand-text { font-size:13px; font-weight:700; color:var(--text); }
+.sb-brand-sub { font-size:10px; color:var(--red); font-weight:600; letter-spacing:0.08em; text-transform:uppercase; }
+.sb-section { padding:10px 12px 4px; font-size:10px; font-weight:600; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; }
+.talent-list { flex:1; overflow-y:auto; padding:4px 8px 12px; }
+.talent-item { display:flex; align-items:center; gap:9px; padding:8px 10px; border-radius:8px; cursor:pointer; transition:background 0.15s; }
+.talent-item:hover { background:var(--surface-2); }
+.talent-item.active { background:var(--red-dim); }
+.t-av { width:28px; height:28px; border-radius:50%; background:var(--red-dim); border:1px solid var(--red-line); color:var(--red); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.t-name { font-size:13px; color:var(--text-2); flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.t-dot { width:7px; height:7px; border-radius:50%; flex-shrink:0; background:var(--surface-3); }
+.t-dot.online { background:var(--green); box-shadow:0 0 6px var(--green); }
+
+/* ── Email list pane ── */
+#list-pane { width:340px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; min-height:0; }
+.pane-header { padding:14px 16px 10px; border-bottom:1px solid var(--border); flex-shrink:0; }
+.pane-title { font-size:14px; font-weight:700; color:var(--text); margin-bottom:8px; }
+.filter-tabs { display:flex; gap:4px; flex-wrap:wrap; }
+.ftab { padding:4px 10px; border-radius:6px; font-size:11px; font-weight:600; cursor:pointer; background:var(--surface-2); border:1px solid var(--border); color:var(--text-3); transition:0.15s; }
+.ftab:hover { color:var(--text-2); }
+.ftab.active { background:var(--red-dim); color:var(--red); border-color:var(--red-line); }
+.email-list { flex:1; overflow-y:auto; }
+.email-row { padding:12px 16px; border-bottom:1px solid var(--border); cursor:pointer; transition:background 0.1s; }
+.email-row:hover { background:var(--surface-2); }
+.email-row.active { background:var(--red-dim); border-left:2px solid var(--red); }
+.er-from { font-size:12px; font-weight:600; color:var(--text); margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; display:flex; align-items:center; justify-content:space-between; gap:6px; }
+.er-subject { font-size:11px; color:var(--text-2); margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.er-meta { display:flex; align-items:center; gap:6px; }
+.score-pill { font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; flex-shrink:0; }
+.score-3 { background:rgba(0,214,143,0.15); color:var(--green); }
+.score-2 { background:rgba(255,179,0,0.15); color:var(--amber); }
+.score-1 { background:rgba(227,28,37,0.15); color:var(--red); }
+.score-draft { background:rgba(227,28,37,0.2); color:var(--red); border:1px solid var(--red-line); }
+.er-date { font-size:10px; color:var(--text-3); flex-shrink:0; }
+.empty-state { padding:40px 20px; text-align:center; color:var(--text-3); font-size:12px; line-height:1.6; }
+
+/* ── Reader pane ── */
+#reader-pane { flex:1; display:flex; flex-direction:column; min-height:0; overflow:hidden; }
+.reader-empty { flex:1; display:flex; align-items:center; justify-content:center; color:var(--text-3); font-size:13px; }
+#reader-content { flex:1; overflow-y:auto; padding:24px 32px; display:none; }
+.reader-subject { font-size:17px; font-weight:700; color:var(--text); margin-bottom:12px; line-height:1.3; }
+.reader-from { font-size:12px; color:var(--text-3); margin-bottom:6px; }
+.reader-date { font-size:11px; color:var(--text-3); margin-bottom:20px; }
+.reader-actions { display:flex; gap:8px; margin-bottom:20px; flex-wrap:wrap; }
+.btn { display:inline-flex; align-items:center; gap:6px; padding:7px 14px; border-radius:8px; font-size:12px; font-weight:600; cursor:pointer; border:none; font-family:var(--sans); transition:0.15s; }
+.btn-primary { background:var(--red); color:#fff; } .btn-primary:hover { background:#c8171f; }
+.btn-ghost { background:var(--surface-2); color:var(--text-2); border:1px solid var(--border-2); } .btn-ghost:hover { background:var(--surface-3); color:var(--text); }
+.btn-sm { padding:5px 10px; font-size:11px; }
+.reader-divider { height:1px; background:var(--border); margin:20px 0; }
+.reader-body { font-size:13px; color:var(--text-2); line-height:1.75; white-space:pre-wrap; word-break:break-word; }
+.draft-box { background:var(--surface-2); border:1px solid var(--border-2); border-left:3px solid var(--red); border-radius:10px; padding:16px 18px; margin-top:20px; }
+.draft-box-label { font-size:10px; font-weight:700; color:var(--red); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:10px; }
+.draft-text { font-size:13px; color:var(--text); line-height:1.75; white-space:pre-wrap; font-family:var(--mono); }
+.triage-box { background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 16px; margin-top:16px; font-size:12px; color:var(--text-3); line-height:1.6; }
+.triage-label { font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:6px; }
+.spinner { display:inline-block; width:14px; height:14px; border:2px solid var(--border-2); border-top-color:var(--text-3); border-radius:50%; animation:spin 0.7s linear infinite; } @keyframes spin { to { transform:rotate(360deg); } }
+#toast { position:fixed; bottom:24px; left:50%; transform:translateX(-50%); background:var(--surface-3); border:1px solid var(--border-2); color:var(--text); padding:10px 20px; border-radius:10px; font-size:13px; font-weight:500; opacity:0; transition:opacity 0.2s; pointer-events:none; z-index:999; }
+</style>
+</head>
+<body>
+
+<aside id="sidebar">
+  <div class="sb-brand">
+    <div>
+      <div class="sb-brand-text">Dev Inbox</div>
+      <div class="sb-brand-sub">🔒 Internal Only</div>
+    </div>
+  </div>
+  <div class="sb-section">Talent Inboxes</div>
+  <div class="talent-list" id="talent-list"></div>
+</aside>
+
+<div id="list-pane">
+  <div class="pane-header">
+    <div class="pane-title" id="pane-title">Select a talent</div>
+    <div class="filter-tabs">
+      <div class="ftab active" data-filter="all" onclick="setFilter('all',this)">All</div>
+      <div class="ftab" data-filter="3" onclick="setFilter('3',this)">Deals</div>
+      <div class="ftab" data-filter="2" onclick="setFilter('2',this)">Review</div>
+      <div class="ftab" data-filter="1" onclick="setFilter('1',this)">Ignored</div>
+      <div class="ftab" data-filter="drafts" onclick="setFilter('drafts',this)">AI Drafts</div>
+    </div>
+  </div>
+  <div class="email-list" id="email-list">
+    <div class="empty-state">Select a talent to load their inbox.</div>
+  </div>
+</div>
+
+<div id="reader-pane">
+  <div class="reader-empty" id="reader-empty">← Select an email</div>
+  <div id="reader-content"></div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ── Config ──────────────────────────────────────────────────────────────────
+let API_KEY = localStorage.getItem('dev_inbox_api_key') || '';
+
+const state = {
+  talent: null,
+  emails: [],       // from inbox/live
+  drafts: [],       // from drafts endpoint
+  filter: 'all',
+  selectedId: null,
+};
+
+// ── API ─────────────────────────────────────────────────────────────────────
+async function api(method, path, body) {
+  const opts = { method, headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' } };
+  if (body) opts.body = JSON.stringify(body);
+  const r = await fetch(path, opts);
+  if (r.status === 403) { promptKey(); throw new Error('Unauthorized'); }
+  if (!r.ok) throw new Error((await r.json().catch(() => ({}))).detail || r.statusText);
+  return r.json();
+}
+
+function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
+function fmtDate(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
+}
+function senderName(s) {
+  if (!s) return 'Unknown';
+  const m = s.match(/^"?([^"<]+)"?\s*</);
+  return m ? m[1].trim() : s.split('@')[0];
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = 1;
+  setTimeout(() => { t.style.opacity = 0; }, 3000);
+}
+
+// ── API key prompt ───────────────────────────────────────────────────────────
+function promptKey() {
+  const key = prompt('Enter API key:');
+  if (key) { API_KEY = key; localStorage.setItem('dev_inbox_api_key', key); bootstrap(); }
+}
+
+// ── Bootstrap ────────────────────────────────────────────────────────────────
+async function bootstrap() {
+  if (!API_KEY) { promptKey(); return; }
+  try {
+    const talents = await api('GET', '/api/dashboard/talents');
+    renderSidebar(talents);
+  } catch(e) { console.error(e); }
+}
+
+function renderSidebar(talents) {
+  const ul = document.getElementById('talent-list');
+  ul.innerHTML = '';
+  talents.forEach(t => {
+    const li = document.createElement('div');
+    li.className = 'talent-item';
+    li.innerHTML = `
+      <div class="t-av">${t.full_name[0].toUpperCase()}</div>
+      <span class="t-name">${esc(t.full_name)}</span>
+      <div class="t-dot ${t.connected ? 'online' : ''}"></div>`;
+    li.addEventListener('click', () => loadTalent(t));
+    ul.appendChild(li);
+  });
+}
+
+// ── Load talent ──────────────────────────────────────────────────────────────
+async function loadTalent(talent) {
+  state.talent = talent;
+  state.selectedId = null;
+
+  document.querySelectorAll('.talent-item').forEach(el => el.classList.remove('active'));
+  event.currentTarget.classList.add('active');
+  document.getElementById('pane-title').textContent = talent.full_name;
+  document.getElementById('email-list').innerHTML = '<div class="empty-state"><span class="spinner"></span></div>';
+  document.getElementById('reader-empty').style.display = 'flex';
+  document.getElementById('reader-content').style.display = 'none';
+
+  try {
+    const [emails, drafts] = await Promise.all([
+      api('GET', `/api/dashboard/talents/${talent.key}/inbox/live`),
+      api('GET', `/api/dashboard/talents/${talent.key}/drafts`),
+    ]);
+    state.emails = emails || [];
+    state.drafts = drafts || [];
+    renderList();
+  } catch(e) {
+    document.getElementById('email-list').innerHTML = `<div class="empty-state">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Filter ───────────────────────────────────────────────────────────────────
+function setFilter(f, el) {
+  state.filter = f;
+  document.querySelectorAll('.ftab').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderList();
+}
+
+// ── Render email list ─────────────────────────────────────────────────────────
+function renderList() {
+  const list = document.getElementById('email-list');
+
+  if (state.filter === 'drafts') {
+    if (!state.drafts.length) {
+      list.innerHTML = '<div class="empty-state">No AI drafts for this talent.</div>';
+      return;
+    }
+    list.innerHTML = state.drafts.map(d => `
+      <div class="email-row ${state.selectedId === 'draft-'+d.id ? 'active' : ''}"
+           onclick="openDraft(${d.id})">
+        <div class="er-from">
+          <span>${esc(senderName(d.sender))}</span>
+          <span class="score-pill score-draft">DRAFT</span>
+        </div>
+        <div class="er-subject">${esc(d.subject || '(no subject)')}</div>
+        <div class="er-meta">
+          <span class="er-date">${fmtDate(d.created_at)}</span>
+          ${d.is_escalate ? '<span class="score-pill score-2">ESCALATE</span>' : ''}
+          ${d.brand_name ? `<span style="font-size:10px;color:var(--text-3);">${esc(d.brand_name)}</span>` : ''}
+        </div>
+      </div>`).join('');
+    return;
+  }
+
+  let emails = state.emails;
+  if (state.filter !== 'all') {
+    const s = parseInt(state.filter);
+    emails = emails.filter(e => e.score === s);
+  }
+
+  if (!emails.length) {
+    list.innerHTML = '<div class="empty-state">No emails matching this filter.</div>';
+    return;
+  }
+
+  const draftIds = new Set(state.drafts.map(d => d.gmail_message_id));
+
+  list.innerHTML = emails.map(e => {
+    const scoreClass = e.score === 3 ? 'score-3' : e.score === 2 ? 'score-2' : e.score === 1 ? 'score-1' : '';
+    const scoreLabel = e.score === 3 ? 'Deal' : e.score === 2 ? 'Review' : e.score === 1 ? 'Ignored' : '?';
+    const hasDraft = draftIds.has(e.gmail_message_id);
+    return `
+      <div class="email-row ${state.selectedId === e.gmail_message_id ? 'active' : ''}"
+           onclick="openEmail('${e.gmail_message_id}')">
+        <div class="er-from">
+          <span>${esc(senderName(e.sender))}</span>
+          ${e.score ? `<span class="score-pill ${scoreClass}">${scoreLabel}</span>` : ''}
+        </div>
+        <div class="er-subject">${esc(e.subject || '(no subject)')}</div>
+        <div class="er-meta">
+          <span class="er-date">${fmtDate(e.email_date || e.processed_at)}</span>
+          ${hasDraft ? '<span class="score-pill score-draft" style="font-size:9px;">AI Draft</span>' : ''}
+          ${e.proposed_rate ? `<span style="font-size:10px;color:var(--green);">$${e.proposed_rate}</span>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+}
+
+// ── Open email ────────────────────────────────────────────────────────────────
+async function openEmail(msgId) {
+  state.selectedId = msgId;
+  renderList();
+  const email = state.emails.find(e => e.gmail_message_id === msgId);
+  const draft = state.drafts.find(d => d.gmail_message_id === msgId);
+
+  const rc = document.getElementById('reader-content');
+  document.getElementById('reader-empty').style.display = 'none';
+  rc.style.display = 'block';
+  rc.innerHTML = `
+    <div class="reader-subject">${esc(email?.subject || '(no subject)')}</div>
+    <div class="reader-from">From: ${esc(email?.sender || '')}</div>
+    <div class="reader-date">${fmtDate(email?.email_date)}</div>
+    <div class="reader-actions">
+      <button class="btn btn-ghost btn-sm" onclick="forceDraft('${msgId}')">✦ Force AI Draft</button>
+    </div>
+    ${email?.triage_reason ? `
+    <div class="triage-box">
+      <div class="triage-label">AI Triage</div>
+      <div>Score: ${email.score || '?'} · Offer: ${esc(email.offer_type || '?')} ${email.proposed_rate ? '· $' + email.proposed_rate : ''}</div>
+      <div style="margin-top:4px;color:var(--text-2);">${esc(email.triage_reason)}</div>
+    </div>` : ''}
+    <div class="reader-divider"></div>
+    <div class="reader-body" id="email-body-text">Loading body…</div>
+    ${draft ? `
+    <div class="draft-box">
+      <div class="draft-box-label">AI Draft Reply ${draft.is_escalate ? '· ESCALATION' : ''}</div>
+      ${draft.escalate_reason ? `<div style="font-size:11px;color:var(--amber);margin-bottom:8px;">${esc(draft.escalate_reason)}</div>` : ''}
+      <div class="draft-text">${esc(draft.draft_text)}</div>
+    </div>` : ''}
+  `;
+
+  // Load body async
+  try {
+    const b = await api('GET', `/api/dashboard/talents/${state.talent.key}/emails/${msgId}/body`);
+    const el = document.getElementById('email-body-text');
+    if (el) el.textContent = b.body || '(no body)';
+  } catch(e) {
+    const el = document.getElementById('email-body-text');
+    if (el) el.textContent = '(could not load body)';
+  }
+}
+
+// ── Open draft (from Drafts tab) ─────────────────────────────────────────────
+async function openDraft(draftId) {
+  state.selectedId = 'draft-' + draftId;
+  renderList();
+  const draft = state.drafts.find(d => d.id === draftId);
+  if (!draft) return;
+
+  document.getElementById('reader-empty').style.display = 'none';
+  const rc = document.getElementById('reader-content');
+  rc.style.display = 'block';
+  rc.innerHTML = `
+    <div class="reader-subject">${esc(draft.subject || '(no subject)')}</div>
+    <div class="reader-from">To: ${esc(draft.sender || '')}</div>
+    <div class="reader-date">Draft created: ${fmtDate(draft.created_at)} · Status: ${esc(draft.status)}</div>
+    <div class="reader-actions">
+      <button class="btn btn-ghost btn-sm" onclick="openEmail('${draft.gmail_message_id}')">← View Original Email</button>
+    </div>
+    ${draft.brand_name ? `<div style="font-size:12px;color:var(--text-3);margin-bottom:12px;">Brand: ${esc(draft.brand_name)}${draft.proposed_rate ? ' · $' + draft.proposed_rate : ''} · ${esc(draft.offer_type || '')}</div>` : ''}
+    ${draft.is_escalate ? `<div style="background:rgba(255,179,0,0.12);border:1px solid rgba(255,179,0,0.3);border-radius:8px;padding:10px 14px;font-size:12px;color:var(--amber);margin-bottom:16px;">⚠ Escalation: ${esc(draft.escalate_reason || '')}</div>` : ''}
+    <div class="draft-box">
+      <div class="draft-box-label">AI Draft Reply</div>
+      <div class="draft-text">${esc(draft.draft_text)}</div>
+    </div>
+  `;
+}
+
+// ── Force draft ───────────────────────────────────────────────────────────────
+async function forceDraft(msgId) {
+  if (!state.talent) return;
+  try {
+    showToast('Queuing AI draft…');
+    await api('POST', `/api/dashboard/talents/${state.talent.key}/force-draft/${msgId}`);
+    showToast('AI draft queued — check Drafts tab in ~15s.');
+    setTimeout(() => loadTalent(state.talent), 18000);
+  } catch(e) {
+    showToast('Failed: ' + e.message);
+  }
+}
+
+bootstrap();
+</script>
+</body>
+</html>

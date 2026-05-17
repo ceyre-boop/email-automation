@@ -73,6 +73,7 @@ def dashboard_page():
 _connect_html_path = Path(__file__).parent / "static" / "connect.html"
 _index_html_path = Path(__file__).parent / "static" / "index.html"
 _home_html_path = Path(__file__).parent / "static" / "home.html"
+_dev_inbox_html_path = Path(__file__).parent / "static" / "dev-inbox.html"
 
 
 @app.get("/api/talents", include_in_schema=False)
@@ -236,6 +237,12 @@ _TERMS_HTML = """<!DOCTYPE html>
 </div>
 </body>
 </html>"""
+
+
+@app.get("/ops", response_class=HTMLResponse, include_in_schema=False)
+def dev_inbox_page():
+    """Dev-only inbox viewer — not linked anywhere on the main site."""
+    return HTMLResponse(content=_dev_inbox_html_path.read_text(encoding="utf-8"))
 
 
 @app.get("/connect", response_class=HTMLResponse, include_in_schema=False)
