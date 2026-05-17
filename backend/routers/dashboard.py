@@ -56,9 +56,10 @@ class TalentReportCard(BaseModel):
     count_good: int
     count_uncertain: int
     count_trash: int
-    count_sent: int
-    count_drafts: int
-    count_ignore: int
+    count_sent: int          # sent today
+    count_drafts: int        # all-time pending (backlog) — used for sidebar badge
+    new_drafts_today: int    # pending drafts created today — used for sidebar badge
+    count_ignore: int        # score=1 today
     total: int
     best_deal_brand: Optional[str] = None
     best_deal_rate: Optional[float] = None
@@ -73,7 +74,8 @@ class DailyReportOut(BaseModel):
     total_trash: int
     total_emails: int
     total_sent: int
-    total_drafts: int
+    total_draft_backlog: int   # all-time pending drafts waiting for review
+    total_new_drafts_today: int  # drafts generated today
     total_ignore: int
     talents: list[TalentReportCard]
 
@@ -241,24 +243,27 @@ def daily_report(db: Session = Depends(get_db)):
     for d in sent_drafts:
         sent_by_talent[d.talent_key.lower()] += 1
 
-    # Pending drafts (all time — not date-windowed; pending = not yet acted on)
-    pending_all = db.query(Draft).filter(
+    # Draft backlog — all pending non-escalation drafts regardless of date
+    all_pending = db.query(Draft).filter(
         Draft.status == DraftStatus.pending,
         Draft.is_escalate == False,  # noqa: E712
     ).all()
-    pending_by_talent: dict[str, int] = defaultdict(int)
-    for d in pending_all:
-        pending_by_talent[d.talent_key.lower()] += 1
+    backlog_by_talent: dict[str, int] = defaultdict(int)
+    for d in all_pending:
+        backlog_by_talent[d.talent_key.lower()] += 1
 
-    pending_all_incl_escalate = db.query(Draft).filter(
+    # New drafts today — pending drafts created since each talent's window start
+    all_pending_with_date = db.query(Draft).filter(
         Draft.status == DraftStatus.pending,
+        Draft.is_escalate == False,  # noqa: E712
+        Draft.created_at >= earliest,
     ).all()
-    pending_all_map: dict[str, int] = defaultdict(int)
-    for d in pending_all_incl_escalate:
-        pending_all_map[d.talent_key.lower()] += 1
+    new_today_by_talent: dict[str, list] = defaultdict(list)
+    for d in all_pending_with_date:
+        new_today_by_talent[d.talent_key.lower()].append(d)
 
     total_good = total_uncertain = total_trash = 0
-    total_sent = total_drafts = total_ignore = 0
+    total_sent = total_draft_backlog = total_new_drafts_today = total_ignore = 0
     cards: list[TalentReportCard] = []
 
     for t_cfg in talent_configs:
@@ -271,14 +276,16 @@ def daily_report(db: Session = Depends(get_db)):
         count_uncertain = sum(1 for e in emails if e.score == 2)
         count_trash = sum(1 for e in emails if e.score == 1)
         count_sent = sent_by_talent.get(lkey, 0)
-        count_drafts = pending_by_talent.get(lkey, 0)
-        count_ignore = count_trash  # Score 1 = Ignore
+        count_backlog = backlog_by_talent.get(lkey, 0)
+        count_new_today = sum(1 for d in new_today_by_talent.get(lkey, []) if d.created_at >= window)
+        count_ignore = count_trash
 
         total_good += count_good
         total_uncertain += count_uncertain
         total_trash += count_trash
         total_sent += count_sent
-        total_drafts += count_drafts
+        total_draft_backlog += count_backlog
+        total_new_drafts_today += count_new_today
         total_ignore += count_ignore
 
         good_with_rate = [e for e in emails if e.score == 3 and e.proposed_rate]
@@ -292,13 +299,14 @@ def daily_report(db: Session = Depends(get_db)):
             count_uncertain=count_uncertain,
             count_trash=count_trash,
             count_sent=count_sent,
-            count_drafts=count_drafts,
+            count_drafts=count_backlog,
+            new_drafts_today=count_new_today,
             count_ignore=count_ignore,
             total=len(emails),
             best_deal_brand=best.brand_name if best else None,
             best_deal_rate=best.proposed_rate if best else None,
-            pending_drafts=pending_all_map.get(lkey, 0),
-            pending_real_drafts=count_drafts,
+            pending_drafts=count_backlog,
+            pending_real_drafts=count_new_today,  # sidebar badge = new today
         ))
 
     return DailyReportOut(
@@ -308,7 +316,8 @@ def daily_report(db: Session = Depends(get_db)):
         total_trash=total_trash,
         total_emails=total_good + total_uncertain + total_trash,
         total_sent=total_sent,
-        total_drafts=total_drafts,
+        total_draft_backlog=total_draft_backlog,
+        total_new_drafts_today=total_new_drafts_today,
         total_ignore=total_ignore,
         talents=cards,
     )

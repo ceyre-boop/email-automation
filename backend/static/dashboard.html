@@ -739,16 +739,16 @@ body {
         <div class="stat-value" id="total-sent">—</div>
       </div>
       <div class="stat-card s-amber">
-        <div class="stat-label">Drafts Pending</div>
-        <div class="stat-value" id="total-drafts">—</div>
+        <div class="stat-label">New Drafts Today</div>
+        <div class="stat-value" id="total-new-drafts">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Draft Backlog</div>
+        <div class="stat-value" id="total-draft-backlog">—</div>
       </div>
       <div class="stat-card">
         <div class="stat-label">Ignored Today</div>
         <div class="stat-value" id="total-ignore">—</div>
-      </div>
-      <div class="stat-card">
-        <div class="stat-label">Total Processed</div>
-        <div class="stat-value" id="total-all">—</div>
       </div>
     </div>
 
@@ -1153,11 +1153,11 @@ function renderSidebar() {
 function renderSummaryBar() {
   const r = state.report;
   if (!r) return;
-  document.getElementById('total-sent').textContent   = r.total_sent ?? 0;
-  document.getElementById('total-drafts').textContent = r.total_drafts ?? 0;
-  document.getElementById('total-ignore').textContent = r.total_ignore ?? 0;
-  document.getElementById('total-all').textContent    = r.total_emails;
-  document.getElementById('report-date').textContent  = r.report_date;
+  document.getElementById('total-sent').textContent         = r.total_sent ?? 0;
+  document.getElementById('total-new-drafts').textContent   = r.total_new_drafts_today ?? 0;
+  document.getElementById('total-draft-backlog').textContent = r.total_draft_backlog ?? 0;
+  document.getElementById('total-ignore').textContent       = r.total_ignore ?? 0;
+  document.getElementById('report-date').textContent        = r.report_date;
 }
 
 // ── Talent cards ───────────────────────────────────────────────────────────
