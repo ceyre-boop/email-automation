@@ -798,7 +798,7 @@ body {
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
         <div>
           <div style="font-size:18px; font-weight:800; letter-spacing:-0.01em;">Marco</div>
-          <div style="font-size:11px; color:var(--text-3); margin-top:2px;">AI operations analyst — system intelligence for the manager</div>
+          <div style="font-size:11px; color:var(--text-3); margin-top:2px;">AI analyst · messages reference 7-day data, not today's counts</div>
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost" onclick="loadMarco()" style="font-size:11px;">↻ Refresh</button>
@@ -1141,7 +1141,6 @@ function renderSidebar() {
     li.innerHTML = `
       <div class="t-avatar">${initial(t.full_name)}</div>
       <span class="t-name">${esc(t.full_name)}</span>
-      ${pending > 0 ? `<span class="t-badge">${pending}</span>` : ''}
       <div class="t-dot ${t.connected ? 'online' : 'offline'}"></div>
     `;
     li.addEventListener('click', () => openRealGmail(t));
