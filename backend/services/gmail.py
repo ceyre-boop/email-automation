@@ -76,35 +76,65 @@ def _iter_internal_link_spans(text: str):
         i = rp + 1
 
 
+def _apply_inline_formatting(text: str) -> str:
+    """
+    Convert markdown-style inline formatting to HTML for Gmail rendering.
+    Handles **bold**, __underline__, and the SOP [b]...[/b] / [ul]...[/ul] tags.
+    Runs AFTER html.escape so we're working on escaped text.
+    """
+    import re
+    # **bold** → <strong>bold</strong>
+    text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
+    # __underline__ → <u>underline</u>
+    text = re.sub(r'__(.+?)__', r'<u>\1</u>', text, flags=re.DOTALL)
+    # SOP hard-coded tags (case-insensitive): [b]...[/b] and [ul]...[/ul]
+    text = re.sub(r'\[b\](.+?)\[/b\]', r'<strong>\1</strong>', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'\[ul\](.+?)\[/ul\]', r'<u>\1</u>', text, flags=re.IGNORECASE | re.DOTALL)
+    return text
+
+
+def _strip_inline_formatting(text: str) -> str:
+    """Remove formatting markers for plain-text version."""
+    import re
+    text = re.sub(r'\*\*(.+?)\*\*', r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'__(.+?)__', r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'\[b\](.+?)\[/b\]', r'\1', text, flags=re.IGNORECASE | re.DOTALL)
+    text = re.sub(r'\[ul\](.+?)\[/ul\]', r'\1', text, flags=re.IGNORECASE | re.DOTALL)
+    return text
+
+
 def _render_email_body(body: str) -> tuple[str, str]:
     """
     Render body into (plain_text, html_text).
 
-    Supports SOP Markdown link format:
-      [Anchor Text] (https://example.com)
-    Plain text keeps only anchor text (no URL).
-    HTML renders anchor text as a clickable hyperlink.
+    Supports:
+      [Anchor Text] (https://example.com)  → clickable link
+      **bold text**                          → <strong>
+      __underlined text__                    → <u>
+      [b]bold[/b]  /  [ul]underline[/ul]    → same (SOP hard-coded tags)
     """
     source = body or ""
     spans = list(_iter_internal_link_spans(source))
-    if not spans:
-        return source, f"<div>{_escape_and_autolink(source).replace('\n', '<br>')}</div>"
 
     plain_chunks: list[str] = []
     html_chunks: list[str] = []
     cursor = 0
+
     for start, end, anchor, url in spans:
-        plain_chunks.append(source[cursor:start])
+        segment = source[cursor:start]
+        plain_chunks.append(_strip_inline_formatting(segment))
+        html_chunks.append(_apply_inline_formatting(_escape_and_autolink(segment)))
         plain_chunks.append(anchor)
-        html_chunks.append(_escape_and_autolink(source[cursor:start]))
         anchor_text = html.escape(anchor)
-        url = html.escape(url, quote=True)
-        html_chunks.append(f'<a href="{url}">{anchor_text}</a>')
+        url_escaped = html.escape(url, quote=True)
+        html_chunks.append(f'<a href="{url_escaped}">{anchor_text}</a>')
         cursor = end
 
-    plain_chunks.append(source[cursor:])
+    tail = source[cursor:]
+    plain_chunks.append(_strip_inline_formatting(tail))
+    html_chunks.append(_apply_inline_formatting(_escape_and_autolink(tail)))
+
     plain = "".join(plain_chunks)
-    html_chunks.append(_escape_and_autolink(source[cursor:]))
     html_body = "".join(html_chunks)
     return plain, f"<div>{html_body.replace('\n', '<br>')}</div>"
 
