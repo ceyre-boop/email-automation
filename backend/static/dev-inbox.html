@@ -151,7 +151,9 @@ async function api(method, path, body) {
 function esc(s) { const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML; }
 function fmtDate(iso) {
   if (!iso) return '';
-  const d = new Date(iso);
+  // Append Z if no timezone info so JS treats it as UTC and converts to local time
+  const ts = iso.endsWith('Z') || iso.includes('+') ? iso : iso + 'Z';
+  const d = new Date(ts);
   return d.toLocaleDateString('en-US', { month:'short', day:'numeric' }) + ' ' + d.toLocaleTimeString('en-US', { hour:'numeric', minute:'2-digit' });
 }
 function senderName(s) {
