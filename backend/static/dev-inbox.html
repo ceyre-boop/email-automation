@@ -272,18 +272,22 @@ function renderList() {
     const scoreClass = e.score === 3 ? 'score-3' : e.score === 2 ? 'score-2' : e.score === 1 ? 'score-1' : '';
     const scoreLabel = e.score === 3 ? 'Deal' : e.score === 2 ? 'Review' : e.score === 1 ? 'Ignored' : '?';
     const hasDraft = draftIds.has(e.gmail_message_id);
+    const reason = e.triage_reason || '';
     return `
       <div class="email-row ${state.selectedId === e.gmail_message_id ? 'active' : ''}"
            onclick="openEmail('${e.gmail_message_id}')">
         <div class="er-from">
           <span>${esc(senderName(e.sender))}</span>
-          ${e.score ? `<span class="score-pill ${scoreClass}">${scoreLabel}</span>` : ''}
+          <div style="display:flex;gap:5px;align-items:center;">
+            ${e.score ? `<span class="score-pill ${scoreClass}">${scoreLabel}</span>` : ''}
+            ${hasDraft ? '<span class="score-pill score-draft" style="font-size:9px;">Draft</span>' : ''}
+            ${e.proposed_rate ? `<span style="font-size:10px;color:var(--green);">$${e.proposed_rate}</span>` : ''}
+          </div>
         </div>
         <div class="er-subject">${esc(e.subject || '(no subject)')}</div>
-        <div class="er-meta">
+        ${reason ? `<div style="font-size:10px;color:var(--text-3);margin-top:3px;line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;">${esc(reason)}</div>` : ''}
+        <div class="er-meta" style="margin-top:4px;">
           <span class="er-date">${fmtDate(e.email_date || e.processed_at)}</span>
-          ${hasDraft ? '<span class="score-pill score-draft" style="font-size:9px;">AI Draft</span>' : ''}
-          ${e.proposed_rate ? `<span style="font-size:10px;color:var(--green);">$${e.proposed_rate}</span>` : ''}
         </div>
       </div>`;
   }).join('');

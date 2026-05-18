@@ -27,6 +27,10 @@ Write 3-6 short, direct messages based on the system data provided.
 Each message should be one or two sentences. Be specific — cite numbers, talent names, trends.
 Avoid generic platitudes. Only flag things that matter.
 
+Pay special attention to Score 2 (Review) emails — these are real brand deals the AI flagged
+but did NOT draft a reply for. The snapshot includes the most common reasons the AI gave for
+scoring emails as Review instead of Draft. Surface these patterns clearly.
+
 Categorize each message as one of: volume, quality, spam, escalation, health
 
 Rate severity as: info, warning, critical
@@ -113,8 +117,9 @@ def _build_snapshot(db: Session, settings) -> dict:
         PollHealth.polled_at >= since_7d, PollHealth.error_message != None  # noqa: E711
     ).count()
 
-    # Per-talent summary
+    # Per-talent summary + Score 2 triage reasons (why emails weren't drafted)
     talent_summary = {}
+    score2_reasons: list[str] = []
     for e in emails_7d:
         key = e.talent_key.lower()
         if key not in talent_summary:
@@ -125,12 +130,17 @@ def _build_snapshot(db: Session, settings) -> dict:
             talent_summary[key]["score1"] += 1
         elif e.score == 2:
             talent_summary[key]["score2"] += 1
+            if e.triage_reason:
+                score2_reasons.append(e.triage_reason)
         elif e.score == 3:
             talent_summary[key]["score3"] += 1
         if (e.risk_score or 0) >= 7:
             talent_summary[key]["high_risk"] += 1
         if e.human_override_occurred:
             talent_summary[key]["overrides"] += 1
+
+    # Summarise the 20 most recent Score 2 reasons so Marco can explain the pattern
+    recent_score2_reasons = score2_reasons[-20:] if score2_reasons else []
 
     # Offer type distribution
     offer_counts: dict[str, int] = {}
@@ -143,13 +153,17 @@ def _build_snapshot(db: Session, settings) -> dict:
         / max(1, sum(1 for e in emails_7d if e.time_to_classify_ms))
     )
 
+    score2_total = sum(1 for e in emails_7d if e.score == 2)
+    score3_total = sum(1 for e in emails_7d if e.score == 3)
+
     return {
         "timestamp": now.isoformat(),
         "last_7_days": {
             "total_emails": len(emails_7d),
             "score1_spam": sum(1 for e in emails_7d if e.score == 1),
-            "score2_review": sum(1 for e in emails_7d if e.score == 2),
-            "score3_deals": sum(1 for e in emails_7d if e.score == 3),
+            "score2_review": score2_total,
+            "score3_deals": score3_total,
+            "draft_conversion_rate": round(score3_total / max(score2_total + score3_total, 1), 2),
             "escalations": escalations_7d,
             "poll_errors": poll_errors_7d,
             "avg_classify_ms": round(avg_classify),
@@ -157,6 +171,7 @@ def _build_snapshot(db: Session, settings) -> dict:
         "last_24_hours": {
             "total_emails": len(emails_1d),
             "score1_spam": sum(1 for e in emails_1d if e.score == 1),
+            "score2_review": sum(1 for e in emails_1d if e.score == 2),
             "score3_deals": sum(1 for e in emails_1d if e.score == 3),
         },
         "current_state": {
@@ -165,4 +180,5 @@ def _build_snapshot(db: Session, settings) -> dict:
         },
         "per_talent": talent_summary,
         "offer_type_distribution": offer_counts,
+        "score2_reasons_why_not_drafted": recent_score2_reasons,
     }
