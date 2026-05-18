@@ -30,6 +30,12 @@ def _get_triage_sections() -> tuple[str, str]:
     return _triage_sections
 
 
+def clear_triage_cache() -> None:
+    """Force reload of triage prompt on next call. Call after prompt file updates."""
+    global _triage_sections
+    _triage_sections = None
+
+
 # ── Prompt parsing ────────────────────────────────────────────────────────────
 
 def _parse_prompt_sections(raw: str) -> tuple[str, str]:

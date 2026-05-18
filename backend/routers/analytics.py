@@ -31,6 +31,8 @@ from backend.models.db import (
 )
 from backend.routers.deps import get_db, verify_api_key
 
+from collections import Counter
+
 router = APIRouter(
     prefix="/api/analytics",
     tags=["analytics"],
@@ -41,6 +43,52 @@ logger = logging.getLogger(__name__)
 
 def _window_start(days: int = 7) -> datetime:
     return datetime.utcnow() - timedelta(days=days)
+
+
+# ── Triage Intelligence ───────────────────────────────────────────────────────
+
+@router.get("/triage-intelligence")
+def triage_intelligence(days: int = 1, db: Session = Depends(get_db)):
+    """Today's triage decision breakdown + top Score 2 reasons for the dashboard."""
+    since = datetime.utcnow() - timedelta(days=days)
+    rows = db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= since).all()
+
+    total = len(rows)
+    score3 = [r for r in rows if r.score == 3]
+    score2 = [r for r in rows if r.score == 2]
+    score1 = [r for r in rows if r.score == 1]
+    fallbacks = [r for r in rows if r.triage_reason and r.triage_reason.startswith("Triage fallback")]
+
+    # Top Score 2 reasons — cluster by common phrases
+    reason_counter: Counter = Counter()
+    for r in score2:
+        if r.triage_reason:
+            # Truncate to ~80 chars for display
+            key = r.triage_reason[:90].rstrip()
+            reason_counter[key] += 1
+
+    top_reasons = [
+        {"reason": reason, "count": count}
+        for reason, count in reason_counter.most_common(5)
+    ]
+
+    # Top Score 3 wins — most common brands being drafted
+    brand_counter: Counter = Counter()
+    for r in score3:
+        if r.brand_name:
+            brand_counter[r.brand_name] += 1
+
+    return {
+        "period_days": days,
+        "total": total,
+        "score3_count": len(score3),
+        "score2_count": len(score2),
+        "score1_count": len(score1),
+        "fallback_count": len(fallbacks),
+        "draft_rate": round(len(score3) / total, 3) if total else 0.0,
+        "top_score2_reasons": top_reasons,
+        "top_drafted_brands": [{"brand": b, "count": c} for b, c in brand_counter.most_common(5)],
+    }
 
 
 # ── Panel 1 — Talent Health ───────────────────────────────────────────────────

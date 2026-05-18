@@ -773,15 +773,27 @@ body {
         <div id="analytics-talent-health" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
       <div>
-        <div class="section-head">Standard Operating Procedures</div>
-        <div class="ctx-panel">
-          <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; margin-bottom:10px;">📄 Open SOP Document</button>
-          <button class="btn btn-ghost" id="btn-recover" onclick="recoverFallbacks()" style="width:100%; justify-content:center; margin-bottom:10px; border-color:rgba(255,179,0,0.4); color:var(--amber);">⚡ Re-triage Failed Emails</button>
-          <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; margin-bottom:10px;">↺ Reset All Badge Counts</button>
-          <div style="font-size:12px; color:var(--text-2); line-height:1.5;">
-            The SOP document defines approved responses for every talent and scenario.
-            The AI reads this document to draft replies — it is the single source of truth.
+        <div class="section-head" style="margin-bottom:12px;">Triage Intelligence</div>
+
+        <!-- Score breakdown today -->
+        <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:10px;">
+          <div style="font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Today's Decisions</div>
+          <div id="triage-score-breakdown" style="display:flex; gap:12px; flex-wrap:wrap;">
+            <span style="font-size:12px; color:var(--text-3);">Loading…</span>
           </div>
+        </div>
+
+        <!-- Top Score 2 reasons -->
+        <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:10px;">
+          <div style="font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Why Emails Aren't Being Drafted</div>
+          <div id="triage-score2-reasons" style="font-size:11px; color:var(--text-2); line-height:1.6;">Loading…</div>
+        </div>
+
+        <!-- Actions -->
+        <div style="display:flex; flex-direction:column; gap:6px;">
+          <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; font-size:11px;">📄 SOP Document</button>
+          <button class="btn btn-ghost" id="btn-recover" onclick="recoverFallbacks()" style="width:100%; justify-content:center; font-size:11px; border-color:rgba(255,179,0,0.4); color:var(--amber);">⚡ Re-triage Failed Emails</button>
+          <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; font-size:11px;">↺ Reset Badge Counts</button>
         </div>
       </div>
     </div>
@@ -1793,12 +1805,35 @@ async function loadHealthScore() {
 // ── Analytics ─────────────────────────────────────────────────────────────
 async function loadAnalytics() {
   try {
-    const [load, talent, scenarios, anomalies] = await Promise.all([
+    const [load, talent, scenarios, anomalies, triageIntel] = await Promise.all([
       api('GET', '/api/analytics/operational-load'),
       api('GET', '/api/analytics/talent-health'),
       api('GET', '/api/analytics/scenario-performance'),
       api('GET', '/api/analytics/anomalies'),
+      api('GET', '/api/analytics/triage-intelligence?days=1'),
     ]);
+
+    // Triage Intelligence panel
+    const breakdown = document.getElementById('triage-score-breakdown');
+    const reasons2 = document.getElementById('triage-score2-reasons');
+    if (triageIntel) {
+      const draftPct = triageIntel.total ? ((triageIntel.score3_count / triageIntel.total) * 100).toFixed(0) : 0;
+      breakdown.innerHTML = `
+        <span style="color:var(--green); font-weight:700;">${triageIntel.score3_count} drafted (${draftPct}%)</span>
+        <span style="color:var(--amber);">${triageIntel.score2_count} review</span>
+        <span style="color:var(--text-3);">${triageIntel.score1_count} ignored</span>
+        ${triageIntel.fallback_count > 0 ? `<span style="color:var(--red);">⚠ ${triageIntel.fallback_count} GPT errors</span>` : ''}
+      `;
+      if (triageIntel.top_score2_reasons?.length) {
+        reasons2.innerHTML = triageIntel.top_score2_reasons.map(r =>
+          `<div style="margin-bottom:5px; padding:5px 8px; background:var(--surface-3); border-radius:5px;">
+            <span style="color:var(--amber); font-weight:600; margin-right:5px;">${r.count}×</span>${esc(r.reason)}
+           </div>`
+        ).join('');
+      } else {
+        reasons2.textContent = triageIntel.score2_count === 0 ? '✓ No review emails today.' : 'No reasons captured yet.';
+      }
+    }
 
     // Strip
     const strip = document.getElementById('analytics-load-strip');

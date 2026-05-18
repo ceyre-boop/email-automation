@@ -7,7 +7,7 @@
     "_triage_model_comment": "Use gpt-4o-mini for triage (cheaper, nearly as accurate). Switch to gpt-4o only if quality drops.",
     "reply_model": "gpt-4o",
     "_reply_model_comment": "Always use gpt-4o for reply drafting \u2014 quality matters here.",
-    "max_tokens_triage": 400,
+    "max_tokens_triage": 500,
     "max_tokens_reply": 1500,
     "temperature_triage": 0.1,
     "_temperature_comment": "Low temperature for triage = consistent, deterministic scoring.",
