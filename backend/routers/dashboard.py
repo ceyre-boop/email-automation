@@ -74,9 +74,10 @@ class DailyReportOut(BaseModel):
     total_trash: int
     total_emails: int
     total_sent: int
-    total_draft_backlog: int   # all-time pending drafts waiting for review
-    total_new_drafts_today: int  # drafts generated today
+    total_draft_backlog: int
+    total_new_drafts_today: int
     total_ignore: int
+    total_deal_value_today: float  # sum of proposed_rate for Score-3 emails today
     talents: list[TalentReportCard]
 
 
@@ -264,6 +265,7 @@ def daily_report(db: Session = Depends(get_db)):
 
     total_good = total_uncertain = total_trash = 0
     total_sent = total_draft_backlog = total_new_drafts_today = total_ignore = 0
+    total_deal_value_today: float = 0.0
     cards: list[TalentReportCard] = []
 
     for t_cfg in talent_configs:
@@ -287,6 +289,9 @@ def daily_report(db: Session = Depends(get_db)):
         total_draft_backlog += count_backlog
         total_new_drafts_today += count_new_today
         total_ignore += count_ignore
+        total_deal_value_today += sum(
+            (e.proposed_rate or 0) for e in emails if e.score == 3 and e.proposed_rate
+        )
 
         good_with_rate = [e for e in emails if e.score == 3 and e.proposed_rate]
         best = max(good_with_rate, key=lambda e: e.proposed_rate, default=None)
@@ -319,6 +324,7 @@ def daily_report(db: Session = Depends(get_db)):
         total_draft_backlog=total_draft_backlog,
         total_new_drafts_today=total_new_drafts_today,
         total_ignore=total_ignore,
+        total_deal_value_today=round(total_deal_value_today, 2),
         talents=cards,
     )
 
