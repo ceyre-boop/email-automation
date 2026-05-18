@@ -752,6 +752,17 @@ body {
       </div>
     </div>
 
+    <!-- ── System Health ──────────────────────────────────────────────────── -->
+    <div id="system-health-bar" class="fade-up" style="margin-bottom:20px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px 20px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
+      <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
+        <div id="health-dot" style="width:12px; height:12px; border-radius:50%; background:var(--surface-3);"></div>
+        <span style="font-size:13px; font-weight:700;" id="health-status">Loading…</span>
+        <span style="font-size:22px; font-weight:800; color:var(--text);" id="health-score"></span>
+      </div>
+      <div id="health-components" style="display:flex; gap:16px; flex-wrap:wrap; flex:1;"></div>
+      <div id="health-issues" style="font-size:11px; color:var(--amber); line-height:1.5; flex-basis:100%;"></div>
+    </div>
+
     <!-- ── Main grid: Talent Health (primary) + SOP panel ────────────────── -->
     <div class="ov-grid fade-up">
       <div>
@@ -1066,7 +1077,8 @@ async function loadOverview() {
     renderSidebar();
     renderSummaryBar();
     showView('overview');
-    // Load analytics + Marco in background after main overview renders
+    // Load health score, analytics, Marco in background after main overview renders
+    loadHealthScore().catch(() => {});
     loadAnalytics().catch(() => {});
     loadMarco().catch(() => {});
   } catch (_) {}
@@ -1710,6 +1722,51 @@ async function saveSettings() {
   }
 }
 
+// ── System Health ──────────────────────────────────────────────────────────
+async function loadHealthScore() {
+  try {
+    const h = await api('GET', '/api/dashboard/health/score');
+    const score = h.score ?? 0;
+    const statusColor = h.status === 'healthy' ? 'var(--green)' : h.status === 'degraded' ? 'var(--green)' : h.status === 'warning' ? 'var(--amber)' : 'var(--red)';
+    const dot = document.getElementById('health-dot');
+    const statusEl = document.getElementById('health-status');
+    const scoreEl = document.getElementById('health-score');
+    const componentsEl = document.getElementById('health-components');
+    const issuesEl = document.getElementById('health-issues');
+    const bar = document.getElementById('system-health-bar');
+
+    dot.style.background = statusColor;
+    dot.style.boxShadow = `0 0 8px ${statusColor}`;
+    statusEl.textContent = 'System ' + (h.status || 'unknown').toUpperCase();
+    statusEl.style.color = statusColor;
+    scoreEl.textContent = (score * 100).toFixed(0) + '%';
+    scoreEl.style.color = statusColor;
+
+    // Color the whole bar for critical
+    bar.style.borderColor = h.status === 'critical' ? 'rgba(227,28,37,0.4)' : h.status === 'warning' ? 'rgba(255,179,0,0.3)' : 'var(--border)';
+
+    const labels = {
+      triage_reliability: 'Triage',
+      queue_liveness: 'Draft Queue',
+      draft_freshness: 'Last Draft',
+      token_health: 'Tokens',
+      poll_health: 'Polls',
+    };
+    componentsEl.innerHTML = Object.entries(h.components || {}).map(([k, v]) => {
+      const c = v >= 0.9 ? 'var(--green)' : v >= 0.6 ? 'var(--amber)' : 'var(--red)';
+      return `<div style="text-align:center;">
+        <div style="font-size:10px; color:var(--text-3); margin-bottom:2px;">${labels[k] || k}</div>
+        <div style="font-size:13px; font-weight:700; color:${c};">${(v * 100).toFixed(0)}%</div>
+      </div>`;
+    }).join('');
+
+    issuesEl.innerHTML = (h.issues || []).map(i => `⚠ ${esc(i)}`).join('<br>');
+    issuesEl.style.display = h.issues?.length ? '' : 'none';
+  } catch(e) {
+    // non-fatal — health bar just stays blank
+  }
+}
+
 // ── Analytics ─────────────────────────────────────────────────────────────
 async function loadAnalytics() {
   try {
@@ -1880,6 +1937,7 @@ async function checkDeploy() {
 }
 checkDeploy();
 setInterval(checkDeploy, 120000);
+setInterval(() => { if (state.view === 'overview') loadHealthScore().catch(() => {}); }, 120000);
 
 // ── Init ───────────────────────────────────────────────────────────────────
 // Apply initial theme before first render (default: overview → dark)

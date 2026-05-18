@@ -147,6 +147,12 @@ def _run_draft_queue():
     except Exception as exc:  # noqa: BLE001
         logger.error("Draft queue worker failed: %s", exc)
     finally:
+        # Always record heartbeat so dashboard knows the queue ran, even if it found nothing
+        try:
+            from backend.services.health import record_queue_heartbeat
+            record_queue_heartbeat(db)
+        except Exception:  # noqa: BLE001
+            pass
         db.close()
 
 

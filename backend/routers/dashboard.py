@@ -510,6 +510,13 @@ def health_summary(db: Session = Depends(get_db)):
     }
 
 
+@router.get("/health/score")
+def system_health_score(db: Session = Depends(get_db)):
+    """System health score (0.0–1.0) with component breakdown and active issues."""
+    from backend.services.health import compute_health_score
+    return compute_health_score(db)
+
+
 @router.get("/audit/triage")
 def triage_audit_for_email(email_id: str, db: Session = Depends(get_db)):
     """Return the triage audit record for a specific email — shows AI reasoning."""

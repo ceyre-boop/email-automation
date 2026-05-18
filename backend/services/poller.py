@@ -571,6 +571,13 @@ def _process_one_message(
         )
         db.commit()
 
+        # Record successful draft for system health score
+        try:
+            from backend.services.health import record_successful_draft
+            record_successful_draft(db)
+        except Exception:  # noqa: BLE001
+            pass
+
         gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
         status_label = "escalated" if is_escalate else "draft_saved"
         _safe_log_sheet(

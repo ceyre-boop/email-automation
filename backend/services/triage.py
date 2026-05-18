@@ -306,24 +306,51 @@ def triage_email(
     )
 
     client = OpenAI(api_key=settings.openai_api_key)
+    model = cfg.get("triage_model", "gpt-4o-mini")
+    max_tok = cfg.get("max_tokens_triage", 400)
     try:
         response = client.chat.completions.create(
-            model=cfg.get("triage_model", "gpt-4o-mini"),
+            model=model,
             messages=messages,
-            max_tokens=cfg.get("max_tokens_triage", 350),
+            max_tokens=max_tok,
             temperature=cfg.get("temperature_triage", 0.1),
             response_format={"type": "json_object"},
         )
-        raw_json = response.choices[0].message.content
+        raw_json = response.choices[0].message.content or ""
+        finish_reason = response.choices[0].finish_reason
+
+        # Hard truncation detection — if GPT stopped because it hit max_tokens mid-JSON
+        if finish_reason == "length":
+            logger.error(
+                "TRIAGE TRUNCATION: %s hit max_tokens (%d) mid-output. "
+                "Raise max_tokens_triage in settings.json. Raw: %.80s",
+                talent_key, max_tok, raw_json,
+            )
+            return _fallback(talent_key, f"output truncated at {max_tok} tokens — raise max_tokens_triage")
+
         result = json.loads(raw_json)
     except json.JSONDecodeError as exc:
-        logger.warning("Triage JSON parse error for %s: %s", talent_key, exc)
+        logger.error(
+            "TRIAGE JSON ERROR: %s returned non-JSON (likely truncated). "
+            "finish_reason unknown. Raw snippet: %.80s — %s",
+            talent_key, raw_json[:80] if "raw_json" in dir() else "N/A", exc,
+        )
         return _fallback(talent_key, "non-JSON output from triage model")
     except Exception as exc:  # noqa: BLE001
         logger.error("Triage API error for %s: %s", talent_key, exc)
         return _fallback(talent_key, f"API error: {exc}")
 
-    # Validate score
+    # Schema validation — required fields must all be present
+    _REQUIRED = {"score", "reason", "offer_type", "proposed_rate_usd", "brand_name"}
+    missing = _REQUIRED - set(result.keys())
+    if missing:
+        logger.error(
+            "TRIAGE SCHEMA MISMATCH for %s — missing fields: %s. Raw: %.120s",
+            talent_key, missing, raw_json[:120],
+        )
+        return _fallback(talent_key, f"schema mismatch — missing: {missing}")
+
+    # Score must be 1, 2, or 3
     score = result.get("score")
     if score not in (1, 2, 3):
         logger.warning("Invalid score %r for %s — routing to Score 2", score, talent_key)
