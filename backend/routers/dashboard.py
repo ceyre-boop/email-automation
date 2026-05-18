@@ -440,6 +440,62 @@ def delete_context(context_id: int, db: Session = Depends(get_db)):
 # ── Health & observability ────────────────────────────────────────────────────
 
 
+@router.post("/recover-fallbacks")
+def recover_fallbacks(
+    background_tasks: BackgroundTasks,
+    days: int = 7,
+    db: Session = Depends(get_db),
+):
+    """
+    Find every email that silently fell back to Score 2 due to a GPT/JSON error,
+    delete those ProcessedEmail records, and re-queue all connected talents for
+    fresh triage. This is the recovery path after a silent failure period.
+    """
+    from datetime import datetime, timedelta
+    cutoff = datetime.utcnow() - timedelta(days=days)
+
+    # Count and delete all fallback-scored ProcessedEmail rows
+    deleted = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.processed_at >= cutoff,
+            ProcessedEmail.triage_reason.like("Triage fallback%"),
+        )
+        .delete(synchronize_session=False)
+    )
+
+    # Also delete score=2 rows where reason indicates a known bad classification
+    # (non-JSON, truncated, schema mismatch) to be safe
+    deleted_truncated = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.processed_at >= cutoff,
+            ProcessedEmail.triage_reason.like("%truncated%"),
+        )
+        .delete(synchronize_session=False)
+    )
+    deleted += deleted_truncated
+
+    db.commit()
+    logger.info("Recovery: deleted %d fallback ProcessedEmail records", deleted)
+
+    # Re-queue triage for every connected active talent
+    tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+    queued = [t.talent_key for t in tokens]
+    for key in queued:
+        background_tasks.add_task(_run_triage_unscored, key)
+
+    return {
+        "ok": True,
+        "deleted_fallback_records": deleted,
+        "queued_talents": queued,
+        "message": (
+            f"Cleared {deleted} failed triage records and re-queued {len(queued)} talent(s). "
+            "Fresh drafts will appear in Gmail within ~2 minutes."
+        ),
+    }
+
+
 @router.get("/health/tokens")
 def token_health(db: Session = Depends(get_db)):
     """Per-talent token health: consecutive failures, last error, last poll time."""

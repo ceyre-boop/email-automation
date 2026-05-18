@@ -776,6 +776,7 @@ body {
         <div class="section-head">Standard Operating Procedures</div>
         <div class="ctx-panel">
           <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; margin-bottom:10px;">📄 Open SOP Document</button>
+          <button class="btn btn-ghost" id="btn-recover" onclick="recoverFallbacks()" style="width:100%; justify-content:center; margin-bottom:10px; border-color:rgba(255,179,0,0.4); color:var(--amber);">⚡ Re-triage Failed Emails</button>
           <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; margin-bottom:10px;">↺ Reset All Badge Counts</button>
           <div style="font-size:12px; color:var(--text-2); line-height:1.5;">
             The SOP document defines approved responses for every talent and scenario.
@@ -1111,6 +1112,28 @@ async function openSopModal() {
     document.getElementById('sop-modal-body').innerHTML = '<p><em>Could not load SOP document.</em></p>';
   }
 }
+async function recoverFallbacks() {
+  const btn = document.getElementById('btn-recover');
+  const orig = btn.innerHTML;
+  if (!confirm(
+    'Re-triage all emails that failed due to GPT errors in the last 7 days?\n\n' +
+    'This will clear the failed records and re-run AI triage on them. ' +
+    'Fresh drafts will appear in Gmail within ~2 minutes. No drafts are deleted.'
+  )) return;
+  btn.innerHTML = '<span class="spinner"></span> Running…';
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/api/dashboard/recover-fallbacks');
+    showToast(`⚡ Recovery started — cleared ${r.deleted_fallback_records} failed records, re-queued ${r.queued_talents?.length || 0} talent(s). Check Gmail in 2 min.`);
+    setTimeout(() => loadOverview(), 5000);
+  } catch(e) {
+    showToast('Recovery failed: ' + e.message);
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
+}
+
 async function resetAllBadges() {
   if (!confirm('Reset all badge counts to zero?\n\nDrafts and emails are untouched — only the counters reset.')) return;
   try {
