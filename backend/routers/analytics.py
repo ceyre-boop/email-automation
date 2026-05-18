@@ -83,7 +83,6 @@ def talent_health(days: int = 7, db: Session = Depends(get_db)):
         score3 = sum(1 for e in emails if e.score == 3)
         score2 = sum(1 for e in emails if e.score == 2)
         score1 = sum(1 for e in emails if e.score == 1)
-        escalations = sum(1 for e in emails if e.score == 3 and e.status == "draft_saved")
         high_risk = sum(1 for e in emails if (e.risk_score or 0) >= 7)
         avg_risk = round(sum((e.risk_score or 0) for e in emails) / total, 1) if total else 0.0
 
@@ -260,21 +259,26 @@ def anomaly_detection(db: Session = Depends(get_db)):
 
     anomalies = []
 
-    # Volume spike/drop
-    if week_avg_per_day > 0:
-        ratio = today_count / week_avg_per_day
+    # Volume spike/drop — only compare after 6+ UTC hours so partial-day doesn't trigger false alarms
+    hours_into_day = now.hour + now.minute / 60
+    if week_avg_per_day > 0 and hours_into_day >= 6:
+        # Scale today's count to a full-day projection before comparing
+        projected_today = today_count * (24 / max(hours_into_day, 1))
+        ratio = projected_today / week_avg_per_day
+        raw_ratio = today_count / week_avg_per_day
         if ratio >= 2.0:
             anomalies.append({
                 "type": "volume_spike",
                 "severity": "warning",
-                "message": f"Today's volume ({today_count}) is {ratio:.1f}x the 7-day average ({week_avg_per_day:.0f}/day).",
+                "message": f"Today's volume ({today_count} so far) is trending {ratio:.1f}x the 7-day average ({week_avg_per_day:.0f}/day).",
                 "talent_key": None,
             })
-        elif ratio <= 0.2 and week_avg_per_day >= 5:
+        elif raw_ratio <= 0.2 and week_avg_per_day >= 5 and hours_into_day >= 18:
+            # Only fire volume-drop after 18:00 UTC (10am-11am Pacific) — full business day
             anomalies.append({
                 "type": "volume_drop",
                 "severity": "warning",
-                "message": f"Today's volume ({today_count}) is only {ratio:.0%} of the 7-day average — possible poll failure.",
+                "message": f"Today's volume ({today_count}) is only {raw_ratio:.0%} of the 7-day average — possible poll failure.",
                 "talent_key": None,
             })
 

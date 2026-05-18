@@ -102,7 +102,8 @@ def _run_draft_queue():
             if not token:
                 continue
 
-            def _draft_one(row, _token=token, _talent_key=talent_key, _talent_name=talent_name, _min_rate=minimum_rate):
+            def _draft_one(row, _talent_key=talent_key, _talent_name=talent_name, _min_rate=minimum_rate):
+                from backend.services import gmail as gmail_svc
                 thread_db = SessionLocal()
                 try:
                     thread_token = thread_db.query(TalentToken).filter(
@@ -117,9 +118,11 @@ def _run_draft_queue():
                     ).first()
                     if already:
                         return
+                    service = gmail_svc.build_service(thread_token, thread_db)
                     _process_one_message(
                         db=thread_db,
                         token_row=thread_token,
+                        service=service,
                         message_id=row.gmail_message_id,
                         talent_key=_talent_key,
                         talent_name=_talent_name,

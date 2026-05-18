@@ -482,19 +482,31 @@ def poll_log(talent_key: str, limit: int = 20, db: Session = Depends(get_db)):
 
 @router.get("/health/summary")
 def health_summary(db: Session = Depends(get_db)):
-    """Today's stats across all talents: emails, drafts, escalations, errors."""
+    """Today's stats across all talents: emails, drafts, escalations, errors, fallback rate."""
     today = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
     emails_today = db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= today).count()
     drafts_today = db.query(Draft).filter(Draft.created_at >= today).count()
     escalations_today = db.query(Draft).filter(Draft.created_at >= today, Draft.is_escalate == True).count()  # noqa: E712
     errors_today = db.query(PollHealth).filter(PollHealth.polled_at >= today, PollHealth.error_message != None).count()  # noqa: E711
     pending_drafts = db.query(Draft).filter(Draft.status == DraftStatus.pending).count()
+    # Fallback count: Score-2 emails where reason starts with "Triage fallback" = silent GPT failures
+    fallbacks_today = db.query(ProcessedEmail).filter(
+        ProcessedEmail.processed_at >= today,
+        ProcessedEmail.triage_reason.like("Triage fallback%"),
+    ).count()
+    score2_today = db.query(ProcessedEmail).filter(
+        ProcessedEmail.processed_at >= today,
+        ProcessedEmail.score == 2,
+    ).count()
     return {
         "emails_today": emails_today,
         "drafts_today": drafts_today,
         "escalations_today": escalations_today,
         "errors_today": errors_today,
         "pending_drafts": pending_drafts,
+        "triage_fallbacks_today": fallbacks_today,
+        "score2_today": score2_today,
+        "fallback_rate": round(fallbacks_today / max(emails_today, 1), 3),
     }
 
 

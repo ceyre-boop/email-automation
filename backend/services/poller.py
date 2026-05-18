@@ -65,6 +65,11 @@ def _talent_config_map(settings) -> dict[str, dict]:
     return {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
 
 
+def _already_processed(db: Session, message_id: str) -> bool:
+    """Return True if this gmail_message_id already has a ProcessedEmail record."""
+    return bool(_batch_already_processed_ids(db, [message_id]))
+
+
 def _batch_already_processed_ids(db: Session, message_ids: list[str]) -> set[str]:
     """Return the subset of message_ids already present in ProcessedEmail (single query)."""
     if not message_ids:
