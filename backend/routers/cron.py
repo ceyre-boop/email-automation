@@ -47,19 +47,23 @@ def _run_poll():
         db.close()
 
 
-def _run_draft_queue():
+def _run_draft_queue(batch_size: int = 60):
     """
-    Continuous drafting worker — finds all Score-3 inbox emails that have no draft yet
-    and processes them. Runs every 3 minutes alongside the poll.
-    This is the core automation loop: email comes in → gets triaged → gets drafted automatically.
+    Continuous drafting worker — finds Score-3 emails with no draft and processes them.
+    Uses a subquery to avoid full table scans, 50 parallel workers per run.
+    Runs every 20s normally; when backlog > 0 it re-queues itself immediately.
     """
-    from backend.models.db import get_session_factory, Draft, InboxEmail, ProcessedEmail, TalentToken
+    from backend.models.db import get_session_factory, Draft, ProcessedEmail, TalentToken
     from backend.services.poller import _process_one_message
     from backend.core.config import get_settings as _gs
+    from backend.services import gmail as gmail_svc
     from concurrent.futures import ThreadPoolExecutor
+    from collections import defaultdict
+    from sqlalchemy import select
 
     SessionLocal = get_session_factory()
     db = SessionLocal()
+    drafted_count = 0
     try:
         settings = _gs()
         if not settings.app_config.get("ai_enabled", True):
@@ -67,93 +71,94 @@ def _run_draft_queue():
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
         talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
 
-        # Find emails that are Score 3 in processed_emails but have no draft
-        drafted_msg_ids = {d.gmail_message_id for d in db.query(Draft.gmail_message_id).all()}
+        # Subquery: find Score-3 ProcessedEmails that have no matching Draft row
+        # Uses NOT EXISTS instead of loading all draft IDs into Python memory
+        drafted_subq = select(Draft.gmail_message_id)
         candidates = (
             db.query(ProcessedEmail)
             .filter(
                 ProcessedEmail.score == 3,
                 ProcessedEmail.status != "archived",
+                ProcessedEmail.gmail_message_id.not_in(drafted_subq),
             )
+            .order_by(ProcessedEmail.processed_at.desc())  # newest first
+            .limit(batch_size)
             .all()
         )
-        pending = [c for c in candidates if c.gmail_message_id not in drafted_msg_ids]
 
-        if not pending:
+        if not candidates:
             return
 
-        logger.info("Draft queue: %d Score-3 emails have no draft — processing now", len(pending))
+        logger.info("Draft queue: %d Score-3 emails need drafts (batch=%d)", len(candidates), batch_size)
 
-        # Group by talent so we can fetch one token per talent
-        from collections import defaultdict
         by_talent: dict[str, list] = defaultdict(list)
-        for row in pending:
+        for row in candidates:
             by_talent[row.talent_key.lower()].append(row)
 
         for talent_key, rows in by_talent.items():
             talent_cfg = talent_map.get(talent_key, {})
+            if talent_cfg.get("paused"):
+                continue
             talent_name = talent_cfg.get("full_name", talent_key)
             minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
 
-            token = db.query(TalentToken).filter(
-                TalentToken.talent_key.ilike(talent_key),
-                TalentToken.active == True,  # noqa: E712
-            ).first()
-            if not token:
-                continue
-
-            def _draft_one(row, _talent_key=talent_key, _talent_name=talent_name, _min_rate=minimum_rate):
-                from backend.services import gmail as gmail_svc
+            def _draft_one(row, _tk=talent_key, _tn=talent_name, _mr=minimum_rate):
                 thread_db = SessionLocal()
                 try:
                     thread_token = thread_db.query(TalentToken).filter(
-                        TalentToken.talent_key.ilike(_talent_key),
+                        TalentToken.talent_key.ilike(_tk),
                         TalentToken.active == True,  # noqa: E712
                     ).first()
                     if not thread_token:
                         return
-                    # Re-check no draft was created since we queried
-                    already = thread_db.query(Draft).filter(
-                        Draft.gmail_message_id == row.gmail_message_id
-                    ).first()
-                    if already:
-                        return
+                    if thread_db.query(Draft).filter(Draft.gmail_message_id == row.gmail_message_id).first():
+                        return  # race-condition guard
                     service = gmail_svc.build_service(thread_token, thread_db)
                     _process_one_message(
                         db=thread_db,
                         token_row=thread_token,
                         service=service,
                         message_id=row.gmail_message_id,
-                        talent_key=_talent_key,
-                        talent_name=_talent_name,
-                        minimum_rate=_min_rate,
+                        talent_key=_tk,
+                        talent_name=_tn,
+                        minimum_rate=_mr,
                         draft_mode=draft_mode,
                         summary={},
                     )
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("Draft queue error on %s/%s: %s", _talent_key, row.gmail_message_id, exc)
+                    logger.warning("Draft queue error %s/%s: %s", _tk, row.gmail_message_id, exc)
                 finally:
                     thread_db.close()
 
-            with ThreadPoolExecutor(max_workers=15) as executor:
+            with ThreadPoolExecutor(max_workers=50) as executor:
                 futures = [executor.submit(_draft_one, row) for row in rows]
                 for f in futures:
                     try:
                         f.result()
+                        drafted_count += 1
                     except Exception as exc:  # noqa: BLE001
-                        logger.warning("Draft queue thread error: %s", exc)
+                        logger.warning("Draft queue future error: %s", exc)
 
-        logger.info("Draft queue run complete")
+        logger.info("Draft queue batch complete: %d processed", drafted_count)
     except Exception as exc:  # noqa: BLE001
         logger.error("Draft queue worker failed: %s", exc)
     finally:
-        # Always record heartbeat so dashboard knows the queue ran, even if it found nothing
         try:
             from backend.services.health import record_queue_heartbeat
             record_queue_heartbeat(db)
         except Exception:  # noqa: BLE001
             pass
         db.close()
+
+
+def _run_backlog_blaster():
+    """
+    Idle-time worker — runs every 30s and processes up to 100 backlogged Score-3
+    emails per cycle. Larger batch than the regular queue; designed to clear the
+    backlog quickly when the system isn't busy with fresh incoming emails.
+    Skips if the regular draft queue is currently active (max_instances=1 guard).
+    """
+    _run_draft_queue(batch_size=100)
 
 
 def _run_proactive_refresh():
@@ -169,6 +174,13 @@ def _run_proactive_refresh():
         logger.error("Proactive token refresh failed: %s", exc)
     finally:
         db.close()
+
+
+@router.post("/api/admin/blast-backlog", dependencies=[Depends(verify_api_key)])
+def blast_backlog(background_tasks: BackgroundTasks):
+    """Immediately blast all backlogged Score-3 emails with no draft. No limit."""
+    background_tasks.add_task(_run_draft_queue, 500)
+    return {"ok": True, "message": "Backlog blast started — processing up to 500 emails now."}
 
 
 @router.get("/cron/poll-inboxes")

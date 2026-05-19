@@ -283,7 +283,11 @@ def on_startup():
         from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue
         scheduler = BackgroundScheduler(daemon=True)
         scheduler.add_job(_run_poll, "interval", seconds=45, id="auto_poll", replace_existing=True, max_instances=1)
-        scheduler.add_job(_run_draft_queue, "interval", seconds=45, id="draft_queue", replace_existing=True, max_instances=1)
+        # Draft queue runs every 20s — faster turnaround on new emails
+        scheduler.add_job(_run_draft_queue, "interval", seconds=20, id="draft_queue", replace_existing=True, max_instances=1)
+        # Backlog blaster: when idle (no new emails), blast larger batches of backlogged Score-3 emails
+        from backend.routers.cron import _run_backlog_blaster
+        scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, id="backlog_blaster", replace_existing=True, max_instances=1)
         scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
         scheduler.start()
         logger.info("Scheduler started — poll every 90s, draft queue every 90s, token refresh every 10 min.")

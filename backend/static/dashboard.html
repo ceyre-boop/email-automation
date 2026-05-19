@@ -792,6 +792,7 @@ body {
         <!-- Actions -->
         <div style="display:flex; flex-direction:column; gap:6px;">
           <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; font-size:11px;">📄 SOP Document</button>
+          <button class="btn btn-primary" id="btn-blast" onclick="blastBacklog()" style="width:100%; justify-content:center; font-size:11px; background:var(--green); margin-bottom:6px;">🚀 Blast Backlog Now</button>
           <button class="btn btn-ghost" id="btn-recover" onclick="recoverFallbacks()" style="width:100%; justify-content:center; font-size:11px; border-color:rgba(255,179,0,0.4); color:var(--amber);">⚡ Re-triage Failed Emails</button>
           <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; font-size:11px;">↺ Reset Badge Counts</button>
         </div>
@@ -1135,6 +1136,23 @@ async function openSopModal() {
     document.getElementById('sop-modal-body').innerHTML = '<p><em>Could not load SOP document.</em></p>';
   }
 }
+async function blastBacklog() {
+  const btn = document.getElementById('btn-blast');
+  const orig = btn.innerHTML;
+  btn.innerHTML = '<span class="spinner"></span> Blasting…';
+  btn.disabled = true;
+  try {
+    const r = await api('POST', '/api/admin/blast-backlog');
+    showToast('🚀 ' + r.message);
+    setTimeout(() => loadOverview(), 8000);
+  } catch(e) {
+    showToast('Blast failed: ' + e.message);
+  } finally {
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
+}
+
 async function recoverFallbacks() {
   const btn = document.getElementById('btn-recover');
   const orig = btn.innerHTML;

@@ -31,11 +31,11 @@ from backend.services.oauth import TokenRefreshError
 
 logger = logging.getLogger(__name__)
 
-BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle (was 20)
+BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle
 
-# Concurrency: Transaction Pooler (port 6543) supports hundreds of connections.
-MAX_CONCURRENT_EMAILS = 25
-MAX_TALENT_WORKERS = 8
+# Concurrency — Transaction Pooler (port 6543) supports hundreds of connections.
+MAX_CONCURRENT_EMAILS = 50   # doubled from 25 — GPT calls are I/O bound, safe to go higher
+MAX_TALENT_WORKERS = 10      # up from 8
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
