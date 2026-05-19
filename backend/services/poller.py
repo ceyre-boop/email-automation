@@ -441,6 +441,10 @@ def _process_one_message(
 
     # ── Score 1 → Archive ────────────────────────────────────────────────────
     if score == 1:
+        logger.info(
+            "ARCHIVING: %s / %s from %s — reason: %s",
+            talent_key, message_id, sender, reason,
+        )
         gmail_svc.archive_message(token_row, message_id, db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
@@ -476,16 +480,19 @@ def _process_one_message(
         thread_already_replied = gmail_svc.thread_has_prior_sent_reply(service, thread_id)
         if thread_already_replied:
             logger.info(
-                "Thread %s for %s already has a sent reply — skipping draft to avoid "
-                "interrupting an active human-managed conversation",
+                "Thread %s for %s already has a sent reply — flagging for human review "
+                "(email stays in inbox, no draft created)",
                 thread_id, talent_key,
             )
+            # Flag as human-review — email stays in INBOX, not archived
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
-                score, brand_name, proposed_rate, offer_type, reason,
-                EmailStatus.archived, body_text=body, email_date=email_date,
+                2, brand_name, proposed_rate, "Human Admin Required",
+                "Ongoing thread — prior reply detected. Human review required.",
+                EmailStatus.flagged, body_text=body, email_date=email_date,
             )
             db.commit()
+            summary["flagged"] += 1
             summary["processed"] += 1
             return
 

@@ -273,6 +273,14 @@ def _build_reply_messages(
         "Match the inbound email to the correct scenario above.\n"
         "Return ONLY the email body text of the Approved Response VERBATIM — no rewrites, no changes, no additions.\n"
         "Do NOT include any meta-instruction lines such as 'Email Draft:', 'CC:', or similar headers. Start directly with the greeting.\n"
+        "\n"
+        "FORMATTING RULES — follow exactly:\n"
+        "- Preserve all **bold** markers exactly as written in the SOP (two asterisks on each side).\n"
+        "- Preserve all <u>underline</u> tags exactly as written in the SOP.\n"
+        "- Preserve all [Anchor Text](URL) hyperlinks exactly as written — do not expand the URL or change the anchor text.\n"
+        "- Do NOT strip, rewrite, or simplify any formatting. Output the markup characters literally.\n"
+        "- CC lines are routing instructions — do NOT include them in the email body.\n"
+        "\n"
         "If no scenario matches: ESCALATE: No matching approved response — human review required."
     )
 
