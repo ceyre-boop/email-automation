@@ -181,6 +181,24 @@ def cron_poll(background_tasks: BackgroundTasks):
     return {"ok": True, "status": "poll started in background"}
 
 
+@router.post("/api/admin/clear-cache", dependencies=[Depends(verify_api_key)])
+def clear_cache():
+    """Force reload of SOP and triage prompt caches on next email. Call after editing sop.md."""
+    from backend.services.reply import clear_sop_cache
+    from backend.services.triage import clear_triage_cache
+    from backend.services.health import check_and_store_sop_hash
+    from backend.models.db import get_session_factory
+    clear_sop_cache()
+    clear_triage_cache()
+    db = get_session_factory()()
+    try:
+        sop_status = check_and_store_sop_hash(db)
+    finally:
+        db.close()
+    logger.info("Cache cleared — SOP and triage prompt will reload on next email")
+    return {"ok": True, "message": "SOP and triage caches cleared. New rules load on next email.", "sop": sop_status}
+
+
 @router.get("/api/db-check", dependencies=[Depends(verify_api_key)])
 def db_check(db: Session = Depends(get_db)):
     """Quick DB connectivity check — returns row counts or the error."""
