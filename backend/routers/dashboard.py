@@ -186,14 +186,14 @@ def _set_dashboard_reset_at(db: Session, when: datetime) -> None:
 
 @router.get("/report", response_model=DailyReportOut)
 def daily_report(db: Session = Depends(get_db)):
-    """Report — today's activity only. Badges auto-reset at midnight UTC."""
+    """Report — counts since last manual reset. No automatic daily reset."""
     settings = get_settings()
     talent_configs = settings.app_config.get("talents", [])
 
     today_utc = datetime.utcnow().date()
-    today_start = datetime.combine(today_utc, datetime.min.time())
+    # Fallback window: 30 days back if no reset has ever been set
+    _fallback_start = datetime.utcnow() - timedelta(days=30)
 
-    # Per-talent reset baselines — use the later of today's midnight or the manual reset
     talent_keys_lower = [t["key"].lower() for t in talent_configs]
     reset_rows = db.query(AppState).filter(
         AppState.key.in_(
@@ -216,13 +216,13 @@ def daily_report(db: Session = Depends(get_db)):
             reset_map[k] = ts
 
     def _window_for(talent_key: str) -> datetime:
-        """Latest of: today midnight, global reset, per-talent reset."""
-        candidates = [today_start]
+        """Latest manual reset for this talent, global reset, or 30-day fallback."""
+        candidates = []
         if global_reset:
             candidates.append(global_reset)
         if talent_key in reset_map:
             candidates.append(reset_map[talent_key])
-        return max(candidates)
+        return max(candidates) if candidates else _fallback_start
 
     # Load all processed emails since the earliest window we need
     earliest = min(_window_for(k) for k in talent_keys_lower) if talent_keys_lower else today_start

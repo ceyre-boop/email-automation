@@ -78,26 +78,35 @@ def _iter_internal_link_spans(text: str):
 
 def _apply_inline_formatting(text: str) -> str:
     """
-    Convert markdown-style inline formatting to HTML for Gmail rendering.
-    Handles **bold**, __underline__, and the SOP [b]...[/b] / [ul]...[/ul] tags.
-    Runs AFTER html.escape so we're working on escaped text.
+    Convert inline formatting markers to HTML. Runs AFTER html.escape.
+
+    Handles all SOP formatting variants:
+      **bold**              → <strong>bold</strong>
+      __underline__         → <u>underline</u>
+      <u>text</u>           → preserved (escaped by html.escape to &lt;u&gt; — restored here)
+      [b]bold[/b]           → <strong>bold</strong>
+      [ul]underline[/ul]    → <u>underline</u>
     """
     import re
-    # **bold** → <strong>bold</strong>
+    # **bold** → <strong>
     text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
-    # __underline__ → <u>underline</u>
+    # __underline__ → <u>
     text = re.sub(r'__(.+?)__', r'<u>\1</u>', text, flags=re.DOTALL)
-    # SOP hard-coded tags (case-insensitive): [b]...[/b] and [ul]...[/ul]
+    # <u>text</u> written in SOP — html.escape turns it into &lt;u&gt;text&lt;/u&gt;
+    # Restore it to real HTML so Gmail renders the underline
+    text = re.sub(r'&lt;u&gt;(.+?)&lt;/u&gt;', r'<u>\1</u>', text, flags=re.IGNORECASE | re.DOTALL)
+    # Hard-coded SOP bracket tags
     text = re.sub(r'\[b\](.+?)\[/b\]', r'<strong>\1</strong>', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'\[ul\](.+?)\[/ul\]', r'<u>\1</u>', text, flags=re.IGNORECASE | re.DOTALL)
     return text
 
 
 def _strip_inline_formatting(text: str) -> str:
-    """Remove formatting markers for plain-text version."""
+    """Strip formatting markers for the plain-text version of the email."""
     import re
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text, flags=re.DOTALL)
     text = re.sub(r'__(.+?)__', r'\1', text, flags=re.DOTALL)
+    text = re.sub(r'<u>(.+?)</u>', r'\1', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'\[b\](.+?)\[/b\]', r'\1', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'\[ul\](.+?)\[/ul\]', r'\1', text, flags=re.IGNORECASE | re.DOTALL)
     return text

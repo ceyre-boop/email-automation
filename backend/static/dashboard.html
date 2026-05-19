@@ -1214,7 +1214,7 @@ function renderSummaryBar() {
   document.getElementById('total-new-drafts').textContent    = r.total_new_drafts_today ?? 0;
   document.getElementById('total-draft-backlog').textContent = r.total_draft_backlog ?? 0;
   document.getElementById('total-ignore').textContent        = r.total_ignore ?? 0;
-  document.getElementById('report-date').textContent         = r.report_date;
+  document.getElementById('report-date').textContent         = 'Since last reset · ' + r.report_date;
   const val = r.total_deal_value_today ?? 0;
   document.getElementById('daily-deal-value').textContent =
     val > 0 ? '$' + val.toLocaleString('en-US', {maximumFractionDigits: 0}) : '$0';
