@@ -267,6 +267,17 @@ def on_startup():
     if missing:
         logger.warning("Missing required env vars: %s — set these in Render dashboard → Environment", missing)
 
+    # Always clear SOP and triage prompt caches on startup so any file updates
+    # take effect immediately after deploy without needing a manual cache clear.
+    try:
+        from backend.services.reply import clear_sop_cache
+        from backend.services.triage import clear_triage_cache
+        clear_sop_cache()
+        clear_triage_cache()
+        logger.info("SOP and triage caches cleared on startup — fresh rules loaded.")
+    except Exception:
+        logger.warning("Cache clear on startup failed (non-fatal).")
+
     if settings.database_url:
         logger.info("Creating database tables if they don't exist…")
         try:
