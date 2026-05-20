@@ -195,6 +195,7 @@ def daily_report(db: Session = Depends(get_db)):
     _fallback_start = datetime.utcnow() - timedelta(days=30)
 
     def _safe_lkey(value: str | None) -> str | None:
+        """Normalize a potential talent key to lowercase; return None for empty/invalid values."""
         if not isinstance(value, str):
             return None
         v = value.strip().lower()
