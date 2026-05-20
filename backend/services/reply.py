@@ -91,10 +91,16 @@ def _get_talent_section_raw(talent_name: str) -> str | None:
     return None
 
 
-def _extract_approved_response(talent_section: str, heading_fragment: str) -> str | None:
+def _extract_approved_response(
+    talent_section: str,
+    heading_fragment: str,
+    strip_cc: bool = True,
+) -> str | None:
     """
     Find the ### scenario heading containing heading_fragment (case-insensitive)
-    and return its **Approved Response:** text with CC routing lines stripped.
+    and return its **Approved Response:** text.
+    strip_cc=True (default): removes CC routing lines from the body.
+    strip_cc=False: preserves the CC line so callers can extract it.
     Returns None if the scenario or response block is not found.
     """
     heading_match = re.search(
@@ -115,12 +121,37 @@ def _extract_approved_response(talent_section: str, heading_fragment: str) -> st
     if end_match:
         response_text = response_text[: end_match.start()]
 
-    lines = [
-        line for line in response_text.strip().splitlines()
-        if not line.strip().upper().startswith("CC:")
-    ]
-    result = "\n".join(lines).strip()
+    if strip_cc:
+        lines = [
+            line for line in response_text.strip().splitlines()
+            if not line.strip().upper().startswith("CC:")
+        ]
+        result = "\n".join(lines).strip()
+    else:
+        result = response_text.strip()
+
     return result or None
+
+
+def _extract_adequate_threshold(talent_section: str) -> float | None:
+    """Parse the adequate-offer dollar threshold from Scenario C's 'Use when' text.
+    Looks for patterns like 'OVER $600' or 'over $900'."""
+    match = re.search(r"OVER\s+\$(\d+)", talent_section, re.IGNORECASE)
+    return float(match.group(1)) if match else None
+
+
+def _extract_cc_from_draft(draft_text: str) -> tuple[str | None, str]:
+    """
+    If draft_text starts with 'CC: ...' strip it and return (cc_string, clean_body).
+    Otherwise returns (None, draft_text unchanged).
+    Handles GPT sometimes including CC despite instructions.
+    """
+    lines = draft_text.strip().splitlines()
+    if lines and lines[0].strip().upper().startswith("CC:"):
+        cc = lines[0][3:].strip()
+        body = "\n".join(lines[1:]).lstrip("\n").strip()
+        return cc or None, body
+    return None, draft_text
 
 
 def _deterministic_initial_or_counter_reply(
@@ -164,6 +195,13 @@ def _deterministic_initial_or_counter_reply(
             return response
         # Fallback for talents without the ⭐ DEFAULT marker
         response = _extract_approved_response(talent_section, "Scenario A")
+        if response:
+            return response
+
+    # Adequate offer → Scenario C (CC manager). Return WITH CC line so caller can wire it.
+    adequate_threshold = _extract_adequate_threshold(talent_section)
+    if adequate_threshold and proposed_rate and float(proposed_rate) > adequate_threshold and not is_bundle:
+        response = _extract_approved_response(talent_section, "Adequate", strip_cc=False)
         if response:
             return response
 
@@ -390,10 +428,12 @@ def draft_reply(
         body_text=body_text,
     )
     if deterministic:
+        cc, clean_text = _extract_cc_from_draft(deterministic)
         return {
-            "draft_text": deterministic,
+            "draft_text": clean_text,
             "is_escalate": False,
             "escalate_reason": None,
+            "cc_recipients": cc,
         }
 
     client = OpenAI(api_key=settings.openai_api_key)
@@ -439,10 +479,12 @@ def draft_reply(
         logger.info("GPT escalated for %s: %s", talent_key, reason)
         return _escalate_result(reason)
 
+    cc, text = _extract_cc_from_draft(text)
     return {
         "draft_text": text,
         "is_escalate": False,
         "escalate_reason": None,
+        "cc_recipients": cc,
     }
 
 
@@ -451,4 +493,5 @@ def _escalate_result(reason: str) -> dict:
         "draft_text": f"ESCALATE: {reason}",
         "is_escalate": True,
         "escalate_reason": reason,
+        "cc_recipients": None,
     }

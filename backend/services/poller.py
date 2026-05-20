@@ -536,6 +536,8 @@ def _process_one_message(
         draft_text = reply_result["draft_text"]
         is_escalate = reply_result["is_escalate"]
         escalate_reason = reply_result.get("escalate_reason")
+        cc_str = reply_result.get("cc_recipients")
+        cc_list = gmail_svc.parse_cc_recipients(cc_str) if cc_str else None
 
         # Save as Gmail Draft in the talent's inbox (unless GPT escalated)
         gmail_draft_id: str | None = None
@@ -546,6 +548,7 @@ def _process_one_message(
                 reply_to=sender,
                 subject=subject,
                 body=draft_text,
+                cc=cc_list or None,
                 db=db,
                 in_reply_to=message_id_header or None,
                 service=service,
@@ -562,7 +565,7 @@ def _process_one_message(
             proposed_rate=proposed_rate,
             offer_type=offer_type,
             draft_text=draft_text,
-            cc_recipients=None,
+            cc_recipients=cc_str,
             gmail_draft_id=gmail_draft_id,
             message_id_header=message_id_header or None,  # stored for In-Reply-To on approve
             status=DraftStatus.pending,
