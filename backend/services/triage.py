@@ -10,6 +10,7 @@ from __future__ import annotations
 import json
 import logging
 import re
+import time
 
 from openai import OpenAI
 
@@ -185,6 +186,35 @@ def _apply_special_routing(
     return score
 
 
+# ── OpenAI retry helper ───────────────────────────────────────────────────────
+
+def _call_openai_with_retry(client: OpenAI, talent_key: str, **kwargs):
+    """
+    Call client.chat.completions.create with retry for per-minute rate limits.
+    Daily cap (RPD) errors are NOT retried — they won't clear until midnight.
+    RPM errors get up to 3 attempts with short backoff (5s, 10s, 20s).
+    """
+    last_exc: Exception | None = None
+    for attempt in range(3):
+        try:
+            return client.chat.completions.create(**kwargs)
+        except Exception as exc:  # noqa: BLE001
+            err_str = str(exc)
+            is_rate_limit = "429" in err_str or "rate_limit_exceeded" in err_str
+            is_daily_cap = "requests per day" in err_str.lower() or "RPD" in err_str
+            if is_rate_limit and not is_daily_cap:
+                wait = 5 * (2 ** attempt)  # 5s, 10s, 20s
+                logger.warning(
+                    "RPM rate limit for %s (attempt %d/3) — retrying in %ds",
+                    talent_key, attempt + 1, wait,
+                )
+                time.sleep(wait)
+                last_exc = exc
+                continue
+            raise  # daily cap or non-rate-limit error — propagate immediately
+    raise last_exc  # type: ignore[misc]
+
+
 # ── Main triage call ──────────────────────────────────────────────────────────
 
 def triage_email(
@@ -315,7 +345,9 @@ def triage_email(
     model = cfg.get("triage_model", "gpt-4o-mini")
     max_tok = cfg.get("max_tokens_triage", 400)
     try:
-        response = client.chat.completions.create(
+        response = _call_openai_with_retry(
+            client,
+            talent_key=talent_key,
             model=model,
             messages=messages,
             max_tokens=max_tok,

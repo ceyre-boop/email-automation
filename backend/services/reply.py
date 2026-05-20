@@ -70,6 +70,112 @@ logger = logging.getLogger(__name__)
 
 _ESCALATE_PREFIX = "ESCALATE:"
 
+
+# ── Deterministic SOP extractor ───────────────────────────────────────────────
+
+def _get_talent_section_raw(talent_name: str) -> str | None:
+    """
+    Return just the '## Talent: X' block from sop.md — no global rules prepended.
+    Tries full name first, then first name only.
+    """
+    md = _load_sop_md()
+    if not md:
+        return None
+    for query in (talent_name, talent_name.split()[0]):
+        match = re.search(rf"\n## Talent: {re.escape(query)}", md, re.IGNORECASE)
+        if match:
+            next_section = re.search(r"\n## ", md[match.end():])
+            if next_section:
+                return md[match.start() : match.end() + next_section.start()]
+            return md[match.start():]
+    return None
+
+
+def _extract_approved_response(talent_section: str, heading_fragment: str) -> str | None:
+    """
+    Find the ### scenario heading containing heading_fragment (case-insensitive)
+    and return its **Approved Response:** text with CC routing lines stripped.
+    Returns None if the scenario or response block is not found.
+    """
+    heading_match = re.search(
+        rf"### [^\n]*{re.escape(heading_fragment)}[^\n]*\n",
+        talent_section,
+        re.IGNORECASE,
+    )
+    if not heading_match:
+        return None
+
+    rest = talent_section[heading_match.end():]
+    resp_match = re.search(r"\*\*Approved Response:\*\*\s*\n", rest)
+    if not resp_match:
+        return None
+
+    response_text = rest[resp_match.end():]
+    end_match = re.search(r"\n###\s", response_text)
+    if end_match:
+        response_text = response_text[: end_match.start()]
+
+    lines = [
+        line for line in response_text.strip().splitlines()
+        if not line.strip().upper().startswith("CC:")
+    ]
+    result = "\n".join(lines).strip()
+    return result or None
+
+
+def _deterministic_initial_or_counter_reply(
+    talent_key: str,
+    talent_name: str,
+    minimum_rate: int | float,
+    proposed_rate: float,
+    triage_reason: str,
+    subject: str,
+    body_text: str,
+) -> str | None:
+    """
+    Return the verbatim SOP approved response for common scenarios — no GPT involved.
+    Covers: rates inquiry (default), bundle request, below-minimum counter.
+    Returns None to fall through to GPT for anything else.
+    """
+    talent_section = _get_talent_section_raw(talent_name)
+    if not talent_section:
+        return None
+
+    triage_lower = (triage_reason or "").lower()
+    body_lower = (body_text or "")[:500].lower()
+
+    is_bundle = "bundle" in triage_lower or "bundle" in body_lower
+    is_inquiry = (
+        not proposed_rate
+        or any(sig in triage_lower for sig in _INQUIRY_SIGNALS)
+        or any(sig in body_lower for sig in _INQUIRY_EMAIL_SIGNALS)
+    )
+
+    # Bundle overrides default
+    if is_bundle:
+        response = _extract_approved_response(talent_section, "Bundle")
+        if response:
+            return response
+
+    # Rates inquiry → default response
+    if is_inquiry and not is_bundle:
+        response = _extract_approved_response(talent_section, "⭐ DEFAULT")
+        if response:
+            return response
+        # Fallback for talents without the ⭐ DEFAULT marker
+        response = _extract_approved_response(talent_section, "Scenario A")
+        if response:
+            return response
+
+    # Below-minimum counter offer
+    if proposed_rate and 0 < proposed_rate < minimum_rate and not is_bundle:
+        for marker in ("Counter", "Below", "below minimum", "lower"):
+            response = _extract_approved_response(talent_section, marker)
+            if response:
+                return response
+
+    return None
+
 # Keywords in the triage reason that indicate the brand is *asking* for rates,
 # not making a concrete offer. When these appear, GPT must use the initial-rates
 # template rather than the counter-offer template — even if it hallucinated a rate.
@@ -192,7 +298,7 @@ def _build_reply_messages(
         "---\n"
         f"You are drafting a reply for: {talent_name}\n"
         "Match the inbound email to the correct scenario above.\n"
-        "Return ONLY the email body text of the Approved Response VERBATIM — no rewrites, no changes, no additions.\n"
+        "CRITICAL: Copy the Approved Response text CHARACTER-FOR-CHARACTER. Do not paraphrase, shorten, expand, or change a single word. Output it in full — do not stop early.\n"
         "Do NOT include any meta-instruction lines such as 'Email Draft:', 'CC:', or similar headers. Start directly with the greeting.\n"
         "\n"
         "FORMATTING RULES — follow exactly:\n"
@@ -276,6 +382,7 @@ def draft_reply(
 
     deterministic = _deterministic_initial_or_counter_reply(
         talent_key=talent_key,
+        talent_name=talent_name,
         minimum_rate=minimum_rate,
         proposed_rate=proposed_rate,
         triage_reason=triage_reason,
@@ -311,7 +418,7 @@ def draft_reply(
             model=cfg.get("reply_model", "gpt-4o"),
             messages=messages,
             max_tokens=cfg.get("max_tokens_reply", 800),
-            temperature=cfg.get("temperature_reply", 0.4),
+            temperature=cfg.get("temperature_reply", 0.0),
         )
         text = response.choices[0].message.content.strip()
     except Exception as exc:  # noqa: BLE001

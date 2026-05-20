@@ -52,7 +52,7 @@
    Approved SOP formatting:
    - Bold: **text**
    - Emphasis: ***text***
-   - Hyperlink: [Anchor Text](URL) or [Anchor Text] (URL)
+   - Hyperlink: [Anchor Text](URL)
    - CC instruction: CC: manager@example.com
 
    Rules:
@@ -106,8 +106,8 @@
 
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Lizz!! I'm happy to share her rates below:
-→ **1 [TikTok]** (https://www.tiktok.com/@lizzmi45): $750
-→ **1 UGC Video**: $900 (usage to be negotiated)
+— **1 TikTok** [VIEW](https://www.tiktok.com/@lizzmi45) → $750
+— **1 UGC Video** → $900 (usage to be negotiated)
 
 Lizz's pricing reflects her extremely high **conversion rate** from content that truly sells. Her monthly GMV is **$550k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super high for a shop creator which is ideal for brand collabs.
 
@@ -122,11 +122,11 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-[Lizz's] (https://www.tiktok.com/@lizzmi45) standard rate is $750 per video! Below is her bundle pricing:
+[Lizz's](https://www.tiktok.com/@lizzmi45) standard rate is $750 per video! Below is her bundle pricing:
 
-3 videos (90%) → $2,000
-5 videos (85%) → $3,100
-10 videos (75%) → $5,600
+— 3 videos (90%) → $2,000
+— 5 videos (85%) → $3,100
+— 10 videos (75%) → $5,600
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
@@ -142,7 +142,7 @@ We've found bundles usually perform **better** since multiple posts make the pro
 CC: chenni@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Lizz] (https://www.tiktok.com/@lizzmi45). Looping in her management team who can move forward with this convo!
+Thank you for the offer! I think this collab could be a good fit for [Lizz](https://www.tiktok.com/@lizzmi45). Looping in her management team who can move forward with this convo!
 
 ---
 
@@ -163,9 +163,9 @@ Thank you for the offer! I think this collab could be a good fit for [Lizz] (htt
 
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Sam!! I'm happy to share her rates below:
-→ **1 [TikTok]** (https://www.tiktok.com/@sam_joness_): $900
-→ **1 [IG Reel]** (https://www.instagram.com/its_samjones_/reels/): $600
-→ **1 [UGC Video]** (https://samjonesugc.my.canva.site/): $1,500 (usage can be added on for an additional cost)
+— **1 TikTok** [VIEW](https://www.tiktok.com/@sam_joness_) → $900
+— **1 IG Reel** [VIEW](https://www.instagram.com/its_samjones_/reels/) → $600
+— **1 UGC Video** [VIEW](https://samjonesugc.my.canva.site/) → $1,500 (usage can be added on for an additional cost)
 
 Sam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over **$150k**!
 
@@ -180,11 +180,11 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-Her standard rate is $900 per video! Below is her bundle pricing:
+[Sam's](https://www.tiktok.com/@sam_joness_) standard rate is $900 per video! Below is her bundle pricing:
 
-3 videos (90%) → $2,400
-5 videos (85%) → $3,800
-10 videos (75%) → $6,750
+— 3 videos (90%) → $2,400
+— 5 videos (85%) → $3,800
+— 10 videos (75%) → $6,750
 
 We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
 
@@ -200,7 +200,7 @@ We've found bundles usually perform better since multiple posts make the product
 CC: cara@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Sam] (https://www.tiktok.com/@sam_joness_). Looping in her management team who can move forward with this convo!
+Thank you for the offer! I think this collab could be a good fit for [Sam](https://www.tiktok.com/@sam_joness_). Looping in her management team who can move forward with this convo!
 
 ---
 
@@ -221,11 +221,11 @@ Thank you for the offer! I think this collab could be a good fit for [Sam] (http
 
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Katrina!! I'm happy to share her rates below:
-→ **1 [TikTok]** (https://www.tiktok.com/@katrinagmoore): $500
-→ Cross posting to **[IG Reels]** (https://www.instagram.com/katrinamoore621/reels/): + $150
-→ **1 UGC Video**: $400 (usage to be negotiated)
+— **1 TikTok** [VIEW](https://www.tiktok.com/@katrinagmoore) → $500
+— Cross-posting to **IG Reels** [VIEW](https://www.instagram.com/katrinamoore621/reels/) → + $150
+— **1 UGC Video** → $400 (usage to be negotiated)
 
-Katrina's pricing reflects her extremely high **conversion rate**. Her monthly GMV is **$450k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong **following** plus great engagement!!!.
+Katrina's pricing reflects her extremely high **conversion rate**. Her monthly GMV is **$450k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong **following** plus great engagement!
 
 Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
 
@@ -238,11 +238,11 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-[Katrina's] (https://www.tiktok.com/@katrinagmoore) standard rate is $500 per video! Below is her bundle pricing:
+[Katrina's](https://www.tiktok.com/@katrinagmoore) standard rate is $500 per video! Below is her bundle pricing:
 
-3 videos (90%) → $1,350
-5 videos (85%) → $2,100
-10 videos (75%) → $3,750
+— 3 videos (90%) → $1,350
+— 5 videos (85%) → $2,100
+— 10 videos (75%) → $3,750
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
@@ -258,7 +258,7 @@ We've found bundles usually perform **better** since multiple posts make the pro
 CC: chenni@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Katrina] (https://www.tiktok.com/@katrinagmoore). Looping in her management team who can move forward with this convo!
+Thank you for the offer! I think this collab could be a good fit for [Katrina](https://www.tiktok.com/@katrinagmoore). Looping in her management team who can move forward with this convo!
 
 ---
 
@@ -278,11 +278,11 @@ Thank you for the offer! I think this collab could be a good fit for [Katrina] (
 - An exact match from scenario below
 
 **Approved Response:**
-Thank you so much for reaching out about a potential partnership with Trinity!! I'm happy to share her media kit **[HERE]** (https://taboost.my.canva.site/trinity) + rates below:
-→ **1 [TikTok]** (https://www.tiktok.com/@trinity.blair): $4,000
-→ **1 [IG Reel]** (https://www.instagram.com/trinyxo): $2,000
-→ **[Podcast Feature]** (https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf): $1,500
-→ **1 UGC Video**: $1,500 (usage to be negotiated)
+Thank you so much for reaching out about a potential partnership with Trinity! I'm happy to share her media kit **[HERE](https://taboost.my.canva.site/trinity)** + rates below:
+— **1 TikTok** [VIEW](https://www.tiktok.com/@trinity.blair) → $4,000
+— **1 IG Reel** [VIEW](https://www.instagram.com/trinyxo) → $2,000
+— **Podcast Feature** [VIEW](https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf) → $1,500
+— **1 UGC Video** → $1,500 (usage to be negotiated)
 
 Trinity's pricing reflects her **3.4M** followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!
 
@@ -297,11 +297,11 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-Trinity's standard rate is $4,000 per video! **[HERE]** (https://taboost.my.canva.site/trinity) is her media kit. Below is her bundle pricing:
+Trinity's standard rate is $4,000 per video! **[HERE](https://taboost.my.canva.site/trinity)** is her media kit. Below is her bundle pricing:
 
-3 videos (85%) → $10,000
-5 videos (80%) → $16,000
-10 videos (70%) → $28,000
+— 3 videos (85%) → $10,000
+— 5 videos (80%) → $16,000
+— 10 videos (70%) → $28,000
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
@@ -317,4 +317,4 @@ We've found bundles usually perform **better** since multiple posts make the pro
 CC: chenni@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Trinity] (https://www.tiktok.com/@trinity.blair). Looping in her management team who can move forward with this convo!
+Thank you for the offer! I think this collab could be a good fit for [Trinity](https://www.tiktok.com/@trinity.blair). Looping in her management team who can move forward with this convo!
