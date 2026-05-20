@@ -91,19 +91,6 @@ _INQUIRY_EMAIL_SIGNALS = (
 # Keeps token usage reasonable while giving GPT enough context for a targeted reply.
 _MAX_EMAIL_BODY_CHARS = 3000
 
-# ── Prompt section cache ──────────────────────────────────────────────────────
-# Parsing the reply.md file (regex over ~3 KB) on every draft_reply call is wasteful.
-# Cache the parsed (system_text, user_template) pair — it doesn't change at runtime.
-_reply_sections: tuple[str, str] | None = None
-
-
-def _get_reply_sections() -> tuple[str, str]:
-    global _reply_sections
-    if _reply_sections is None:
-        _reply_sections = _parse_prompt_sections(get_settings().reply_prompt)
-    return _reply_sections
-
-
 def _load_talent_context(db, talent_key: str) -> tuple[str, str]:
     """
     Return (voice_profile, manager_instructions) for a talent.
@@ -163,72 +150,6 @@ def _redact_pii(text: str) -> str:
     for pattern in _PII_PATTERNS:
         text = pattern.sub("[REDACTED]", text)
     return text
-
-
-def _build_sop_rules_text(talent_key: str) -> str:
-    """Return a formatted string of the talent's SOP rules for the GPT prompt."""
-    sop = get_settings().sop_data
-    sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
-    talent_data = sop.get(sop_key, {}) if sop_key else {}
-    rules = talent_data.get("rules", [])
-    if not rules:
-        return "No SOP rules found for this talent."
-    lines = []
-    for rule in rules:
-        # New format: scenario-based with explicit fields
-        if "scenario" in rule:
-            scenario = rule.get("scenario", "")
-            label = rule.get("label", "")
-            trigger = rule.get("trigger", "").strip()
-            response = rule.get("response", "").strip()
-            cc = rule.get("cc")
-            is_default = rule.get("is_default", False)
-            if not response:
-                continue
-            response = _redact_pii(response)
-            cc_note = f"\nCC: {cc}" if cc else ""
-            default_note = " [DEFAULT — use when no other scenario matches]" if is_default else ""
-            lines.append(f"SCENARIO {scenario}{default_note}: {label}\nTRIGGER: {trigger}\nRESPONSE: {response}{cc_note}")
-        else:
-            # Legacy format: plain trigger/response pairs
-            trigger = rule.get("trigger", "").replace("\r\n", "\n").strip()
-            response = rule.get("response", "").replace("\r\n", "\n").strip()
-            _ACTION_KEYWORDS = ("move to", "cc ", "delete", "ask for consult", "tagged email", "marked a initial")
-            if any(response.lower().startswith(kw) for kw in _ACTION_KEYWORDS):
-                continue
-            if any(kw in response.lower() for kw in ("move to ", "cc cara", "cc chenni", "cc nicole", "move it to")):
-                continue
-            response = _redact_pii(response)
-            lines.append(f"TRIGGER: {trigger}\nRESPONSE: {response}")
-    return "\n\n".join(lines) if lines else "No email-reply rules found — ESCALATE all."
-
-
-def _get_cc_for_reply(talent_key: str, proposed_rate: float) -> str | None:
-    """Return a CC email address if the matched SOP scenario requires one."""
-    sop = get_settings().sop_data
-    sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
-    if not sop_key:
-        return None
-    rules = sop.get(sop_key, {}).get("rules", [])
-    for rule in rules:
-        if "scenario" not in rule or not rule.get("cc"):
-            continue
-        # Scenario C fires when proposed_rate > 1500 for Sylvia
-        trigger = rule.get("trigger", "").lower()
-        if "over" in trigger and proposed_rate > 0:
-            try:
-                threshold = float(''.join(c for c in trigger.split("over")[1][:10] if c.isdigit()))
-                if proposed_rate > threshold:
-                    return rule["cc"]
-            except (ValueError, IndexError):
-                pass
-    return None
-
-
-def _deterministic_initial_or_counter_reply(*args, **kwargs) -> None:
-    # Disabled — sop.md is the single source of truth now.
-    # GPT reads the full SOP document and returns the correct response verbatim.
-    return None
 
 
 def _parse_prompt_sections(raw: str) -> tuple[str, str]:
