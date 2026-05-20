@@ -194,7 +194,18 @@ def daily_report(db: Session = Depends(get_db)):
     # Fallback window: 30 days back if no reset has ever been set
     _fallback_start = datetime.utcnow() - timedelta(days=30)
 
-    talent_keys_lower = [t["key"].lower() for t in talent_configs]
+    def _safe_lkey(value: str | None) -> str | None:
+        """Normalize a potential talent key to lowercase; return None for empty/invalid values."""
+        if not isinstance(value, str):
+            return None
+        v = value.strip().lower()
+        return v or None
+
+    talent_keys_lower = [
+        t["key"].lower()
+        for t in talent_configs
+        if isinstance(t.get("key"), str) and t.get("key").strip()
+    ]
     reset_rows = db.query(AppState).filter(
         AppState.key.in_(
             [_DASHBOARD_RESET_KEY] + [f"reset_at_{k}" for k in talent_keys_lower]
@@ -225,7 +236,7 @@ def daily_report(db: Session = Depends(get_db)):
         return max(candidates) if candidates else _fallback_start
 
     # Load all processed emails since the earliest window we need
-    earliest = min(_window_for(k) for k in talent_keys_lower) if talent_keys_lower else today_start
+    earliest = min(_window_for(k) for k in talent_keys_lower) if talent_keys_lower else _fallback_start
     all_emails = (
         db.query(ProcessedEmail)
         .filter(ProcessedEmail.processed_at >= earliest)
@@ -233,7 +244,10 @@ def daily_report(db: Session = Depends(get_db)):
     )
     emails_by_talent: dict[str, list] = defaultdict(list)
     for e in all_emails:
-        emails_by_talent[e.talent_key.lower()].append(e)
+        lkey = _safe_lkey(getattr(e, "talent_key", None))
+        if not lkey or not getattr(e, "processed_at", None):
+            continue
+        emails_by_talent[lkey].append(e)
 
     # Sent drafts per talent (status='sent') — since today or reset
     sent_drafts = db.query(Draft).filter(
@@ -242,7 +256,10 @@ def daily_report(db: Session = Depends(get_db)):
     ).all()
     sent_by_talent: dict[str, int] = defaultdict(int)
     for d in sent_drafts:
-        sent_by_talent[d.talent_key.lower()] += 1
+        lkey = _safe_lkey(getattr(d, "talent_key", None))
+        if not lkey:
+            continue
+        sent_by_talent[lkey] += 1
 
     # Draft backlog — all pending non-escalation drafts regardless of date
     all_pending = db.query(Draft).filter(
@@ -251,7 +268,10 @@ def daily_report(db: Session = Depends(get_db)):
     ).all()
     backlog_by_talent: dict[str, int] = defaultdict(int)
     for d in all_pending:
-        backlog_by_talent[d.talent_key.lower()] += 1
+        lkey = _safe_lkey(getattr(d, "talent_key", None))
+        if not lkey:
+            continue
+        backlog_by_talent[lkey] += 1
 
     # New drafts today — pending drafts created since each talent's window start
     all_pending_with_date = db.query(Draft).filter(
@@ -261,7 +281,10 @@ def daily_report(db: Session = Depends(get_db)):
     ).all()
     new_today_by_talent: dict[str, list] = defaultdict(list)
     for d in all_pending_with_date:
-        new_today_by_talent[d.talent_key.lower()].append(d)
+        lkey = _safe_lkey(getattr(d, "talent_key", None))
+        if not lkey:
+            continue
+        new_today_by_talent[lkey].append(d)
 
     total_good = total_uncertain = total_trash = 0
     total_sent = total_draft_backlog = total_new_drafts_today = total_ignore = 0
@@ -272,14 +295,20 @@ def daily_report(db: Session = Depends(get_db)):
         key = t_cfg["key"]
         lkey = key.lower()
         window = _window_for(lkey)
-        emails = [e for e in emails_by_talent.get(lkey, []) if e.processed_at >= window]
+        emails = [
+            e for e in emails_by_talent.get(lkey, [])
+            if getattr(e, "processed_at", None) and e.processed_at >= window
+        ]
 
         count_good = sum(1 for e in emails if e.score == 3)
         count_uncertain = sum(1 for e in emails if e.score == 2)
         count_trash = sum(1 for e in emails if e.score == 1)
         count_sent = sent_by_talent.get(lkey, 0)
         count_backlog = backlog_by_talent.get(lkey, 0)
-        count_new_today = sum(1 for d in new_today_by_talent.get(lkey, []) if d.created_at >= window)
+        count_new_today = sum(
+            1 for d in new_today_by_talent.get(lkey, [])
+            if getattr(d, "created_at", None) and d.created_at >= window
+        )
         count_ignore = count_trash
 
         total_good += count_good
