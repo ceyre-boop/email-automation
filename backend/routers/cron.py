@@ -91,53 +91,61 @@ def _run_draft_queue(batch_size: int = 60):
 
         logger.info("Draft queue: %d Score-3 emails need drafts (batch=%d)", len(candidates), batch_size)
 
-        by_talent: dict[str, list] = defaultdict(list)
-        for row in candidates:
-            by_talent[row.talent_key.lower()].append(row)
+        # Pre-fetch one token per talent so we don't re-query inside every thread
+        token_cache: dict[str, object] = {}
+        for talent_key in {row.talent_key.lower() for row in candidates}:
+            tok = db.query(TalentToken).filter(
+                TalentToken.talent_key.ilike(talent_key),
+                TalentToken.active == True,  # noqa: E712
+            ).first()
+            if tok:
+                token_cache[talent_key] = tok
 
-        for talent_key, rows in by_talent.items():
-            talent_cfg = talent_map.get(talent_key, {})
+        def _draft_one(row):
+            _tk = row.talent_key.lower()
+            talent_cfg = talent_map.get(_tk, {})
             if talent_cfg.get("paused"):
-                continue
-            talent_name = talent_cfg.get("full_name", talent_key)
-            minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
+                return
+            if _tk not in token_cache:
+                return
+            _tn = talent_cfg.get("full_name", _tk)
+            _mr = talent_cfg.get("minimum_rate_usd", 0)
+            thread_db = SessionLocal()
+            try:
+                thread_token = thread_db.query(TalentToken).filter(
+                    TalentToken.talent_key.ilike(_tk),
+                    TalentToken.active == True,  # noqa: E712
+                ).first()
+                if not thread_token:
+                    return
+                if thread_db.query(Draft).filter(Draft.gmail_message_id == row.gmail_message_id).first():
+                    return  # race-condition guard
+                service = gmail_svc.build_service(thread_token, thread_db)
+                _process_one_message(
+                    db=thread_db,
+                    token_row=thread_token,
+                    service=service,
+                    message_id=row.gmail_message_id,
+                    talent_key=_tk,
+                    talent_name=_tn,
+                    minimum_rate=_mr,
+                    draft_mode=draft_mode,
+                    summary={},
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Draft queue error %s/%s: %s", _tk, row.gmail_message_id, exc)
+            finally:
+                thread_db.close()
 
-            def _draft_one(row, _tk=talent_key, _tn=talent_name, _mr=minimum_rate):
-                thread_db = SessionLocal()
+        # All candidates submitted to a single pool — no per-talent serialisation
+        with ThreadPoolExecutor(max_workers=50) as executor:
+            futures = [executor.submit(_draft_one, row) for row in candidates]
+            for f in futures:
                 try:
-                    thread_token = thread_db.query(TalentToken).filter(
-                        TalentToken.talent_key.ilike(_tk),
-                        TalentToken.active == True,  # noqa: E712
-                    ).first()
-                    if not thread_token:
-                        return
-                    if thread_db.query(Draft).filter(Draft.gmail_message_id == row.gmail_message_id).first():
-                        return  # race-condition guard
-                    service = gmail_svc.build_service(thread_token, thread_db)
-                    _process_one_message(
-                        db=thread_db,
-                        token_row=thread_token,
-                        service=service,
-                        message_id=row.gmail_message_id,
-                        talent_key=_tk,
-                        talent_name=_tn,
-                        minimum_rate=_mr,
-                        draft_mode=draft_mode,
-                        summary={},
-                    )
+                    f.result()
+                    drafted_count += 1
                 except Exception as exc:  # noqa: BLE001
-                    logger.warning("Draft queue error %s/%s: %s", _tk, row.gmail_message_id, exc)
-                finally:
-                    thread_db.close()
-
-            with ThreadPoolExecutor(max_workers=50) as executor:
-                futures = [executor.submit(_draft_one, row) for row in rows]
-                for f in futures:
-                    try:
-                        f.result()
-                        drafted_count += 1
-                    except Exception as exc:  # noqa: BLE001
-                        logger.warning("Draft queue future error: %s", exc)
+                    logger.warning("Draft queue future error: %s", exc)
 
         logger.info("Draft queue batch complete: %d processed", drafted_count)
     except Exception as exc:  # noqa: BLE001
@@ -178,9 +186,36 @@ def _run_proactive_refresh():
 
 @router.post("/api/admin/blast-backlog", dependencies=[Depends(verify_api_key)])
 def blast_backlog(background_tasks: BackgroundTasks):
-    """Immediately blast all backlogged Score-3 emails with no draft. No limit."""
-    background_tasks.add_task(_run_draft_queue, 500)
-    return {"ok": True, "message": "Backlog blast started — processing up to 500 emails now."}
+    """Blast ALL backlogged Score-3 emails with no draft — no batch limit, runs until empty."""
+    background_tasks.add_task(_blast_all_until_empty)
+    return {"ok": True, "message": "Full backlog blast started — will run until empty."}
+
+
+def _blast_all_until_empty():
+    """Keep calling the draft queue with large batches until there's nothing left."""
+    import time
+    rounds = 0
+    while rounds < 20:  # safety cap: max 20 rounds × 200 emails = 4000 emails
+        rounds += 1
+        from backend.models.db import get_session_factory, Draft, ProcessedEmail
+        from sqlalchemy import select
+        SessionLocal = get_session_factory()
+        db = SessionLocal()
+        try:
+            drafted_subq = select(Draft.gmail_message_id)
+            remaining = db.query(ProcessedEmail).filter(
+                ProcessedEmail.score == 3,
+                ProcessedEmail.status != "archived",
+                ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+            ).count()
+        finally:
+            db.close()
+        if remaining == 0:
+            logger.info("Backlog blast complete after %d round(s).", rounds)
+            break
+        logger.info("Backlog blast round %d — %d remaining", rounds, remaining)
+        _run_draft_queue(batch_size=200)
+        time.sleep(2)  # brief pause between rounds to let DB settle
 
 
 @router.get("/cron/poll-inboxes")

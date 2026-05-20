@@ -1154,17 +1154,45 @@ async function openSopModal() {
 }
 async function blastBacklog() {
   const btn = document.getElementById('btn-blast');
-  const orig = btn.innerHTML;
-  btn.innerHTML = '<span class="spinner"></span> Blasting…';
   btn.disabled = true;
   try {
     const r = await api('POST', '/api/admin/blast-backlog');
-    showToast('🚀 ' + r.message);
-    setTimeout(() => loadOverview(), 8000);
+    showToast('🚀 Full blast started — draining backlog…');
+    // Poll every 5s and update the backlog counter live until it hits 0
+    let stalls = 0;
+    let lastCount = null;
+    const poll = setInterval(async () => {
+      try {
+        const ov = await api('GET', '/api/dashboard/overview');
+        const backlog = ov.totals?.total_draft_backlog ?? ov.total_draft_backlog ?? null;
+        if (backlog !== null) {
+          const el = document.getElementById('total-draft-backlog');
+          if (el) el.textContent = backlog.toLocaleString();
+          btn.innerHTML = `🚀 Blasting… (${backlog} left)`;
+          if (backlog === 0) {
+            clearInterval(poll);
+            showToast('✅ Backlog cleared!');
+            btn.innerHTML = '🚀 Blast Backlog Now';
+            btn.disabled = false;
+            loadOverview();
+            loadDraftQueue().catch(()=>{});
+            return;
+          }
+          if (backlog === lastCount) stalls++;
+          else stalls = 0;
+          lastCount = backlog;
+          if (stalls >= 6) { // 30s no change — give up polling, restore button
+            clearInterval(poll);
+            btn.innerHTML = '🚀 Blast Backlog Now';
+            btn.disabled = false;
+            loadOverview();
+          }
+        }
+      } catch(_) {}
+    }, 5000);
   } catch(e) {
     showToast('Blast failed: ' + e.message);
-  } finally {
-    btn.innerHTML = orig;
+    btn.innerHTML = '🚀 Blast Backlog Now';
     btn.disabled = false;
   }
 }
