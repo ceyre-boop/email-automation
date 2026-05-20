@@ -2,58 +2,58 @@
 
 ## Global Rules — Mandatory
 
-1. **The SOP document must be followed explicitly.**
+1. The SOP document must be followed explicitly.
    - Do not deviate from approved responses.
    - Do not rewrite, improve, shorten, expand, or personalize approved responses unless specifically instructed by an admin.
 
-2. **Talent matching is mandatory.**
+2. Talent matching is mandatory.
    - Each talent has different rates, terms, and response language.
    - Always identify the correct talent before selecting a response.
    - Never use one talent's response for another talent.
 
-3. **This workflow is for INITIAL inbound emails only.**
+3. This workflow is for INITIAL inbound emails only.
    - Draft responses only for first-time inbound emails or new deal inquiries.
    - If the email is part of an ongoing thread, follow-up, negotiation, or reply after the initial response, do not draft a response.
    - Instead return:
-     - Classification: Human Admin Required
-     - Reason: This appears to be a follow-up or ongoing conversation.
+     Classification: Human Admin Required
+     Reason: This appears to be a follow-up or ongoing conversation.
 
-4. **Default to the Initial Approved Response.**
+4. Default to the Initial Approved Response.
    - Each talent will have an Initial Approved Response.
    - This should be treated as the default response for valid inbound opportunities.
    - Only choose another approved response if the email clearly matches a more specific scenario.
    - Only avoid the initial response if the email is obvious spam, irrelevant, or requires human admin review.
 
-5. **Err on the side of responding.**
+5. Err on the side of responding.
    - Only classify as Spam/Trash/Archive if the email is clearly and truly spam.
    - If there is any reasonable chance the email is a real brand, agency, PR, event, collaboration, gifting, partnership, or paid inquiry, use the talent's Initial Approved Response.
    - It is better to reply to a questionable email than to accidentally ignore or trash a real opportunity.
 
-6. **Spam handling must be conservative.**
+6. Spam handling must be conservative.
    - Do not classify as Spam merely because the email is vague, low-budget, generic, poorly written, or from an unfamiliar sender.
    - Classify as Spam only when there are clear indicators such as phishing, scams, suspicious links, unrelated services, mass SEO/web/design pitches, fake invoices, malware, adult/illegal content, or obvious automated junk.
    - If uncertain, do not mark as Spam. Use the Initial Approved Response or Human Admin Required.
 
-7. **Output must clearly state the action.**
+7. Output must clearly state the action.
    Use one of:
    - Approved Response
    - Human Admin Required
    - Spam/Trash
 
-8. **If using an approved response:**
+8. If using an approved response:
    - Return the exact approved response only.
    - Do not modify the response text.
    - Do not combine multiple approved responses.
    - Do not add extra commentary inside the email draft.
 
-9. **Formatting, hyperlinks, and internal instructions.**
+9. Formatting, hyperlinks, and internal instructions.
    Approved responses may contain formatting markup and internal routing instructions that must be properly rendered in drafted emails.
 
    Approved SOP formatting:
-   - Bold: `**text**`
-   - Bold + Italic: `***text***`
-   - Hyperlink: `[Anchor Text](URL)` or `[Anchor Text] (URL)`
-   - CC instruction: `CC: manager@example.com`
+   - Bold: **text**
+   - Emphasis: ***text***
+   - Hyperlink: [Anchor Text](URL) or [Anchor Text] (URL)
+   - CC instruction: CC: manager@example.com
 
    Rules:
    - Preserve all approved response wording exactly.
@@ -61,7 +61,7 @@
    - Do not add formatting that does not exist in the SOP.
 
    Hyperlink behavior:
-   - Render `[Anchor Text](URL)` as a clickable hyperlink.
+   - Render [Anchor Text](URL) as a clickable hyperlink.
    - Display ONLY the Anchor Text visibly in the final email.
    - Use the URL inside parentheses as the hyperlink destination.
    - Do not display raw URLs in the visible email body.
@@ -74,16 +74,16 @@
    - Place the listed email address only in the CC field.
 
    Formatting behavior:
-   - Render `**text**` as bold.
-   - Render `***text***` as bold and italic.
+   - Render **text** as bold.
+   - Render ***text*** as bold & italicised.
    - Render hyperlinks correctly.
-   - If formatting cannot be rendered, remove the markups and render plain text as is.
+   - If formatting cannot be rendered, remove the markups and render plain text as is (without markups).
 
 ---
 
 ## SOP Status
 
-**✅ AI may draft:** Sylvia Van Hoeven, Lizz Freixas, Sam Jones, Katrina Moore, Trinity Blair
+**✅ AI may draft:** Lizz Freixas, Sam Jones, Katrina Moore, Trinity Blair, Sylvia Van Hoeven
 
 **⏳ Pending — Human Admin Required:** All other talents
 
@@ -105,15 +105,13 @@
 - An exact match from scenario below
 
 **Approved Response:**
-```
 Thank you so much for reaching out about a potential partnership with Lizz!! I'm happy to share her rates below:
-→ **1 [TikTok](https://www.tiktok.com/@lizzmi45)**: $750
+→ **1 [TikTok]** (https://www.tiktok.com/@lizzmi45): $750
 → **1 UGC Video**: $900 (usage to be negotiated)
 
 Lizz's pricing reflects her extremely high **conversion rate** from content that truly sells. Her monthly GMV is **$550k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super high for a shop creator which is ideal for brand collabs.
 
 Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
-```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
 
@@ -124,15 +122,13 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-```
-[Lizz's](https://www.tiktok.com/@lizzmi45) standard rate is $750 per video! Below is her bundle pricing:
+[Lizz's] (https://www.tiktok.com/@lizzmi45) standard rate is $750 per video! Below is her bundle pricing:
 
 3 videos (90%) → $2,000
 5 videos (85%) → $3,100
 10 videos (75%) → $5,600
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
-```
 
 ### Scenario C: Initial Inbound (Adequate Offer)
 
@@ -143,12 +139,10 @@ We've found bundles usually perform **better** since multiple posts make the pro
 - An explicit offer of the above rate is not specified
 
 **Approved Response:**
-```
 CC: chenni@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Lizz](https://www.tiktok.com/@lizzmi45). Looping in her management team who can move forward with this convo!
-```
+Thank you for the offer! I think this collab could be a good fit for [Lizz] (https://www.tiktok.com/@lizzmi45). Looping in her management team who can move forward with this convo!
 
 ---
 
@@ -168,16 +162,14 @@ Thank you for the offer! I think this collab could be a good fit for [Lizz](http
 - An exact match from scenario below
 
 **Approved Response:**
-```
 Thank you so much for reaching out about a potential partnership with Sam!! I'm happy to share her rates below:
-→ **1 [TikTok](https://www.tiktok.com/@sam_joness_)**: $900
-→ **1 [IG Reel](https://www.instagram.com/its_samjones_/reels/)**: $600
-→ **1 [UGC Video](https://samjonesugc.my.canva.site/)**: $1,500 (usage can be added on for an additional cost)
+→ **1 [TikTok]** (https://www.tiktok.com/@sam_joness_): $900
+→ **1 [IG Reel]** (https://www.instagram.com/its_samjones_/reels/): $600
+→ **1 [UGC Video]** (https://samjonesugc.my.canva.site/): $1,500 (usage can be added on for an additional cost)
 
 Sam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over **$150k**!
 
 Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
-```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
 
@@ -188,7 +180,6 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-```
 Her standard rate is $900 per video! Below is her bundle pricing:
 
 3 videos (90%) → $2,400
@@ -196,7 +187,6 @@ Her standard rate is $900 per video! Below is her bundle pricing:
 10 videos (75%) → $6,750
 
 We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
-```
 
 ### Scenario C: Initial Inbound (Adequate Offer)
 
@@ -207,12 +197,10 @@ We've found bundles usually perform better since multiple posts make the product
 - An explicit offer of the above rate is not specified
 
 **Approved Response:**
-```
 CC: cara@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Sam](https://www.tiktok.com/@sam_joness_). Looping in her management team who can move forward with this convo!
-```
+Thank you for the offer! I think this collab could be a good fit for [Sam] (https://www.tiktok.com/@sam_joness_). Looping in her management team who can move forward with this convo!
 
 ---
 
@@ -232,16 +220,14 @@ Thank you for the offer! I think this collab could be a good fit for [Sam](https
 - An exact match from scenario below
 
 **Approved Response:**
-```
 Thank you so much for reaching out about a potential partnership with Katrina!! I'm happy to share her rates below:
-→ **1 [TikTok](https://www.tiktok.com/@katrinagmoore)**: $500
-→ Cross posting to **[IG Reels](https://www.instagram.com/katrinamoore621/reels/)**: + $150
+→ **1 [TikTok]** (https://www.tiktok.com/@katrinagmoore): $500
+→ Cross posting to **[IG Reels]** (https://www.instagram.com/katrinamoore621/reels/): + $150
 → **1 UGC Video**: $400 (usage to be negotiated)
 
-Katrina's pricing reflects her extremely high **conversion rate**. Her monthly GMV is **$450k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong **following** plus great engagement!!!
+Katrina's pricing reflects her extremely high **conversion rate**. Her monthly GMV is **$450k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong **following** plus great engagement!!!.
 
 Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
-```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
 
@@ -252,15 +238,13 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-```
-[Katrina's](https://www.tiktok.com/@katrinagmoore) standard rate is $500 per video! Below is her bundle pricing:
+[Katrina's] (https://www.tiktok.com/@katrinagmoore) standard rate is $500 per video! Below is her bundle pricing:
 
 3 videos (90%) → $1,350
 5 videos (85%) → $2,100
 10 videos (75%) → $3,750
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
-```
 
 ### Scenario C: Initial Inbound (Adequate Offer)
 
@@ -271,12 +255,10 @@ We've found bundles usually perform **better** since multiple posts make the pro
 - An explicit offer of the above rate is not specified
 
 **Approved Response:**
-```
 CC: chenni@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Katrina](https://www.tiktok.com/@katrinagmoore). Looping in her management team who can move forward with this convo!
-```
+Thank you for the offer! I think this collab could be a good fit for [Katrina] (https://www.tiktok.com/@katrinagmoore). Looping in her management team who can move forward with this convo!
 
 ---
 
@@ -296,17 +278,15 @@ Thank you for the offer! I think this collab could be a good fit for [Katrina](h
 - An exact match from scenario below
 
 **Approved Response:**
-```
-Thank you so much for reaching out about a potential partnership with Trinity!! I'm happy to share her media kit **[HERE](https://taboost.my.canva.site/trinity)** + rates below:
-→ **1 [TikTok](https://www.tiktok.com/@trinity.blair)**: $4,000
-→ **1 [IG Reel](https://www.instagram.com/trinyxo)**: $2,000
-→ **[Podcast Feature](https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf)**: $1,500
+Thank you so much for reaching out about a potential partnership with Trinity!! I'm happy to share her media kit **[HERE]** (https://taboost.my.canva.site/trinity) + rates below:
+→ **1 [TikTok]** (https://www.tiktok.com/@trinity.blair): $4,000
+→ **1 [IG Reel]** (https://www.instagram.com/trinyxo): $2,000
+→ **[Podcast Feature]** (https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf): $1,500
 → **1 UGC Video**: $1,500 (usage to be negotiated)
 
 Trinity's pricing reflects her **3.4M** followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!
 
 Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
-```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
 
@@ -317,15 +297,13 @@ Please let us know ***what type of collab you're looking for*** in your offer + 
 - Multiple post rate is not asked for
 
 **Approved Response:**
-```
-Trinity's standard rate is $4,000 per video! **[HERE](https://taboost.my.canva.site/trinity)** is her media kit. Below is her bundle pricing:
+Trinity's standard rate is $4,000 per video! **[HERE]** (https://taboost.my.canva.site/trinity) is her media kit. Below is her bundle pricing:
 
 3 videos (85%) → $10,000
 5 videos (80%) → $16,000
 10 videos (70%) → $28,000
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
-```
 
 ### Scenario C: Initial Inbound (Adequate Offer)
 
@@ -336,52 +314,7 @@ We've found bundles usually perform **better** since multiple posts make the pro
 - An explicit offer of the above rate is not specified
 
 **Approved Response:**
-```
 CC: chenni@taboost.me
 Hi,
 
-Thank you for the offer! I think this collab could be a good fit for [Trinity](https://www.tiktok.com/@trinity.blair). Looping in her management team who can move forward with this convo!
-```
-
----
-
-## Talent: Sylvia Van Hoeven
-
-**Manager:** Cara Best (cara@taboost.me)
-
-**SOP Status:** ✅ APPROVED
-
-### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
-
-**Use when:**
-- Asking for rates or a potential to collab
-- All other general inquiries
-
-**Approved Response:**
-```
-Thank you so much for reaching out about a potential partnership with Sylvia!! I'm happy to share her media kit **[HERE](https://taboost.my.canva.site/sylvia)** + rates below:
-→ **1 [TikTok](https://www.tiktok.com/@sylviavanhoevenbeauty)** (beauty): $2,000
-→ **1 [TikTok](https://www.tiktok.com/@sylviavanhoeven)** (fashion): $1,000
-→ **1 [IG Reel](https://www.instagram.com/sylviavanhoeven)**: $850
-→ **1 UGC Video**: $1,500 (usage to be negotiated)
-
-Sylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers!
-
-Please let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We'd love to explore working together!
-```
-
-### Scenario B: Initial Inbound (Bundle Rate Requested)
-
-**Use when:**
-- Asking for bundle rates
-
-**Approved Response:**
-```
-Sylvia's standard rate is $2,000 per video! **[HERE](https://taboost.my.canva.site/sylvia)** is her media kit. Below is her bundle pricing:
-
-3 videos (90%) → $5,400
-5 videos (85%) → $8,500
-10 videos (75%) → $15,000
-
-We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
-```
+Thank you for the offer! I think this collab could be a good fit for [Trinity] (https://www.tiktok.com/@trinity.blair). Looping in her management team who can move forward with this convo!
