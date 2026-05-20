@@ -1694,3 +1694,143 @@ def reset_counters(db: Session = Depends(get_db)):
     _set_dashboard_reset_at(db, now)
     db.commit()
     return {"ok": True, "reset_at": now.isoformat(), "message": "Counters reset. Badges now count from this moment forward."}
+
+
+# ── Retry triage fallbacks ─────────────────────────────────────────────────────
+
+def _retry_one_fallback(processed_email_id: int) -> None:
+    """
+    Background task: re-triage one fallback email using its stored body_text.
+    Updates the ProcessedEmail record in-place and creates a Draft if score=3.
+    Does NOT create a Gmail draft (email is already marked read).
+    """
+    from backend.models.db import get_session_factory
+    from backend.services import triage as triage_svc
+    from backend.services import reply as reply_svc
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    logger_rt = logging.getLogger(__name__ + ".retry")
+    try:
+        row = db.query(ProcessedEmail).filter(ProcessedEmail.id == processed_email_id).first()
+        if not row or not row.body_text:
+            logger_rt.warning("Retry fallback %s: row missing or no body_text", processed_email_id)
+            return
+
+        settings = get_settings()
+        talent_cfg = next(
+            (t for t in settings.app_config.get("talents", [])
+             if t.get("key", "").lower() == (row.talent_key or "").lower()),
+            None,
+        )
+        if not talent_cfg:
+            logger_rt.warning("Retry fallback %s: no talent config for %s", processed_email_id, row.talent_key)
+            return
+
+        sender_domain = row.sender.split("@")[-1] if row.sender and "@" in row.sender else ""
+
+        result = triage_svc.triage_email(
+            talent_key=row.talent_key,
+            talent_name=talent_cfg.get("full_name", ""),
+            minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
+            subject=row.subject or "",
+            sender=row.sender or "",
+            sender_domain=sender_domain,
+            body=row.body_text,
+        )
+
+        new_score = result["score"]
+        row.score = new_score
+        row.triage_reason = result["reason"]
+        row.offer_type = result.get("offer_type", "")
+        row.proposed_rate = result.get("proposed_rate_usd", 0)
+        row.brand_name = result.get("brand_name", "")
+
+        if new_score == 1:
+            row.status = EmailStatus.archived
+
+        elif new_score == 3:
+            # Skip if a draft already exists for this message
+            existing = db.query(Draft).filter(Draft.gmail_message_id == row.gmail_message_id).first()
+            if not existing:
+                draft_result = reply_svc.draft_reply(
+                    talent_key=row.talent_key,
+                    talent_name=talent_cfg.get("full_name", ""),
+                    minimum_rate=talent_cfg.get("minimum_rate_usd", 0),
+                    subject=row.subject or "",
+                    sender=row.sender or "",
+                    offer_type=result.get("offer_type", ""),
+                    brand_name=result.get("brand_name", ""),
+                    proposed_rate=float(result.get("proposed_rate_usd") or 0),
+                    triage_reason=result["reason"],
+                    db=db,
+                    body_text=row.body_text,
+                )
+                if not draft_result["is_escalate"]:
+                    db.add(Draft(
+                        talent_key=row.talent_key,
+                        gmail_message_id=row.gmail_message_id,
+                        thread_id=row.thread_id or "",
+                        sender=row.sender or "",
+                        subject=row.subject or "",
+                        brand_name=result.get("brand_name", ""),
+                        proposed_rate=float(result.get("proposed_rate_usd") or 0),
+                        offer_type=result.get("offer_type", ""),
+                        draft_text=draft_result["draft_text"],
+                        status=DraftStatus.pending,
+                        is_escalate=False,
+                        escalate_reason=None,
+                    ))
+                    row.status = EmailStatus.draft_saved
+            else:
+                row.status = EmailStatus.draft_saved
+
+        db.commit()
+        logger_rt.info(
+            "Retry fallback %s (%s / %s): score 2 → %s",
+            processed_email_id, row.talent_key, row.gmail_message_id, new_score,
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger_rt.error("Retry fallback error for id=%s: %s", processed_email_id, exc)
+        db.rollback()
+    finally:
+        db.close()
+
+
+@router.post("/retry-fallbacks")
+def retry_triage_fallbacks(
+    background_tasks: BackgroundTasks,
+    hours: int = 24,
+    db: Session = Depends(get_db),
+):
+    """
+    Re-triage all emails that failed with a triage fallback in the last N hours.
+    Uses body_text stored in processed_emails — no Gmail API calls needed.
+    Generates new drafts for any that score 3 on re-triage.
+    """
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    fallbacks = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.processed_at >= cutoff,
+            ProcessedEmail.triage_reason.like("Triage fallback%"),
+            ProcessedEmail.body_text.isnot(None),
+        )
+        .all()
+    )
+    if not fallbacks:
+        return {"queued": 0, "message": f"No triage fallbacks with body text found in last {hours}h"}
+
+    for row in fallbacks:
+        background_tasks.add_task(_retry_one_fallback, row.id)
+
+    talent_counts: dict[str, int] = {}
+    for row in fallbacks:
+        talent_counts[row.talent_key] = talent_counts.get(row.talent_key, 0) + 1
+
+    return {
+        "queued": len(fallbacks),
+        "hours_back": hours,
+        "by_talent": talent_counts,
+        "message": f"Re-triaging {len(fallbacks)} fallback emails in background.",
+    }
