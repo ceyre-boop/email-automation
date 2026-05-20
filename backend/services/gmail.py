@@ -80,30 +80,32 @@ def _apply_inline_formatting(text: str) -> str:
     """
     Convert inline formatting markers to HTML. Runs AFTER html.escape.
 
-    Handles all SOP formatting variants:
-      **bold**              → <strong>bold</strong>
-      __underline__         → <u>underline</u>
-      <u>text</u>           → preserved (escaped by html.escape to &lt;u&gt; — restored here)
-      [b]bold[/b]           → <strong>bold</strong>
-      [ul]underline[/ul]    → <u>underline</u>
+      ***bold+italic***     → <strong><em>text</em></strong>   (must come before **)
+      **bold**              → <strong>text</strong>
+      __underline__         → <u>text</u>
+      &lt;u&gt;text&lt;/u&gt; → <u>text</u>  (html.escape artifact)
+      [b]bold[/b]           → <strong>text</strong>
+      [ul]text[/ul]         → <u>text</u>
     """
     import re
-    # **bold** → <strong>
+    # ***bold+italic*** — must be matched BEFORE ** to avoid partial match
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'<strong><em>\1</em></strong>', text, flags=re.DOTALL)
+    # **bold**
     text = re.sub(r'\*\*(.+?)\*\*', r'<strong>\1</strong>', text, flags=re.DOTALL)
-    # __underline__ → <u>
+    # __underline__
     text = re.sub(r'__(.+?)__', r'<u>\1</u>', text, flags=re.DOTALL)
-    # <u>text</u> written in SOP — html.escape turns it into &lt;u&gt;text&lt;/u&gt;
-    # Restore it to real HTML so Gmail renders the underline
+    # <u>text</u> — html.escape turns < > into &lt; &gt;, restore them
     text = re.sub(r'&lt;u&gt;(.+?)&lt;/u&gt;', r'<u>\1</u>', text, flags=re.IGNORECASE | re.DOTALL)
-    # Hard-coded SOP bracket tags
+    # Hard-coded bracket tags
     text = re.sub(r'\[b\](.+?)\[/b\]', r'<strong>\1</strong>', text, flags=re.IGNORECASE | re.DOTALL)
     text = re.sub(r'\[ul\](.+?)\[/ul\]', r'<u>\1</u>', text, flags=re.IGNORECASE | re.DOTALL)
     return text
 
 
 def _strip_inline_formatting(text: str) -> str:
-    """Strip formatting markers for the plain-text version of the email."""
+    """Strip all formatting markers for the plain-text version of the email."""
     import re
+    text = re.sub(r'\*\*\*(.+?)\*\*\*', r'\1', text, flags=re.DOTALL)
     text = re.sub(r'\*\*(.+?)\*\*', r'\1', text, flags=re.DOTALL)
     text = re.sub(r'__(.+?)__', r'\1', text, flags=re.DOTALL)
     text = re.sub(r'<u>(.+?)</u>', r'\1', text, flags=re.IGNORECASE | re.DOTALL)
@@ -131,13 +133,24 @@ def _render_email_body(body: str) -> tuple[str, str]:
 
     for start, end, anchor, url in spans:
         segment = source[cursor:start]
+
+        # Detect **[Anchor](URL)** — bold wrapping around a link.
+        # The ** before [ stays in `segment`; the ** after ) is the next char.
+        bold_link = segment.endswith('**') and end < len(source) and source[end:end+2] == '**'
+        if bold_link:
+            segment = segment[:-2]          # strip trailing ** from preceding text
+            end_adj = end + 2               # skip trailing ** after the link
+        else:
+            end_adj = end
+
         plain_chunks.append(_strip_inline_formatting(segment))
         html_chunks.append(_apply_inline_formatting(_escape_and_autolink(segment)))
         plain_chunks.append(anchor)
         anchor_text = html.escape(anchor)
         url_escaped = html.escape(url, quote=True)
-        html_chunks.append(f'<a href="{url_escaped}">{anchor_text}</a>')
-        cursor = end
+        link_html = f'<a href="{url_escaped}">{anchor_text}</a>'
+        html_chunks.append(f'<strong>{link_html}</strong>' if bold_link else link_html)
+        cursor = end_adj
 
     tail = source[cursor:]
     plain_chunks.append(_strip_inline_formatting(tail))

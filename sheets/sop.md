@@ -51,8 +51,8 @@
 
    Approved SOP formatting:
    - Bold: `**text**`
-   - Underline: `<u>text</u>`
-   - Hyperlink: `[Anchor Text](URL)`
+   - Bold + Italic: `***text***`
+   - Hyperlink: `[Anchor Text](URL)` or `[Anchor Text] (URL)`
    - CC instruction: `CC: manager@example.com`
 
    Rules:
@@ -75,9 +75,9 @@
 
    Formatting behavior:
    - Render `**text**` as bold.
-   - Render `<u>text</u>` as underlined.
+   - Render `***text***` as bold and italic.
    - Render hyperlinks correctly.
-   - If formatting cannot be rendered, preserve the original markup visibly for manual review.
+   - If formatting cannot be rendered, remove the markups and render plain text as is.
 
 ---
 
@@ -107,12 +107,12 @@
 **Approved Response:**
 ```
 Thank you so much for reaching out about a potential partnership with Lizz!! I'm happy to share her rates below:
-• **1 [TikTok](https://www.tiktok.com/@lizzmi45)**: $750
-• **1 UGC Video**: $900 (usage to be negotiated)
+→ **1 [TikTok](https://www.tiktok.com/@lizzmi45)**: $750
+→ **1 UGC Video**: $900 (usage to be negotiated)
 
 Lizz's pricing reflects her extremely high **conversion rate** from content that truly sells. Her monthly GMV is **$550k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super high for a shop creator which is ideal for brand collabs.
 
-Please let us know <u>what type of collab you're looking for</u> in your offer + if you have any questions moving forward. We'd love to explore working together!
+Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
 ```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
@@ -170,13 +170,13 @@ Thank you for the offer! I think this collab could be a good fit for [Lizz](http
 **Approved Response:**
 ```
 Thank you so much for reaching out about a potential partnership with Sam!! I'm happy to share her rates below:
-• **1 [TikTok](https://www.tiktok.com/@sam_joness_)**: $900
-• **1 [IG Reel](https://www.instagram.com/its_samjones_/reels/)**: $600
-• **1 [UGC Video](https://samjonesugc.my.canva.site/)**: $1,500 (usage can be added on for an additional cost)
+→ **1 [TikTok](https://www.tiktok.com/@sam_joness_)**: $900
+→ **1 [IG Reel](https://www.instagram.com/its_samjones_/reels/)**: $600
+→ **1 [UGC Video](https://samjonesugc.my.canva.site/)**: $1,500 (usage can be added on for an additional cost)
 
 Sam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over **$150k**!
 
-Please let us know <u>what type of collab you're looking for</u> in your offer + if you have any questions moving forward. We'd love to explore working together!
+Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
 ```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
@@ -234,13 +234,13 @@ Thank you for the offer! I think this collab could be a good fit for [Sam](https
 **Approved Response:**
 ```
 Thank you so much for reaching out about a potential partnership with Katrina!! I'm happy to share her rates below:
-• **1 [TikTok](https://www.tiktok.com/@katrinagmoore)**: $500
-• Cross posting to **[IG Reels](https://www.instagram.com/katrinamoore621/reels/)**: + $150
-• **1 UGC Video**: $400 (usage to be negotiated)
+→ **1 [TikTok](https://www.tiktok.com/@katrinagmoore)**: $500
+→ Cross posting to **[IG Reels](https://www.instagram.com/katrinamoore621/reels/)**: + $150
+→ **1 UGC Video**: $400 (usage to be negotiated)
 
 Katrina's pricing reflects her extremely high **conversion rate**. Her monthly GMV is **$450k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong **following** plus great engagement!!!
 
-Please let us know <u>what type of collab you're looking for</u> in your offer + if you have any questions moving forward. We'd love to explore working together!
+Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
 ```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
@@ -298,14 +298,14 @@ Thank you for the offer! I think this collab could be a good fit for [Katrina](h
 **Approved Response:**
 ```
 Thank you so much for reaching out about a potential partnership with Trinity!! I'm happy to share her media kit **[HERE](https://taboost.my.canva.site/trinity)** + rates below:
-• **1 [TikTok](https://www.tiktok.com/@trinity.blair)**: $4,000
-• **1 [IG Reel](https://www.instagram.com/trinyxo)**: $2,000
-• **[Podcast](https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf)** Feature: $1,500
-• **1 UGC Video**: $1,500 (usage to be negotiated)
+→ **1 [TikTok](https://www.tiktok.com/@trinity.blair)**: $4,000
+→ **1 [IG Reel](https://www.instagram.com/trinyxo)**: $2,000
+→ **[Podcast Feature](https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf)**: $1,500
+→ **1 UGC Video**: $1,500 (usage to be negotiated)
 
 Trinity's pricing reflects her **3.4M** followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!
 
-Please let us know <u>what type of collab you're looking for</u> in your offer + if you have any questions moving forward. We'd love to explore working together!
+Please let us know ***what type of collab you're looking for*** in your offer + if you have any questions moving forward. We'd love to explore working together!
 ```
 
 ### Scenario B: Initial Inbound (Bundle Rate Requested)
@@ -360,10 +360,10 @@ Thank you for the offer! I think this collab could be a good fit for [Trinity](h
 **Approved Response:**
 ```
 Thank you so much for reaching out about a potential partnership with Sylvia!! I'm happy to share her media kit **[HERE](https://taboost.my.canva.site/sylvia)** + rates below:
-• **1 [TikTok](https://www.tiktok.com/@sylviavanhoevenbeauty)** (beauty): $2,000
-• **1 [TikTok](https://www.tiktok.com/@sylviavanhoeven)** (fashion): $1,000
-• **1 [IG Reel](https://www.instagram.com/sylviavanhoeven)**: $850
-• **1 UGC Video**: $1,500 (usage to be negotiated)
+→ **1 [TikTok](https://www.tiktok.com/@sylviavanhoevenbeauty)** (beauty): $2,000
+→ **1 [TikTok](https://www.tiktok.com/@sylviavanhoeven)** (fashion): $1,000
+→ **1 [IG Reel](https://www.instagram.com/sylviavanhoeven)**: $850
+→ **1 UGC Video**: $1,500 (usage to be negotiated)
 
 Sylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers!
 
