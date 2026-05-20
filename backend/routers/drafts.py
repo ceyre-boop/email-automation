@@ -93,7 +93,28 @@ def _get_token_or_404(db: Session, talent_key: str) -> TalentToken:
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 
-@router.get("", response_model=list[DraftOut])
+def _draft_to_dict(r: Draft) -> dict:
+    return {
+        "id": r.id,
+        "talent_key": r.talent_key,
+        "gmail_message_id": r.gmail_message_id,
+        "sender": r.sender,
+        "subject": r.subject,
+        "brand_name": r.brand_name,
+        "proposed_rate": r.proposed_rate,
+        "offer_type": r.offer_type,
+        "draft_text": r.draft_text,
+        "status": r.status if isinstance(r.status, str) else r.status.value,
+        "is_escalate": bool(r.is_escalate),
+        "escalate_reason": r.escalate_reason,
+        "created_at": r.created_at.isoformat() if r.created_at else None,
+        "human_edited": bool(getattr(r, "human_edited", False) or False),
+        "human_edited_at": r.human_edited_at.isoformat() if getattr(r, "human_edited_at", None) else None,
+        "human_edited_by": getattr(r, "human_edited_by", None),
+    }
+
+
+@router.get("")
 def list_drafts(
     status: Optional[str] = Query(None, description="Filter by status: pending, approved, sent, discarded"),
     talent_key: Optional[str] = Query(None, description="Filter by talent"),
@@ -107,7 +128,7 @@ def list_drafts(
         q = q.filter(Draft.status == DraftStatus.pending)
     if talent_key:
         q = q.filter(Draft.talent_key.ilike(talent_key))
-    return q.order_by(Draft.created_at.desc()).all()
+    return [_draft_to_dict(r) for r in q.order_by(Draft.created_at.desc()).all()]
 
 
 @router.get("/human-edited")
@@ -194,9 +215,9 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
     return {"ok": True, "message": "Draft cleared — will be regenerated within 20 seconds."}
 
 
-@router.get("/{draft_id}", response_model=DraftOut)
+@router.get("/{draft_id}")
 def get_draft(draft_id: int, db: Session = Depends(get_db)):
-    return _get_draft_or_404(db, draft_id)
+    return _draft_to_dict(_get_draft_or_404(db, draft_id))
 
 
 @router.post("/{draft_id}/approve")
