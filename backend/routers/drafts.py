@@ -110,6 +110,90 @@ def list_drafts(
     return q.order_by(Draft.created_at.desc()).all()
 
 
+@router.get("/human-edited")
+def list_human_edited_drafts(
+    talent_key: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """All drafts that a human has touched — across all statuses."""
+    q = db.query(Draft).filter(Draft.human_edited == True)  # noqa: E712
+    if talent_key:
+        q = q.filter(Draft.talent_key.ilike(talent_key))
+    rows = q.order_by(Draft.human_edited_at.desc()).limit(200).all()
+    return [
+        {
+            "id": r.id,
+            "talent_key": r.talent_key,
+            "gmail_message_id": r.gmail_message_id,
+            "sender": r.sender,
+            "subject": r.subject,
+            "brand_name": r.brand_name,
+            "proposed_rate": r.proposed_rate,
+            "status": r.status,
+            "human_edited_at": r.human_edited_at.isoformat() if r.human_edited_at else None,
+            "human_edited_by": r.human_edited_by,
+            "draft_text": r.draft_text,
+            "original_draft_text": r.original_draft_text,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/orphaned")
+def list_orphaned_emails(
+    talent_key: Optional[str] = Query(None),
+    limit: int = Query(100),
+    db: Session = Depends(get_db),
+):
+    """Score-3 emails that have no draft — real deals that fell through the cracks."""
+    from backend.models.db import ProcessedEmail
+    from sqlalchemy import select
+
+    drafted_subq = select(Draft.gmail_message_id)
+    q = db.query(ProcessedEmail).filter(
+        ProcessedEmail.score == 3,
+        ProcessedEmail.status != "archived",
+        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+    )
+    if talent_key:
+        q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
+    rows = q.order_by(ProcessedEmail.processed_at.desc()).limit(limit).all()
+    return [
+        {
+            "gmail_message_id": r.gmail_message_id,
+            "talent_key": r.talent_key,
+            "sender": r.sender,
+            "subject": r.subject,
+            "brand_name": r.brand_name,
+            "proposed_rate": r.proposed_rate,
+            "offer_type": r.offer_type,
+            "triage_reason": r.triage_reason,
+            "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/orphaned/{gmail_message_id}/regenerate")
+def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
+    """Force-regenerate a draft for an orphaned score-3 email."""
+    from backend.models.db import ProcessedEmail
+    pe = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == gmail_message_id
+    ).first()
+    if not pe:
+        raise HTTPException(status_code=404, detail="Email not found in processed records.")
+    if pe.score != 3:
+        raise HTTPException(status_code=400, detail="Email is not Score 3 — cannot regenerate draft.")
+
+    existing = db.query(Draft).filter(Draft.gmail_message_id == gmail_message_id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    return {"ok": True, "message": "Draft cleared — will be regenerated within 20 seconds."}
+
+
 @router.get("/{draft_id}", response_model=DraftOut)
 def get_draft(draft_id: int, db: Session = Depends(get_db)):
     return _get_draft_or_404(db, draft_id)
@@ -247,35 +331,6 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
     return {"ok": True, "message": "Draft discarded."}
 
 
-@router.get("/human-edited")
-def list_human_edited_drafts(
-    talent_key: Optional[str] = Query(None),
-    db: Session = Depends(get_db),
-):
-    """All drafts that a human has touched — across all statuses."""
-    q = db.query(Draft).filter(Draft.human_edited == True)  # noqa: E712
-    if talent_key:
-        q = q.filter(Draft.talent_key.ilike(talent_key))
-    rows = q.order_by(Draft.human_edited_at.desc()).limit(200).all()
-    return [
-        {
-            "id": r.id,
-            "talent_key": r.talent_key,
-            "gmail_message_id": r.gmail_message_id,
-            "sender": r.sender,
-            "subject": r.subject,
-            "brand_name": r.brand_name,
-            "proposed_rate": r.proposed_rate,
-            "status": r.status,
-            "human_edited_at": r.human_edited_at.isoformat() if r.human_edited_at else None,
-            "human_edited_by": r.human_edited_by,
-            "draft_text": r.draft_text,
-            "original_draft_text": r.original_draft_text,
-        }
-        for r in rows
-    ]
-
-
 @router.get("/{draft_id}/edit-history")
 def get_edit_history(draft_id: int, db: Session = Depends(get_db)):
     """Full edit log for a single draft."""
@@ -296,66 +351,6 @@ def get_edit_history(draft_id: int, db: Session = Depends(get_db)):
         }
         for l in logs
     ]
-
-
-@router.get("/orphaned")
-def list_orphaned_emails(
-    talent_key: Optional[str] = Query(None),
-    limit: int = Query(100),
-    db: Session = Depends(get_db),
-):
-    """
-    Score-3 emails that have no draft (deleted, failed, or never drafted).
-    These are real deals that fell through the cracks — each has a Regenerate button.
-    """
-    from backend.models.db import ProcessedEmail
-    from sqlalchemy import select
-
-    drafted_subq = select(Draft.gmail_message_id)
-    q = db.query(ProcessedEmail).filter(
-        ProcessedEmail.score == 3,
-        ProcessedEmail.status != "archived",
-        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
-    )
-    if talent_key:
-        q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
-    rows = q.order_by(ProcessedEmail.processed_at.desc()).limit(limit).all()
-    return [
-        {
-            "gmail_message_id": r.gmail_message_id,
-            "talent_key": r.talent_key,
-            "sender": r.sender,
-            "subject": r.subject,
-            "brand_name": r.brand_name,
-            "proposed_rate": r.proposed_rate,
-            "offer_type": r.offer_type,
-            "triage_reason": r.triage_reason,
-            "processed_at": r.processed_at.isoformat() if r.processed_at else None,
-        }
-        for r in rows
-    ]
-
-
-@router.post("/orphaned/{gmail_message_id}/regenerate")
-def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
-    """Force-regenerate a draft for an orphaned score-3 email."""
-    from backend.models.db import ProcessedEmail
-    pe = db.query(ProcessedEmail).filter(
-        ProcessedEmail.gmail_message_id == gmail_message_id
-    ).first()
-    if not pe:
-        raise HTTPException(status_code=404, detail="Email not found in processed records.")
-    if pe.score != 3:
-        raise HTTPException(status_code=400, detail="Email is not Score 3 — cannot regenerate draft.")
-
-    # Delete any existing discarded draft so the queue picks it up fresh
-    existing = db.query(Draft).filter(Draft.gmail_message_id == gmail_message_id).first()
-    if existing:
-        db.delete(existing)
-        db.commit()
-
-    # Queue it — the draft queue will draft it within 20s
-    return {"ok": True, "message": "Draft cleared — will be regenerated within 20 seconds."}
 
 
 @router.post("/discard-all")
