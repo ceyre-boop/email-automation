@@ -843,6 +843,31 @@ body {
       </div>
     </div>
 
+    <!-- ── Human Edited Drafts ──────────────────────────────────────────── -->
+    <div class="fade-up" style="margin-bottom:24px;" id="human-edited-section">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="section-head" style="margin-bottom:0;">Human Edited</div>
+          <span id="human-edited-count" style="background:rgba(255,179,0,0.15); color:var(--amber); border:1px solid rgba(255,179,0,0.3); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
+        </div>
+        <button class="btn btn-ghost" onclick="loadHumanEdited()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+      </div>
+      <div id="human-edited-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
+    <!-- ── Orphaned Emails (Draft Recovery) ─────────────────────────────── -->
+    <div class="fade-up" style="margin-bottom:24px;" id="orphaned-section">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="section-head" style="margin-bottom:0;">Lost Drafts</div>
+          <span id="orphaned-count" style="background:var(--red-dim); color:var(--red); border:1px solid var(--red-line); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
+          <span style="font-size:11px; color:var(--text-3);">Score 3 emails with no draft — click Regenerate to recover</span>
+        </div>
+        <button class="btn btn-ghost" onclick="loadOrphaned()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+      </div>
+      <div id="orphaned-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
     <!-- ── Marco section ───────────────────────────────────────────────── -->
     <div class="fade-up" style="padding-top:28px; border-top:1px solid var(--border); margin-bottom:40px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
@@ -1119,6 +1144,8 @@ async function loadOverview() {
     showView('overview');
     // Load all background panels
     loadDraftQueue().catch(() => {});
+    loadHumanEdited().catch(() => {});
+    loadOrphaned().catch(() => {});
     loadHealthScore().catch(() => {});
     loadAnalytics().catch(() => {});
     loadMarco().catch(() => {});
@@ -1854,14 +1881,16 @@ async function loadDraftQueue() {
       const senderName = (d.sender || '').replace(/^"?([^"<]+)"?\s*<.*>$/, '$1').trim() || d.sender || 'Unknown';
       const rate = d.proposed_rate ? ` · $${d.proposed_rate.toLocaleString()}` : '';
       const escalate = d.is_escalate ? `<span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">ESCALATION</span>` : '';
+      const humanEdited = d.human_edited ? `<span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">✎ EDITED</span>` : '';
       return `
-      <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
+      <div style="background:var(--surface-2); border:1px solid ${d.human_edited ? 'rgba(255,179,0,0.3)' : 'var(--border)'}; border-radius:10px; overflow:hidden;">
         <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer;" onclick="toggleDraftExpand(${d.id})">
           <div style="width:30px; height:30px; border-radius:50%; background:var(--red-dim); border:1px solid var(--red-line); color:var(--red); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${initials}</div>
           <div style="flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
               <span style="font-size:12px; font-weight:700; color:var(--text);">${esc(d.talent_key)}</span>
               ${escalate}
+              ${humanEdited}
               ${d.brand_name ? `<span style="font-size:11px; color:var(--green);">${esc(d.brand_name)}${rate}</span>` : ''}
             </div>
             <div style="font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(senderName)} — ${esc(d.subject || '(no subject)')}</div>
@@ -1877,6 +1906,86 @@ async function loadDraftQueue() {
     }).join('');
   } catch(e) {
     document.getElementById('draft-queue-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load drafts: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Human Edited Drafts ──────────────────────────────────────────────────────
+async function loadHumanEdited() {
+  try {
+    const rows = await api('GET', '/api/drafts/human-edited');
+    const list = document.getElementById('human-edited-list');
+    const countEl = document.getElementById('human-edited-count');
+    countEl.textContent = rows.length;
+    if (!rows.length) {
+      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:12px;">No human-edited drafts yet.</div>`;
+      return;
+    }
+    list.innerHTML = rows.map(r => {
+      const changed = r.original_draft_text && r.original_draft_text !== r.draft_text;
+      return `
+      <div style="background:var(--surface-2);border:1px solid rgba(255,179,0,0.25);border-left:3px solid var(--amber);border-radius:10px;padding:12px 16px;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
+          <span style="font-size:12px;font-weight:700;color:var(--text);">${esc(r.talent_key)}</span>
+          <span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">✎ HUMAN EDITED</span>
+          ${r.proposed_rate ? `<span style="background:rgba(0,214,143,0.12);border:1px solid rgba(0,214,143,0.25);color:var(--green);border-radius:6px;font-size:10px;font-weight:800;padding:2px 7px;">$${Number(r.proposed_rate).toLocaleString()}</span>` : ''}
+          <span style="font-size:10px;color:var(--text-3);margin-left:auto;">${r.status} · ${r.human_edited_at ? fmtDate(r.human_edited_at) : '—'}</span>
+        </div>
+        <div style="font-size:12px;color:var(--text-2);margin-bottom:4px;">${esc(r.brand_name || r.sender || '')} — ${esc(r.subject || '(no subject)')}</div>
+        ${r.human_edited_by ? `<div style="font-size:11px;color:var(--text-3);">Edited by: ${esc(r.human_edited_by)}</div>` : ''}
+        ${changed ? `<div style="font-size:10px;color:var(--amber);margin-top:4px;">⚠ Content was changed from AI original</div>` : ''}
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('human-edited-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Orphaned / Lost Drafts ───────────────────────────────────────────────────
+async function loadOrphaned() {
+  try {
+    const rows = await api('GET', '/api/drafts/orphaned?limit=50');
+    const list = document.getElementById('orphaned-list');
+    const countEl = document.getElementById('orphaned-count');
+    countEl.textContent = rows.length;
+    if (!rows.length) {
+      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:12px;">No lost drafts — everything is accounted for ✓</div>`;
+      return;
+    }
+    list.innerHTML = rows.map(r => `
+      <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
+        <div style="flex:1;min-width:0;">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+            <span style="font-size:12px;font-weight:700;color:var(--text);">${esc(r.talent_key)}</span>
+            ${r.proposed_rate ? `<span style="background:rgba(0,214,143,0.12);border:1px solid rgba(0,214,143,0.25);color:var(--green);border-radius:6px;font-size:10px;font-weight:800;padding:2px 7px;">$${Number(r.proposed_rate).toLocaleString()}</span>` : ''}
+            ${r.brand_name ? `<span style="font-size:11px;color:var(--text-3);">${esc(r.brand_name)}</span>` : ''}
+          </div>
+          <div style="font-size:12px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.subject || '(no subject)')}</div>
+          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${esc(r.triage_reason || '')}</div>
+        </div>
+        <button id="regen-${esc(r.gmail_message_id)}" onclick="regenerateDraft('${esc(r.gmail_message_id)}', this)"
+          style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:var(--green);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);flex-shrink:0;">
+          ↺ Regenerate
+        </button>
+      </div>`
+    ).join('');
+  } catch(e) {
+    document.getElementById('orphaned-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+async function regenerateDraft(msgId, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Queuing…';
+  try {
+    await api('POST', `/api/drafts/orphaned/${msgId}/regenerate`);
+    btn.textContent = '✓ Queued';
+    btn.style.color = 'var(--green)';
+    showToast('Draft queued — will appear in ~20 seconds.');
+    setTimeout(() => loadOrphaned(), 25000);
+  } catch(e) {
+    showToast('Regenerate failed: ' + e.message);
+    btn.disabled = false;
+    btn.textContent = '↺ Regenerate';
   }
 }
 

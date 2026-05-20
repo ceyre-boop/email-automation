@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.models.db import Draft, DraftStatus, TalentToken
+from backend.models.db import Draft, DraftEditLog, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
 from backend.services import gmail as gmail_svc
 from backend.services.gmail import parse_cc_recipients
@@ -33,6 +33,7 @@ logger = logging.getLogger(__name__)
 class DraftOut(BaseModel):
     id: int
     talent_key: str
+    gmail_message_id: Optional[str] = None
     sender: Optional[str]
     subject: Optional[str]
     brand_name: Optional[str]
@@ -43,6 +44,9 @@ class DraftOut(BaseModel):
     is_escalate: bool
     escalate_reason: Optional[str]
     created_at: datetime
+    human_edited: bool = False
+    human_edited_at: Optional[datetime] = None
+    human_edited_by: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -51,6 +55,7 @@ class DraftOut(BaseModel):
 class EditBody(BaseModel):
     draft_text: str
     reviewed_by: Optional[str] = None
+    edit_note: Optional[str] = None
 
 
 class ApproveBody(BaseModel):
@@ -178,8 +183,28 @@ def edit_draft(draft_id: int, body: EditBody, db: Session = Depends(get_db)):
     if not body.draft_text.strip():
         raise HTTPException(status_code=422, detail="draft_text cannot be empty.")
 
+    # Log the human edit before overwriting
+    log = DraftEditLog(
+        draft_id=draft.id,
+        talent_key=draft.talent_key,
+        gmail_message_id=draft.gmail_message_id,
+        edited_by=body.reviewed_by,
+        edit_note=body.edit_note,
+        text_before=draft.draft_text,
+        text_after=body.draft_text,
+        edited_at=datetime.utcnow(),
+    )
+    db.add(log)
+
+    # Preserve the original AI text on first edit
+    if not draft.human_edited:
+        draft.original_draft_text = draft.draft_text
+
     draft.draft_text = body.draft_text
     draft.reviewed_by = body.reviewed_by
+    draft.human_edited = True
+    draft.human_edited_at = datetime.utcnow()
+    draft.human_edited_by = body.reviewed_by
     # If there's an existing Gmail draft, delete it and recreate with new text
     if draft.gmail_draft_id:
         token = _get_token_or_404(db, draft.talent_key)
@@ -220,6 +245,117 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
     db.commit()
     logger.info("Draft %s discarded by %s", draft_id, body.reviewed_by)
     return {"ok": True, "message": "Draft discarded."}
+
+
+@router.get("/human-edited")
+def list_human_edited_drafts(
+    talent_key: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """All drafts that a human has touched — across all statuses."""
+    q = db.query(Draft).filter(Draft.human_edited == True)  # noqa: E712
+    if talent_key:
+        q = q.filter(Draft.talent_key.ilike(talent_key))
+    rows = q.order_by(Draft.human_edited_at.desc()).limit(200).all()
+    return [
+        {
+            "id": r.id,
+            "talent_key": r.talent_key,
+            "gmail_message_id": r.gmail_message_id,
+            "sender": r.sender,
+            "subject": r.subject,
+            "brand_name": r.brand_name,
+            "proposed_rate": r.proposed_rate,
+            "status": r.status,
+            "human_edited_at": r.human_edited_at.isoformat() if r.human_edited_at else None,
+            "human_edited_by": r.human_edited_by,
+            "draft_text": r.draft_text,
+            "original_draft_text": r.original_draft_text,
+        }
+        for r in rows
+    ]
+
+
+@router.get("/{draft_id}/edit-history")
+def get_edit_history(draft_id: int, db: Session = Depends(get_db)):
+    """Full edit log for a single draft."""
+    logs = (
+        db.query(DraftEditLog)
+        .filter(DraftEditLog.draft_id == draft_id)
+        .order_by(DraftEditLog.edited_at.asc())
+        .all()
+    )
+    return [
+        {
+            "id": l.id,
+            "edited_by": l.edited_by,
+            "edit_note": l.edit_note,
+            "text_before": l.text_before,
+            "text_after": l.text_after,
+            "edited_at": l.edited_at.isoformat(),
+        }
+        for l in logs
+    ]
+
+
+@router.get("/orphaned")
+def list_orphaned_emails(
+    talent_key: Optional[str] = Query(None),
+    limit: int = Query(100),
+    db: Session = Depends(get_db),
+):
+    """
+    Score-3 emails that have no draft (deleted, failed, or never drafted).
+    These are real deals that fell through the cracks — each has a Regenerate button.
+    """
+    from backend.models.db import ProcessedEmail
+    from sqlalchemy import select
+
+    drafted_subq = select(Draft.gmail_message_id)
+    q = db.query(ProcessedEmail).filter(
+        ProcessedEmail.score == 3,
+        ProcessedEmail.status != "archived",
+        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+    )
+    if talent_key:
+        q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
+    rows = q.order_by(ProcessedEmail.processed_at.desc()).limit(limit).all()
+    return [
+        {
+            "gmail_message_id": r.gmail_message_id,
+            "talent_key": r.talent_key,
+            "sender": r.sender,
+            "subject": r.subject,
+            "brand_name": r.brand_name,
+            "proposed_rate": r.proposed_rate,
+            "offer_type": r.offer_type,
+            "triage_reason": r.triage_reason,
+            "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/orphaned/{gmail_message_id}/regenerate")
+def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
+    """Force-regenerate a draft for an orphaned score-3 email."""
+    from backend.models.db import ProcessedEmail
+    pe = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == gmail_message_id
+    ).first()
+    if not pe:
+        raise HTTPException(status_code=404, detail="Email not found in processed records.")
+    if pe.score != 3:
+        raise HTTPException(status_code=400, detail="Email is not Score 3 — cannot regenerate draft.")
+
+    # Delete any existing discarded draft so the queue picks it up fresh
+    existing = db.query(Draft).filter(Draft.gmail_message_id == gmail_message_id).first()
+    if existing:
+        db.delete(existing)
+        db.commit()
+
+    # Queue it — the draft queue will draft it within 20s
+    return {"ok": True, "message": "Draft cleared — will be regenerated within 20 seconds."}
 
 
 @router.post("/discard-all")

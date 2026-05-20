@@ -161,12 +161,10 @@ def _run_draft_queue(batch_size: int = 60):
 
 def _run_backlog_blaster():
     """
-    Idle-time worker — runs every 30s and processes up to 100 backlogged Score-3
-    emails per cycle. Larger batch than the regular queue; designed to clear the
-    backlog quickly when the system isn't busy with fresh incoming emails.
-    Skips if the regular draft queue is currently active (max_instances=1 guard).
+    Runs every 30s. Processes up to 300 backlogged emails per cycle — no cap on
+    total backlog; each scheduler tick just keeps biting chunks until it's empty.
     """
-    _run_draft_queue(batch_size=100)
+    _run_draft_queue(batch_size=300)
 
 
 def _run_proactive_refresh():

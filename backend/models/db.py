@@ -150,6 +150,27 @@ class Draft(Base):
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
     reviewed_by: Mapped[str | None] = mapped_column(String(128))
+    # Human-touch audit
+    human_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    human_edited_at: Mapped[datetime | None] = mapped_column(DateTime)
+    human_edited_by: Mapped[str | None] = mapped_column(String(128))
+    original_draft_text: Mapped[str | None] = mapped_column(Text)  # AI original before any edits
+
+
+class DraftEditLog(Base):
+    """Every human edit to a draft — full audit trail."""
+
+    __tablename__ = "draft_edit_logs"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    draft_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    talent_key: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
+    gmail_message_id: Mapped[str] = mapped_column(String(128), nullable=False)
+    edited_by: Mapped[str | None] = mapped_column(String(128))
+    edit_note: Mapped[str | None] = mapped_column(Text)
+    text_before: Mapped[str] = mapped_column(Text, nullable=False)
+    text_after: Mapped[str] = mapped_column(Text, nullable=False)
+    edited_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
 
 
 class InboxEmail(Base):
@@ -316,6 +337,11 @@ def create_tables():
             # Email threading: store original Message-ID header so approved replies thread correctly
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS cc_recipients TEXT",
+            # Human-touch audit columns
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited BOOLEAN DEFAULT FALSE",
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_at TIMESTAMP",
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_by VARCHAR(128)",
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS original_draft_text TEXT",
         ]:
             try:
                 conn.execute(text(stmt))
