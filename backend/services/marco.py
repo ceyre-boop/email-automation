@@ -35,8 +35,8 @@ Categorize each message as one of: volume, quality, spam, escalation, health
 
 Rate severity as: info, warning, critical
 
-Return a JSON array:
-[{"message": "...", "category": "volume|quality|spam|escalation|health", "talent_key": "<key or null>", "severity": "info|warning|critical"}]
+Return a JSON object with a single key "messages" containing an array:
+{"messages": [{"message": "...", "category": "volume|quality|spam|escalation|health", "talent_key": "<key or null>", "severity": "info|warning|critical"}, ...]}
 
 Only include messages that are genuinely noteworthy. Fewer strong signals beat many weak ones."""
 
@@ -67,13 +67,19 @@ def generate_messages(db: Session) -> int:
         )
         raw = response.choices[0].message.content
         parsed = json.loads(raw)
-        # Handle both {"messages": [...]} and [...]
-        if isinstance(parsed, dict):
-            messages = parsed.get("messages", [])
-        else:
+        # Handle {"messages": [...]}, bare [...], or any dict whose first list value is the payload
+        if isinstance(parsed, list):
             messages = parsed
+        elif isinstance(parsed, dict):
+            # Try "messages" first, then fall back to any list value in the dict
+            if "messages" in parsed:
+                messages = parsed["messages"]
+            else:
+                messages = next((v for v in parsed.values() if isinstance(v, list)), [])
+        else:
+            messages = []
     except Exception as exc:
-        logger.error("Marco GPT call failed: %s", exc)
+        logger.error("Marco GPT call failed: %s", exc, exc_info=True)
         return 0
 
     count = 0

@@ -2085,7 +2085,11 @@ async function generateMarco() {
   btn.disabled = true;
   try {
     const r = await api('POST', '/api/analytics/marco/generate');
-    showToast(`✦ Marco generated ${r.generated} message${r.generated !== 1 ? 's' : ''}.`);
+    if (r.generated === 0) {
+      showToast('Marco: no messages generated — check server logs.');
+    } else {
+      showToast(`✦ Marco generated ${r.generated} message${r.generated !== 1 ? 's' : ''}.`);
+    }
     await loadMarco();
   } catch(e) {
     showToast('Marco generation failed: ' + e.message);
