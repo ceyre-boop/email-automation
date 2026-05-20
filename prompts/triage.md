@@ -57,7 +57,10 @@ Format:
 
 proposed_rate_usd rules:
 - 0 if asking for rates or no specific dollar amount stated
-- Non-zero ONLY if brand explicitly states a specific payment amount (e.g. "$500 per video")
+- 0 if the amount is described as "up to $X", "earn up to", "potential earnings", or affiliate/commission estimates
+- 0 if the email is an affiliate gifting program (free sample + commission) — these are NOT direct paid offers
+- 0 if the payment is conditional on performance, clicks, or sales (commission-based)
+- Non-zero ONLY if brand explicitly states a guaranteed flat payment: "we will pay you $X per video" or "our budget is $X"
 
 ---
 
