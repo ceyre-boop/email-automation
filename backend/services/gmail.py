@@ -598,6 +598,54 @@ def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
         return False  # conservative: don't block on API failure
 
 
+# ── Triage labels ─────────────────────────────────────────────────────────────
+
+_TRIAGE_LABEL_CFG = {
+    1: {"name": "AI: Junk",   "backgroundColor": "#e8eaed", "textColor": "#202124"},
+    2: {"name": "AI: Review", "backgroundColor": "#f4511e", "textColor": "#ffffff"},
+    3: {"name": "AI: Draft",  "backgroundColor": "#16a765", "textColor": "#ffffff"},
+}
+
+
+def _get_or_create_triage_label(service, score: int) -> str | None:
+    """Return label ID for the given triage score, creating the label if it doesn't exist yet."""
+    cfg = _TRIAGE_LABEL_CFG.get(score)
+    if not cfg:
+        return None
+    try:
+        existing = service.users().labels().list(userId="me").execute()
+        for lbl in existing.get("labels", []):
+            if lbl.get("name") == cfg["name"]:
+                return lbl["id"]
+        created = service.users().labels().create(
+            userId="me",
+            body={
+                "name": cfg["name"],
+                "labelListVisibility": "labelShow",
+                "messageListVisibility": "show",
+                "color": {"backgroundColor": cfg["backgroundColor"], "textColor": cfg["textColor"]},
+            },
+        ).execute()
+        return created.get("id")
+    except Exception:
+        return None
+
+
+def apply_triage_label(token_row, message_id: str, score: int, db=None, service=None) -> None:
+    """Apply the AI triage label to a Gmail message. Non-fatal — never blocks the main flow."""
+    try:
+        svc = service or _gmail_service(token_row, db)
+        label_id = _get_or_create_triage_label(svc, score)
+        if label_id:
+            svc.users().messages().modify(
+                userId="me",
+                id=message_id,
+                body={"addLabelIds": [label_id]},
+            ).execute()
+    except Exception:  # noqa: BLE001
+        pass  # labels are best-effort — a failure here must never crash triage
+
+
 def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
     """Delete a draft from the talent's Gmail account."""
     service = _gmail_service(token_row, db)

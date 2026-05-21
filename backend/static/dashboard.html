@@ -453,6 +453,7 @@ body {
 .er-date { font-size: 10px; color: var(--text-3); flex-shrink: 0; font-family: var(--mono); }
 .er-subject { font-size: 12px; color: var(--text-2); margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .er-meta { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.er-triage { font-size: 11px; color: var(--text-3); padding: 1px 12px 5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; line-height: 1.4; font-style: italic; }
 
 .score-dot {
   width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
@@ -1525,6 +1526,7 @@ function renderEmailList() {
     let badge = '';
     if (isTrash) badge = '<span class="draft-badge trash">TRASH</span>';
     else if (hasDraft) badge = '<span class="draft-badge">DRAFT</span>';
+    const offerLine = `Score: ${email.score ?? '?'} · Offer: ${esc(email.offer_type || 'Unknown')}`;
     div.innerHTML = `
       <div class="er-top">
         <span class="er-sender">${esc(shortSender(email.sender))}</span>
@@ -1533,9 +1535,10 @@ function renderEmailList() {
       <div class="er-subject">${esc(email.subject || '(no subject)')}</div>
       <div class="er-meta">
         <span class="score-dot ${scoreDotClass(email.score)}"></span>
-        ${esc(meta || email.triage_reason || scoreLabel(email.score))}
+        ${offerLine}
         ${badge}
       </div>
+      ${email.triage_reason ? `<div class="er-triage">${esc(email.triage_reason)}</div>` : ''}
     `;
     const html = `
       <div class="reader-header">
@@ -1637,7 +1640,9 @@ function renderReadingPane(email, draft) {
       </div>
     </div>
 
-    <div class="msg-card fade-up">
+    <div id="draft-compose-area"></div>
+
+    <div class="msg-card fade-up" style="margin-top:16px;">
       <div class="msg-meta">
         <div class="msg-av">${initial(senderShort)}</div>
         <div style="flex:1">
@@ -1645,6 +1650,11 @@ function renderReadingPane(email, draft) {
           <div class="msg-addr">${esc(email.sender)} · ${fmtDate(email)}</div>
         </div>
         <span class="pill ${scorePillClass(email.score)}">${scoreLabel(email.score)}</span>
+      </div>
+
+      <div class="msg-triage-block" style="margin:10px 0 14px; padding:10px 12px; background:var(--surface-3); border-radius:6px; border-left:3px solid var(--${email.score===3?'green':email.score===2?'amber':'text-3'});">
+        <div style="font-size:11px; font-weight:700; color:var(--text-2); margin-bottom:3px;">Score: ${email.score ?? '?'} · Offer: ${esc(email.offer_type || 'Unknown')}</div>
+        ${email.triage_reason ? `<div style="font-size:11px; color:var(--text-3); line-height:1.5;">${esc(email.triage_reason)}</div>` : ''}
       </div>
 
       <div id="msg-body-${email.gmail_message_id}">
@@ -1657,8 +1667,6 @@ function renderReadingPane(email, draft) {
         ${email.offer_type ? `<span class="pill misc">${esc(email.offer_type)}</span>` : ''}
       </div>
     </div>
-
-    <div id="draft-compose-area"></div>
   `;
 
   if (draft) {
