@@ -252,6 +252,9 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
     if not success:
         raise HTTPException(status_code=502, detail="Gmail send failed — check token and try again.")
 
+    if draft.gmail_message_id:
+        gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
+
     # Delete the Gmail draft copy (sent from the Sent folder now)
     if draft.gmail_draft_id:
         gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)

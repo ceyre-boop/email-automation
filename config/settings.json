@@ -251,8 +251,29 @@
       "category": "TBD",
       "minimum_rate_usd": 0,
       "rate_unit": "per video",
-      "paused": true,
-      "_note": "New talent \u2014 paused until Gmail connected and SOP approved."
+      "_note": "New talent \u2014 Gmail can now be connected. Fill SOP and manager details before enabling reply automation."
+    },
+    {
+      "key": "Hana",
+      "full_name": "Hana",
+      "gmail_connection_name": "Gmail - Hana",
+      "sop_tab_name": "Hana",
+      "manager": "TBD",
+      "category": "TBD",
+      "minimum_rate_usd": 0,
+      "rate_unit": "per video",
+      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet."
+    },
+    {
+      "key": "Audur",
+      "full_name": "Audur",
+      "gmail_connection_name": "Gmail - Audur",
+      "sop_tab_name": "Audur",
+      "manager": "TBD",
+      "category": "TBD",
+      "minimum_rate_usd": 0,
+      "rate_unit": "per video",
+      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet."
     }
   ],
   "make": {

@@ -471,6 +471,79 @@ def mark_as_read(token_row, message_id: str, db=None, service=None) -> bool:
         return False
 
 
+def _get_or_create_custom_label(service, label_name: str, *, background_color: str, text_color: str) -> str | None:
+    """Return a Gmail user-label ID, creating it if needed."""
+    try:
+        existing = service.users().labels().list(userId="me").execute()
+        for lbl in existing.get("labels", []):
+            if lbl.get("name") == label_name:
+                return lbl["id"]
+        created = service.users().labels().create(
+            userId="me",
+            body={
+                "name": label_name,
+                "labelListVisibility": "labelShow",
+                "messageListVisibility": "show",
+                "color": {
+                    "backgroundColor": background_color,
+                    "textColor": text_color,
+                },
+            },
+        ).execute()
+        return created.get("id")
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not ensure Gmail label %s: %s", label_name, exc)
+        return None
+
+
+def move_to_revisit(token_row, message_id: str, db=None, service=None) -> bool:
+    """
+    Remove INBOX/UNREAD and add the Revisit label.
+    Used for ignore / human-review states that should leave the inbox but not be trashed.
+    """
+    if service is None:
+        service = _gmail_service(token_row, db)
+    label_id = _get_or_create_custom_label(
+        service,
+        "Revisit",
+        background_color="#fbbc04",
+        text_color="#202124",
+    )
+    try:
+        body: dict[str, list[str]] = {"removeLabelIds": ["INBOX", "UNREAD"]}
+        if label_id:
+            body["addLabelIds"] = [label_id]
+        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+        return True
+    except HttpError as exc:
+        logger.error("Move-to-Revisit failed for %s / %s: %s", token_row.talent_key, message_id, exc)
+        return False
+
+
+def mark_initial_response_sent(token_row, message_id: str, db=None, service=None) -> bool:
+    """
+    Remove INBOX/UNREAD and add the A Initial Response label.
+    Applied only after a reply has actually been sent.
+    """
+    if service is None:
+        service = _gmail_service(token_row, db)
+    label_id = _get_or_create_custom_label(
+        service,
+        "A Initial Response",
+        background_color="#16a765",
+        text_color="#ffffff",
+    )
+    try:
+        body: dict[str, list[str]] = {"removeLabelIds": ["INBOX", "UNREAD"]}
+        if label_id:
+            body["addLabelIds"] = [label_id]
+        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+        return True
+    except HttpError as exc:
+        logger.error("Initial-response label update failed for %s / %s: %s", token_row.talent_key, message_id, exc)
+        return False
+
+
 # ── Drafts ────────────────────────────────────────────────────────────────────
 
 

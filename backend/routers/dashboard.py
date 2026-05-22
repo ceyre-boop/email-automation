@@ -1182,10 +1182,18 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
         .all()
     ) if gmail_draft_ids else []
     db_map = {row.gmail_draft_id: row for row in db_drafts}
+    message_ids = [row.gmail_message_id for row in db_drafts if row.gmail_message_id]
+    processed_rows = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.gmail_message_id.in_(message_ids))
+        .all()
+    ) if message_ids else []
+    processed_map = {row.gmail_message_id: row for row in processed_rows}
 
     results = []
     for gd in gmail_drafts:
         db_row = db_map.get(gd["gmail_draft_id"])
+        processed_row = processed_map.get(db_row.gmail_message_id) if db_row and db_row.gmail_message_id else None
         results.append({
             "gmail_draft_id": gd["gmail_draft_id"],
             "db_draft_id": db_row.id if db_row else None,
@@ -1199,6 +1207,7 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
             "brand_name": db_row.brand_name if db_row else None,
             "proposed_rate": db_row.proposed_rate if db_row else None,
             "offer_type": db_row.offer_type if db_row else None,
+            "triage_reason": processed_row.triage_reason if processed_row else None,
             "status": db_row.status if db_row else "gmail_only",
             "sender": db_row.sender if db_row else None,
         })

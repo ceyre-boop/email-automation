@@ -1571,6 +1571,7 @@ function renderDraftOnlyPane(draft) {
   pane.innerHTML = `
     <div class="thread-head fade-up">
       <div class="thread-subject">${esc(draft.subject || '(no subject)')}</div>
+      ${draft.triage_reason ? `<div style="margin-top:8px; font-size:12px; color:var(--text-3); line-height:1.55; max-width:760px;">${esc(draft.triage_reason)}</div>` : ''}
     </div>
     <div class="ai-composer fade-up">
       <div class="ai-head">
@@ -1631,10 +1632,12 @@ function resetReadingPane() {
 function renderReadingPane(email, draft) {
   const pane = document.getElementById('gmail-reading-pane');
   const senderShort = shortSender(email.sender);
+  const triageSentence = email.triage_reason || draft?.triage_reason || '';
 
   pane.innerHTML = `
     <div class="thread-head fade-up">
       <div class="thread-subject">${esc(email.subject || '(no subject)')}</div>
+      ${triageSentence ? `<div style="margin-top:8px; font-size:12px; color:var(--text-3); line-height:1.55; max-width:760px;">${esc(triageSentence)}</div>` : ''}
       <div class="thread-actions">
         <button class="btn btn-ghost" onclick="archiveEmail('${email.gmail_message_id}')">Archive</button>
       </div>
@@ -1654,7 +1657,7 @@ function renderReadingPane(email, draft) {
 
       <div class="msg-triage-block" style="margin:10px 0 14px; padding:10px 12px; background:var(--surface-3); border-radius:6px; border-left:3px solid var(--${email.score===3?'green':email.score===2?'amber':'text-3'});">
         <div style="font-size:11px; font-weight:700; color:var(--text-2); margin-bottom:3px;">Score: ${email.score ?? '?'} · Offer: ${esc(email.offer_type || 'Unknown')}</div>
-        ${email.triage_reason ? `<div style="font-size:11px; color:var(--text-3); line-height:1.5;">${esc(email.triage_reason)}</div>` : ''}
+        ${triageSentence ? `<div style="font-size:11px; color:var(--text-3); line-height:1.5;">${esc(triageSentence)}</div>` : ''}
       </div>
 
       <div id="msg-body-${email.gmail_message_id}">
@@ -1690,12 +1693,14 @@ function renderDraftCompose(draft, email) {
   const area = document.getElementById('draft-compose-area');
   if (!area) return;
   const isEscalate = draft.is_escalate;
+  const triageSentence = email?.triage_reason || draft?.triage_reason || '';
   area.innerHTML = `
     <div class="ai-composer fade-up">
       <div class="ai-head">
         <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT COMPOSER</div>
         <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
       </div>
+      ${triageSentence ? `<div style="margin:0 0 10px; font-size:12px; color:var(--text-3); line-height:1.55;">${esc(triageSentence)}</div>` : ''}
       ${isEscalate ? `<div class="escalate-notice">⚠ ${esc(draft.escalate_reason || 'Manual review required.')}</div>` : ''}
       <div class="ai-to">Reply to: <span>${esc(draft.sender || email.sender)}</span></div>
       <textarea class="ai-textarea" id="draft-text-${draft.id}">${esc(draft.draft_text)}</textarea>

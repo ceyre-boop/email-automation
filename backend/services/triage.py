@@ -22,6 +22,11 @@ logger = logging.getLogger(__name__)
 # Parsing the prompt file (regex over ~3 KB) on every triage call is wasteful.
 # Cache the parsed (system_text, user_template) pair — it doesn't change at runtime.
 _triage_sections: tuple[str, str] | None = None
+_EVENT_INVITE_KEYWORDS = (
+    "event invite", "invitation", "you're invited", "rsvp", "launch party",
+    "panel", "red carpet", "guest list", "join us at", "attend our event",
+    "private dinner", "popup", "premiere", "screening",
+)
 
 
 def _get_triage_sections() -> tuple[str, str]:
@@ -35,6 +40,18 @@ def clear_triage_cache() -> None:
     """Force reload of triage prompt on next call. Call after prompt file updates."""
     global _triage_sections
     _triage_sections = None
+
+
+def _looks_like_event_invite(subject: str, body: str, offer_type: str) -> bool:
+    """
+    Detect obvious event invitations that should not generate outbound replies.
+    This is intentionally conservative: only clear invite / RSVP language triggers it.
+    """
+    haystack = f"{subject}\n{body}".lower()
+    offer_lower = (offer_type or "").lower()
+    if "event" not in offer_lower and "appearance" not in offer_lower:
+        return False
+    return any(keyword in haystack for keyword in _EVENT_INVITE_KEYWORDS)
 
 
 # ── Prompt parsing ────────────────────────────────────────────────────────────
@@ -406,6 +423,12 @@ def triage_email(
 
     # Apply special per-talent overrides
     score = _apply_special_routing(talent_key, score, offer_type, proposed_rate, policy, brand_name)
+
+    if _looks_like_event_invite(subject, body, offer_type):
+        logger.info("Event invite detected for %s → forcing Score 2 / review path", talent_key)
+        score = 2
+        if not result.get("reason"):
+            result["reason"] = "Clear event invitation — no auto-reply."
 
     return {
         "score": score,

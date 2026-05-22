@@ -393,6 +393,7 @@ def _process_one_message(
 
         if existing_thread_activity or existing_thread_draft or thread_manually_handled:
             reason = "Ongoing thread — prior sent activity detected. Human review required."
+            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
                 2, "", 0.0, "Human Admin Required", reason, EmailStatus.flagged,
@@ -458,7 +459,7 @@ def _process_one_message(
 
     # ── Score 2 → Flag for review (no draft) ────────────────────────────────────
     elif score == 2:
-        gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
+        gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
         gmail_svc.apply_triage_label(token_row, message_id, 2, db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
@@ -483,10 +484,10 @@ def _process_one_message(
         if thread_already_replied:
             logger.info(
                 "Thread %s for %s already has a sent reply — flagging for human review "
-                "(email stays in inbox, no draft created)",
+                "(no outbound draft, moved to Revisit)",
                 thread_id, talent_key,
             )
-            # Flag as human-review — email stays in INBOX, not archived
+            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
                 2, brand_name, proposed_rate, "Human Admin Required",
@@ -592,6 +593,8 @@ def _process_one_message(
 
         gmail_svc.apply_triage_label(token_row, message_id, 3, db=db, service=service)
         gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
+        if is_escalate:
+            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
         status_label = "escalated" if is_escalate else "draft_saved"
         _safe_log_sheet(
             talent_key, sender, subject, score, brand_name, proposed_rate,
