@@ -136,7 +136,7 @@
       "sop_tab_name": "Hana",
       "manager": "Chenni",
       "category": "Fashion/Beauty",
-      "minimum_rate_usd": 500,
+      "minimum_rate_usd": 750,
       "rate_unit": "per video"
     },
     {
@@ -146,7 +146,7 @@
       "sop_tab_name": "Audur",
       "manager": "Nicole",
       "category": "Beauty",
-      "minimum_rate_usd": 500,
+      "minimum_rate_usd": 800,
       "rate_unit": "per video"
     },
     {
@@ -202,7 +202,7 @@
       "sop_tab_name": "Jenn",
       "manager": "Chenni",
       "category": "Fashion",
-      "minimum_rate_usd": 300,
+      "minimum_rate_usd": 500,
       "rate_unit": "per video"
     },
     {
@@ -212,7 +212,7 @@
       "sop_tab_name": "Angela",
       "manager": "Chenni",
       "category": "Fashion",
-      "minimum_rate_usd": 600,
+      "minimum_rate_usd": 750,
       "rate_unit": "per video"
     },
     {
@@ -242,7 +242,7 @@
       "sop_tab_name": "Grayson",
       "manager": "Nicole",
       "category": "Fashion",
-      "minimum_rate_usd": 300,
+      "minimum_rate_usd": 750,
       "rate_unit": "per video"
     },
     {
@@ -252,7 +252,7 @@
       "sop_tab_name": "Kylika",
       "manager": "Nicole",
       "category": "Beauty",
-      "minimum_rate_usd": 400,
+      "minimum_rate_usd": 750,
       "rate_unit": "per video"
     },
     {
@@ -262,7 +262,7 @@
       "sop_tab_name": "Anastasiya",
       "manager": "Cara",
       "category": "Fashion/Beauty",
-      "minimum_rate_usd": 600,
+      "minimum_rate_usd": 750,
       "rate_unit": "per video"
     },
     {
@@ -284,7 +284,7 @@
       "sop_tab_name": "Wesley",
       "manager": "Chenni",
       "category": "Fashion/Beauty",
-      "minimum_rate_usd": 500,
+      "minimum_rate_usd": 750,
       "rate_unit": "per video"
     },
     {
@@ -294,7 +294,7 @@
       "sop_tab_name": "Hana",
       "manager": "TBD",
       "category": "TBD",
-      "minimum_rate_usd": 0,
+      "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet."
     },
@@ -305,7 +305,7 @@
       "sop_tab_name": "Audur",
       "manager": "TBD",
       "category": "TBD",
-      "minimum_rate_usd": 0,
+      "minimum_rate_usd": 800,
       "rate_unit": "per video",
       "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet."
     }

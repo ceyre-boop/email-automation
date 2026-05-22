@@ -291,7 +291,7 @@
     "full_name": "Jenn Lyles",
     "manager": "Chenni",
     "category": "Fashion",
-    "min_rate_usd": 300,
+    "min_rate_usd": 500,
     "rate_unit": "per video",
     "rules": [],
     "sop_status": "approved"
@@ -300,7 +300,7 @@
     "full_name": "Angela Callisto",
     "manager": "Chenni",
     "category": "Fashion",
-    "min_rate_usd": 600,
+    "min_rate_usd": 750,
     "rate_unit": "per video",
     "rules": [],
     "sop_status": "approved"
@@ -327,7 +327,7 @@
     "full_name": "Grayson Finks",
     "manager": "Nicole",
     "category": "Fashion",
-    "min_rate_usd": 300,
+    "min_rate_usd": 750,
     "rate_unit": "per video",
     "rules": [],
     "sop_status": "approved"
@@ -336,7 +336,7 @@
     "full_name": "Kylika Miller",
     "manager": "Nicole",
     "category": "Beauty",
-    "min_rate_usd": 400,
+    "min_rate_usd": 750,
     "rate_unit": "per video",
     "rules": [],
     "sop_status": "approved"
@@ -374,7 +374,7 @@
     "manager": "Chenni Li",
     "manager_email": "chenni@taboost.me",
     "category": "Fashion/Beauty",
-    "min_rate_usd": 500,
+    "min_rate_usd": 750,
     "rate_unit": "per video",
     "sop_status": "approved",
     "rules": []
@@ -384,7 +384,7 @@
     "manager": "Chenni Li",
     "manager_email": "chenni@taboost.me",
     "category": "Fashion/Beauty",
-    "min_rate_usd": 500,
+    "min_rate_usd": 750,
     "rate_unit": "per video",
     "sop_status": "approved",
     "rules": []
@@ -394,7 +394,7 @@
     "manager": "Nicole Park",
     "manager_email": "nicole@taboost.me",
     "category": "Beauty",
-    "min_rate_usd": 500,
+    "min_rate_usd": 800,
     "rate_unit": "per video",
     "sop_status": "approved",
     "rules": []
