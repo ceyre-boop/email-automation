@@ -351,7 +351,14 @@ def _process_one_message(
     import time as _time
     detail = gmail_svc.get_message_detail(token_row, message_id, db=db, service=service)
     if not detail:
-        logger.warning("Empty detail for %s / %s — skipping", talent_key, message_id)
+        logger.warning("Empty detail for %s / %s — recording error to prevent infinite retry", talent_key, message_id)
+        _record_processed(
+            db, talent_key, message_id, "", "", "",
+            2, "", 0.0, "Unknown", "Gmail fetch failed — message unavailable or deleted",
+            EmailStatus.error,
+        )
+        db.commit()
+        summary["errors"] += 1
         return
 
     thread_id = detail.get("thread_id", "")
