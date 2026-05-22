@@ -263,6 +263,19 @@ def triage_email(
     policy = settings.confidence_policy
     triage_cfg = settings.app_config.get("triage", {})
 
+    # ── Pre-filter: personal email forward (Rule 8) ───────────────────────────
+    # If the inbound sender matches the talent's personal email, leave in INBOX untouched.
+    personal_email = talent_cfg.get("personal_email", "")
+    if personal_email and sender_lower == personal_email.lower():
+        logger.info(
+            "Pre-filter: personal email match for %s (%s) → ignore, leave in INBOX",
+            talent_key, sender,
+        )
+        return _ignore_leave_inbox(
+            "Email originated from talent personal email — left in INBOX for human review.",
+            "Personal Email Forward",
+        )
+
     # Build a per-hour rate note for talents whose rate unit is not "per video".
     # This is critical for KatrinaD (per hour) so GPT interprets offered amounts correctly.
     talent_cfg = next(
@@ -424,11 +437,15 @@ def triage_email(
     # Apply special per-talent overrides
     score = _apply_special_routing(talent_key, score, offer_type, proposed_rate, policy, brand_name)
 
+    # Event invite detection (Rule 7) — leave in INBOX, no draft, no label change
     if _looks_like_event_invite(subject, body, offer_type):
-        logger.info("Event invite detected for %s → forcing Score 2 / review path", talent_key)
-        score = 2
-        if not result.get("reason"):
-            result["reason"] = "Clear event invitation — no auto-reply."
+        logger.info(
+            "Event invite detected for %s (%s) → ignore, leave in INBOX", talent_key, subject,
+        )
+        return _ignore_leave_inbox(
+            f"Event / appearance / speaking invite — left in INBOX for human review. ({result.get('reason', '')})",
+            offer_type,
+        )
 
     return {
         "score": score,
@@ -440,6 +457,22 @@ def triage_email(
         "urgency_score": _clamp_score(result.get("urgency_score"), 0),
         "risk_score": _clamp_score(result.get("risk_score"), 0),
         "alternatives_considered": str(result.get("alternatives_considered", "") or ""),
+    }
+
+
+def _ignore_leave_inbox(reason: str, offer_type: str = "Event Invite") -> dict:
+    """Return a triage result that tells the poller to leave the email in INBOX untouched."""
+    return {
+        "score": 2,
+        "reason": reason,
+        "offer_type": offer_type,
+        "proposed_rate_usd": 0.0,
+        "brand_name": "",
+        "sentiment_score": 5,
+        "urgency_score": 0,
+        "risk_score": 0,
+        "alternatives_considered": "",
+        "ignore_leave_inbox": True,
     }
 
 

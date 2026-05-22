@@ -459,8 +459,12 @@ def _process_one_message(
 
     # ── Score 2 → Flag for review (no draft) ────────────────────────────────────
     elif score == 2:
-        gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
-        gmail_svc.apply_triage_label(token_row, message_id, 2, db=db, service=service)
+        if triage_result.get("ignore_leave_inbox"):
+            # Event invite / personal email forward — leave untouched in INBOX (SOP Rules 7 & 8)
+            logger.info("ignore_leave_inbox for %s / %s — no label, no read-mark", talent_key, message_id)
+        else:
+            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
+            gmail_svc.apply_triage_label(token_row, message_id, 2, db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,

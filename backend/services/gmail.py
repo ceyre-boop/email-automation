@@ -674,9 +674,9 @@ def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
 # ── Triage labels ─────────────────────────────────────────────────────────────
 
 _TRIAGE_LABEL_CFG = {
-    1: {"name": "AI: Junk",   "backgroundColor": "#e8eaed", "textColor": "#202124"},
-    2: {"name": "AI: Review", "backgroundColor": "#f4511e", "textColor": "#ffffff"},
-    3: {"name": "AI: Draft",  "backgroundColor": "#16a765", "textColor": "#ffffff"},
+    1: {"name": "Spam",              "backgroundColor": "#e8eaed", "textColor": "#202124"},
+    2: {"name": "Revisit",           "backgroundColor": "#f4511e", "textColor": "#ffffff"},
+    3: {"name": "A Initial Response","backgroundColor": "#16a765", "textColor": "#ffffff"},
 }
 
 
