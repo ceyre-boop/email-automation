@@ -17,7 +17,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from backend.models.db import Draft, DraftEditLog, DraftStatus, TalentToken
+from backend.models.db import Draft, DraftEditLog, DraftStatus, ProcessedEmail, TalentToken
 from backend.routers.deps import get_db, verify_api_key
 from backend.services import gmail as gmail_svc
 from backend.services.gmail import parse_cc_recipients
@@ -39,6 +39,7 @@ class DraftOut(BaseModel):
     brand_name: Optional[str]
     proposed_rate: Optional[float]
     offer_type: Optional[str]
+    triage_reason: Optional[str] = None
     draft_text: str
     status: str
     is_escalate: bool
@@ -93,7 +94,7 @@ def _get_token_or_404(db: Session, talent_key: str) -> TalentToken:
 # ── Routes ────────────────────────────────────────────────────────────────────
 
 
-def _draft_to_dict(r: Draft) -> dict:
+def _draft_to_dict(r: Draft, triage_reason: str | None = None) -> dict:
     return {
         "id": r.id,
         "talent_key": r.talent_key,
@@ -103,6 +104,7 @@ def _draft_to_dict(r: Draft) -> dict:
         "brand_name": r.brand_name,
         "proposed_rate": r.proposed_rate,
         "offer_type": r.offer_type,
+        "triage_reason": triage_reason,
         "draft_text": r.draft_text,
         "status": r.status if isinstance(r.status, str) else r.status.value,
         "is_escalate": bool(r.is_escalate),
@@ -128,7 +130,15 @@ def list_drafts(
         q = q.filter(Draft.status == DraftStatus.pending)
     if talent_key:
         q = q.filter(Draft.talent_key.ilike(talent_key))
-    return [_draft_to_dict(r) for r in q.order_by(Draft.created_at.desc()).all()]
+    rows = q.order_by(Draft.created_at.desc()).all()
+    msg_ids = [r.gmail_message_id for r in rows if r.gmail_message_id]
+    processed_rows = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.gmail_message_id.in_(msg_ids))
+        .all()
+    ) if msg_ids else []
+    triage_map = {r.gmail_message_id: r.triage_reason for r in processed_rows}
+    return [_draft_to_dict(r, triage_map.get(r.gmail_message_id)) for r in rows]
 
 
 @router.get("/human-edited")
@@ -217,7 +227,15 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
 
 @router.get("/{draft_id}")
 def get_draft(draft_id: int, db: Session = Depends(get_db)):
-    return _draft_to_dict(_get_draft_or_404(db, draft_id))
+    draft = _get_draft_or_404(db, draft_id)
+    processed = None
+    if draft.gmail_message_id:
+        processed = (
+            db.query(ProcessedEmail)
+            .filter(ProcessedEmail.gmail_message_id == draft.gmail_message_id)
+            .first()
+        )
+    return _draft_to_dict(draft, processed.triage_reason if processed else None)
 
 
 @router.post("/{draft_id}/approve")
