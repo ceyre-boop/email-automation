@@ -263,8 +263,16 @@ def triage_email(
     policy = settings.confidence_policy
     triage_cfg = settings.app_config.get("triage", {})
 
+    # Build a per-hour rate note for talents whose rate unit is not "per video".
+    # This is critical for KatrinaD (per hour) so GPT interprets offered amounts correctly.
+    talent_cfg = next(
+        (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),
+        {},
+    )
+
     # ── Pre-filter: personal email forward (Rule 8) ───────────────────────────
     # If the inbound sender matches the talent's personal email, leave in INBOX untouched.
+    sender_lower = sender.lower()
     personal_email = talent_cfg.get("personal_email", "")
     if personal_email and sender_lower == personal_email.lower():
         logger.info(
@@ -275,13 +283,6 @@ def triage_email(
             "Email originated from talent personal email — left in INBOX for human review.",
             "Personal Email Forward",
         )
-
-    # Build a per-hour rate note for talents whose rate unit is not "per video".
-    # This is critical for KatrinaD (per hour) so GPT interprets offered amounts correctly.
-    talent_cfg = next(
-        (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),
-        {},
-    )
     rate_unit = talent_cfg.get("rate_unit", "per video")
     rate_note = (
         f"This talent's rate is {rate_unit}. The minimum rate listed above is "
@@ -301,7 +302,6 @@ def triage_email(
     blocked_subject_keywords = [str(k).strip().lower() for k in never_reply.get("subject_keywords", []) if str(k).strip()]
     blocked_body_keywords = [str(k).strip().lower() for k in never_reply.get("body_keywords", []) if str(k).strip()]
 
-    sender_lower = sender.lower()
     subject_lower = subject.lower()
     body_lower = (body or "").lower()
 
