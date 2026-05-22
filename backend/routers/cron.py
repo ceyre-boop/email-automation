@@ -20,6 +20,7 @@ from backend.models.db import Draft, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
 from backend.services.oauth import proactive_refresh_all_tokens
 from backend.services.poller import poll_all_inboxes
+from backend.services.talent_access import ensure_talent_gmail_enabled
 
 router = APIRouter(tags=["internal"])
 logger = logging.getLogger(__name__)
@@ -444,6 +445,7 @@ def n8n_approve_draft(
     if draft.status != DraftStatus.pending:
         raise HTTPException(status_code=400, detail=f"Draft is '{draft.status}' — cannot approve.")
 
+    ensure_talent_gmail_enabled(draft.talent_key)
     token = db.query(TalentToken).filter(
         TalentToken.talent_key.ilike(draft.talent_key),
         TalentToken.active == True,  # noqa: E712

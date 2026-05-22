@@ -22,6 +22,7 @@ from backend.routers.deps import get_db, verify_api_key
 from backend.services import gmail as gmail_svc
 from backend.services.gmail import parse_cc_recipients
 from backend.services.oauth import TokenRefreshError
+from backend.services.talent_access import ensure_talent_gmail_enabled
 
 router = APIRouter(prefix="/api/drafts", tags=["drafts"], dependencies=[Depends(verify_api_key)])
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ def _get_draft_or_404(db: Session, draft_id: int) -> Draft:
 
 
 def _get_token_or_404(db: Session, talent_key: str) -> TalentToken:
+    ensure_talent_gmail_enabled(talent_key)
     token = (
         db.query(TalentToken)
         .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
@@ -406,6 +408,13 @@ def discard_all_pending(db: Session = Depends(get_db)):
     for draft in pending:
         # Delete the Gmail draft copy if one exists
         if draft.gmail_draft_id:
+            try:
+                ensure_talent_gmail_enabled(draft.talent_key)
+            except HTTPException:
+                draft.status = DraftStatus.discarded
+                db.add(draft)
+                cleared += 1
+                continue
             token = db.query(TalentToken).filter(
                 TalentToken.talent_key == draft.talent_key,
                 TalentToken.active == True,  # noqa: E712
