@@ -109,6 +109,7 @@ def compute_health_score(db: Session) -> dict:
     fallbacks_today = db.query(ProcessedEmail).filter(
         ProcessedEmail.processed_at >= today_start,
         ProcessedEmail.triage_reason.like("Triage fallback%"),
+        ProcessedEmail.triage_reason.notlike("%SOP pending%"),
     ).count()
     if emails_today == 0:
         triage_score = 1.0  # no data yet today, not a fault

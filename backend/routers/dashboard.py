@@ -35,6 +35,7 @@ from backend.models.db import (
     TriageAudit,
 )
 from backend.routers.deps import get_db, verify_api_key
+from backend.services.talent_access import ensure_talent_gmail_enabled, is_talent_paused
 
 router = APIRouter(
     prefix="/api/dashboard",
@@ -580,10 +581,11 @@ def health_summary(db: Session = Depends(get_db)):
     escalations_today = db.query(Draft).filter(Draft.created_at >= today, Draft.is_escalate == True).count()  # noqa: E712
     errors_today = db.query(PollHealth).filter(PollHealth.polled_at >= today, PollHealth.error_message != None).count()  # noqa: E711
     pending_drafts = db.query(Draft).filter(Draft.status == DraftStatus.pending).count()
-    # Fallback count: Score-2 emails where reason starts with "Triage fallback" = silent GPT failures
+    # Fallback count: real GPT failures only — excludes manual admin resets (SOP-pending re-queue)
     fallbacks_today = db.query(ProcessedEmail).filter(
         ProcessedEmail.processed_at >= today,
         ProcessedEmail.triage_reason.like("Triage fallback%"),
+        ProcessedEmail.triage_reason.notlike("%SOP pending%"),
     ).count()
     score2_today = db.query(ProcessedEmail).filter(
         ProcessedEmail.processed_at >= today,
@@ -742,6 +744,7 @@ def process_single_email(body: ProcessEmailIn, db: Session = Depends(get_db)):
     Process one email through triage + reply. Called by n8n Gmail trigger
     for near-real-time processing (replaces waiting for the 60s poll cycle).
     """
+    ensure_talent_gmail_enabled(body.talent_key)
     from backend.services.poller import _already_processed, _process_one_message
     from backend.core.config import get_settings as _gs
 
@@ -788,6 +791,7 @@ def process_batch(
     """
     from backend.services.poller import _already_processed
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
 
     token = db.query(TalentToken).filter(
         TalentToken.talent_key.ilike(talent_key),
@@ -840,6 +844,7 @@ def force_blast(
     """
     from backend.services import gmail as gmail_svc
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
 
     token = db.query(TalentToken).filter(
         TalentToken.talent_key.ilike(talent_key),
@@ -877,6 +882,9 @@ def _run_force_blast(talent_key: str, msg_ids: list):
     Background worker for force-blast. Processes every message ID with full
     triage + reply, 15 workers in parallel, logging progress every 50 emails.
     """
+    if is_talent_paused(talent_key):
+        logger.info("Force blast skipped for %s — Gmail automation disabled", talent_key)
+        return
     from concurrent.futures import ThreadPoolExecutor, as_completed
     from backend.models.db import get_session_factory, Draft, TalentToken
     from backend.services.poller import _process_one_message
@@ -941,6 +949,9 @@ def _run_force_blast(talent_key: str, msg_ids: list):
 
 def _run_process_batch(talent_key: str, msg_ids: list):
     """Background task: run full triage + reply on a list of message IDs."""
+    if is_talent_paused(talent_key):
+        logger.info("Batch processing skipped for %s — Gmail automation disabled", talent_key)
+        return
     from backend.models.db import get_session_factory, TalentToken
     from backend.services.poller import _already_processed, _process_one_message
     from backend.core.config import get_settings as _gs
@@ -1017,6 +1028,7 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
     from backend.models.db import InboxEmail
     from backend.services import gmail as gmail_svc
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
 
     # ── Primary: read from cache ──────────────────────────────────────────────
     cached = (
@@ -1159,6 +1171,7 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
     """
     from backend.services import gmail as gmail_svc
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
     token = (
         db.query(TalentToken)
         .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
@@ -1228,6 +1241,7 @@ def force_draft_email(
     Used when the team spots a missed opportunity in the No Draft or trash view.
     """
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
     token = db.query(TalentToken).filter(
         TalentToken.talent_key.ilike(talent_key), TalentToken.active == True  # noqa: E712
     ).first()
@@ -1242,6 +1256,7 @@ def archive_email(talent_key: str, gmail_message_id: str, db: Session = Depends(
     """Archive a specific email in the talent's Gmail account and mark it in DB."""
     from backend.services import gmail as gmail_svc
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
     token = (
         db.query(TalentToken)
         .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
@@ -1274,6 +1289,7 @@ def email_body(talent_key: str, gmail_message_id: str, db: Session = Depends(get
     """Return email body — from cache if available, else live from Gmail."""
     from backend.models.db import InboxEmail
     from backend.services import gmail as gmail_svc
+    ensure_talent_gmail_enabled(talent_key)
 
     # Check inbox cache first
     cached = db.query(InboxEmail).filter(
@@ -1314,6 +1330,9 @@ def email_body(talent_key: str, gmail_message_id: str, db: Session = Depends(get
 
 def _run_backfill(talent_key: str, days: int):
     """Background task: read all Gmail messages from the last N days and store them."""
+    if is_talent_paused(talent_key):
+        logger.info("Backfill skipped for %s — Gmail automation disabled", talent_key)
+        return
     from backend.models.db import get_session_factory, ProcessedEmail, TalentToken, EmailStatus
     from backend.services import gmail as gmail_svc
     from datetime import datetime
@@ -1405,6 +1424,7 @@ def start_backfill(
 ):
     """Start a background backfill of the last N days of Gmail history."""
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
     token = db.query(TalentToken).filter(
         TalentToken.talent_key.ilike(talent_key),
         TalentToken.active == True,  # noqa: E712
@@ -1430,6 +1450,9 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
 
     Each email runs in its own thread with its own DB session — mirrors _run_process_batch.
     """
+    if is_talent_paused(talent_key):
+        logger.info("Triage-unscored skipped for %s — Gmail automation disabled", talent_key)
+        return
     from concurrent.futures import ThreadPoolExecutor
 
     from backend.core.config import get_settings as _gs
@@ -1578,6 +1601,7 @@ def triage_unscored(
     empty-inbox case gracefully.
     """
     _validate_talent(talent_key)
+    ensure_talent_gmail_enabled(talent_key)
     token = db.query(TalentToken).filter(
         TalentToken.talent_key.ilike(talent_key),
         TalentToken.active == True,  # noqa: E712
