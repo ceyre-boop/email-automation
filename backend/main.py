@@ -251,8 +251,8 @@ def onboarding_page(talent: str = Query(..., description="Talent key from settin
     Serve the one-time Gmail onboarding page for a talent.
     Returns 404 if the talent_key is not defined in settings.json.
     """
-    talent_map = {t["key"]: t for t in get_settings().app_config.get("talents", [])}
-    if talent not in talent_map:
+    talent_map = {t["key"].lower(): t for t in get_settings().app_config.get("talents", [])}
+    if talent.lower() not in talent_map:
         raise HTTPException(status_code=404, detail=f"Unknown talent: {talent}")
     return HTMLResponse(content=_connect_html_path.read_text(encoding="utf-8"))
 
