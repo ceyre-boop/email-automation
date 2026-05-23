@@ -1969,12 +1969,11 @@ def purge_duplicate_drafts(
         if not draft_id:
             continue
         try:
-            full = service.users().drafts().get(
-                userId="me", id=draft_id, format="minimal",
-            ).execute()
-            thread_id = full.get("message", {}).get("threadId", draft_id)
+            full = service.users().drafts().get(userId="me", id=draft_id).execute()
+            thread_id = full.get("message", {}).get("threadId") or draft_id
             thread_to_drafts[thread_id].append(draft_id)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Could not fetch draft %s: %s", draft_id, exc)
             errors += 1
 
     for thread_id, draft_ids in thread_to_drafts.items():
