@@ -1957,8 +1957,8 @@ def purge_duplicate_drafts(
     if not all_draft_stubs:
         return {"deleted": 0, "message": "No drafts found"}
 
-    # Fetch subject/threadId for each draft to group duplicates
-    # Do this in batches to avoid rate limits
+    # Group by threadId — the list stub already contains message.threadId
+    # so we avoid an extra API call per draft.
     from collections import defaultdict
     thread_to_drafts: dict[str, list[str]] = defaultdict(list)
     deleted = 0
@@ -1968,23 +1968,8 @@ def purge_duplicate_drafts(
         draft_id = stub.get("id")
         if not draft_id:
             continue
-        try:
-            full = service.users().drafts().get(userId="me", id=draft_id).execute()
-            thread_id = full.get("message", {}).get("threadId") or draft_id
-            thread_to_drafts[thread_id].append(draft_id)
-        except Exception as exc:
-            logger.warning("Could not fetch draft %s: %s", draft_id, exc)
-            errors += 1
-            if errors == 1:
-                first_error = str(exc)
-
-    if errors and not thread_to_drafts:
-        return {
-            "total_drafts_found": len(all_draft_stubs),
-            "errors": errors,
-            "first_error": locals().get("first_error", "unknown"),
-            "message": "All draft fetches failed — see first_error for root cause.",
-        }
+        thread_id = stub.get("message", {}).get("threadId") or draft_id
+        thread_to_drafts[thread_id].append(draft_id)
 
     for thread_id, draft_ids in thread_to_drafts.items():
         if len(draft_ids) <= keep:
