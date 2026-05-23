@@ -37,6 +37,7 @@ class DraftStatus(str, enum.Enum):
 
 
 class EmailStatus(str, enum.Enum):
+    processing = "processing"   # Claimed by a worker — prevents concurrent re-processing
     archived = "archived"      # Score 1
     flagged = "flagged"        # Score 2
     draft_saved = "draft_saved"  # Score 3 draft created
@@ -378,3 +379,9 @@ def create_tables():
                 conn.commit()
             except Exception:
                 pass
+        # Add 'processing' value to the emailstatus enum type (idempotent — fails silently if already exists)
+        try:
+            conn.execute(text("ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'"))
+            conn.commit()
+        except Exception:
+            pass

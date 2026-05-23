@@ -349,6 +349,28 @@ def _process_one_message(
     summary: dict,
 ):
     import time as _time
+    from sqlalchemy.exc import IntegrityError
+
+    # Atomically claim this message before any GPT/Gmail API calls.
+    # If a concurrent worker already claimed it the INSERT fails on the unique constraint
+    # and we skip immediately — this prevents duplicate drafts from overlapping poll workers.
+    claim = ProcessedEmail(
+        talent_key=talent_key,
+        gmail_message_id=message_id,
+        thread_id="",
+        sender="",
+        subject="",
+        score=0,
+        status=EmailStatus.processing,
+    )
+    try:
+        db.add(claim)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        logger.info("Skipping %s / %s — already claimed by another worker", talent_key, message_id)
+        return
+
     detail = gmail_svc.get_message_detail(token_row, message_id, db=db, service=service)
     if not detail:
         logger.warning("Empty detail for %s / %s — recording error to prevent infinite retry", talent_key, message_id)
@@ -652,36 +674,62 @@ def _record_processed(
     time_to_draft_ms: int | None = None,
     human_override_occurred: bool = False,
 ):
-    row = ProcessedEmail(
-        talent_key=talent_key,
-        gmail_message_id=message_id,
-        thread_id=thread_id,
-        sender=sender,
-        subject=subject,
-        score=score,
-        brand_name=brand_name,
-        proposed_rate=proposed_rate,
-        offer_type=offer_type,
-        triage_reason=reason,
-        body_text=body_text or None,
-        email_date=email_date,
-        processed_at=datetime.utcnow(),
-        status=status,
-        sender_domain=sender_domain,
-        email_length=email_length,
-        sentiment_score=sentiment_score,
-        urgency_score=urgency_score,
-        risk_score=risk_score,
-        is_thread=is_thread,
-        has_attachments=has_attachments,
-        has_links=has_links,
-        alternatives_considered=alternatives_considered or None,
-        time_to_classify_ms=time_to_classify_ms,
-        time_to_draft_ms=time_to_draft_ms,
-        human_override_occurred=human_override_occurred,
-    )
-    try:
+    # The claim row was pre-inserted at the start of _process_one_message.
+    # Update it in-place rather than inserting a duplicate.
+    existing = db.query(ProcessedEmail).filter(ProcessedEmail.gmail_message_id == message_id).first()
+    if existing:
+        existing.talent_key = talent_key
+        existing.thread_id = thread_id
+        existing.sender = sender
+        existing.subject = subject
+        existing.score = score
+        existing.brand_name = brand_name
+        existing.proposed_rate = proposed_rate
+        existing.offer_type = offer_type
+        existing.triage_reason = reason
+        existing.body_text = body_text or None
+        existing.email_date = email_date
+        existing.processed_at = datetime.utcnow()
+        existing.status = status
+        existing.sender_domain = sender_domain
+        existing.email_length = email_length
+        existing.sentiment_score = sentiment_score
+        existing.urgency_score = urgency_score
+        existing.risk_score = risk_score
+        existing.is_thread = is_thread
+        existing.has_attachments = has_attachments
+        existing.has_links = has_links
+        existing.alternatives_considered = alternatives_considered or None
+        existing.time_to_classify_ms = time_to_classify_ms
+        existing.time_to_draft_ms = time_to_draft_ms
+        existing.human_override_occurred = human_override_occurred
+    else:
+        row = ProcessedEmail(
+            talent_key=talent_key,
+            gmail_message_id=message_id,
+            thread_id=thread_id,
+            sender=sender,
+            subject=subject,
+            score=score,
+            brand_name=brand_name,
+            proposed_rate=proposed_rate,
+            offer_type=offer_type,
+            triage_reason=reason,
+            body_text=body_text or None,
+            email_date=email_date,
+            processed_at=datetime.utcnow(),
+            status=status,
+            sender_domain=sender_domain,
+            email_length=email_length,
+            sentiment_score=sentiment_score,
+            urgency_score=urgency_score,
+            risk_score=risk_score,
+            is_thread=is_thread,
+            has_attachments=has_attachments,
+            has_links=has_links,
+            alternatives_considered=alternatives_considered or None,
+            time_to_classify_ms=time_to_classify_ms,
+            time_to_draft_ms=time_to_draft_ms,
+            human_override_occurred=human_override_occurred,
+        )
         db.add(row)
-        db.flush()
-    except Exception:
-        db.rollback()

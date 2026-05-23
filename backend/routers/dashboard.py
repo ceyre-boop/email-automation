@@ -1867,3 +1867,80 @@ def retry_triage_fallbacks(
         "by_talent": talent_counts,
         "message": f"Re-triaging {len(fallbacks)} fallback emails in background.",
     }
+
+
+@router.post("/talents/{talent_key}/purge-duplicate-drafts")
+def purge_duplicate_drafts(
+    talent_key: str,
+    keep: int = 1,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """
+    Delete all but `keep` Gmail drafts per unique thread/subject from the talent's Gmail account.
+    Keeps the newest draft for each thread and deletes the rest.
+    Use after a runaway poller loop creates thousands of duplicates.
+    """
+    from backend.services import gmail as gmail_svc
+
+    token = db.query(TalentToken).filter(TalentToken.talent_key == talent_key).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Talent not found")
+
+    service = gmail_svc.build_service(token, db)
+
+    # Paginate through ALL drafts (Gmail API caps list at 500 per page)
+    all_draft_stubs: list[dict] = []
+    page_token = None
+    while True:
+        kwargs: dict = {"userId": "me", "maxResults": 500}
+        if page_token:
+            kwargs["pageToken"] = page_token
+        result = service.users().drafts().list(**kwargs).execute()
+        stubs = result.get("drafts", [])
+        all_draft_stubs.extend(stubs)
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            break
+
+    if not all_draft_stubs:
+        return {"deleted": 0, "message": "No drafts found"}
+
+    # Fetch subject/threadId for each draft to group duplicates
+    # Do this in batches to avoid rate limits
+    from collections import defaultdict
+    thread_to_drafts: dict[str, list[str]] = defaultdict(list)
+    deleted = 0
+    errors = 0
+
+    for stub in all_draft_stubs:
+        draft_id = stub.get("id")
+        if not draft_id:
+            continue
+        try:
+            full = service.users().drafts().get(userId="me", id=draft_id, format="metadata",
+                                                 metadataHeaders=["Subject"]).execute()
+            thread_id = full.get("message", {}).get("threadId", draft_id)
+            thread_to_drafts[thread_id].append(draft_id)
+        except Exception:
+            errors += 1
+
+    for thread_id, draft_ids in thread_to_drafts.items():
+        if len(draft_ids) <= keep:
+            continue
+        # Delete all but the last `keep` (assume list order = insertion order, keep last)
+        to_delete = draft_ids[:-keep]
+        for draft_id in to_delete:
+            try:
+                service.users().drafts().delete(userId="me", id=draft_id).execute()
+                deleted += 1
+            except Exception:
+                errors += 1
+
+    return {
+        "total_drafts_found": len(all_draft_stubs),
+        "threads_with_duplicates": sum(1 for ids in thread_to_drafts.values() if len(ids) > keep),
+        "deleted": deleted,
+        "errors": errors,
+        "message": f"Deleted {deleted} duplicate drafts, kept {keep} per thread.",
+    }
