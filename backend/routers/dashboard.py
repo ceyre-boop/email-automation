@@ -1869,6 +1869,57 @@ def retry_triage_fallbacks(
     }
 
 
+@router.post("/talents/{talent_key}/repush-drafts")
+def repush_drafts(
+    talent_key: str,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """
+    Re-create Gmail drafts from DB draft rows whose gmail_draft_id is missing or was deleted.
+    Safe to call multiple times — skips drafts that already have a valid gmail_draft_id.
+    """
+    from backend.services import gmail as gmail_svc
+
+    token = db.query(TalentToken).filter(TalentToken.talent_key == talent_key).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Talent not found")
+
+    pending = (
+        db.query(Draft)
+        .filter(Draft.talent_key == talent_key, Draft.status == "pending")
+        .all()
+    )
+
+    pushed, skipped, errors = 0, 0, 0
+    for draft in pending:
+        # gmail_draft_id may reference a now-deleted draft — clear it so we repush
+        draft.gmail_draft_id = None
+        try:
+            cc_list = gmail_svc.parse_cc_recipients(draft.cc_recipients) if draft.cc_recipients else None
+            gmail_draft_id = gmail_svc.create_gmail_draft(
+                token,
+                thread_id=draft.thread_id or "",
+                reply_to=draft.sender or "",
+                subject=draft.subject or "",
+                body=draft.draft_text,
+                cc=cc_list or None,
+                db=db,
+                in_reply_to=draft.message_id_header or None,
+            )
+            if gmail_draft_id:
+                draft.gmail_draft_id = gmail_draft_id
+                pushed += 1
+            else:
+                errors += 1
+        except Exception as exc:
+            logger.error("repush failed for draft %s: %s", draft.id, exc)
+            errors += 1
+
+    db.commit()
+    return {"pushed": pushed, "skipped": skipped, "errors": errors}
+
+
 @router.post("/talents/{talent_key}/purge-duplicate-drafts")
 def purge_duplicate_drafts(
     talent_key: str,
