@@ -1975,6 +1975,16 @@ def purge_duplicate_drafts(
         except Exception as exc:
             logger.warning("Could not fetch draft %s: %s", draft_id, exc)
             errors += 1
+            if errors == 1:
+                first_error = str(exc)
+
+    if errors and not thread_to_drafts:
+        return {
+            "total_drafts_found": len(all_draft_stubs),
+            "errors": errors,
+            "first_error": locals().get("first_error", "unknown"),
+            "message": "All draft fetches failed — see first_error for root cause.",
+        }
 
     for thread_id, draft_ids in thread_to_drafts.items():
         if len(draft_ids) <= keep:
