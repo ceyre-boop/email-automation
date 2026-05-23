@@ -1969,10 +1969,8 @@ def purge_duplicate_drafts(
         if not draft_id:
             continue
         try:
-            # Use minimal=True equivalent via fields param — threadId is all we need
             full = service.users().drafts().get(
-                userId="me", id=draft_id,
-                fields="id,message/threadId",
+                userId="me", id=draft_id, format="minimal",
             ).execute()
             thread_id = full.get("message", {}).get("threadId", draft_id)
             thread_to_drafts[thread_id].append(draft_id)
