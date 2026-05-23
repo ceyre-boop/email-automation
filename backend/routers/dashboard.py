@@ -1932,7 +1932,7 @@ def purge_duplicate_drafts(
         if len(draft_ids) <= keep:
             continue
         # Delete all but the last `keep` (assume list order = insertion order, keep last)
-        to_delete = draft_ids[:-keep]
+        to_delete = draft_ids if keep == 0 else draft_ids[:-keep]
         for draft_id in to_delete:
             try:
                 service.users().drafts().delete(userId="me", id=draft_id).execute()

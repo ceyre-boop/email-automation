@@ -193,7 +193,8 @@
       "minimum_rate_usd": 300,
       "rate_unit": "per video",
       "personal_email": "lizz@gmail.com",
-      "_note": "Dual manager escalation: offers above $650 go to Cara; at or below $650 go to Chenni."
+      "_note": "Dual manager escalation: offers above $650 go to Cara; at or below $650 go to Chenni.",
+      "paused": true
     },
     {
       "key": "Jenn",
