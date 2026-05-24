@@ -350,7 +350,7 @@
     "draft_email_ratio_kill": 5.0,
     "stuck_processing_threshold_minutes": 5,
     "alert_cooldown_minutes": 30,
-    "alert_email": "colineyre222@gmail.com",
+    "alert_email": "info@taboost.me",
     "recovery_wait_minutes": 30,
     "recovery_health_threshold": 0.7
   }
