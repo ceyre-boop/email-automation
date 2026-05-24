@@ -241,6 +241,7 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
                 talent_key, emails_found, len(pending_ids), MAX_CONCURRENT_EMAILS,
             )
 
+            manager_name = talent_cfg.get("manager", "")
             futures: dict[Future, str] = {}
             with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
                 for message_id in pending_ids:
@@ -252,6 +253,7 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
                         talent_name,
                         minimum_rate,
                         draft_mode,
+                        manager_name,
                     )
                     futures[future] = message_id
 
@@ -301,6 +303,7 @@ def _process_message_in_thread(
     talent_name: str,
     minimum_rate: float,
     draft_mode: bool,
+    manager_name: str = "",
 ) -> dict:
     """Process one email in a worker thread with its own DB session and TalentToken."""
     Session = _get_session_factory()
@@ -328,6 +331,7 @@ def _process_message_in_thread(
             minimum_rate=minimum_rate,
             draft_mode=draft_mode,
             summary=summary,
+            manager_name=manager_name,
         )
         return {"status": "ok", "summary": summary}
     except Exception as exc:  # noqa: BLE001
@@ -347,6 +351,7 @@ def _process_one_message(
     minimum_rate: float,
     draft_mode: bool,
     summary: dict,
+    manager_name: str = "",
 ):
     import time as _time
     from sqlalchemy.exc import IntegrityError
@@ -477,6 +482,7 @@ def _process_one_message(
         )
         gmail_svc.archive_message(token_row, message_id, db=db, service=service)
         gmail_svc.apply_triage_label(token_row, message_id, 1, db=db, service=service)
+        gmail_svc.apply_extra_label(token_row, message_id, "auto_archived", db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
@@ -494,6 +500,10 @@ def _process_one_message(
         else:
             gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
             gmail_svc.apply_triage_label(token_row, message_id, 2, db=db, service=service)
+            gmail_svc.apply_manager_review_label(token_row, message_id, manager_name, db=db, service=service)
+            # Rate negotiation: proposed rate is known and below the talent's floor
+            if proposed_rate > 0 and minimum_rate > 0 and proposed_rate < minimum_rate:
+                gmail_svc.apply_extra_label(token_row, message_id, "rate_negotiation", db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
@@ -626,6 +636,14 @@ def _process_one_message(
 
         gmail_svc.apply_triage_label(token_row, message_id, 3, db=db, service=service)
         gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
+        # Known brand: same sender already had a draft sent in this inbox
+        prior_sent = db.query(Draft).filter(
+            Draft.talent_key == talent_key,
+            Draft.sender == sender,
+            Draft.status == DraftStatus.sent,
+        ).first()
+        if prior_sent:
+            gmail_svc.apply_extra_label(token_row, message_id, "known_brand", db=db, service=service)
         if is_escalate:
             gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
         status_label = "escalated" if is_escalate else "draft_saved"

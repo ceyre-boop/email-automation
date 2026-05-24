@@ -674,29 +674,43 @@ def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
 # ── Triage labels ─────────────────────────────────────────────────────────────
 
 _TRIAGE_LABEL_CFG = {
-    1: {"name": "Spam",              "backgroundColor": "#e8eaed", "textColor": "#202124"},
-    2: {"name": "Revisit",           "backgroundColor": "#f4511e", "textColor": "#ffffff"},
-    3: {"name": "A Initial Response","backgroundColor": "#16a765", "textColor": "#ffffff"},
+    1: {"name": "Spam",               "backgroundColor": "#e8eaed", "textColor": "#202124"},
+    2: {"name": "Revisit",            "backgroundColor": "#f4511e", "textColor": "#ffffff"},
+    3: {"name": "A Initial Response", "backgroundColor": "#16a765", "textColor": "#ffffff"},
 }
 
+# Extra labels applied at specific lifecycle events
+_EXTRA_LABEL_CFG = {
+    "auto_archived":       {"name": "Auto-Archived",           "backgroundColor": "#b9b9b9", "textColor": "#202124"},
+    "rate_negotiation":    {"name": "Needs Rate Negotiation",  "backgroundColor": "#ffad47", "textColor": "#202124"},
+    "known_brand":         {"name": "Known Brand",             "backgroundColor": "#4986e7", "textColor": "#ffffff"},
+    "draft_sent":          {"name": "Draft Sent",              "backgroundColor": "#16a765", "textColor": "#ffffff"},
+}
 
-def _get_or_create_triage_label(service, score: int) -> str | None:
-    """Return label ID for the given triage score, creating the label if it doesn't exist yet."""
-    cfg = _TRIAGE_LABEL_CFG.get(score)
-    if not cfg:
-        return None
+# Manager-review label colours — one per manager name
+_MANAGER_LABEL_COLORS = {
+    "Cara":    {"backgroundColor": "#a479e2", "textColor": "#ffffff"},
+    "Chenni":  {"backgroundColor": "#f691b3", "textColor": "#202124"},
+    "Nicole":  {"backgroundColor": "#4986e7", "textColor": "#ffffff"},
+    "Colin":   {"backgroundColor": "#e8eaed", "textColor": "#202124"},
+}
+_MANAGER_LABEL_DEFAULT_COLOR = {"backgroundColor": "#e8eaed", "textColor": "#202124"}
+
+
+def _get_or_create_label(service, name: str, bg: str, fg: str) -> str | None:
+    """Return (creating if needed) a Gmail label ID by exact name."""
     try:
         existing = service.users().labels().list(userId="me").execute()
         for lbl in existing.get("labels", []):
-            if lbl.get("name") == cfg["name"]:
+            if lbl.get("name") == name:
                 return lbl["id"]
         created = service.users().labels().create(
             userId="me",
             body={
-                "name": cfg["name"],
+                "name": name,
                 "labelListVisibility": "labelShow",
                 "messageListVisibility": "show",
-                "color": {"backgroundColor": cfg["backgroundColor"], "textColor": cfg["textColor"]},
+                "color": {"backgroundColor": bg, "textColor": fg},
             },
         ).execute()
         return created.get("id")
@@ -704,19 +718,61 @@ def _get_or_create_triage_label(service, score: int) -> str | None:
         return None
 
 
+def _apply_label_ids(service, message_id: str, label_ids: list[str]) -> None:
+    if not label_ids:
+        return
+    service.users().messages().modify(
+        userId="me",
+        id=message_id,
+        body={"addLabelIds": label_ids},
+    ).execute()
+
+
+def _get_or_create_triage_label(service, score: int) -> str | None:
+    cfg = _TRIAGE_LABEL_CFG.get(score)
+    if not cfg:
+        return None
+    return _get_or_create_label(service, cfg["name"], cfg["backgroundColor"], cfg["textColor"])
+
+
 def apply_triage_label(token_row, message_id: str, score: int, db=None, service=None) -> None:
-    """Apply the AI triage label to a Gmail message. Non-fatal — never blocks the main flow."""
+    """Apply the AI triage score label. Non-fatal."""
     try:
         svc = service or _gmail_service(token_row, db)
         label_id = _get_or_create_triage_label(svc, score)
         if label_id:
-            svc.users().messages().modify(
-                userId="me",
-                id=message_id,
-                body={"addLabelIds": [label_id]},
-            ).execute()
+            _apply_label_ids(svc, message_id, [label_id])
     except Exception:  # noqa: BLE001
-        pass  # labels are best-effort — a failure here must never crash triage
+        pass
+
+
+def apply_extra_label(token_row, message_id: str, label_key: str, db=None, service=None) -> None:
+    """Apply a named lifecycle label (auto_archived, rate_negotiation, known_brand, draft_sent). Non-fatal."""
+    try:
+        cfg = _EXTRA_LABEL_CFG.get(label_key)
+        if not cfg:
+            return
+        svc = service or _gmail_service(token_row, db)
+        label_id = _get_or_create_label(svc, cfg["name"], cfg["backgroundColor"], cfg["textColor"])
+        if label_id:
+            _apply_label_ids(svc, message_id, [label_id])
+    except Exception:  # noqa: BLE001
+        pass
+
+
+def apply_manager_review_label(token_row, message_id: str, manager_name: str, db=None, service=None) -> None:
+    """Apply a per-manager review label (e.g. 'Chenni Review'). Non-fatal."""
+    try:
+        if not manager_name:
+            return
+        name = f"{manager_name} Review"
+        color = _MANAGER_LABEL_COLORS.get(manager_name, _MANAGER_LABEL_DEFAULT_COLOR)
+        svc = service or _gmail_service(token_row, db)
+        label_id = _get_or_create_label(svc, name, color["backgroundColor"], color["textColor"])
+        if label_id:
+            _apply_label_ids(svc, message_id, [label_id])
+    except Exception:  # noqa: BLE001
+        pass
 
 
 def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:

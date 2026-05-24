@@ -274,6 +274,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
 
     if draft.gmail_message_id:
         gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
+        gmail_svc.apply_extra_label(token, draft.gmail_message_id, "draft_sent", db=db)
 
     # Delete the Gmail draft copy (sent from the Sent folder now)
     if draft.gmail_draft_id:
