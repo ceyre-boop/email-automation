@@ -156,6 +156,7 @@ class Draft(Base):
     human_edited_at: Mapped[datetime | None] = mapped_column(DateTime)
     human_edited_by: Mapped[str | None] = mapped_column(String(128))
     original_draft_text: Mapped[str | None] = mapped_column(Text)  # AI original before any edits
+    triggered_by_job: Mapped[str | None] = mapped_column(String(32))
 
 
 class DraftEditLog(Base):
@@ -283,6 +284,25 @@ class MarcoMessage(Base):
     dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
+class GuardianAuditLog(Base):
+    """Persistent audit trail for Guardian circuit-breaker actions."""
+
+    __tablename__ = "guardian_audit_log"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    action: Mapped[str] = mapped_column(String(64), nullable=False)
+    talent_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    reason: Mapped[str] = mapped_column(Text, nullable=False)
+    detail: Mapped[str | None] = mapped_column(Text, nullable=True)
+    triggered_by: Mapped[str] = mapped_column(String(64), default="guardian", nullable=False, server_default="guardian")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+
 # ── Engine / session factory ─────────────────────────────────────────────────
 # These are created lazily so tests can override DATABASE_URL before import.
 
@@ -324,6 +344,23 @@ def create_tables():
             conn.commit()
         except Exception:
             pass
+        try:
+            conn.execute(text(
+                """
+                CREATE TABLE IF NOT EXISTS guardian_audit_log (
+                    id SERIAL PRIMARY KEY,
+                    action VARCHAR(64) NOT NULL,
+                    talent_key VARCHAR(64),
+                    reason TEXT NOT NULL,
+                    detail TEXT,
+                    triggered_by VARCHAR(64) NOT NULL DEFAULT 'guardian',
+                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """
+            ))
+            conn.commit()
+        except Exception:
+            pass
         # Token health tracking columns
         for stmt in [
             "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMP",
@@ -343,6 +380,7 @@ def create_tables():
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_at TIMESTAMP",
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_by VARCHAR(128)",
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS original_draft_text TEXT",
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS triggered_by_job VARCHAR(32)",
         ]:
             try:
                 conn.execute(text(stmt))

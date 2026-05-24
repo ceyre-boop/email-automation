@@ -15,7 +15,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from backend.core.config import get_settings
 from backend.models.db import create_tables
 try:
-    from backend.routers import auth, cron, drafts, dashboard, analytics
+    from backend.routers import auth, cron, drafts, dashboard, analytics, guardian
 except Exception as _import_exc:
     print(f"FATAL: router import failed — {_import_exc}", file=sys.stderr, flush=True)
     import traceback; traceback.print_exc(file=sys.stderr)
@@ -57,6 +57,7 @@ app.include_router(drafts.router)
 app.include_router(cron.router)
 app.include_router(dashboard.router)
 app.include_router(analytics.router)
+app.include_router(guardian.router)
 
 
 # ── Manager Dashboard ─────────────────────────────────────────────────────────
@@ -259,8 +260,13 @@ def onboarding_page(talent: str = Query(..., description="Talent key from settin
 
 # ── Startup ───────────────────────────────────────────────────────────────────
 
+# Guardian needs a reference to the scheduler to pause/resume jobs.
+_scheduler = None
+
+
 @app.on_event("startup")
 def on_startup():
+    global _scheduler
     settings = get_settings()
     missing = [k for k in ("google_client_id", "google_client_secret", "openai_api_key", "database_url")
                if not getattr(settings, k)]
@@ -291,13 +297,14 @@ def on_startup():
     # Auto-poll every 60 seconds + proactive token refresh every 10 minutes
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster
-        scheduler = BackgroundScheduler(daemon=True)
-        scheduler.add_job(_run_poll, "interval", seconds=45, id="auto_poll", replace_existing=True, max_instances=1)
-        scheduler.add_job(_run_draft_queue, "interval", seconds=20, id="draft_queue", replace_existing=True, max_instances=1)
-        scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, id="backlog_blaster", replace_existing=True, max_instances=1)
-        scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
-        scheduler.start()
-        logger.info("Scheduler started — poll every 45s, draft queue every 20s, backlog blaster every 30s, token refresh every 10 min.")
+        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian
+        _scheduler = BackgroundScheduler(daemon=True)
+        _scheduler.add_job(_run_poll, "interval", seconds=45, id="auto_poll", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_draft_queue, "interval", seconds=20, id="draft_queue", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, id="backlog_blaster", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
+        _scheduler.add_job(_run_guardian, "interval", seconds=60, id="guardian", replace_existing=True, max_instances=1)
+        _scheduler.start()
+        logger.info("Scheduler started — poll 45s, draft queue 20s, backlog blaster 30s, guardian 60s, token refresh 10min.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")

@@ -18,6 +18,7 @@ import logging
 import pathlib
 from datetime import datetime, timedelta
 
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.models.db import AppState, Draft, DraftStatus, PollHealth, ProcessedEmail, TalentToken
@@ -173,7 +174,39 @@ def compute_health_score(db: Session) -> dict:
             issues.append("No recent drafts found in the last 6 hours")
     components["draft_freshness"] = round(draft_score, 3)
 
-    # ── 4. Gmail token health (weight: 0.10) ──────────────────────────────────
+    # ── 4. Draft velocity (weight: 0.20) ──────────────────────────────────────
+    ten_min_ago = now - timedelta(minutes=10)
+    drafts_10min = db.query(Draft).filter(Draft.created_at >= ten_min_ago).count()
+    if drafts_10min < 20:
+        velocity_score = 1.0
+    elif drafts_10min < 40:
+        velocity_score = 0.5
+        issues.append(f"High draft velocity: {drafts_10min} drafts in last 10 minutes")
+    else:
+        velocity_score = 0.0
+        issues.append(f"CRITICAL draft velocity: {drafts_10min} drafts in 10 min — possible runaway loop")
+    components["draft_velocity"] = round(velocity_score, 3)
+
+    # ── 5. Per-talent draft balance (weight: 0.10) ────────────────────────────
+    today_talent_counts = (
+        db.query(Draft.talent_key, func.count(Draft.id))
+        .filter(Draft.created_at >= today_start)
+        .group_by(Draft.talent_key)
+        .all()
+    )
+    max_talent_drafts = max((c for _, c in today_talent_counts), default=0)
+    if max_talent_drafts > 100:
+        balance_score = 0.0
+        outlier = next((k for k, c in today_talent_counts if c == max_talent_drafts), "unknown")
+        issues.append(f"Draft outlier: {max_talent_drafts} drafts today for {outlier}")
+    elif max_talent_drafts > 50:
+        balance_score = 0.5
+        issues.append(f"Elevated draft count: {max_talent_drafts} drafts today for one talent")
+    else:
+        balance_score = 1.0
+    components["per_talent_balance"] = round(balance_score, 3)
+
+    # ── 6. Gmail token health (weight: 0.05) ──────────────────────────────────
     all_tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
     failing = [t for t in all_tokens if (t.consecutive_failures or 0) >= 3]
     if not all_tokens:
@@ -184,7 +217,7 @@ def compute_health_score(db: Session) -> dict:
             issues.append(f"{len(failing)} Gmail token(s) failing: {', '.join(t.talent_key for t in failing)}")
     components["token_health"] = round(token_score, 3)
 
-    # ── 5. Poll error rate (weight: 0.10) ─────────────────────────────────────
+    # ── 7. Poll error rate (weight: 0.05) ─────────────────────────────────────
     poll_rows = db.query(PollHealth).filter(PollHealth.polled_at >= today_start).all()
     if not poll_rows:
         poll_score = 1.0
@@ -197,11 +230,13 @@ def compute_health_score(db: Session) -> dict:
 
     # ── Weighted final score ──────────────────────────────────────────────────
     weights = {
-        "triage_reliability": 0.30,
-        "queue_liveness": 0.25,
-        "draft_freshness": 0.25,
-        "token_health": 0.10,
-        "poll_health": 0.10,
+        "triage_reliability": 0.25,
+        "queue_liveness": 0.20,
+        "draft_freshness": 0.15,
+        "draft_velocity": 0.20,
+        "per_talent_balance": 0.10,
+        "token_health": 0.05,
+        "poll_health": 0.05,
     }
     score = sum(components[k] * weights[k] for k in weights)
 

@@ -95,7 +95,8 @@
       "manager": "Cara",
       "category": "Beauty",
       "minimum_rate_usd": 1000,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Trin",
@@ -105,7 +106,8 @@
       "manager": "Chenni",
       "category": "Lifestyle",
       "minimum_rate_usd": 2000,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Sam",
@@ -117,7 +119,8 @@
       "minimum_rate_usd": 700,
       "rate_unit": "per video",
       "paused": true,
-      "_note": "Gmail automation disabled. Do not read or write emails for this inbox."
+      "_note": "Gmail automation disabled. Do not read or write emails for this inbox.",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Anastasiya",
@@ -127,7 +130,8 @@
       "manager": "Cara",
       "category": "Beauty/Fashion",
       "minimum_rate_usd": 750,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Hana",
@@ -137,7 +141,8 @@
       "manager": "Chenni",
       "category": "Fashion/Beauty",
       "minimum_rate_usd": 750,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Audur",
@@ -147,7 +152,8 @@
       "manager": "Nicole",
       "category": "Beauty",
       "minimum_rate_usd": 800,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Britt",
@@ -157,7 +163,8 @@
       "manager": "Chenni",
       "category": "Home/Living",
       "minimum_rate_usd": 900,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Allee",
@@ -167,7 +174,8 @@
       "manager": "Chenni",
       "category": "Fashion",
       "minimum_rate_usd": 650,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Lizz",
@@ -179,7 +187,8 @@
       "minimum_rate_usd": 600,
       "rate_unit": "per video",
       "paused": true,
-      "_note": "Gmail automation disabled. Do not read or write emails for this inbox."
+      "_note": "Gmail automation disabled. Do not read or write emails for this inbox.",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Katrina",
@@ -194,7 +203,8 @@
       "rate_unit": "per video",
       "personal_email": "lizz@gmail.com",
       "_note": "Dual manager escalation: offers above $650 go to Cara; at or below $650 go to Chenni.",
-      "paused": true
+      "paused": true,
+      "max_drafts_per_day": 50
     },
     {
       "key": "Jenn",
@@ -204,7 +214,8 @@
       "manager": "Chenni",
       "category": "Fashion",
       "minimum_rate_usd": 500,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Angela",
@@ -214,7 +225,8 @@
       "manager": "Chenni",
       "category": "Fashion",
       "minimum_rate_usd": 750,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Colleen",
@@ -224,7 +236,8 @@
       "manager": "Cara",
       "category": "Beauty",
       "minimum_rate_usd": 800,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Alana",
@@ -234,7 +247,8 @@
       "manager": "Nicole",
       "category": "Fashion",
       "minimum_rate_usd": 400,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Grayson",
@@ -244,7 +258,8 @@
       "manager": "Nicole",
       "category": "Fashion",
       "minimum_rate_usd": 750,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Kylika",
@@ -254,7 +269,8 @@
       "manager": "Nicole",
       "category": "Beauty",
       "minimum_rate_usd": 750,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Anastasiya",
@@ -264,7 +280,8 @@
       "manager": "Cara",
       "category": "Fashion/Beauty",
       "minimum_rate_usd": 750,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Skyler",
@@ -276,7 +293,8 @@
       "minimum_rate_usd": 0,
       "rate_unit": "per video",
       "paused": true,
-      "_note": "New talent \u2014 paused until SOP entry is populated and Gmail connected."
+      "_note": "New talent \u2014 paused until SOP entry is populated and Gmail connected.",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Wesley",
@@ -286,7 +304,8 @@
       "manager": "Chenni",
       "category": "Fashion/Beauty",
       "minimum_rate_usd": 750,
-      "rate_unit": "per video"
+      "rate_unit": "per video",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Hana",
@@ -297,7 +316,8 @@
       "category": "TBD",
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
-      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet."
+      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet.",
+      "max_drafts_per_day": 50
     },
     {
       "key": "Audur",
@@ -308,7 +328,8 @@
       "category": "TBD",
       "minimum_rate_usd": 800,
       "rate_unit": "per video",
-      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet."
+      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet.",
+      "max_drafts_per_day": 50
     }
   ],
   "make": {
@@ -316,5 +337,21 @@
     "_workspace_zone_comment": "TODO: Confirm your Make workspace zone (us1, eu1, etc.).",
     "error_alert_email": "colineyre222@gmail.com",
     "_error_alert_email_comment": "TODO: Email address to receive immediate error alerts when a Make scenario fails or OAuth expires."
+  },
+  "guardian": {
+    "_comment": "Self-healing watchdog \u2014 all thresholds tunable without redeploy",
+    "enabled": true,
+    "velocity_window_minutes": 10,
+    "global_draft_hard_limit": 50,
+    "per_talent_draft_warn_limit": 15,
+    "per_talent_draft_hard_limit": 30,
+    "default_max_drafts_per_day": 50,
+    "draft_email_ratio_warn": 3.0,
+    "draft_email_ratio_kill": 5.0,
+    "stuck_processing_threshold_minutes": 5,
+    "alert_cooldown_minutes": 30,
+    "alert_email": "colineyre222@gmail.com",
+    "recovery_wait_minutes": 30,
+    "recovery_health_threshold": 0.7
   }
 }

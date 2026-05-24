@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
@@ -24,6 +25,11 @@ from backend.services.talent_access import ensure_talent_gmail_enabled
 
 router = APIRouter(tags=["internal"])
 logger = logging.getLogger(__name__)
+
+# Mutex preventing draft_queue and backlog_blaster from overlapping.
+# Both jobs run 50-worker thread pools against the same NOT-IN subquery —
+# without this lock they race to create duplicate Gmail drafts.
+_draft_queue_lock = threading.Lock()
 
 
 from datetime import datetime as _dt
@@ -53,7 +59,18 @@ def _run_draft_queue(batch_size: int = 60):
     Continuous drafting worker — finds Score-3 emails with no draft and processes them.
     Uses a subquery to avoid full table scans, 50 parallel workers per run.
     Runs every 20s normally; when backlog > 0 it re-queues itself immediately.
+    Protected by _draft_queue_lock so backlog_blaster can never overlap this job.
     """
+    if not _draft_queue_lock.acquire(blocking=False):
+        logger.info("Draft queue skipped — already running")
+        return
+    try:
+        _run_draft_queue_inner(batch_size)
+    finally:
+        _draft_queue_lock.release()
+
+
+def _run_draft_queue_inner(batch_size: int = 60):
     from backend.models.db import get_session_factory, Draft, ProcessedEmail, TalentToken
     from backend.services.poller import _process_one_message
     from backend.core.config import get_settings as _gs
@@ -166,6 +183,21 @@ def _run_backlog_blaster():
     total backlog; each scheduler tick just keeps biting chunks until it's empty.
     """
     _run_draft_queue(batch_size=300)
+
+
+def _run_guardian():
+    """Guardian self-healing watchdog — runs every 60 seconds."""
+    from backend.models.db import get_session_factory
+    import backend.main as _main_module
+    from backend.services.guardian import GuardianWatchdog
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        GuardianWatchdog(scheduler=_main_module._scheduler).run(db)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Guardian watchdog failed: %s", exc)
+    finally:
+        db.close()
 
 
 def _run_proactive_refresh():
