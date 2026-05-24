@@ -494,15 +494,14 @@ def _process_one_message(
         time_to_classify_ms=time_to_classify_ms,
     )
 
-    # ── Score 1 → Archive ────────────────────────────────────────────────────
+    # ── Score 1 → Move to Revisit ───────────────────────────────────────────
     if score == 1:
         logger.info(
-            "ARCHIVING: %s / %s from %s — reason: %s",
+            "REVISIT: %s / %s from %s — reason: %s",
             talent_key, message_id, sender, reason,
         )
-        gmail_svc.archive_message(token_row, message_id, db=db, service=service)
+        gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
         gmail_svc.apply_triage_label(token_row, message_id, 1, db=db, service=service)
-        gmail_svc.apply_extra_label(token_row, message_id, "auto_archived", db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
@@ -619,6 +618,15 @@ def _process_one_message(
                 in_reply_to=message_id_header or None,
                 service=service,
             )
+            # Gmail API failed — escalate so it routes to human review instead of
+            # sitting as a phantom "pending" draft that will fail on approve.
+            if gmail_draft_id is None:
+                logger.warning(
+                    "Gmail draft creation failed for %s / %s — escalating to human review",
+                    talent_key, message_id,
+                )
+                is_escalate = True
+                escalate_reason = "Gmail draft creation failed — check talent OAuth / Gmail API"
 
         # Persist draft + processed record together, then commit once
         draft_row = Draft(

@@ -79,6 +79,10 @@ class DailyReportOut(BaseModel):
     total_new_drafts_today: int
     total_ignore: int
     total_deal_value_today: float  # sum of proposed_rate for Score-3 emails today
+    # Calendar-day fields (reset at midnight UTC regardless of manual reset)
+    total_sent_cal_today: int = 0
+    total_new_drafts_cal_today: int = 0
+    total_replies_today: int = 0  # inbound emails today on threads where we already sent
     talents: list[TalentReportCard]
 
 
@@ -344,6 +348,34 @@ def daily_report(db: Session = Depends(get_db)):
             pending_real_drafts=count_new_today,  # sidebar badge = new today
         ))
 
+    # ── Calendar-day stats (midnight UTC → now, ignoring manual reset) ──────
+    cal_midnight = datetime(today_utc.year, today_utc.month, today_utc.day)
+
+    sent_cal_today = db.query(Draft).filter(
+        Draft.status == DraftStatus.sent,
+        Draft.reviewed_at >= cal_midnight,
+    ).count()
+
+    new_drafts_cal_today = db.query(Draft).filter(
+        Draft.status == DraftStatus.pending,
+        Draft.is_escalate == False,  # noqa: E712
+        Draft.created_at >= cal_midnight,
+    ).count()
+
+    # Reply emails: inbound emails today whose thread_id matches a sent draft
+    sent_thread_ids = [
+        r[0] for r in db.query(Draft.thread_id)
+        .filter(Draft.status == DraftStatus.sent, Draft.thread_id.isnot(None))
+        .distinct()
+        .all()
+    ]
+    replies_today = 0
+    if sent_thread_ids:
+        replies_today = db.query(ProcessedEmail).filter(
+            ProcessedEmail.thread_id.in_(sent_thread_ids),
+            ProcessedEmail.processed_at >= cal_midnight,
+        ).count()
+
     return DailyReportOut(
         report_date=today_utc.isoformat(),
         total_good=total_good,
@@ -355,6 +387,9 @@ def daily_report(db: Session = Depends(get_db)):
         total_new_drafts_today=total_new_drafts_today,
         total_ignore=total_ignore,
         total_deal_value_today=round(total_deal_value_today, 2),
+        total_sent_cal_today=sent_cal_today,
+        total_new_drafts_cal_today=new_drafts_cal_today,
+        total_replies_today=replies_today,
         talents=cards,
     )
 

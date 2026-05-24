@@ -279,6 +279,7 @@ body {
 .stat-card.s-red .stat-value { color: var(--red); }
 .stat-card.s-green .stat-value { color: var(--green); }
 .stat-card.s-amber .stat-value { color: var(--amber); }
+.stat-card.s-blue .stat-value { color: #60a5fa; }
 
 .ov-grid { display: grid; grid-template-columns: 1fr 340px; gap: 28px; max-width: 1400px; }
 
@@ -748,8 +749,12 @@ body {
         <div class="stat-value" id="total-draft-backlog">—</div>
       </div>
       <div class="stat-card">
-        <div class="stat-label">Ignored Today</div>
+        <div class="stat-label">Revisit</div>
         <div class="stat-value" id="total-ignore">—</div>
+      </div>
+      <div class="stat-card s-blue">
+        <div class="stat-label">Replies</div>
+        <div class="stat-value" id="total-replies">—</div>
       </div>
     </div>
 
@@ -1300,11 +1305,12 @@ function renderSidebar() {
 function renderSummaryBar() {
   const r = state.report;
   if (!r) return;
-  document.getElementById('total-sent').textContent          = r.total_sent ?? 0;
-  document.getElementById('total-new-drafts').textContent    = r.total_new_drafts_today ?? 0;
+  document.getElementById('total-sent').textContent          = r.total_sent_cal_today ?? 0;
+  document.getElementById('total-new-drafts').textContent    = r.total_new_drafts_cal_today ?? 0;
   document.getElementById('total-draft-backlog').textContent = r.total_draft_backlog ?? 0;
   document.getElementById('total-ignore').textContent        = r.total_ignore ?? 0;
-  document.getElementById('report-date').textContent         = 'Since last reset · ' + r.report_date;
+  document.getElementById('total-replies').textContent       = r.total_replies_today ?? 0;
+  document.getElementById('report-date').textContent         = 'Today · ' + r.report_date;
   const val = r.total_deal_value_today ?? 0;
   document.getElementById('daily-deal-value').textContent =
     val > 0 ? '$' + val.toLocaleString('en-US', {maximumFractionDigits: 0}) : '$0';
