@@ -82,6 +82,7 @@ class DailyReportOut(BaseModel):
     # Calendar-day fields (reset at midnight UTC regardless of manual reset)
     total_sent_cal_today: int = 0
     total_new_drafts_cal_today: int = 0
+    total_revisit_cal_today: int = 0  # score=1 emails processed today
     total_replies_today: int = 0  # inbound emails today on threads where we already sent
     talents: list[TalentReportCard]
 
@@ -362,6 +363,12 @@ def daily_report(db: Session = Depends(get_db)):
         Draft.created_at >= cal_midnight,
     ).count()
 
+    # Revisit (score=1) — calendar day only
+    revisit_cal_today = db.query(ProcessedEmail).filter(
+        ProcessedEmail.score == 1,
+        ProcessedEmail.processed_at >= cal_midnight,
+    ).count()
+
     # Reply emails: inbound emails today whose thread_id matches a sent draft
     sent_thread_ids = [
         r[0] for r in db.query(Draft.thread_id)
@@ -389,6 +396,7 @@ def daily_report(db: Session = Depends(get_db)):
         total_deal_value_today=round(total_deal_value_today, 2),
         total_sent_cal_today=sent_cal_today,
         total_new_drafts_cal_today=new_drafts_cal_today,
+        total_revisit_cal_today=revisit_cal_today,
         total_replies_today=replies_today,
         talents=cards,
     )
