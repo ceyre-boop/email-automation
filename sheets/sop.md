@@ -85,7 +85,7 @@ Any email primarily related to an event, appearance, travel invite, or speaking 
 - Do not relabel or archive the email.
 - Leave the email in INBOX for human admin review.
 
-Output:
+**Output:**
 Classification: Ignore
 Reason: Event / appearance / speaking invite.
 Draft Sent: No
@@ -95,18 +95,18 @@ Action: Leave in INBOX
 
 ### Rule 8 — Talent Personal Email Handling
 
-Each talent may have a personal email address on file (Scenario C).
+Each talent may include a Scenario C containing their personal email address.
 
 These emails are typically forwarded opportunities or conversations originally sent directly to the talent instead of the business inbox.
 
 **Rules:**
-- If the inbound sender matches the personal email listed for the matched talent:
+- If the inbound sender matches the personal email listed in Scenario C for the matched talent:
   - Do not create a draft or reply
   - Do not classify as Spam
   - Do not relabel or archive the email
   - Leave the email in INBOX for human admin review
 
-Output:
+**Output:**
 Classification: Ignore
 Reason: Email originated from talent personal email.
 Draft Sent: No
@@ -118,31 +118,31 @@ Action: Leave in INBOX
 
 Approved responses may contain formatting markup and internal routing instructions.
 
-Approved SOP formatting:
+**Approved SOP formatting:**
 - Bold: **text**
 - Emphasis: ***text***
 - Hyperlink: [Anchor Text](URL)
 - CC instruction: CC: manager@example.com
 
-Rules:
+**Rules:**
 - Preserve all approved response wording exactly.
 - Preserve and render all approved formatting.
 - Do not add formatting that does not exist in the SOP.
 
-Hyperlink behavior:
+**Hyperlink behavior:**
 - Render [Anchor Text](URL) as a clickable hyperlink.
 - Display only the Anchor Text visibly.
 - Use the URL inside parentheses as the hyperlink destination.
 - Do not display raw URLs in the visible email body.
 - Hyperlink only the Anchor Text, never the surrounding sentence or paragraph.
 
-CC behavior:
+**CC behavior:**
 - CC instructions are internal routing instructions only.
 - Do not display CC instructions in the email body.
 - Remove the CC line from the drafted email content.
 - Place the listed email address only in the CC field.
 
-Formatting behavior:
+**Formatting behavior:**
 - Render **text** as bold.
 - Render ***text*** as bold and italicized.
 - Render hyperlinks correctly.
@@ -162,7 +162,8 @@ If no draft is sent because the email is classified as Ignore or Human Admin Req
 - Remove INBOX label: Yes
 - Apply label: Revisit
 
-Exception: Event invite emails should remain in INBOX with no label changes unless otherwise specified.
+Exception:
+- Event invite emails should remain in INBOX with no label changes unless otherwise specified.
 
 **C. Spam**
 
@@ -228,6 +229,10 @@ Please let us know **what type of collab you're looking for** in your offer + if
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
+### Scenario C: Personal Email Forward
+
+**Personal Email:** katrinamoore621@gmail.com
+
 ---
 
 ## Talent: Anastasiya Ray
@@ -250,7 +255,7 @@ We've found bundles usually perform **better** since multiple posts make the pro
 Thank you so much for reaching out about a potential partnership with Anastasiya!! I'm happy to share her rates below:
     **1 TikTok** [anastasiya_ray](https://www.tiktok.com/@anastasiya_ray) - $800
     **1 TikTok (2nd)** [theraysfinds](https://www.tiktok.com/@theraysfinds) - $800
-    **1 IG Reel** [ugcbyanastasiya](https://www.instagram.com/ugcbyanastasiya/) - $750
+    **1 Instagram** [Reel](https://www.instagram.com/ugcbyanastasiya/) - $750
     **1 UGC Video** [Portfolio](https://ugcbyanastasiya.com/) - $1,000 (usage to be negotiated)
 
 Anastasiya's pricing reflects her high-quality, **polished** content with a bestie beauty vibe that feels authentic, relatable, and **brand-elevating**!! Plus she's a UGC expert so she knows how to make videos that convert!!
@@ -274,6 +279,10 @@ Please let us know **what type of collab you're looking for** in your offer + if
 
 We've found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
 
+### Scenario C: Personal Email Forward
+
+**Personal Email:** ugcbyanastasiya@gmail.com
+
 ---
 
 ## Talent: Wesley Barker
@@ -295,7 +304,7 @@ We've found bundles usually perform better since multiple posts make the product
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Wesley!! I'm happy to share her rates below:
     **1 TikTok** [wesleyrbarker](https://www.tiktok.com/@wesleyrbarker) - $750
-    **1 IG Reel** [wesleyrbarker](https://www.instagram.com/wesleyrbarker/) - $500
+    **1 Instagram** [Reel](https://www.instagram.com/wesleyrbarker/) - $500
     **1 UGC Video** - $600 (usage to be negotiated)
 
 Wesley's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **fashion & beauty** recommendations on TikTok Shop!!
@@ -319,6 +328,10 @@ Please let us know **what type of collab you're looking for** in your offer + if
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
+### Scenario C: Personal Email Forward
+
+**Personal Email:** wesleybarkerbookings@gmail.com
+
 ---
 
 ## Talent: Hana Tanaka
@@ -340,7 +353,7 @@ We've found bundles usually perform **better** since multiple posts make the pro
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Hana!! I'm happy to share her rates below:
     **1 TikTok** [hanaisfinechina](https://www.tiktok.com/@hanaisfinechina) - $750
-    **1 IG Reel** [hanaisfinechina](https://www.instagram.com/hanaisfinechina/) - $500
+    **1 Instagram** [Reel](https://www.instagram.com/hanaisfinechina/) - $500
     **1 UGC Video** - $600 (usage to be negotiated)
 
 Hana's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **fashion & beauty** recommendations on TikTok Shop!!
@@ -363,6 +376,10 @@ Please let us know **what type of collab you're looking for** in your offer + if
     10 videos (75%) → $5,600
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
+
+### Scenario C: Personal Email Forward
+
+**Personal Email:** hanaisfinechina@gmail.com
 
 ---
 
@@ -408,6 +425,10 @@ Please let us know **what type of collab you're looking for** + if you have any 
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
+### Scenario C: Personal Email Forward
+
+**Personal Email:** jenn@jennlyles.com
+
 ---
 
 ## Talent: Angela Callisto
@@ -429,7 +450,7 @@ We've found bundles usually perform **better** since multiple posts make the pro
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Angela!! I'm happy to share her rates below:
     **1 TikTok** [angelacallisto123](https://www.tiktok.com/@angelacallisto123) - $750
-    **1 IG Reel** [angelacallisto](https://www.instagram.com/angelacallisto/) - $500
+    **1 Instagram** [Reel](https://www.instagram.com/angelacallisto/) - $500
     **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Angela's pricing reflects her extremely high conversion rate (consistent **$450k+** monthly GMV). She's a TikTok Shop Star who specializes in real friend-to-friend recommendations for **fashion & beauty** based on her authenticity!!
@@ -452,6 +473,10 @@ Please let us know **what type of collab you're looking for** in your offer + if
     10 videos (75%) → $5,600
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
+
+### Scenario C: Personal Email Forward
+
+**Personal Email:** angelacallisto123@gmail.com
 
 ---
 
@@ -497,6 +522,10 @@ Please let us know **what type of collab you're looking for** in your offer + if
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
+### Scenario C: Personal Email Forward
+
+**Personal Email:** graysonfinks@gmail.com
+
 ---
 
 ## Talent: Kylika Miller
@@ -518,7 +547,7 @@ We've found bundles usually perform **better** since multiple posts make the pro
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Kylika!! I'm happy to share her rates below:
     **1 TikTok** [kylikamiller44](https://www.tiktok.com/@kylikamiller44) - $750
-    **1 IG Reel** [kylikamiller](https://www.instagram.com/kylikamiller/) - $500
+    **1 Instagram** [Reel](https://www.instagram.com/kylikamiller/) - $500
     **1 UGC Video** - $600 (usage to be negotiated)
 
 Kylika's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **fashion & beauty** recommendations on TikTok Shop!!
@@ -542,6 +571,10 @@ Please let us know **what type of collab you're looking for** in your offer + if
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 
+### Scenario C: Personal Email Forward
+
+**Personal Email:** kylikacollabs@gmail.com
+
 ---
 
 ## Talent: Audur Banks
@@ -563,7 +596,8 @@ We've found bundles usually perform **better** since multiple posts make the pro
 **Approved Response:**
 Thank you so much for reaching out about a potential partnership with Audur!! I'm happy to share her rates below:
     **1 TikTok** [thatnordicblonde](https://www.tiktok.com/@thatnordicblonde) - $800
-    **1 IG Reel** [thatnordicblonde](https://www.instagram.com/thatnordicblonde/) - $500
+    **1 TikTok (2nd)** [everydayaudur](https://www.tiktok.com/@everydayaudur) - $500
+    **1 Instagram** [Reel](https://www.instagram.com/thatnordicblonde/) - $500
     **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Audur's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **beauty & personal care** recommendations on TikTok Shop!!
@@ -586,3 +620,34 @@ Please let us know **what type of collab you're looking for** in your offer + if
     10 videos (75%) → $6,000
 
 We've found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
+
+### Scenario C: Personal Email Forward
+
+**Personal Email:** thebanksedit@gmail.com
+
+---
+
+## Talent: Skyler Clark
+
+**Manager:** Marco Perez
+
+**SOP Status:** ✅ APPROVED
+
+### Scenario A: Initial Inbound (Default Response) ⭐ DEFAULT
+
+**Use when:**
+- Asking for rates or a potential to collab
+- All other general inquiries
+
+**Do not use when:**
+- An exact match from scenario below
+- Specifically an event invite only
+
+**Approved Response:**
+Thank you so much for reaching out about a potential partnership with Skyler!! I'm happy to share her rates below:
+    **1 TikTok** [skylerclarkk](https://www.tiktok.com/@skylerclarkk) - $500
+    **1 Instagram** [Reel](https://www.instagram.com/crashingskymusic/) - $300
+
+Skyler's pricing reflects her high quality content + the access you'll get to the community of music fans on TikTok!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We'd love to explore working together!

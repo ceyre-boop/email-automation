@@ -367,7 +367,7 @@
     "min_rate_usd": 0,
     "rate_unit": "per video",
     "rules": [],
-    "sop_status": "pending"
+    "sop_status": "approved"
   },
   "Wesley": {
     "full_name": "Wesley Barker",

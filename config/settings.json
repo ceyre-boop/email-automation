@@ -304,12 +304,11 @@
       "full_name": "Skyler Clark",
       "gmail_connection_name": "Gmail - Skyler",
       "sop_tab_name": "Skyler",
-      "manager": "TBD",
-      "category": "TBD",
-      "minimum_rate_usd": 0,
+      "manager": "Marco",
+      "category": "Music",
+      "minimum_rate_usd": 300,
       "rate_unit": "per video",
-      "paused": true,
-      "_note": "New talent \u2014 paused until SOP entry is populated and Gmail connected.",
+      "tier": "low",
       "max_drafts_per_day": 50
     },
     {

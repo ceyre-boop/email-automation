@@ -1990,3 +1990,62 @@ def purge_duplicate_drafts(
         "errors": errors,
         "message": f"Deleted {deleted} duplicate drafts, kept {keep} per thread.",
     }
+
+
+@router.post("/clear-all-inboxes")
+def clear_all_inboxes(
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """
+    Archive (mark read + remove from INBOX) every message currently in the INBOX
+    for all connected talent Gmail accounts. Use to start fresh.
+    """
+    from backend.services import gmail as gmail_svc
+
+    tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+    if not tokens:
+        return {"message": "No connected talent accounts found.", "results": []}
+
+    results = []
+    for token in tokens:
+        archived = 0
+        errors = 0
+        page_token_gmail = None
+        service = gmail_svc.build_service(token, db)
+
+        while True:
+            kwargs: dict = {"userId": "me", "labelIds": ["INBOX"], "maxResults": 500}
+            if page_token_gmail:
+                kwargs["pageToken"] = page_token_gmail
+            try:
+                resp = service.users().messages().list(**kwargs).execute()
+            except Exception as exc:
+                logger.error("clear-all-inboxes list error for %s: %s", token.talent_key, exc)
+                errors += 1
+                break
+
+            messages = resp.get("messages", [])
+            for msg in messages:
+                ok = gmail_svc.archive_message(token, msg["id"], db=db, service=service)
+                if ok:
+                    archived += 1
+                else:
+                    errors += 1
+
+            page_token_gmail = resp.get("nextPageToken")
+            if not page_token_gmail:
+                break
+
+        results.append({
+            "talent": token.talent_key,
+            "archived": archived,
+            "errors": errors,
+        })
+        logger.info("clear-all-inboxes: %s — archived %d, errors %d", token.talent_key, archived, errors)
+
+    total_archived = sum(r["archived"] for r in results)
+    return {
+        "message": f"Cleared {total_archived} messages across {len(results)} accounts.",
+        "results": results,
+    }
