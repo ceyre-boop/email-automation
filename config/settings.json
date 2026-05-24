@@ -273,17 +273,6 @@
       "max_drafts_per_day": 50
     },
     {
-      "key": "Anastasiya",
-      "full_name": "Anastasiya Ray",
-      "gmail_connection_name": "Gmail - Anastasiya",
-      "sop_tab_name": "Anastasiya",
-      "manager": "Cara",
-      "category": "Fashion/Beauty",
-      "minimum_rate_usd": 750,
-      "rate_unit": "per video",
-      "max_drafts_per_day": 50
-    },
-    {
       "key": "Skyler",
       "full_name": "Skyler Clark",
       "gmail_connection_name": "Gmail - Skyler",
@@ -305,30 +294,6 @@
       "category": "Fashion/Beauty",
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
-      "max_drafts_per_day": 50
-    },
-    {
-      "key": "Hana",
-      "full_name": "Hana",
-      "gmail_connection_name": "Gmail - Hana",
-      "sop_tab_name": "Hana",
-      "manager": "TBD",
-      "category": "TBD",
-      "minimum_rate_usd": 750,
-      "rate_unit": "per video",
-      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet.",
-      "max_drafts_per_day": 50
-    },
-    {
-      "key": "Audur",
-      "full_name": "Audur",
-      "gmail_connection_name": "Gmail - Audur",
-      "sop_tab_name": "Audur",
-      "manager": "TBD",
-      "category": "TBD",
-      "minimum_rate_usd": 800,
-      "rate_unit": "per video",
-      "_note": "New talent \u2014 Gmail can now be connected. SOP/scenario assets are not in repo yet.",
       "max_drafts_per_day": 50
     }
   ],
