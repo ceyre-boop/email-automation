@@ -128,6 +128,7 @@ def _run_draft_queue_inner(batch_size: int = 60):
                 return
             _tn = talent_cfg.get("full_name", _tk)
             _mr = talent_cfg.get("minimum_rate_usd", 0)
+            _mgr = talent_cfg.get("manager", "")
             thread_db = SessionLocal()
             try:
                 thread_token = thread_db.query(TalentToken).filter(
@@ -149,14 +150,15 @@ def _run_draft_queue_inner(batch_size: int = 60):
                     minimum_rate=_mr,
                     draft_mode=draft_mode,
                     summary={},
+                    manager_name=_mgr,
                 )
             except Exception as exc:  # noqa: BLE001
                 logger.warning("Draft queue error %s/%s: %s", _tk, row.gmail_message_id, exc)
             finally:
                 thread_db.close()
 
-        # All candidates submitted to a single pool — no per-talent serialisation
-        with ThreadPoolExecutor(max_workers=50) as executor:
+        # Capped at 10 workers — 50 was the source of the May 23 runaway draft incident
+        with ThreadPoolExecutor(max_workers=10) as executor:
             futures = [executor.submit(_draft_one, row) for row in candidates]
             for f in futures:
                 try:

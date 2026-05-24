@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle
 
 # Concurrency — Transaction Pooler (port 6543) supports hundreds of connections.
-MAX_CONCURRENT_EMAILS = 50   # doubled from 25 — GPT calls are I/O bound, safe to go higher
+MAX_CONCURRENT_EMAILS = 10   # capped at 10 — 50 caused the May 23 runaway draft incident
 MAX_TALENT_WORKERS = 10      # up from 8
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
@@ -386,6 +386,26 @@ def _process_one_message(
         )
         db.commit()
         summary["errors"] += 1
+        return
+
+    # SOP Rule 1: only process emails currently in INBOX.
+    # Re-check after fetch — the email may have been moved by another worker or manually.
+    if "INBOX" not in detail.get("label_ids", []):
+        logger.info(
+            "Skipping %s / %s — no longer in INBOX (labels: %s)",
+            talent_key, message_id, detail.get("label_ids", []),
+        )
+        # Update the claim row so we don't retry this message next cycle
+        claim_row = db.query(ProcessedEmail).filter(
+            ProcessedEmail.gmail_message_id == message_id,
+            ProcessedEmail.status == EmailStatus.processing,
+        ).first()
+        if claim_row:
+            claim_row.status = EmailStatus.archived
+            claim_row.triage_reason = "Skipped — not in INBOX at processing time (SOP Rule 1)"
+            db.add(claim_row)
+            db.commit()
+        summary["processed"] += 1
         return
 
     thread_id = detail.get("thread_id", "")
