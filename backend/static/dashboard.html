@@ -187,8 +187,9 @@ body {
 .t-dot {
   width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
 }
-.t-dot.online { background: var(--green); box-shadow: 0 0 6px var(--green); }
-.t-dot.offline { background: var(--text-3); }
+.t-dot.online    { background: var(--green);  box-shadow: 0 0 6px var(--green); }
+.t-dot.drafting  { background: #f4b400;       box-shadow: 0 0 6px #f4b400; }
+.t-dot.offline   { background: var(--text-3); }
 
 .t-badge {
   background: var(--red); color: #fff;
@@ -1280,6 +1281,13 @@ function closeSopModal() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
 
+// ── Dot state: green = auto-send, yellow = drafting, grey = disconnected/paused
+function dotClass(t) {
+  if (!t.connected || t.paused) return 'offline';
+  if (t.draft_mode) return 'drafting';
+  return 'online';
+}
+
 // ── Sidebar ────────────────────────────────────────────────────────────────
 function renderSidebar() {
   const ul = document.getElementById('talent-list');
@@ -1294,7 +1302,7 @@ function renderSidebar() {
     li.innerHTML = `
       <div class="t-avatar">${initial(t.full_name)}</div>
       <span class="t-name">${esc(t.full_name)}</span>
-      <div class="t-dot ${t.connected ? 'online' : 'offline'}"></div>
+      <div class="t-dot ${dotClass(t)}"></div>
     `;
     li.addEventListener('click', () => openRealGmail(t));
     ul.appendChild(li);

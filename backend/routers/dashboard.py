@@ -97,6 +97,8 @@ class TalentOut(BaseModel):
     email: Optional[str] = None
     inbox_email: Optional[str] = None
     connected_at: Optional[str] = None
+    paused: bool = False
+    draft_mode: bool = True
 
 
 class EmailOut(BaseModel):
@@ -369,7 +371,8 @@ def daily_report(db: Session = Depends(get_db)):
         ProcessedEmail.processed_at >= cal_midnight,
     ).count()
 
-    # Reply emails: inbound emails today whose thread_id matches a sent draft
+    # Reply emails: inbound today on threads where we previously sent — excluding
+    # threads we've already drafted/sent a follow-up for today (already handled).
     sent_thread_ids = [
         r[0] for r in db.query(Draft.thread_id)
         .filter(Draft.status == DraftStatus.sent, Draft.thread_id.isnot(None))
@@ -378,10 +381,26 @@ def daily_report(db: Session = Depends(get_db)):
     ]
     replies_today = 0
     if sent_thread_ids:
-        replies_today = db.query(ProcessedEmail).filter(
+        reply_email_rows = db.query(ProcessedEmail).filter(
             ProcessedEmail.thread_id.in_(sent_thread_ids),
             ProcessedEmail.processed_at >= cal_midnight,
-        ).count()
+        ).all()
+        if reply_email_rows:
+            reply_thread_ids = [e.thread_id for e in reply_email_rows if e.thread_id]
+            already_handled = {
+                r[0] for r in db.query(Draft.thread_id)
+                .filter(
+                    Draft.thread_id.in_(reply_thread_ids),
+                    Draft.status.in_([DraftStatus.pending, DraftStatus.sent]),
+                    Draft.created_at >= cal_midnight,
+                )
+                .distinct().all()
+                if r[0]
+            }
+            replies_today = sum(
+                1 for e in reply_email_rows
+                if e.thread_id not in already_handled
+            )
 
     return DailyReportOut(
         report_date=today_utc.isoformat(),
@@ -413,6 +432,8 @@ def list_talents(db: Session = Depends(get_db)):
         for row in db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
     }
 
+    global_draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
+
     return [
         TalentOut(
             key=t["key"],
@@ -424,6 +445,8 @@ def list_talents(db: Session = Depends(get_db)):
             email=connected[t["key"].lower()].email if t["key"].lower() in connected else None,
             inbox_email=t.get("inbox_email"),
             connected_at=connected[t["key"].lower()].connected_at.isoformat() if t["key"].lower() in connected else None,
+            paused=t.get("paused", False),
+            draft_mode=global_draft_mode,
         )
         for t in talent_configs
     ]

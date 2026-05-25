@@ -107,60 +107,6 @@
     "sop_status": "approved",
     "manager_email": "chenni@taboost.me"
   },
-  "Sam": {
-    "full_name": "Sam Jones",
-    "manager": "Cara Best",
-    "manager_email": "cara@taboost.me",
-    "category": "Home/Living",
-    "min_rate_usd": 700,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": [
-      {
-        "scenario": "A",
-        "label": "Initial Inbound (Default Response)",
-        "trigger": "Asking for rates or a potential to collab\nAll other general inquiries",
-        "use_when": [
-          "Asking for rates or a potential to collab",
-          "All other general inquiries"
-        ],
-        "do_not_use_when": [
-          "An exact match from scenario below"
-        ],
-        "response": "Thank you so much for reaching out about a potential partnership with Sam!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok [https://www.tiktok.com/@sam_joness_]: $900\n\u2022 1 IG Reel [https://www.instagram.com/its_samjones_/reels/]: $600\n\u2022 1 UGC Video [https://samjonesugc.my.canva.site/]: $1,500 (usage can be added on for an additional cost)\n\nSam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over $150k!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!",
-        "cc": null,
-        "is_default": true
-      },
-      {
-        "scenario": "B",
-        "label": "Initial Inbound (Bundle Rate Requested)",
-        "trigger": "Asking for bundle rates",
-        "use_when": [
-          "Asking for bundle rates"
-        ],
-        "do_not_use_when": [
-          "Multiple post rate is not asked for"
-        ],
-        "response": "Her standard rate is $900 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,400\n5 videos (85%) \u2192 $3,800\n10 videos (75%) \u2192 $6,750\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!",
-        "cc": null,
-        "is_default": false
-      },
-      {
-        "scenario": "C",
-        "label": "Initial Inbound (Adequate Offer)",
-        "trigger": "Initially offered a rate that is OVER $900 for one post",
-        "use_when": [
-          "Initially offered a rate that is OVER $900 for one post"
-        ],
-        "do_not_use_when": [
-          "An explicit offer of the above rate is not specified"
-        ],
-        "response": "Email Draft: CC cara@taboost.me\nHi,\n\nThank you for the offer! I think this collab could be a good fit for Sam [https://www.tiktok.com/@sam_joness_]. Looping in her management team who can move forward with this convo!",
-        "cc": "cara@taboost.me",
-        "is_default": false
-      }
-    ]
-  },
   "Britt": {
     "full_name": "Brittanie Hammer",
     "manager": "Chenni",
@@ -178,60 +124,6 @@
     "rate_unit": "per video",
     "rules": [],
     "sop_status": "pending"
-  },
-  "Lizz": {
-    "full_name": "Lizz Freixas",
-    "manager": "Chenni Li",
-    "manager_email": "chenni@taboost.me",
-    "category": "Fashion",
-    "min_rate_usd": 600,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": [
-      {
-        "scenario": "A",
-        "label": "Initial Inbound (Default Response)",
-        "trigger": "Asking for rates or a potential to collab\nAll other general inquiries",
-        "use_when": [
-          "Asking for rates or a potential to collab",
-          "All other general inquiries"
-        ],
-        "do_not_use_when": [
-          "An exact match from scenario below"
-        ],
-        "response": "Thank you so much for reaching out about a potential partnership with Lizz!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok [https://www.tiktok.com/@lizzmi45]: $750\n\u2022 1 UGC Video: $900 (usage to be negotiated)\n\nLizz's pricing reflects her extremely high conversion rate from content that truly sells. Her monthly GMV is $550k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super high for a shop creator which is ideal for brand collabs.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!",
-        "cc": null,
-        "is_default": true
-      },
-      {
-        "scenario": "B",
-        "label": "Initial Inbound (Bundle Rate Requested)",
-        "trigger": "Asking for bundle rates",
-        "use_when": [
-          "Asking for bundle rates"
-        ],
-        "do_not_use_when": [
-          "Multiple post rate is not asked for"
-        ],
-        "response": "Lizz's [https://www.tiktok.com/@lizzmi45] standard rate is $750 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $2,000\n5 videos (85%) \u2192 $3,100\n10 videos (75%) \u2192 $5,600\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!",
-        "cc": null,
-        "is_default": false
-      },
-      {
-        "scenario": "C",
-        "label": "Initial Inbound (Adequate Offer)",
-        "trigger": "Initially offered a rate that is OVER $600 for one post",
-        "use_when": [
-          "Initially offered a rate that is OVER $600 for one post"
-        ],
-        "do_not_use_when": [
-          "An explicit offer of the above rate is not specified"
-        ],
-        "response": "Email Draft: CC chenni@taboost.me\nHi,\n\nThank you for the offer! I think this collab could be a good fit for Lizz [https://www.tiktok.com/@lizzmi45]. Looping in her management team who can move forward with this convo!",
-        "cc": "chenni@taboost.me",
-        "is_default": false
-      }
-    ]
   },
   "Katrina": {
     "full_name": "Katrina Moore",

@@ -116,20 +116,6 @@
       "max_drafts_per_day": 50
     },
     {
-      "key": "Sam",
-      "full_name": "Sam Jones",
-      "gmail_connection_name": "Gmail - Sam",
-      "sop_tab_name": "Sam J",
-      "manager": "Cara",
-      "category": "Home/Living",
-      "minimum_rate_usd": 700,
-      "rate_unit": "per video",
-      "tier": "top",
-      "paused": true,
-      "_note": "Top earner — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
-    },
-    {
       "key": "Anastasiya",
       "full_name": "Anastasiya Ray",
       "gmail_connection_name": "Gmail - Anastasiya",
@@ -187,20 +173,6 @@
       "manager": "Chenni",
       "category": "Fashion",
       "minimum_rate_usd": 650,
-      "rate_unit": "per video",
-      "tier": "mid",
-      "paused": true,
-      "_note": "Mid tier — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
-    },
-    {
-      "key": "Lizz",
-      "full_name": "Lizz Freixas",
-      "gmail_connection_name": "Gmail - Lizz",
-      "sop_tab_name": "Lizz",
-      "manager": "Chenni",
-      "category": "Fashion",
-      "minimum_rate_usd": 600,
       "rate_unit": "per video",
       "tier": "mid",
       "paused": true,
