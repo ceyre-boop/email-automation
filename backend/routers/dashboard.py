@@ -503,6 +503,47 @@ def reset_talent_badges(talent_key: str, db: Session = Depends(get_db)):
     return {"ok": True, "talent_key": talent_key, "reset_at": now.isoformat()}
 
 
+@router.post("/talents/{talent_key}/send-all")
+def send_all_for_talent(talent_key: str, db: Session = Depends(get_db)):
+    """Send all pending, non-escalated drafts for a single talent inbox."""
+    _validate_talent(talent_key)
+    from backend.services import gmail as gmail_svc
+
+    token = db.query(TalentToken).filter(
+        TalentToken.talent_key == talent_key,
+        TalentToken.active == True,  # noqa: E712
+    ).first()
+    if not token:
+        raise HTTPException(status_code=404, detail=f"No active OAuth token for {talent_key}")
+
+    pending = db.query(Draft).filter(
+        Draft.talent_key == talent_key,
+        Draft.status == DraftStatus.pending,
+        Draft.is_escalate == False,  # noqa: E712
+        Draft.gmail_draft_id.isnot(None),
+    ).all()
+
+    sent_count = 0
+    failed_count = 0
+    for draft in pending:
+        try:
+            ok = gmail_svc.send_gmail_draft(token, draft.gmail_draft_id, db=db)
+            if ok:
+                draft.status = DraftStatus.sent
+                draft.reviewed_at = datetime.utcnow()
+                db.add(draft)
+                sent_count += 1
+            else:
+                failed_count += 1
+        except Exception as exc:
+            logger.warning("send-all: failed to send draft %s for %s: %s", draft.id, talent_key, exc)
+            failed_count += 1
+
+    db.commit()
+    logger.info("send-all for %s: sent=%d failed=%d", talent_key, sent_count, failed_count)
+    return {"ok": True, "talent_key": talent_key, "sent_count": sent_count, "failed_count": failed_count}
+
+
 @router.get("/context", response_model=list[ContextOut])
 def list_context(db: Session = Depends(get_db)):
     """Active manager context entries, oldest first (applied in that order)."""

@@ -447,7 +447,7 @@ def _process_one_message(
 
         if existing_thread_activity or existing_thread_draft or thread_manually_handled:
             reason = "Ongoing thread — prior sent activity detected. Human review required."
-            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
+            # SOP Rule 10B: leave Gmail untouched — no labels, no inbox removal
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
                 2, "", 0.0, "Human Admin Required", reason, EmailStatus.flagged,
@@ -494,13 +494,14 @@ def _process_one_message(
         time_to_classify_ms=time_to_classify_ms,
     )
 
-    # ── Score 1 → Move to Revisit ───────────────────────────────────────────
+    # ── Score 1 → Spam (Option C) ───────────────────────────────────────────
     if score == 1:
         logger.info(
-            "REVISIT: %s / %s from %s — reason: %s",
+            "SPAM: %s / %s from %s — reason: %s",
             talent_key, message_id, sender, reason,
         )
-        gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
+        # SOP Rule 10C: remove from INBOX, apply Spam label — no Revisit label
+        gmail_svc.archive_message(token_row, message_id, db=db, service=service)
         gmail_svc.apply_triage_label(token_row, message_id, 1, db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
@@ -511,18 +512,14 @@ def _process_one_message(
         _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason)
         summary["archived"] += 1
 
-    # ── Score 2 → Flag for review (no draft) ────────────────────────────────────
+    # ── Score 2 → Human review (Option B) ───────────────────────────────────
     elif score == 2:
+        # SOP Rule 10B: leave Gmail completely untouched — no labels, no inbox removal.
+        # Event invites (ignore_leave_inbox=True) are already covered by this same rule.
         if triage_result.get("ignore_leave_inbox"):
-            # Event invite / personal email forward — leave untouched in INBOX (SOP Rules 7 & 8)
-            logger.info("ignore_leave_inbox for %s / %s — no label, no read-mark", talent_key, message_id)
+            logger.info("ignore_leave_inbox for %s / %s — leaving in INBOX (SOP Rules 7 & 8)", talent_key, message_id)
         else:
-            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
-            gmail_svc.apply_triage_label(token_row, message_id, 2, db=db, service=service)
-            gmail_svc.apply_manager_review_label(token_row, message_id, manager_name, db=db, service=service)
-            # Rate negotiation: proposed rate is known and below the talent's floor
-            if proposed_rate > 0 and minimum_rate > 0 and proposed_rate < minimum_rate:
-                gmail_svc.apply_extra_label(token_row, message_id, "rate_negotiation", db=db, service=service)
+            logger.info("Score 2 for %s / %s — leaving in INBOX untouched (SOP Rule 10B)", talent_key, message_id)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
@@ -545,11 +542,10 @@ def _process_one_message(
         thread_already_replied = gmail_svc.thread_has_prior_sent_reply(service, thread_id)
         if thread_already_replied:
             logger.info(
-                "Thread %s for %s already has a sent reply — flagging for human review "
-                "(no outbound draft, moved to Revisit)",
+                "Thread %s for %s already has a sent reply — leaving in INBOX untouched (SOP Rule 10B)",
                 thread_id, talent_key,
             )
-            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
+            # SOP Rule 10B: leave Gmail untouched
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
                 2, brand_name, proposed_rate, "Human Admin Required",
@@ -628,58 +624,79 @@ def _process_one_message(
                 is_escalate = True
                 escalate_reason = "Gmail draft creation failed — check talent OAuth / Gmail API"
 
-        # Persist draft + processed record together, then commit once
-        draft_row = Draft(
-            talent_key=talent_key,
-            gmail_message_id=message_id,
-            thread_id=thread_id,
-            sender=sender,
-            subject=subject,
-            brand_name=brand_name,
-            proposed_rate=proposed_rate,
-            offer_type=offer_type,
-            draft_text=draft_text,
-            cc_recipients=cc_str,
-            gmail_draft_id=gmail_draft_id,
-            message_id_header=message_id_header or None,  # stored for In-Reply-To on approve
-            status=DraftStatus.pending,
-            is_escalate=is_escalate,
-            escalate_reason=escalate_reason,
-        )
-        db.add(draft_row)
-        _record_processed(
-            db, talent_key, message_id, thread_id, sender, subject,
-            score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved,
-            body_text=body, email_date=email_date,
-            time_to_draft_ms=time_to_draft_ms, **_extra,
-        )
-        db.commit()
-
-        # Record successful draft for system health score
-        try:
-            from backend.services.health import record_successful_draft
-            record_successful_draft(db)
-        except Exception:  # noqa: BLE001
-            pass
-
-        gmail_svc.apply_triage_label(token_row, message_id, 3, db=db, service=service)
-        gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
-        # Known brand: same sender already had a draft sent in this inbox
-        prior_sent = db.query(Draft).filter(
-            Draft.talent_key == talent_key,
-            Draft.sender == sender,
-            Draft.status == DraftStatus.sent,
-        ).first()
-        if prior_sent:
-            gmail_svc.apply_extra_label(token_row, message_id, "known_brand", db=db, service=service)
         if is_escalate:
-            gmail_svc.move_to_revisit(token_row, message_id, db=db, service=service)
-        status_label = "escalated" if is_escalate else "draft_saved"
-        _safe_log_sheet(
-            talent_key, sender, subject, score, brand_name, proposed_rate,
-            offer_type, status_label, escalate_reason or reason,
-        )
-        summary["drafted"] += 1
+            # ── Option B: GPT escalated or Gmail draft creation failed ──────────
+            # SOP Rule 10B: leave Gmail completely untouched — no labels, no inbox removal.
+            # Do NOT create a DB Draft row (avoids phantom unsendable drafts on the dashboard).
+            logger.info(
+                "Score 3 escalated for %s / %s (%s) — leaving in INBOX untouched (SOP Rule 10B)",
+                talent_key, message_id, escalate_reason,
+            )
+            _record_processed(
+                db, talent_key, message_id, thread_id, sender, subject,
+                score, brand_name, proposed_rate, offer_type,
+                escalate_reason or reason, EmailStatus.flagged,
+                body_text=body, email_date=email_date,
+                time_to_draft_ms=time_to_draft_ms, **_extra,
+            )
+            db.commit()
+            _safe_log_sheet(
+                talent_key, sender, subject, score, brand_name, proposed_rate,
+                offer_type, "escalated", escalate_reason or reason,
+            )
+            summary["flagged"] += 1
+
+        else:
+            # ── Option A: real Gmail draft created ──────────────────────────────
+            draft_row = Draft(
+                talent_key=talent_key,
+                gmail_message_id=message_id,
+                thread_id=thread_id,
+                sender=sender,
+                subject=subject,
+                brand_name=brand_name,
+                proposed_rate=proposed_rate,
+                offer_type=offer_type,
+                draft_text=draft_text,
+                cc_recipients=cc_str,
+                gmail_draft_id=gmail_draft_id,
+                message_id_header=message_id_header or None,
+                status=DraftStatus.pending,
+                is_escalate=False,
+                escalate_reason=None,
+            )
+            db.add(draft_row)
+            _record_processed(
+                db, talent_key, message_id, thread_id, sender, subject,
+                score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved,
+                body_text=body, email_date=email_date,
+                time_to_draft_ms=time_to_draft_ms, **_extra,
+            )
+            db.commit()
+
+            # Record successful draft for system health score
+            try:
+                from backend.services.health import record_successful_draft
+                record_successful_draft(db)
+            except Exception:  # noqa: BLE001
+                pass
+
+            # SOP Rule 10A: remove INBOX/UNREAD and apply "A Initial Response" label
+            gmail_svc.mark_initial_response_sent(token_row, message_id, db=db, service=service)
+            gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
+            # Known brand extra label (informational only — does not change INBOX state)
+            prior_sent = db.query(Draft).filter(
+                Draft.talent_key == talent_key,
+                Draft.sender == sender,
+                Draft.status == DraftStatus.sent,
+            ).first()
+            if prior_sent:
+                gmail_svc.apply_extra_label(token_row, message_id, "known_brand", db=db, service=service)
+            _safe_log_sheet(
+                talent_key, sender, subject, score, brand_name, proposed_rate,
+                offer_type, "draft_saved", reason,
+            )
+            summary["drafted"] += 1
 
     summary["processed"] += 1
 
