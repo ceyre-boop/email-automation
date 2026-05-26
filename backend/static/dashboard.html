@@ -888,6 +888,7 @@ body {
         </div>
         <div style="display:flex; gap:8px;">
           <button class="btn btn-ghost" onclick="loadMarco()" style="font-size:11px;">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="dismissAllMarco()" style="font-size:11px;">✕ Dismiss All</button>
           <button class="btn btn-primary" onclick="generateMarco()" id="btn-marco-gen" style="font-size:11px;">✦ Generate Now</button>
         </div>
       </div>
@@ -2356,6 +2357,17 @@ async function dismissMarco(id, btn) {
     }
   } catch(e) {
     showToast('Dismiss failed.');
+  }
+}
+
+async function dismissAllMarco() {
+  if (!confirm('Dismiss all Marco messages?')) return;
+  try {
+    const r = await api('POST', '/api/analytics/marco/dismiss-all');
+    showToast(`Dismissed ${r.dismissed} message${r.dismissed !== 1 ? 's' : ''}.`);
+    await loadMarco();
+  } catch(e) {
+    showToast('Dismiss all failed: ' + e.message);
   }
 }
 

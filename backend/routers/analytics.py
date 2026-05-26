@@ -431,6 +431,21 @@ def dismiss_marco_message(message_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@router.post("/marco/dismiss-all")
+def dismiss_all_marco_messages(category: str | None = None, db: Session = Depends(get_db)):
+    """Bulk-dismiss all undismissed Marco messages, optionally filtered by category."""
+    q = db.query(MarcoMessage).filter(MarcoMessage.dismissed == False)  # noqa: E712
+    if category:
+        q = q.filter(MarcoMessage.category == category)
+    rows = q.all()
+    now = datetime.utcnow()
+    for row in rows:
+        row.dismissed = True
+        row.dismissed_at = now
+    db.commit()
+    return {"ok": True, "dismissed": len(rows)}
+
+
 @router.post("/marco/generate")
 def generate_marco_messages(db: Session = Depends(get_db)):
     """Trigger GPT-4o to analyze system state and generate Marco narrative messages."""
