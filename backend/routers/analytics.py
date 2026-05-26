@@ -431,6 +431,56 @@ def dismiss_marco_message(message_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@router.get("/sop-audit")
+def sop_audit(db: Session = Depends(get_db)):
+    """Character-level verbatim compliance check of all pending, non-human-edited drafts against SOP."""
+    import json
+    import re
+    from pathlib import Path
+
+    sop_path = Path(__file__).parent.parent.parent / "sheets" / "sop_data.json"
+    sop_data = json.loads(sop_path.read_text())
+
+    drafts = (
+        db.query(Draft)
+        .filter(Draft.status == DraftStatus.pending, Draft.human_edited == False)  # noqa: E712
+        .all()
+    )
+
+    compliant, deviations = [], []
+    for d in drafts:
+        talent = sop_data.get(d.talent_key)
+        if not talent:
+            continue
+        rules = talent.get("rules", [])
+        rule = next((r for r in rules if r.get("offer_type") == d.offer_type), None)
+        if not rule:
+            rule = next((r for r in rules if r.get("is_default")), None)
+        if not rule:
+            continue
+
+        expected = rule["response"].strip().replace("\r\n", "\n")
+        actual = re.sub(r"^CC:.*\n", "", d.draft_text or "").strip().replace("\r\n", "\n")
+
+        entry = {"draft_id": d.id, "talent_key": d.talent_key, "subject": d.subject}
+        if actual == expected:
+            compliant.append(entry)
+        else:
+            deviations.append({
+                **entry,
+                "offer_type": d.offer_type,
+                "expected_preview": expected[:200],
+                "actual_preview": actual[:200],
+            })
+
+    return {
+        "compliant_count": len(compliant),
+        "deviation_count": len(deviations),
+        "compliant": compliant,
+        "deviations": deviations,
+    }
+
+
 @router.post("/marco/dismiss-all")
 def dismiss_all_marco_messages(category: str | None = None, db: Session = Depends(get_db)):
     """Bulk-dismiss all undismissed Marco messages, optionally filtered by category."""
