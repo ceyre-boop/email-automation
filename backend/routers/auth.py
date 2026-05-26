@@ -13,13 +13,13 @@ import secrets
 import unicodedata
 
 import requests
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import HTMLResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
-from backend.models.db import OAuthState, TalentToken
-from backend.routers.deps import get_db
+from backend.models.db import Draft, InboxEmail, OAuthState, PollHealth, ProcessedEmail, TalentToken
+from backend.routers.deps import get_db, verify_api_key
 from backend.services.oauth import build_authorization_url, exchange_code, reset_token_failure
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -250,6 +250,22 @@ def _success_page(name: str) -> str:
   </main>
 </body>
 </html>"""
+
+
+@router.post("/disconnect/{talent_key}", dependencies=[Depends(verify_api_key)])
+def disconnect_talent(talent_key: str, db: Session = Depends(get_db)):
+    """Remove a talent's Gmail connection and all associated records."""
+    token = db.query(TalentToken).filter(TalentToken.talent_key.ilike(talent_key)).first()
+    if not token:
+        raise HTTPException(status_code=404, detail="Talent not connected.")
+    db.query(ProcessedEmail).filter(ProcessedEmail.talent_key.ilike(talent_key)).delete(synchronize_session=False)
+    db.query(Draft).filter(Draft.talent_key.ilike(talent_key)).delete(synchronize_session=False)
+    db.query(InboxEmail).filter(InboxEmail.talent_key.ilike(talent_key)).delete(synchronize_session=False)
+    db.query(PollHealth).filter(PollHealth.talent_key.ilike(talent_key)).delete(synchronize_session=False)
+    db.delete(token)
+    db.commit()
+    logger.info("disconnect_talent: removed %s and all associated records", talent_key)
+    return {"ok": True, "removed": talent_key}
 
 
 def _error_page(error: str) -> str:

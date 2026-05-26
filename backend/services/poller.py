@@ -14,7 +14,7 @@ from __future__ import annotations
 import logging
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -177,6 +177,18 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
         if not token_row:
             logger.error("TalentToken not found for id=%s (key=%s)", token_row_id, talent_key)
             return {}
+
+        # Sweep ghost claim rows (score=0) older than 10 min — from crashed prior poll cycles
+        try:
+            db.query(ProcessedEmail).filter(
+                ProcessedEmail.talent_key == talent_key,
+                ProcessedEmail.score == 0,
+                ProcessedEmail.processed_at < datetime.utcnow() - timedelta(minutes=10),
+            ).delete(synchronize_session=False)
+            db.commit()
+        except Exception as _e:
+            logger.warning("Ghost cleanup failed for %s: %s", talent_key, _e)
+            db.rollback()
 
         talent_name = talent_cfg.get("full_name", talent_key)
         minimum_rate = talent_cfg.get("minimum_rate_usd", 0)

@@ -423,3 +423,12 @@ def create_tables():
             conn.commit()
         except Exception:
             pass
+        # Clean up ghost claim rows stuck at score=0 from crashed poll cycles
+        try:
+            conn.execute(text(
+                "DELETE FROM processed_emails WHERE score = 0 "
+                "AND processed_at < NOW() - INTERVAL '10 minutes'"
+            ))
+            conn.commit()
+        except Exception:
+            pass
