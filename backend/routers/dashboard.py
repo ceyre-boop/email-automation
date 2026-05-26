@@ -532,6 +532,14 @@ def send_all_for_talent(talent_key: str, db: Session = Depends(get_db)):
                 draft.status = DraftStatus.sent
                 draft.reviewed_at = datetime.utcnow()
                 db.add(draft)
+                if draft.gmail_message_id:
+                    gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
+                    pe = db.query(ProcessedEmail).filter(
+                        ProcessedEmail.gmail_message_id == draft.gmail_message_id
+                    ).first()
+                    if pe:
+                        pe.status = EmailStatus.sent
+                        db.add(pe)
                 sent_count += 1
             else:
                 failed_count += 1

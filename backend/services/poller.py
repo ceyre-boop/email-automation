@@ -344,7 +344,6 @@ def _process_message_in_thread(
 def _process_one_message(
     db: Session,
     token_row,
-    service,
     message_id: str,
     talent_key: str,
     talent_name: str,
@@ -352,6 +351,7 @@ def _process_one_message(
     draft_mode: bool,
     summary: dict,
     manager_name: str = "",
+    service=None,
 ):
     import time as _time
     from sqlalchemy.exc import IntegrityError
