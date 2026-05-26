@@ -674,6 +674,18 @@ body {
   padding: 16px 24px; border-top: 1px solid var(--border); flex-shrink: 0;
   display: flex; gap: 10px; justify-content: flex-end;
 }
+#loading-overlay {
+  display: none; position: fixed; inset: 0; z-index: 600;
+  background: rgba(0,0,0,0.45); backdrop-filter: blur(3px);
+  align-items: center; justify-content: center;
+}
+#loading-overlay.active { display: flex; }
+#loading-overlay-msg {
+  background: var(--surface, #111); border: 1px solid var(--border, #333);
+  border-radius: 12px; padding: 18px 32px;
+  font-size: 14px; font-weight: 600; color: var(--text, #f8fafc);
+  letter-spacing: 0.01em;
+}
 </style>
 </head>
 <body>
@@ -921,6 +933,9 @@ body {
 
 </main>
 
+<!-- Loading overlay -->
+<div id="loading-overlay"><div id="loading-overlay-msg">Working…</div></div>
+
 <!-- SOP Modal -->
 <div id="sop-modal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center;">
   <div id="sop-modal-overlay" onclick="closeSopModal()"
@@ -1110,6 +1125,15 @@ function showToast(msg) {
   _toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
 }
 
+// ── Loading overlay ────────────────────────────────────────────────────────
+function showOverlay(msg = 'Working…') {
+  document.getElementById('loading-overlay-msg').textContent = msg;
+  document.getElementById('loading-overlay').classList.add('active');
+}
+function hideOverlay() {
+  document.getElementById('loading-overlay').classList.remove('active');
+}
+
 // ── API key overlay ────────────────────────────────────────────────────────
 function showApiKeyOverlay() { document.getElementById('api-key-overlay').style.display = 'flex'; }
 function hideApiKeyOverlay() { document.getElementById('api-key-overlay').style.display = 'none'; }
@@ -1164,6 +1188,7 @@ async function bootstrap() {
 
 // ── Overview ───────────────────────────────────────────────────────────────
 async function loadOverview() {
+  showOverlay('Loading…');
   try {
     const [report, talents] = await Promise.all([
       api('GET', '/api/dashboard/report'),
@@ -1181,7 +1206,7 @@ async function loadOverview() {
     loadHealthScore().catch(() => {});
     loadAnalytics().catch(() => {});
     loadMarco().catch(() => {});
-  } catch (_) {}
+  } catch (_) {} finally { hideOverlay(); }
 }
 
 function showView(name) {
@@ -1283,13 +1308,14 @@ async function recoverFallbacks() {
 
 async function resetAllBadges() {
   if (!confirm('Reset all badge counts to zero?\n\nDrafts and emails are untouched — only the counters reset.')) return;
+  showOverlay('Resetting…');
   try {
     await api('POST', '/api/dashboard/reset-badges');
     await loadOverview();
     showToast('All badge counts reset to zero.');
   } catch (e) {
     showToast('Reset failed — ' + e.message);
-  }
+  } finally { hideOverlay(); }
 }
 
 async function purgeStaleDrafts() {
@@ -1301,7 +1327,7 @@ async function purgeStaleDrafts() {
   const btn = document.getElementById('btn-purge-stale');
   const orig = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Purging…';
+  showOverlay('Purging stale drafts…');
   try {
     const url = (days !== null && days.trim() !== '')
       ? `/api/dashboard/admin/drafts/purge-stale?days=${encodeURIComponent(days.trim())}`
@@ -1310,10 +1336,11 @@ async function purgeStaleDrafts() {
     showToast(`Purged ${r.deleted} stale draft(s). ${r.message}`);
     await loadReport();
   } catch(e) {
-    showToast('Purge failed: ' + (e.message || e), 'error');
+    showToast('Purge failed: ' + (e.message || e));
   } finally {
     btn.disabled = false;
     btn.textContent = orig;
+    hideOverlay();
   }
 }
 
@@ -1321,16 +1348,16 @@ async function sendAllForTalent(talentKey, btn) {
   if (!confirm(`Send ALL pending drafts for ${talentKey}? This cannot be undone.`)) return;
   const orig = btn.textContent;
   btn.disabled = true;
-  btn.textContent = 'Sending…';
+  showOverlay('Sending drafts…');
   try {
     const r = await api('POST', `/api/dashboard/talents/${talentKey}/send-all`);
     showToast(`Sent ${r.sent_count} draft(s) for ${talentKey}` + (r.failed_count > 0 ? ` (${r.failed_count} failed)` : ''));
     await loadReport();
   } catch(e) {
-    showToast('Send all failed: ' + (e.message || e), 'error');
+    showToast('Send all failed: ' + (e.message || e));
     btn.disabled = false;
     btn.textContent = orig;
-  }
+  } finally { hideOverlay(); }
 }
 
 async function resetTalentBadges(talentKey, btn) {
@@ -1467,9 +1494,12 @@ document.getElementById('nav-overview').addEventListener('click', async () => {
   await loadOverview();
 });
 document.getElementById('btn-refresh').addEventListener('click', async () => {
-  if (state.view === 'gmail' && state.selectedTalent) await loadTalentData(state.selectedTalent);
-  else await loadOverview();
-  showToast('Refreshed.');
+  showOverlay('Refreshing…');
+  try {
+    if (state.view === 'gmail' && state.selectedTalent) await loadTalentData(state.selectedTalent);
+    else await loadOverview();
+    showToast('Refreshed.');
+  } finally { hideOverlay(); }
 });
 const _gmailBack = document.getElementById('gmail-back');
 if (_gmailBack) _gmailBack.addEventListener('click', async () => {
@@ -2386,6 +2416,7 @@ async function dismissMarco(id, btn) {
 
 // ── Inbox Feed ─────────────────────────────────────────────────────────────
 async function loadEmailFeed() {
+  showOverlay('Loading inbox feed…');
   try {
     const rows = await api('GET', '/api/analytics/email-feed?hours=24&limit=100');
     const list = document.getElementById('email-feed-list');
@@ -2421,7 +2452,7 @@ async function loadEmailFeed() {
     }).join('');
   } catch(e) {
     showToast('Inbox Feed load failed: ' + e.message);
-  }
+  } finally { hideOverlay(); }
 }
 
 function checkFeedEmpty() {
@@ -2434,6 +2465,7 @@ async function feedSendDraft(draftId, btn) {
   const orig = btn.innerHTML;
   btn.innerHTML = '…';
   btn.disabled = true;
+  showOverlay('Sending draft…');
   try {
     await api('POST', `/api/drafts/${draftId}/approve`, { reviewed_by: 'inbox-feed' });
     showToast('Sent.');
@@ -2443,13 +2475,14 @@ async function feedSendDraft(draftId, btn) {
     showToast('Send failed: ' + e.message);
     btn.innerHTML = orig;
     btn.disabled = false;
-  }
+  } finally { hideOverlay(); }
 }
 
 async function feedCreateDraft(talentKey, gmailMessageId, btn) {
   const orig = btn.innerHTML;
   btn.innerHTML = '…';
   btn.disabled = true;
+  showOverlay('Creating draft…');
   try {
     await api('POST', `/api/dashboard/talents/${talentKey}/force-draft/${gmailMessageId}`);
     showToast('Draft queued — refreshing in a moment…');
@@ -2459,29 +2492,31 @@ async function feedCreateDraft(talentKey, gmailMessageId, btn) {
     showToast('Create failed: ' + e.message);
     btn.innerHTML = orig;
     btn.disabled = false;
-  }
+  } finally { hideOverlay(); }
 }
 
 async function retriageBackfill() {
   if (!confirm('Re-triage all Score-2 emails from the last 24h that have no "Re:" in subject? This will release them for re-processing on the next poll cycle.')) return;
+  showOverlay('Re-triaging emails…');
   try {
     const r = await api('POST', '/api/analytics/retriage-backfill');
     showToast(`Released ${r.released} email${r.released !== 1 ? 's' : ''} for re-triage.`);
     await loadEmailFeed();
   } catch(e) {
     showToast('Re-triage failed: ' + e.message);
-  }
+  } finally { hideOverlay(); }
 }
 
 async function dismissAllMarco() {
   if (!confirm('Dismiss all Marco messages?')) return;
+  showOverlay('Dismissing…');
   try {
     const r = await api('POST', '/api/analytics/marco/dismiss-all');
     showToast(`Dismissed ${r.dismissed} message${r.dismissed !== 1 ? 's' : ''}.`);
     await loadMarco();
   } catch(e) {
     showToast('Dismiss all failed: ' + e.message);
-  }
+  } finally { hideOverlay(); }
 }
 
 // ── Deploy watcher ─────────────────────────────────────────────────────────
