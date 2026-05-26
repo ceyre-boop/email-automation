@@ -2403,7 +2403,10 @@ async function loadEmailFeed() {
         <span style="color:var(--text-2); min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sender}</span>
         <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
         <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
-        <button class="btn btn-ghost" style="font-size:11px; padding:2px 8px; white-space:nowrap;" onclick="feedCreateDraft('${r.talent_key}','${r.gmail_message_id}',this)">Create</button>
+        ${r.draft_id
+          ? `<button class="btn btn-primary" style="font-size:11px; padding:2px 8px; white-space:nowrap;" onclick="feedSendDraft(${r.draft_id},this)">Send</button>`
+          : `<button class="btn btn-ghost" style="font-size:11px; padding:2px 8px; white-space:nowrap;" onclick="feedCreateDraft('${r.talent_key}','${r.gmail_message_id}',this)">Create</button>`
+        }
         <button style="background:none; border:none; color:var(--text-3); cursor:pointer; font-size:16px; line-height:1; padding:0 4px;" onclick="document.getElementById('feed-row-${r.gmail_message_id}').remove(); checkFeedEmpty();" title="Remove from list">&times;</button>
       </div>`;
     }).join('');
@@ -2415,6 +2418,23 @@ async function loadEmailFeed() {
 function checkFeedEmpty() {
   const list = document.getElementById('email-feed-list');
   if (!list.children.length) document.getElementById('email-feed-empty').style.display = '';
+}
+
+async function feedSendDraft(draftId, btn) {
+  if (!confirm('Send this draft now?')) return;
+  const orig = btn.innerHTML;
+  btn.innerHTML = '…';
+  btn.disabled = true;
+  try {
+    await api('POST', `/api/drafts/${draftId}/approve`, { reviewed_by: 'inbox-feed' });
+    showToast('Sent.');
+    btn.closest('div[id^="feed-row-"]').remove();
+    checkFeedEmpty();
+  } catch(e) {
+    showToast('Send failed: ' + e.message);
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
 }
 
 async function feedCreateDraft(talentKey, gmailMessageId, btn) {

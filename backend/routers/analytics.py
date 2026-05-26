@@ -467,6 +467,17 @@ def email_feed(hours: int = 24, limit: int = 100, db: Session = Depends(get_db))
         .limit(limit)
         .all()
     )
+    # Look up pending drafts for these emails in one query
+    message_ids = [r.gmail_message_id for r in rows if r.gmail_message_id]
+    draft_map: dict[str, int] = {}
+    if message_ids:
+        drafts = (
+            db.query(Draft.gmail_message_id, Draft.id)
+            .filter(Draft.gmail_message_id.in_(message_ids), Draft.status == DraftStatus.pending)
+            .all()
+        )
+        draft_map = {d.gmail_message_id: d.id for d in drafts}
+
     return [
         {
             "gmail_message_id": r.gmail_message_id,
@@ -477,6 +488,7 @@ def email_feed(hours: int = 24, limit: int = 100, db: Session = Depends(get_db))
             "triage_reason": r.triage_reason,
             "status": r.status if isinstance(r.status, str) else r.status.value,
             "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+            "draft_id": draft_map.get(r.gmail_message_id),
         }
         for r in rows
     ]
