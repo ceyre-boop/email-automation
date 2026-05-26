@@ -2398,8 +2398,11 @@ async function loadEmailFeed() {
       const reason = (r.triage_reason || '').slice(0, 90);
       const sender = (r.sender || '').replace(/<.*>/, '').trim().slice(0, 30);
       const subject = (r.subject || '(no subject)').slice(0, 50);
+      const talentObj = (state.talents || []).find(t => t.key === r.talent_key);
+      const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (r.talent_key || '?');
       return `<div id="feed-row-${r.gmail_message_id}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--surface-2,#1a1a1a); border-radius:8px; font-size:12px;">
         <span style="background:${color}22; color:${color}; font-weight:700; font-size:10px; padding:2px 7px; border-radius:99px; white-space:nowrap;">${label}</span>
+        <span style="background:var(--surface-3,#222); color:var(--text-2); font-size:10px; font-weight:600; padding:2px 7px; border-radius:99px; white-space:nowrap; min-width:60px; text-align:center;">${esc(talentLabel)}</span>
         <span style="color:var(--text-2); min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sender}</span>
         <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
         <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
