@@ -277,7 +277,20 @@ class GuardianWatchdog:
             self._send_guardian_alert(db, f"ALERT: {talent_key} paused — {reason}", talent_key, detail, cfg)
 
         elif t in ("talent_warn", "ratio_warn"):
+            # Cooldown: suppress repeated warn notifications for the same talent
+            warn_cooldown = cfg.get("warn_cooldown_minutes", 30)
+            warn_key = f"guardian_warn_sent_at_{talent_key or 'global'}"
+            last_warn_str = _get_state(db, warn_key)
+            if last_warn_str:
+                try:
+                    last_warn = datetime.fromisoformat(last_warn_str)
+                    if (datetime.utcnow() - last_warn).total_seconds() < warn_cooldown * 60:
+                        logger.info("Guardian: warn suppressed for %s (cooldown active)", talent_key)
+                        continue
+                except ValueError:
+                    pass
             _log_marco(db, f"GUARDIAN WARNING: {reason}", talent_key=talent_key, severity="warning")
+            _set_state(db, warn_key, datetime.utcnow().isoformat())
 
     # ── Remediation ───────────────────────────────────────────────────────────
 
