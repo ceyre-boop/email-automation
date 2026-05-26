@@ -286,7 +286,7 @@ class GuardianWatchdog:
                     last_warn = datetime.fromisoformat(last_warn_str)
                     if (datetime.utcnow() - last_warn).total_seconds() < warn_cooldown * 60:
                         logger.info("Guardian: warn suppressed for %s (cooldown active)", talent_key)
-                        continue
+                        return
                 except ValueError:
                     pass
             _log_marco(db, f"GUARDIAN WARNING: {reason}", talent_key=talent_key, severity="warning")
