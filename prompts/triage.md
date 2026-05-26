@@ -13,21 +13,18 @@ Your job is to score each inbound email 1, 2, or 3. You must follow the TABOOST 
 
 ### ELIGIBILITY GATE — Run this check FIRST. If it fails, stop immediately.
 
-Before scoring, answer both questions:
+This workflow is for INITIAL inbound emails only. Emails already in an ongoing thread must not receive an auto-reply.
 
-1. Is this email currently in the INBOX? (Assume yes — it was fetched from INBOX.)
-2. Is this a NEW, INITIAL inbound email? Or is it a reply, follow-up, ongoing negotiation, counter-offer, or continuation of a prior conversation?
+**Default assumption: the email IS initial inbound.** Treat it as a new initial inbound unless the one hard rule below is met. When in doubt, treat as initial — missing a real opportunity is worse than sending an extra reply.
 
-**If the email is NOT a new initial inbound email → score it 2 immediately. Do not evaluate further. Do not score it 3 regardless of content.**
+**Only score it 2 for follow-up/thread reasons if:**
+- Subject line explicitly starts with "Re:" or "RE:"
 
-Signs an email is NOT initial inbound:
-- Subject line starts with "Re:" or "RE:" or "Fwd:" referencing a prior exchange
-- Body references a previous conversation, prior email, or earlier offer
-- Email is clearly a follow-up, check-in, negotiation counter, or response to something already sent
-- Body contains quoted/replied text from prior messages
-- Sender references something discussed before
+That is the only permitted signal for this gate. Do NOT use body content to infer follow-up intent. Body phrases like "following up," "as I mentioned," "per our conversation," "hope you're well," quoted text, or anything else in the body are NOT sufficient to classify an email as a follow-up. If the subject does not start with "Re:", treat the email as a new initial inbound regardless of what the body says.
 
-This gate is absolute. An ongoing-thread email can never be Score 3. Missing a follow-up is always better than auto-replying to an active negotiation.
+The Python system already handles real Gmail thread detection before this prompt runs. Your job here is only to catch the explicit Re: subject case.
+
+If the email IS clearly a reply (Re: subject) → score it 2 immediately. Otherwise proceed to scoring.
 
 ---
 

@@ -431,6 +431,57 @@ def dismiss_marco_message(message_id: int, db: Session = Depends(get_db)):
     return {"ok": True}
 
 
+@router.post("/retriage-backfill")
+def retriage_backfill(db: Session = Depends(get_db)):
+    """Release false-positive Score-2 records (no Re: subject, not a real thread) so next poll re-triages them."""
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    rows = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.score == 2,
+            ProcessedEmail.processed_at >= cutoff,
+            ProcessedEmail.triage_reason.notlike("Ongoing thread%"),
+            ProcessedEmail.subject.notlike("Re:%"),
+            ProcessedEmail.subject.notlike("RE:%"),
+        )
+        .all()
+    )
+    count = len(rows)
+    for row in rows:
+        db.delete(row)
+    db.commit()
+    logger.info("retriage-backfill: released %d false-positive Score-2 records", count)
+    return {"ok": True, "released": count}
+
+
+@router.get("/email-feed")
+def email_feed(hours: int = 24, limit: int = 100, db: Session = Depends(get_db)):
+    """Recent processed emails regardless of score — for the Inbox Feed dashboard panel."""
+    from datetime import timedelta
+    cutoff = datetime.utcnow() - timedelta(hours=hours)
+    rows = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.processed_at >= cutoff)
+        .order_by(ProcessedEmail.processed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "gmail_message_id": r.gmail_message_id,
+            "talent_key": r.talent_key,
+            "sender": r.sender,
+            "subject": r.subject,
+            "score": r.score,
+            "triage_reason": r.triage_reason,
+            "status": r.status if isinstance(r.status, str) else r.status.value,
+            "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+        }
+        for r in rows
+    ]
+
+
 @router.get("/sop-audit")
 def sop_audit(db: Session = Depends(get_db)):
     """Character-level verbatim compliance check of all pending, non-human-edited drafts against SOP."""

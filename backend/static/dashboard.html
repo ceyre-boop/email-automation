@@ -899,6 +899,22 @@ body {
     </div>
   </div>
 
+  <!-- ── Inbox Feed ───────────────────────────────────────────────────────── -->
+  <div style="background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:20px; margin:16px;">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+      <div>
+        <div style="font-size:18px; font-weight:800; letter-spacing:-0.01em;">Inbox Feed</div>
+        <div style="font-size:11px; color:var(--text-3); margin-top:2px;">All processed emails · last 24h · manual override available</div>
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost" onclick="loadEmailFeed()" style="font-size:11px;">↻ Refresh</button>
+        <button class="btn btn-ghost" onclick="retriageBackfill()" style="font-size:11px; border-color:rgba(251,191,36,0.5); color:#f59e0b;">⟳ Re-triage Score 2</button>
+      </div>
+    </div>
+    <div id="email-feed-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+    <div id="email-feed-empty" style="display:none; text-align:center; padding:32px 0; color:var(--text-3); font-size:13px;">No emails processed in the last 24 hours.</div>
+  </div>
+
 </main>
 
 <!-- SOP Modal -->
@@ -1161,6 +1177,7 @@ async function loadOverview() {
     loadHealthScore().catch(() => {});
     loadAnalytics().catch(() => {});
     loadMarco().catch(() => {});
+    loadEmailFeed().catch(() => {});
   } catch (_) {}
 }
 
@@ -2357,6 +2374,71 @@ async function dismissMarco(id, btn) {
     }
   } catch(e) {
     showToast('Dismiss failed.');
+  }
+}
+
+// ── Inbox Feed ─────────────────────────────────────────────────────────────
+async function loadEmailFeed() {
+  try {
+    const rows = await api('GET', '/api/analytics/email-feed?hours=24&limit=100');
+    const list = document.getElementById('email-feed-list');
+    const empty = document.getElementById('email-feed-empty');
+    if (!rows || !rows.length) {
+      list.innerHTML = '';
+      empty.style.display = '';
+      return;
+    }
+    empty.style.display = 'none';
+    const scoreColor = { 1: '#ef4444', 2: '#f59e0b', 3: '#22c55e' };
+    const scoreLabel = { 1: 'Spam', 2: 'Review', 3: 'Draft' };
+    list.innerHTML = rows.map(r => {
+      const color = scoreColor[r.score] || '#6b7280';
+      const label = scoreLabel[r.score] || String(r.score);
+      const reason = (r.triage_reason || '').slice(0, 90);
+      const sender = (r.sender || '').replace(/<.*>/, '').trim().slice(0, 30);
+      const subject = (r.subject || '(no subject)').slice(0, 50);
+      return `<div id="feed-row-${r.gmail_message_id}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--surface-2,#1a1a1a); border-radius:8px; font-size:12px;">
+        <span style="background:${color}22; color:${color}; font-weight:700; font-size:10px; padding:2px 7px; border-radius:99px; white-space:nowrap;">${label}</span>
+        <span style="color:var(--text-2); min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sender}</span>
+        <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
+        <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
+        <button class="btn btn-ghost" style="font-size:11px; padding:2px 8px; white-space:nowrap;" onclick="feedCreateDraft('${r.talent_key}','${r.gmail_message_id}',this)">Create</button>
+        <button style="background:none; border:none; color:var(--text-3); cursor:pointer; font-size:16px; line-height:1; padding:0 4px;" onclick="document.getElementById('feed-row-${r.gmail_message_id}').remove(); checkFeedEmpty();" title="Remove from list">&times;</button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    showToast('Inbox Feed load failed: ' + e.message);
+  }
+}
+
+function checkFeedEmpty() {
+  const list = document.getElementById('email-feed-list');
+  if (!list.children.length) document.getElementById('email-feed-empty').style.display = '';
+}
+
+async function feedCreateDraft(talentKey, gmailMessageId, btn) {
+  const orig = btn.innerHTML;
+  btn.innerHTML = '…';
+  btn.disabled = true;
+  try {
+    await api('POST', `/api/dashboard/talents/${talentKey}/force-draft/${gmailMessageId}`);
+    showToast('Draft queued — check draft queue in ~20s.');
+    btn.innerHTML = '✓ Queued';
+  } catch(e) {
+    showToast('Create failed: ' + e.message);
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
+}
+
+async function retriageBackfill() {
+  if (!confirm('Re-triage all Score-2 emails from the last 24h that have no "Re:" in subject? This will release them for re-processing on the next poll cycle.')) return;
+  try {
+    const r = await api('POST', '/api/analytics/retriage-backfill');
+    showToast(`Released ${r.released} email${r.released !== 1 ? 's' : ''} for re-triage.`);
+    await loadEmailFeed();
+  } catch(e) {
+    showToast('Re-triage failed: ' + e.message);
   }
 }
 
