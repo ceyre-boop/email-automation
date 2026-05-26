@@ -474,17 +474,6 @@ def _process_one_message(
     score = triage_result["score"]
     reason = triage_result["reason"]
 
-    # Hard enforcement: GPT may only assign Score 2 via the eligibility gate if the
-    # subject starts with "Re:". The pre-triage thread guard already handles DB/Gmail
-    # thread matches. Any content-based Score 2 from GPT without "Re:" is overridden.
-    if score == 2 and not subject.lower().startswith("re:"):
-        logger.info(
-            "TRIAGE OVERRIDE %s/%s: score 2→3 (no Re: in subject '%s', gpt reason: %s)",
-            talent_key, message_id, subject, reason,
-        )
-        reason = f"[Auto-upgraded 2→3: no Re: in subject] {reason}"
-        score = 3
-
     offer_type = triage_result["offer_type"]
     proposed_rate = triage_result["proposed_rate_usd"]
     brand_name = triage_result["brand_name"]
