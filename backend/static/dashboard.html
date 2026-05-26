@@ -2221,8 +2221,16 @@ async function loadAnalytics() {
 
     // Talent health — dots style: deals / review / spam / risk
     const th = document.getElementById('analytics-talent-health');
+    const pendingByKey = {};
+    (state.report?.talents || []).forEach(c => {
+      pendingByKey[c.talent_key.toLowerCase()] = c.pending_drafts ?? 0;
+    });
     th.innerHTML = (talent || []).filter(t => t.total_emails > 0).map(t => {
       const riskColor = t.avg_risk_score >= 5 ? 'var(--red)' : t.avg_risk_score >= 3 ? 'var(--amber)' : 'var(--text-3)';
+      const pending = pendingByKey[t.talent_key.toLowerCase()] || 0;
+      const sendAllBtn = pending > 0
+        ? `<button onclick="sendAllForTalent('${esc(t.talent_key)}', this)" style="margin-top:8px; width:100%; padding:5px 0; font-size:11px; font-weight:600; background:var(--green); color:#fff; border:none; border-radius:6px; cursor:pointer;">▶ Send All (${pending})</button>`
+        : '';
       return `<div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 14px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
           <span style="font-size:13px; font-weight:600;">${esc(t.full_name)}</span>
@@ -2234,6 +2242,7 @@ async function loadAnalytics() {
           <span style="color:var(--red);">● ${t.score1_spam} spam</span>
           <span style="color:${riskColor};">⚡ risk ${t.avg_risk_score}</span>
         </div>
+        ${sendAllBtn}
       </div>`;
     }).join('') || '<div style="color:var(--text-3); font-size:12px; padding:12px 0;">No data yet.</div>';
 
