@@ -207,6 +207,45 @@ def list_orphaned_emails(
     ]
 
 
+@router.post("/orphaned/trash-all")
+def trash_all_orphaned(
+    talent_key: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Trash all orphaned score-3 emails in Gmail and mark them archived in DB."""
+    from backend.models.db import ProcessedEmail
+    from sqlalchemy import select
+
+    drafted_subq = select(Draft.gmail_message_id)
+    q = db.query(ProcessedEmail).filter(
+        ProcessedEmail.score == 3,
+        ProcessedEmail.status != "archived",
+        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+    )
+    if talent_key:
+        q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
+    rows = q.all()
+
+    trashed = 0
+    failed = 0
+    for row in rows:
+        try:
+            token_row = db.query(TalentToken).filter(
+                TalentToken.talent_key.ilike(row.talent_key)
+            ).first()
+            if token_row:
+                service = gmail_svc.build_service(token_row, db=db)
+                service.users().messages().trash(userId="me", id=row.gmail_message_id).execute()
+            row.status = "archived"
+            trashed += 1
+        except Exception as e:
+            logger.warning("trash_all_orphaned: failed to trash %s: %s", row.gmail_message_id, e)
+            row.status = "archived"  # mark archived in DB even if Gmail call failed
+            failed += 1
+    db.commit()
+    return {"ok": True, "trashed": trashed, "failed": failed}
+
+
 @router.post("/orphaned/{gmail_message_id}/regenerate")
 def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
     """Force-regenerate a draft for an orphaned score-3 email."""

@@ -870,7 +870,10 @@ body {
           <span id="orphaned-count" style="background:var(--red-dim); color:var(--red); border:1px solid var(--red-line); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
           <span style="font-size:11px; color:var(--text-3);">Score 3 emails with no draft — click Regenerate to recover</span>
         </div>
-        <button class="btn btn-ghost" onclick="loadOrphaned()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" onclick="loadOrphaned()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+          <button id="trash-all-btn" class="btn" onclick="trashAllOrphaned(this)" style="font-size:11px; padding:4px 10px; background:var(--red); color:#fff; border:none;">🗑 Trash All</button>
+        </div>
       </div>
       <div id="orphaned-list" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
@@ -2023,6 +2026,24 @@ async function loadOrphaned() {
     ).join('');
   } catch(e) {
     document.getElementById('orphaned-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load: ${esc(e.message)}</div>`;
+  }
+}
+
+async function trashAllOrphaned(btn) {
+  const count = parseInt(document.getElementById('orphaned-count').textContent) || 0;
+  if (!count) { showToast('No lost drafts to trash'); return; }
+  if (!confirm(`Trash all ${count} lost draft email(s)? This cannot be undone.`)) return;
+  btn.disabled = true;
+  btn.textContent = 'Trashing…';
+  try {
+    const r = await api('POST', '/api/drafts/orphaned/trash-all');
+    showToast(`Trashed ${r.trashed} email(s)${r.failed ? ` (${r.failed} failed)` : ''}`);
+    await loadOrphaned();
+  } catch(e) {
+    showToast('Trash all failed: ' + (e.message || e), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '🗑 Trash All';
   }
 }
 
