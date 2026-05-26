@@ -246,6 +246,36 @@ def trash_all_orphaned(
     return {"ok": True, "trashed": trashed, "failed": failed}
 
 
+@router.post("/orphaned/regenerate-all")
+def regenerate_all_orphaned(
+    talent_key: Optional[str] = Query(None),
+    db: Session = Depends(get_db),
+):
+    """Bulk-regenerate drafts for all orphaned Score-3 emails with no draft. Clears any stale Draft record so the draft-queue worker recreates it within 20 seconds."""
+    from backend.models.db import ProcessedEmail
+    from sqlalchemy import select
+
+    drafted_subq = select(Draft.gmail_message_id)
+    q = db.query(ProcessedEmail).filter(
+        ProcessedEmail.score == 3,
+        ProcessedEmail.status != "archived",
+        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+    )
+    if talent_key:
+        q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
+    orphans = q.all()
+
+    queued = 0
+    for pe in orphans:
+        existing = db.query(Draft).filter(Draft.gmail_message_id == pe.gmail_message_id).first()
+        if existing:
+            db.delete(existing)
+        queued += 1
+
+    db.commit()
+    return {"ok": True, "queued": queued, "message": f"{queued} orphaned draft(s) cleared — will regenerate within 20 seconds."}
+
+
 @router.post("/orphaned/{gmail_message_id}/regenerate")
 def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
     """Force-regenerate a draft for an orphaned score-3 email."""
@@ -313,7 +343,6 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
 
     if draft.gmail_message_id:
         gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
-        gmail_svc.apply_extra_label(token, draft.gmail_message_id, "draft_sent", db=db)
 
     # Delete the Gmail draft copy (sent from the Sent folder now)
     if draft.gmail_draft_id:

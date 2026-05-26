@@ -500,9 +500,8 @@ def _process_one_message(
             "SPAM: %s / %s from %s — reason: %s",
             talent_key, message_id, sender, reason,
         )
-        # SOP Rule 10C: remove from INBOX, apply Spam label — no Revisit label
-        gmail_svc.archive_message(token_row, message_id, db=db, service=service)
-        gmail_svc.apply_triage_label(token_row, message_id, 1, db=db, service=service)
+        # SOP Rule 10C: atomic — INBOX removal + Spam label in one API call
+        gmail_svc.archive_as_spam(token_row, message_id, db=db, service=service)
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
@@ -684,14 +683,6 @@ def _process_one_message(
             # SOP Rule 10A: remove INBOX/UNREAD and apply "A Initial Response" label
             gmail_svc.mark_initial_response_sent(token_row, message_id, db=db, service=service)
             gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
-            # Known brand extra label (informational only — does not change INBOX state)
-            prior_sent = db.query(Draft).filter(
-                Draft.talent_key == talent_key,
-                Draft.sender == sender,
-                Draft.status == DraftStatus.sent,
-            ).first()
-            if prior_sent:
-                gmail_svc.apply_extra_label(token_row, message_id, "known_brand", db=db, service=service)
             _safe_log_sheet(
                 talent_key, sender, subject, score, brand_name, proposed_rate,
                 offer_type, "draft_saved", reason,

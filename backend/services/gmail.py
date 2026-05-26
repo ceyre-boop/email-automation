@@ -472,7 +472,10 @@ def mark_as_read(token_row, message_id: str, db=None, service=None) -> bool:
 
 
 def _get_or_create_custom_label(service, label_name: str, *, background_color: str, text_color: str) -> str | None:
-    """Return a Gmail user-label ID, creating it if needed."""
+    """Return a Gmail user-label ID, creating it if needed. Only whitelisted labels are permitted."""
+    if label_name not in _ALLOWED_LABELS:
+        logger.warning("LABEL GUARD: rejected unauthorized label '%s' — only %s are permitted", label_name, sorted(_ALLOWED_LABELS))
+        return None
     try:
         existing = service.users().labels().list(userId="me").execute()
         for lbl in existing.get("labels", []):
@@ -496,27 +499,25 @@ def _get_or_create_custom_label(service, label_name: str, *, background_color: s
         return None
 
 
-def move_to_revisit(token_row, message_id: str, db=None, service=None) -> bool:
+def archive_as_spam(token_row, message_id: str, db=None, service=None) -> bool:
     """
-    Remove INBOX/UNREAD and add the Revisit label.
-    Used for ignore / human-review states that should leave the inbox but not be trashed.
+    Atomic Option C: remove INBOX/UNREAD and apply Spam label in a single API call.
+    Raises RuntimeError if the Spam label cannot be created — never archives without labeling.
     """
     if service is None:
         service = _gmail_service(token_row, db)
-    label_id = _get_or_create_custom_label(
-        service,
-        "Revisit",
-        background_color="#fbbc04",
-        text_color="#202124",
-    )
+    label_id = _get_or_create_label(service, "Spam", "#e8eaed", "#202124")
+    if not label_id:
+        raise RuntimeError(f"Could not obtain Spam label ID for {token_row.talent_key}/{message_id} — refusing to archive without label")
     try:
-        body: dict[str, list[str]] = {"removeLabelIds": ["INBOX", "UNREAD"]}
-        if label_id:
-            body["addLabelIds"] = [label_id]
-        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+        service.users().messages().modify(
+            userId="me",
+            id=message_id,
+            body={"removeLabelIds": ["INBOX", "UNREAD"], "addLabelIds": [label_id]},
+        ).execute()
         return True
     except HttpError as exc:
-        logger.error("Move-to-Revisit failed for %s / %s: %s", token_row.talent_key, message_id, exc)
+        logger.error("archive_as_spam failed for %s / %s: %s", token_row.talent_key, message_id, exc)
         return False
 
 
@@ -673,19 +674,14 @@ def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
 
 # ── Triage labels ─────────────────────────────────────────────────────────────
 
+# Only these two labels may ever be applied. All other label operations are rejected.
+_ALLOWED_LABELS: frozenset[str] = frozenset({"A Initial Response", "Spam"})
+
 _TRIAGE_LABEL_CFG = {
-    1: {"name": "Spam",               "backgroundColor": "#e8eaed", "textColor": "#202124"},
-    2: {"name": "Revisit",            "backgroundColor": "#f4511e", "textColor": "#ffffff"},
-    3: {"name": "A Initial Response", "backgroundColor": "#16a765", "textColor": "#ffffff"},
+    1: {"name": "Spam", "backgroundColor": "#e8eaed", "textColor": "#202124"},
 }
 
-# Extra labels applied at specific lifecycle events
-_EXTRA_LABEL_CFG = {
-    "auto_archived":       {"name": "Auto-Archived",           "backgroundColor": "#b9b9b9", "textColor": "#202124"},
-    "rate_negotiation":    {"name": "Needs Rate Negotiation",  "backgroundColor": "#ffad47", "textColor": "#202124"},
-    "known_brand":         {"name": "Known Brand",             "backgroundColor": "#4986e7", "textColor": "#ffffff"},
-    "draft_sent":          {"name": "Draft Sent",              "backgroundColor": "#16a765", "textColor": "#ffffff"},
-}
+_EXTRA_LABEL_CFG: dict = {}
 
 # Manager-review label colours — one per manager name
 _MANAGER_LABEL_COLORS = {
@@ -698,7 +694,10 @@ _MANAGER_LABEL_DEFAULT_COLOR = {"backgroundColor": "#e8eaed", "textColor": "#202
 
 
 def _get_or_create_label(service, name: str, bg: str, fg: str) -> str | None:
-    """Return (creating if needed) a Gmail label ID by exact name."""
+    """Return (creating if needed) a Gmail label ID by exact name. Only whitelisted labels are permitted."""
+    if name not in _ALLOWED_LABELS:
+        logger.warning("LABEL GUARD: rejected unauthorized label '%s' — only %s are permitted", name, sorted(_ALLOWED_LABELS))
+        return None
     try:
         existing = service.users().labels().list(userId="me").execute()
         for lbl in existing.get("labels", []):
@@ -747,7 +746,7 @@ def apply_triage_label(token_row, message_id: str, score: int, db=None, service=
 
 
 def apply_extra_label(token_row, message_id: str, label_key: str, db=None, service=None) -> None:
-    """Apply a named lifecycle label (auto_archived, rate_negotiation, known_brand, draft_sent). Non-fatal."""
+    """Apply a named lifecycle label. Non-fatal. No-op if label_key not in _EXTRA_LABEL_CFG or not in _ALLOWED_LABELS."""
     try:
         cfg = _EXTRA_LABEL_CFG.get(label_key)
         if not cfg:
