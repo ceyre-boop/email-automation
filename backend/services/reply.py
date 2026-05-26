@@ -480,12 +480,54 @@ def draft_reply(
         return _escalate_result(reason)
 
     cc, text = _extract_cc_from_draft(text)
+
+    # Post-generation quality gate — catches empty drafts, unfilled placeholders,
+    # and SOP structural leakage before the draft reaches Gmail.
+    validation_error = validate_draft_text(text, brand_name=brand_name)
+    if validation_error:
+        logger.warning("Reply validation failed for %s: %s", talent_key, validation_error)
+        return _escalate_result(f"Draft failed quality check: {validation_error}")
+
     return {
         "draft_text": text,
         "is_escalate": False,
         "escalate_reason": None,
         "cc_recipients": cc,
     }
+
+
+def validate_draft_text(draft_text: str, brand_name: str | None = None) -> str | None:
+    """
+    Returns an error reason string if the draft fails quality checks, else None.
+    Catches: empty drafts, unfilled SOP placeholders, and SOP meta-structure leaking
+    into the output (which means the AI returned the template instead of filling it).
+    """
+    if not draft_text or not draft_text.strip():
+        return "Draft is empty"
+
+    # Unfilled double-brace placeholders from the prompt template
+    import re
+    if re.search(r"\{\{[A-Z_]+\}\}", draft_text):
+        return "Draft contains unfilled prompt placeholders"
+
+    # Known brand name not substituted — catches "[Brand Name]" when we know the brand
+    if brand_name and "[Brand Name]" in draft_text:
+        return f"Draft contains literal [Brand Name] placeholder; known brand is '{brand_name}'"
+
+    # SOP structural markers leaked into output — AI returned template content verbatim
+    sop_leakage_markers = [
+        "Trigger / Scenario",
+        "Response / Action",
+        "## SYSTEM PROMPT",
+        "## USER PROMPT TEMPLATE",
+        "STEP 1 —",
+        "STEP 2 —",
+    ]
+    for marker in sop_leakage_markers:
+        if marker in draft_text:
+            return f"Draft contains SOP structural marker: '{marker}' — AI returned template instead of filling it"
+
+    return None
 
 
 def _escalate_result(reason: str) -> dict:

@@ -2099,6 +2099,103 @@ def purge_duplicate_drafts(
     }
 
 
+@router.post("/admin/drafts/purge-stale")
+def purge_stale_drafts(
+    days: int | None = None,
+    db: Session = Depends(get_db),
+    _: str = Depends(verify_api_key),
+):
+    """
+    Purge phantom Draft DB rows whose gmail_draft_id no longer exists in Gmail.
+    Pass ?days=N to hard-delete all pending drafts older than N days without
+    Gmail validation (faster path for known-stale batches).
+    """
+    from backend.services import gmail as gmail_svc
+
+    pending = db.query(Draft).filter(
+        Draft.status == DraftStatus.pending,
+        Draft.is_escalate == False,  # noqa: E712
+    ).all()
+
+    if not pending:
+        return {"checked": 0, "deleted": 0, "message": "No pending drafts to check"}
+
+    deleted = 0
+    errors = 0
+
+    if days is not None:
+        # Hard delete by age — no Gmail validation needed
+        cutoff = datetime.utcnow() - timedelta(days=days)
+        stale = [d for d in pending if d.created_at and d.created_at < cutoff]
+        for draft in stale:
+            try:
+                db.delete(draft)
+                deleted += 1
+            except Exception as exc:
+                logger.warning("purge-stale: delete failed for draft %s: %s", draft.id, exc)
+                errors += 1
+        db.commit()
+        return {
+            "checked": len(pending),
+            "stale_by_age": len(stale),
+            "deleted": deleted,
+            "errors": errors,
+            "message": f"Deleted {deleted} drafts older than {days} days",
+        }
+
+    # Gmail validation path — check each draft_id against Gmail API
+    # Group by talent to reuse the same Gmail service per talent
+    from collections import defaultdict
+    by_talent: dict[str, list] = defaultdict(list)
+    for d in pending:
+        by_talent[d.talent_key].append(d)
+
+    tokens = {
+        t.talent_key: t
+        for t in db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+    }
+
+    phantom_count = 0
+    for talent_key, drafts in by_talent.items():
+        token = tokens.get(talent_key)
+        if not token:
+            logger.warning("purge-stale: no active token for %s — skipping", talent_key)
+            continue
+        service = gmail_svc.build_service(token, db)
+        for draft in drafts:
+            if not draft.gmail_draft_id:
+                # No gmail_draft_id stored — treat as phantom
+                try:
+                    db.delete(draft)
+                    deleted += 1
+                    phantom_count += 1
+                except Exception as exc:
+                    logger.warning("purge-stale: delete failed for draft %s: %s", draft.id, exc)
+                    errors += 1
+                continue
+            try:
+                service.users().drafts().get(userId="me", id=draft.gmail_draft_id).execute()
+                # Draft exists in Gmail — keep it
+            except Exception:
+                # 404 or other error — draft no longer in Gmail
+                try:
+                    db.delete(draft)
+                    deleted += 1
+                    phantom_count += 1
+                except Exception as exc:
+                    logger.warning("purge-stale: delete failed for draft %s: %s", draft.id, exc)
+                    errors += 1
+
+    db.commit()
+    return {
+        "checked": len(pending),
+        "phantom_found": phantom_count,
+        "deleted": deleted,
+        "errors": errors,
+        "message": f"Deleted {deleted} phantom drafts not found in Gmail",
+    }
+
+
 @router.post("/clear-all-inboxes")
 def clear_all_inboxes(
     db: Session = Depends(get_db),

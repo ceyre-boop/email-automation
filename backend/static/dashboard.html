@@ -816,6 +816,7 @@ body {
           <button class="btn btn-primary" id="btn-blast" onclick="blastBacklog()" style="width:100%; justify-content:center; font-size:11px; background:var(--green); margin-bottom:6px;">🚀 Blast Backlog Now</button>
           <button class="btn btn-ghost" id="btn-recover" onclick="recoverFallbacks()" style="width:100%; justify-content:center; font-size:11px; border-color:rgba(255,179,0,0.4); color:var(--amber);">⚡ Re-triage Failed Emails</button>
           <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; font-size:11px;">↺ Reset Badge Counts</button>
+          <button class="btn btn-ghost" id="btn-purge-stale" onclick="purgeStaleDrafts()" style="width:100%; justify-content:center; font-size:11px; border-color:rgba(239,68,68,0.4); color:#ef4444;">🗑 Purge Stale Drafts</button>
         </div>
       </div>
     </div>
@@ -1264,6 +1265,31 @@ async function resetAllBadges() {
     showToast('All badge counts reset to zero.');
   } catch (e) {
     showToast('Reset failed — ' + e.message);
+  }
+}
+
+async function purgeStaleDrafts() {
+  const days = prompt('Hard-delete pending drafts older than N days (leave blank to validate against Gmail instead):', '');
+  const msg = days !== null && days.trim() !== ''
+    ? `Delete all pending drafts older than ${days} days? This cannot be undone.`
+    : 'Check all pending drafts against Gmail and delete any that no longer exist there?';
+  if (!confirm(msg)) return;
+  const btn = document.getElementById('btn-purge-stale');
+  const orig = btn.textContent;
+  btn.disabled = true;
+  btn.textContent = 'Purging…';
+  try {
+    const url = (days !== null && days.trim() !== '')
+      ? `/api/dashboard/admin/drafts/purge-stale?days=${encodeURIComponent(days.trim())}`
+      : '/api/dashboard/admin/drafts/purge-stale';
+    const r = await api('POST', url);
+    showToast(`Purged ${r.deleted} stale draft(s). ${r.message}`);
+    await loadReport();
+  } catch(e) {
+    showToast('Purge failed: ' + (e.message || e), 'error');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = orig;
   }
 }
 

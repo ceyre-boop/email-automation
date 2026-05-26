@@ -270,6 +270,38 @@ class GuardianWatchdog:
             self._send_guardian_alert(db, f"ALERT: Global AI kill triggered — {reason}", None, detail, cfg)
 
         elif t == "talent_pause":
+            # Idempotency: if talent is already paused, skip entirely.
+            # Without this, the guardian fires _log_marco every 60s indefinitely
+            # because the velocity window still shows the breach after pause.
+            try:
+                cfg_data = json.loads(_CONFIG_PATH.read_text())
+                already_paused = next(
+                    (bool(t_cfg.get("paused")) for t_cfg in cfg_data.get("talents", [])
+                     if t_cfg.get("key", "").lower() == (talent_key or "").lower()),
+                    False,
+                )
+                if already_paused:
+                    logger.info("Guardian: %s already paused — skipping re-dispatch", talent_key)
+                    return
+            except Exception as exc:
+                logger.warning("Guardian: could not check pause state for %s: %s", talent_key, exc)
+
+            # Per-talent pause cooldown — defense-in-depth for the race window
+            # between settings.json write and the next guardian cycle read.
+            pause_key = f"guardian_pause_sent_at_{talent_key or 'global'}"
+            last_pause_str = _get_state(db, pause_key)
+            if last_pause_str:
+                try:
+                    last_pause = datetime.fromisoformat(last_pause_str)
+                    if (datetime.utcnow() - last_pause).total_seconds() < cfg.get("alert_cooldown_minutes", 30) * 60:
+                        logger.info("Guardian: pause cooldown active for %s — skipping", talent_key)
+                        return
+                except ValueError:
+                    pass
+            # Set cooldown key BEFORE the pause action — if _pause_talent fails
+            # (settings write error), the cooldown still prevents 60s re-fire loops.
+            _set_state(db, pause_key, datetime.utcnow().isoformat())
+
             self._pause_talent(talent_key, reason)
             _log_audit(db, "pause_talent", reason=reason, talent_key=talent_key,
                        detail=json.dumps(detail))
@@ -414,10 +446,27 @@ def _log_audit(
 
 
 def _log_marco(
-    db: Session, message: str, talent_key: str | None, severity: str = "critical"
+    db: Session, message: str, talent_key: str | None, severity: str = "critical",
+    dedup_minutes: int = 30,
 ) -> None:
     from backend.models.db import MarcoMessage
     try:
+        # Suppress identical guardian messages within dedup window — prevents
+        # Marco's Activity Hub from filling with the same alert every 60s.
+        since = datetime.utcnow() - timedelta(minutes=dedup_minutes)
+        existing = (
+            db.query(MarcoMessage)
+            .filter(
+                MarcoMessage.message == message,
+                MarcoMessage.talent_key == talent_key,
+                MarcoMessage.category == "guardian",
+                MarcoMessage.created_at >= since,
+            )
+            .first()
+        )
+        if existing:
+            logger.info("Guardian._log_marco: suppressed duplicate '%s' for %s", message[:60], talent_key)
+            return
         row = MarcoMessage(
             message=message,
             category="guardian",
