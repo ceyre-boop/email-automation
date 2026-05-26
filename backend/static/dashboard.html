@@ -904,7 +904,7 @@ body {
   </div>
 
   <!-- ── Inbox Feed view ─────────────────────────────────────────────────── -->
-  <div id="view-feed" style="display:none; padding:20px; height:100%; overflow-y:auto;">
+  <div id="view-feed" style="display:none; padding:20px; flex:1; overflow-y:auto;">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
       <div>
         <div style="font-size:22px; font-weight:800; letter-spacing:-0.01em;">Inbox Feed</div>
@@ -1463,6 +1463,7 @@ function renderContextPanel() {
 document.getElementById('nav-overview').addEventListener('click', async () => {
   state.selectedTalent = null;
   currentTalentKey = null;
+  showView('overview');
   await loadOverview();
 });
 document.getElementById('btn-refresh').addEventListener('click', async () => {
