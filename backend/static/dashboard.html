@@ -234,6 +234,7 @@ body {
   overflow-y: auto;
   min-height: 0;
   padding: 32px 40px 48px;
+  max-height: 100%;
 }
 
 /* When JS adds .reader class, switch to grid layout for the reading pane
@@ -911,7 +912,7 @@ body {
         <button class="btn btn-ghost" onclick="retriageBackfill()" style="font-size:11px; border-color:rgba(251,191,36,0.5); color:#f59e0b;">⟳ Re-triage Score 2</button>
       </div>
     </div>
-    <div id="email-feed-list" style="display:flex; flex-direction:column; gap:6px;"></div>
+    <div id="email-feed-list" style="display:flex; flex-direction:column; gap:6px; max-height:340px; overflow-y:auto;"></div>
     <div id="email-feed-empty" style="display:none; text-align:center; padding:32px 0; color:var(--text-3); font-size:13px;">No emails processed in the last 24 hours.</div>
   </div>
 
