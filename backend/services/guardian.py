@@ -104,7 +104,7 @@ class GuardianWatchdog:
         self, db: Session, cfg: dict, by_talent: dict[str, int], total: int
     ) -> list[dict]:
         triggers = []
-        hard_global = cfg.get("global_draft_hard_limit", 50)
+        hard_global = cfg.get("global_draft_hard_limit", 120)
         hard_talent = cfg.get("per_talent_draft_hard_limit", 30)
         warn_talent = cfg.get("per_talent_draft_warn_limit", 15)
         window = cfg.get("velocity_window_minutes", 10)

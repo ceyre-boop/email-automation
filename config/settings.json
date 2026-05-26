@@ -306,7 +306,7 @@
     "_comment": "Self-healing watchdog \u2014 all thresholds tunable without redeploy",
     "enabled": true,
     "velocity_window_minutes": 10,
-    "global_draft_hard_limit": 50,
+    "global_draft_hard_limit": 120,
     "per_talent_draft_warn_limit": 15,
     "per_talent_draft_hard_limit": 30,
     "default_max_drafts_per_day": 50,

@@ -636,6 +636,7 @@ def send_standalone_message(token_row, to: str, subject: str, body: str, db=None
     """Send a fresh (non-reply) email from the talent's Gmail account."""
     service = _gmail_service(token_row, db)
     mime_msg = MIMEText(body, "plain")
+    mime_msg["From"] = "Colin <colineyre222@gmail.com>"
     mime_msg["To"] = to
     mime_msg["Subject"] = subject
     raw = base64.urlsafe_b64encode(mime_msg.as_bytes()).decode()

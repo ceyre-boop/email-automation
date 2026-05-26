@@ -1362,6 +1362,12 @@ def force_draft_email(
     ).first()
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
+    email_row = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == gmail_message_id
+    ).first()
+    if email_row and email_row.score == 2:
+        email_row.score = 3
+        db.commit()
     background_tasks.add_task(_run_force_blast, talent_key, [gmail_message_id])
     return {"ok": True, "queued": gmail_message_id}
 
