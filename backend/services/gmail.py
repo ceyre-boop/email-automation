@@ -579,18 +579,20 @@ def move_to_inbox(token_row, message_id: str, db=None, service=None) -> bool:
 
 
 def restore_inbox_label(token_row, message_id: str, db=None, service=None) -> bool:
-    """Adds INBOX, removes 'A Initial Response' and 'Spam' labels. Inbox Feed B-button action."""
+    """Adds INBOX, removes all non-system custom labels. Inbox Feed B-button action."""
+    _SYSTEM_PREFIXES = (
+        "INBOX", "SENT", "DRAFT", "SPAM", "TRASH",
+        "UNREAD", "STARRED", "IMPORTANT", "CATEGORY_",
+    )
     if service is None:
         service = _gmail_service(token_row, db)
-    remove_ids = []
-    for name, bg, fg in [("A Initial Response", "#16a765", "#ffffff"), ("Spam", "#e8eaed", "#202124")]:
-        lid = _get_or_create_label(service, name, bg, fg)
-        if lid:
-            remove_ids.append(lid)
-    body: dict = {"addLabelIds": ["INBOX"]}
-    if remove_ids:
-        body["removeLabelIds"] = remove_ids
     try:
+        msg = service.users().messages().get(userId="me", id=message_id, format="minimal").execute()
+        current_labels = msg.get("labelIds", [])
+        to_remove = [l for l in current_labels if not any(l.startswith(p) for p in _SYSTEM_PREFIXES)]
+        body: dict = {"addLabelIds": ["INBOX"]}
+        if to_remove:
+            body["removeLabelIds"] = to_remove
         service.users().messages().modify(userId="me", id=message_id, body=body).execute()
         return True
     except HttpError as exc:

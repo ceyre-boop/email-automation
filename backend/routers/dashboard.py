@@ -1455,6 +1455,8 @@ def force_draft_email(
         in_reply_to=message_id_header,
         cc=cc_list,
     )
+    if not gmail_draft_id:
+        raise HTTPException(status_code=502, detail="Gmail draft creation failed — token may need refresh.")
 
     # Save Draft row to DB
     draft_row = Draft(
@@ -1477,10 +1479,9 @@ def force_draft_email(
     db.add(draft_row)
 
     # Apply "A Initial Response" label + remove INBOX on the original email
-    try:
-        gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
-    except Exception as exc:
-        logger.warning("force-draft: label apply failed for %s: %s", gmail_message_id, exc)
+    labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
+    if not labeled:
+        logger.warning("force-draft: mark_initial_response_sent returned False for %s", gmail_message_id)
 
     # Update ProcessedEmail score to 3 if it exists
     pe = db.query(ProcessedEmail).filter(
