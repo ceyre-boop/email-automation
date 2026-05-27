@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, text
+from sqlalchemy import Date, case, func, text
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -51,43 +51,53 @@ def _window_start(days: int = 7) -> datetime:
 def triage_intelligence(days: int = 1, db: Session = Depends(get_db)):
     """Today's triage decision breakdown + top Score 2 reasons for the dashboard."""
     since = datetime.utcnow() - timedelta(days=days)
-    rows = db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= since).all()
 
-    total = len(rows)
-    score3 = [r for r in rows if r.score == 3]
-    score2 = [r for r in rows if r.score == 2]
-    score1 = [r for r in rows if r.score == 1]
-    fallbacks = [r for r in rows if r.triage_reason and r.triage_reason.startswith("Triage fallback")]
+    agg = db.query(
+        ProcessedEmail.score,
+        func.count().label("cnt"),
+    ).filter(ProcessedEmail.processed_at >= since).group_by(ProcessedEmail.score).all()
 
-    # Top Score 2 reasons — cluster by common phrases
+    score_map = {row.score: row.cnt for row in agg}
+    total = sum(score_map.values())
+    score3_count = score_map.get(3, 0)
+    score2_count = score_map.get(2, 0)
+    score1_count = score_map.get(1, 0)
+
+    fallback_count = db.query(func.count()).filter(
+        ProcessedEmail.processed_at >= since,
+        ProcessedEmail.triage_reason.ilike("Triage fallback%"),
+    ).scalar() or 0
+
+    reason_rows = db.query(ProcessedEmail.triage_reason).filter(
+        ProcessedEmail.processed_at >= since,
+        ProcessedEmail.score == 2,
+        ProcessedEmail.triage_reason.isnot(None),
+    ).all()
     reason_counter: Counter = Counter()
-    for r in score2:
-        if r.triage_reason:
-            # Truncate to ~80 chars for display
-            key = r.triage_reason[:90].rstrip()
-            reason_counter[key] += 1
+    for (reason,) in reason_rows:
+        reason_counter[reason[:90].rstrip()] += 1
 
-    top_reasons = [
-        {"reason": reason, "count": count}
-        for reason, count in reason_counter.most_common(5)
-    ]
-
-    # Top Score 3 wins — most common brands being drafted
-    brand_counter: Counter = Counter()
-    for r in score3:
-        if r.brand_name:
-            brand_counter[r.brand_name] += 1
+    brand_rows = db.query(ProcessedEmail.brand_name).filter(
+        ProcessedEmail.processed_at >= since,
+        ProcessedEmail.score == 3,
+        ProcessedEmail.brand_name.isnot(None),
+    ).all()
+    brand_counter: Counter = Counter(b for (b,) in brand_rows)
 
     return {
         "period_days": days,
         "total": total,
-        "score3_count": len(score3),
-        "score2_count": len(score2),
-        "score1_count": len(score1),
-        "fallback_count": len(fallbacks),
-        "draft_rate": round(len(score3) / total, 3) if total else 0.0,
-        "top_score2_reasons": top_reasons,
-        "top_drafted_brands": [{"brand": b, "count": c} for b, c in brand_counter.most_common(5)],
+        "score3_count": score3_count,
+        "score2_count": score2_count,
+        "score1_count": score1_count,
+        "fallback_count": fallback_count,
+        "draft_rate": round(score3_count / total, 3) if total else 0.0,
+        "top_score2_reasons": [
+            {"reason": r, "count": c} for r, c in reason_counter.most_common(5)
+        ],
+        "top_drafted_brands": [
+            {"brand": b, "count": c} for b, c in brand_counter.most_common(5)
+        ],
     }
 
 
@@ -100,17 +110,18 @@ def talent_health(days: int = 7, db: Session = Depends(get_db)):
     talent_configs = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
     since = _window_start(days)
 
-    rows = (
-        db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= since)
-        .all()
-    )
+    agg_rows = db.query(
+        ProcessedEmail.talent_key,
+        func.count().label("total"),
+        func.sum(case((ProcessedEmail.score == 3, 1), else_=0)).label("score3"),
+        func.sum(case((ProcessedEmail.score == 2, 1), else_=0)).label("score2"),
+        func.sum(case((ProcessedEmail.score == 1, 1), else_=0)).label("score1"),
+        func.sum(case((ProcessedEmail.risk_score >= 7, 1), else_=0)).label("high_risk"),
+        func.avg(func.coalesce(ProcessedEmail.risk_score, 0)).label("avg_risk"),
+    ).filter(ProcessedEmail.processed_at >= since).group_by(ProcessedEmail.talent_key).all()
 
-    by_talent: dict[str, list] = defaultdict(list)
-    for r in rows:
-        by_talent[r.talent_key.lower()].append(r)
+    by_talent = {row.talent_key.lower(): row for row in agg_rows if row.talent_key}
 
-    # Connected tokens
     connected = {
         r.talent_key.lower()
         for r in db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
@@ -126,13 +137,13 @@ def talent_health(days: int = 7, db: Session = Depends(get_db)):
 
     results = []
     for key, cfg in talent_configs.items():
-        emails = by_talent.get(key, [])
-        total = len(emails)
-        score3 = sum(1 for e in emails if e.score == 3)
-        score2 = sum(1 for e in emails if e.score == 2)
-        score1 = sum(1 for e in emails if e.score == 1)
-        high_risk = sum(1 for e in emails if (e.risk_score or 0) >= 7)
-        avg_risk = round(sum((e.risk_score or 0) for e in emails) / total, 1) if total else 0.0
+        row = by_talent.get(key)
+        total = row.total if row else 0
+        score3 = row.score3 if row else 0
+        score2 = row.score2 if row else 0
+        score1 = row.score1 if row else 0
+        high_risk = row.high_risk if row else 0
+        avg_risk = round(float(row.avg_risk or 0), 1) if row else 0.0
 
         results.append({
             "talent_key": key,
@@ -162,52 +173,36 @@ def scenario_performance(days: int = 7, db: Session = Depends(get_db)):
     """Which offer types fire most, which escalate, which score highest."""
     since = _window_start(days)
 
-    rows = (
-        db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= since, ProcessedEmail.offer_type != None)  # noqa: E711
-        .all()
-    )
-
-    by_type: dict[str, dict] = defaultdict(lambda: {
-        "count": 0, "score1": 0, "score2": 0, "score3": 0,
-        "total_rate": 0.0, "rate_count": 0,
-        "avg_sentiment": 0.0, "avg_urgency": 0.0, "avg_risk": 0.0,
-        "overrides": 0,
-    })
-
-    for r in rows:
-        ot = r.offer_type or "Unknown"
-        d = by_type[ot]
-        d["count"] += 1
-        if r.score == 1:
-            d["score1"] += 1
-        elif r.score == 2:
-            d["score2"] += 1
-        elif r.score == 3:
-            d["score3"] += 1
-        if r.proposed_rate:
-            d["total_rate"] += r.proposed_rate
-            d["rate_count"] += 1
-        d["avg_sentiment"] += (r.sentiment_score or 5)
-        d["avg_urgency"] += (r.urgency_score or 0)
-        d["avg_risk"] += (r.risk_score or 0)
-        if r.human_override_occurred:
-            d["overrides"] += 1
+    agg_rows = db.query(
+        ProcessedEmail.offer_type,
+        func.count().label("total"),
+        func.sum(case((ProcessedEmail.score == 1, 1), else_=0)).label("score1"),
+        func.sum(case((ProcessedEmail.score == 2, 1), else_=0)).label("score2"),
+        func.sum(case((ProcessedEmail.score == 3, 1), else_=0)).label("score3"),
+        func.avg(ProcessedEmail.proposed_rate).label("avg_rate"),
+        func.avg(func.coalesce(ProcessedEmail.sentiment_score, 5)).label("avg_sentiment"),
+        func.avg(func.coalesce(ProcessedEmail.urgency_score, 0)).label("avg_urgency"),
+        func.avg(func.coalesce(ProcessedEmail.risk_score, 0)).label("avg_risk"),
+        func.sum(case((ProcessedEmail.human_override_occurred == True, 1), else_=0)).label("overrides"),  # noqa: E712
+    ).filter(
+        ProcessedEmail.processed_at >= since,
+        ProcessedEmail.offer_type.isnot(None),
+    ).group_by(ProcessedEmail.offer_type).all()
 
     result = []
-    for ot, d in by_type.items():
-        n = d["count"]
+    for row in agg_rows:
+        n = row.total or 0
         result.append({
-            "offer_type": ot,
+            "offer_type": row.offer_type or "Unknown",
             "count": n,
-            "score1_pct": round(d["score1"] / n, 3) if n else 0.0,
-            "score2_pct": round(d["score2"] / n, 3) if n else 0.0,
-            "score3_pct": round(d["score3"] / n, 3) if n else 0.0,
-            "avg_rate_usd": round(d["total_rate"] / d["rate_count"], 2) if d["rate_count"] else 0.0,
-            "avg_sentiment": round(d["avg_sentiment"] / n, 1) if n else 0.0,
-            "avg_urgency": round(d["avg_urgency"] / n, 1) if n else 0.0,
-            "avg_risk": round(d["avg_risk"] / n, 1) if n else 0.0,
-            "override_count": d["overrides"],
+            "score1_pct": round(row.score1 / n, 3) if n else 0.0,
+            "score2_pct": round(row.score2 / n, 3) if n else 0.0,
+            "score3_pct": round(row.score3 / n, 3) if n else 0.0,
+            "avg_rate_usd": round(float(row.avg_rate or 0), 2),
+            "avg_sentiment": round(float(row.avg_sentiment or 0), 1),
+            "avg_urgency": round(float(row.avg_urgency or 0), 1),
+            "avg_risk": round(float(row.avg_risk or 0), 1),
+            "override_count": row.overrides or 0,
             "days": days,
         })
 
@@ -222,49 +217,42 @@ def operational_load(days: int = 7, db: Session = Depends(get_db)):
     """Emails per hour/day, automation rate, time saved, human interventions."""
     since = _window_start(days)
 
-    rows = (
-        db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= since)
-        .all()
-    )
+    scalar = db.query(
+        func.count().label("total"),
+        func.sum(case((ProcessedEmail.score.in_([1, 3]), 1), else_=0)).label("automated"),
+        func.sum(case((ProcessedEmail.human_override_occurred == True, 1), else_=0)).label("overrides"),  # noqa: E712
+        func.avg(ProcessedEmail.time_to_classify_ms).label("avg_classify_ms"),
+        func.avg(ProcessedEmail.time_to_draft_ms).label("avg_draft_ms"),
+        func.sum(case((ProcessedEmail.score == 3, 5), (ProcessedEmail.score == 1, 1), else_=0)).label("minutes_saved"),
+    ).filter(ProcessedEmail.processed_at >= since).one()
 
-    total = len(rows)
-    automated = sum(1 for r in rows if r.score in (1, 3))
-    overrides = sum(1 for r in rows if r.human_override_occurred)
-    avg_classify_ms = (
-        sum(r.time_to_classify_ms for r in rows if r.time_to_classify_ms)
-        / max(1, sum(1 for r in rows if r.time_to_classify_ms))
-    )
-    avg_draft_ms = (
-        sum(r.time_to_draft_ms for r in rows if r.time_to_draft_ms)
-        / max(1, sum(1 for r in rows if r.time_to_draft_ms))
-    )
+    total = scalar.total or 0
+    automated = scalar.automated or 0
+    overrides = scalar.overrides or 0
+    avg_classify_ms = round(float(scalar.avg_classify_ms or 0))
+    avg_draft_ms = round(float(scalar.avg_draft_ms or 0))
+    estimated_minutes_saved = scalar.minutes_saved or 0
 
-    # Hourly distribution (UTC hour bucket)
-    hourly: dict[int, int] = defaultdict(int)
-    daily: dict[str, int] = defaultdict(int)
-    for r in rows:
-        hourly[r.processed_at.hour] += 1
-        daily[r.processed_at.strftime("%Y-%m-%d")] += 1
+    hourly_rows = db.query(
+        func.extract("hour", ProcessedEmail.processed_at).label("hour"),
+        func.count().label("cnt"),
+    ).filter(ProcessedEmail.processed_at >= since).group_by(
+        func.extract("hour", ProcessedEmail.processed_at)
+    ).all()
+    hourly: dict[int, int] = {int(r.hour): r.cnt for r in hourly_rows}
 
-    # Estimate time saved: assume each deal email takes 5 min to read + reply manually
-    # Automated handling of score-3 = full reply drafted (~5 min saved)
-    # Automated handling of score-1 = spam filtered (~1 min saved)
-    score3_count = sum(1 for r in rows if r.score == 3)
-    score1_count = sum(1 for r in rows if r.score == 1)
-    estimated_minutes_saved = score3_count * 5 + score1_count * 1
+    daily_rows = db.query(
+        func.cast(ProcessedEmail.processed_at, Date).label("day"),
+        func.count().label("cnt"),
+    ).filter(ProcessedEmail.processed_at >= since).group_by(
+        func.cast(ProcessedEmail.processed_at, Date)
+    ).order_by(func.cast(ProcessedEmail.processed_at, Date)).all()
 
-    # Poll health stats
-    poll_rows = (
-        db.query(PollHealth)
-        .filter(PollHealth.polled_at >= since)
-        .all()
-    )
-    poll_errors = sum(1 for p in poll_rows if p.error_message)
-    avg_poll_ms = (
-        sum(p.duration_ms for p in poll_rows if p.duration_ms)
-        / max(1, sum(1 for p in poll_rows if p.duration_ms))
-    )
+    poll_scalar = db.query(
+        func.count().label("total"),
+        func.sum(case((PollHealth.error_message.isnot(None), 1), else_=0)).label("errors"),
+        func.avg(PollHealth.duration_ms).label("avg_ms"),
+    ).filter(PollHealth.polled_at >= since).one()
 
     return {
         "period_days": days,
@@ -272,16 +260,13 @@ def operational_load(days: int = 7, db: Session = Depends(get_db)):
         "automated_count": automated,
         "automation_rate": round(automated / total, 3) if total else 0.0,
         "human_overrides": overrides,
-        "avg_classify_ms": round(avg_classify_ms),
-        "avg_draft_ms": round(avg_draft_ms),
+        "avg_classify_ms": avg_classify_ms,
+        "avg_draft_ms": avg_draft_ms,
         "estimated_minutes_saved": estimated_minutes_saved,
-        "hourly_distribution": [{"hour": h, "count": hourly[h]} for h in range(24)],
-        "daily_volume": [
-            {"date": d, "count": daily[d]}
-            for d in sorted(daily.keys())
-        ],
-        "poll_error_count": poll_errors,
-        "avg_poll_duration_ms": round(avg_poll_ms),
+        "hourly_distribution": [{"hour": h, "count": hourly.get(h, 0)} for h in range(24)],
+        "daily_volume": [{"date": str(r.day), "count": r.cnt} for r in daily_rows],
+        "poll_error_count": poll_scalar.errors or 0,
+        "avg_poll_duration_ms": round(float(poll_scalar.avg_ms or 0)),
     }
 
 
@@ -295,22 +280,41 @@ def anomaly_detection(db: Session = Depends(get_db)):
     yesterday_start = today_start - timedelta(days=1)
     week_start = today_start - timedelta(days=7)
 
+    # Today: small window, keep as .all() for high-risk + spam checks
     today_emails = db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= today_start).all()
-    yesterday_count = db.query(ProcessedEmail).filter(
+    today_count = len(today_emails)
+
+    yesterday_count = db.query(func.count()).filter(
         ProcessedEmail.processed_at >= yesterday_start,
         ProcessedEmail.processed_at < today_start,
-    ).count()
-    week_emails = db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= week_start).all()
+    ).scalar() or 0
 
-    today_count = len(today_emails)
-    week_avg_per_day = len(week_emails) / 7
+    week_total = db.query(func.count()).filter(ProcessedEmail.processed_at >= week_start).scalar() or 0
+    week_avg_per_day = week_total / 7
+
+    # Sender override escalations — only the two columns needed
+    override_sender_rows = db.query(ProcessedEmail.sender).filter(
+        ProcessedEmail.processed_at >= week_start,
+        ProcessedEmail.score == 3,
+        ProcessedEmail.human_override_occurred == True,  # noqa: E712
+        ProcessedEmail.sender.isnot(None),
+    ).all()
+    sender_escalations: dict[str, int] = defaultdict(int)
+    for (sender,) in override_sender_rows:
+        sender_escalations[sender] += 1
+
+    # Per-talent spam rate (week) — aggregated
+    week_talent_agg = db.query(
+        ProcessedEmail.talent_key,
+        func.count().label("total"),
+        func.sum(case((ProcessedEmail.score == 1, 1), else_=0)).label("spam"),
+    ).filter(ProcessedEmail.processed_at >= week_start).group_by(ProcessedEmail.talent_key).all()
+    week_by_talent = {row.talent_key.lower(): row for row in week_talent_agg if row.talent_key}
 
     anomalies = []
 
-    # Volume spike/drop — only compare after 6+ UTC hours so partial-day doesn't trigger false alarms
     hours_into_day = now.hour + now.minute / 60
     if week_avg_per_day > 0 and hours_into_day >= 6:
-        # Scale today's count to a full-day projection before comparing
         projected_today = today_count * (24 / max(hours_into_day, 1))
         ratio = projected_today / week_avg_per_day
         raw_ratio = today_count / week_avg_per_day
@@ -322,7 +326,6 @@ def anomaly_detection(db: Session = Depends(get_db)):
                 "talent_key": None,
             })
         elif raw_ratio <= 0.2 and week_avg_per_day >= 5 and hours_into_day >= 18:
-            # Only fire volume-drop after 18:00 UTC (10am-11am Pacific) — full business day
             anomalies.append({
                 "type": "volume_drop",
                 "severity": "warning",
@@ -330,7 +333,6 @@ def anomaly_detection(db: Session = Depends(get_db)):
                 "talent_key": None,
             })
 
-    # High-risk emails today
     high_risk_today = [e for e in today_emails if (e.risk_score or 0) >= 8]
     if high_risk_today:
         anomalies.append({
@@ -340,12 +342,6 @@ def anomaly_detection(db: Session = Depends(get_db)):
             "talent_key": None,
         })
 
-    # Repeated escalations from same sender (last 7 days)
-    sender_escalations: dict[str, int] = defaultdict(int)
-    for e in week_emails:
-        if e.score == 3 and e.human_override_occurred:
-            if e.sender:
-                sender_escalations[e.sender] += 1
     for sender, count in sender_escalations.items():
         if count >= 3:
             anomalies.append({
@@ -355,21 +351,17 @@ def anomaly_detection(db: Session = Depends(get_db)):
                 "talent_key": None,
             })
 
-    # Per-talent spam rate spike
+    # Per-talent spam spike: compare today rate vs 7-day rate
     by_talent_today: dict[str, list] = defaultdict(list)
-    by_talent_week: dict[str, list] = defaultdict(list)
     for e in today_emails:
         by_talent_today[e.talent_key.lower()].append(e)
-    for e in week_emails:
-        by_talent_week[e.talent_key.lower()].append(e)
 
-    for key in set(list(by_talent_today.keys()) + list(by_talent_week.keys())):
+    for key, wk in week_by_talent.items():
         td = by_talent_today.get(key, [])
-        wk = by_talent_week.get(key, [])
-        if len(td) < 5 or len(wk) < 10:
+        if len(td) < 5 or (wk.total or 0) < 10:
             continue
         today_spam = sum(1 for e in td if e.score == 1) / len(td)
-        week_spam = sum(1 for e in wk if e.score == 1) / len(wk)
+        week_spam = (wk.spam or 0) / wk.total
         if today_spam >= week_spam * 1.5 and today_spam >= 0.4:
             anomalies.append({
                 "type": "spam_spike",
@@ -378,7 +370,6 @@ def anomaly_detection(db: Session = Depends(get_db)):
                 "talent_key": key,
             })
 
-    # Token failures
     for row in db.query(TalentToken).filter(TalentToken.consecutive_failures >= 2).all():
         anomalies.append({
             "type": "token_failure",

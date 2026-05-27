@@ -1239,13 +1239,14 @@ async function loadOverview({ silent = false } = {}) {
     renderSidebar();
     renderSummaryBar();
     showView('overview');
-    // Load all background panels
+    // Wave 2 — cheap endpoints, fire immediately
     loadDraftQueue().catch(() => {});
     loadHumanEdited().catch(() => {});
     loadOrphaned().catch(() => {});
     loadHealthScore().catch(() => {});
-    loadAnalytics().catch(() => {});
     loadMarco().catch(() => {});
+    // Wave 3 — heavy analytics, delayed to avoid saturating the single Uvicorn worker
+    setTimeout(() => { loadAnalytics().catch(() => {}); }, 1500);
   } catch (_) {} finally { if (!silent) hideOverlay(); }
 }
 
