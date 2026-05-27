@@ -1460,7 +1460,6 @@ function renderSummaryBar() {
   const r = state.report;
   if (!r) return;
   document.getElementById('total-sent').textContent          = r.total_sent_cal_today ?? 0;
-  document.getElementById('total-new-drafts').textContent    = r.total_new_drafts_cal_today ?? 0;
   document.getElementById('total-draft-backlog').textContent = r.total_draft_backlog ?? 0;
   document.getElementById('total-ignore').textContent        = r.total_revisit_cal_today ?? 0;
   document.getElementById('total-replies').textContent       = r.total_replies_today ?? 0;
