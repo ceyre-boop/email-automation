@@ -294,14 +294,15 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
         db.add(token_row)
         db.commit()
 
-        # Spam folder rescue — draft replies for score=3 emails missed by INBOX filter
-        try:
-            spam_drafted = _spam_sweep_for_talent(token_row, talent_cfg, db)
-            if spam_drafted:
-                logger.info("spam_sweep: %d draft(s) created for %s", spam_drafted, talent_key)
-                summary["drafted"] = summary.get("drafted", 0) + spam_drafted
-        except Exception as exc:  # noqa: BLE001
-            logger.warning("spam_sweep failed for %s: %s", talent_key, exc)
+        # Spam folder rescue — controlled by spam_sweep_enabled in settings.json
+        if get_settings().app_config.get("spam_sweep_enabled", False):
+            try:
+                spam_drafted = _spam_sweep_for_talent(token_row, talent_cfg, db)
+                if spam_drafted:
+                    logger.info("spam_sweep: %d draft(s) created for %s", spam_drafted, talent_key)
+                    summary["drafted"] = summary.get("drafted", 0) + spam_drafted
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("spam_sweep failed for %s: %s", talent_key, exc)
 
         _record_poll_health(db, talent_key, emails_found, emails_processed_count, None,
                             int((time.monotonic() - poll_start) * 1000))
