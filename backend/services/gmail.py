@@ -502,26 +502,28 @@ def _get_or_create_custom_label(service, label_name: str, *, background_color: s
 def archive_as_spam(token_row, message_id: str, db=None, service=None) -> bool:
     """
     Atomic Option C: remove INBOX/UNREAD and apply Misc label in a single API call.
-    Raises RuntimeError if the Misc label cannot be created — never archives without labeling.
+    If the Misc label cannot be created, archives anyway without it — the archive action
+    (removing from INBOX) is never blocked by a label failure.
     """
     if service is None:
         service = _gmail_service(token_row, db)
     label_id = _get_or_create_label(service, "Misc", "#e8eaed", "#202124")
     if not label_id:
-        raise RuntimeError(f"Could not obtain Misc label ID for {token_row.talent_key}/{message_id} — refusing to archive without label")
+        logger.warning(
+            "Misc label unavailable for %s/%s — archiving without it",
+            token_row.talent_key, message_id,
+        )
     try:
-        service.users().messages().modify(
-            userId="me",
-            id=message_id,
-            body={
-                "removeLabelIds": [
-                    "INBOX", "UNREAD",
-                    "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
-                    "CATEGORY_UPDATES", "CATEGORY_FORUMS",
-                ],
-                "addLabelIds": [label_id],
-            },
-        ).execute()
+        body: dict = {
+            "removeLabelIds": [
+                "INBOX", "UNREAD",
+                "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
+                "CATEGORY_UPDATES", "CATEGORY_FORUMS",
+            ],
+        }
+        if label_id:
+            body["addLabelIds"] = [label_id]
+        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
         return True
     except HttpError as exc:
         logger.error("archive_as_spam failed for %s / %s: %s", token_row.talent_key, message_id, exc)

@@ -2529,8 +2529,9 @@ async function feedActionB(talentKey, gmailMessageId, btn) {
   try {
     await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/keep-in-inbox`);
     showToast('Kept in inbox for human review.');
-  } catch(e) { showToast('Failed: ' + e.message); }
-  btn.innerHTML = orig; btn.disabled = false;
+    document.getElementById(`feed-row-${gmailMessageId}`)?.remove();
+    checkFeedEmpty();
+  } catch(e) { showToast('Failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
 }
 
 async function feedActionC(talentKey, gmailMessageId, btn) {
