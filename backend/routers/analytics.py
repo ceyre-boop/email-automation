@@ -456,13 +456,17 @@ def retriage_backfill(db: Session = Depends(get_db)):
 
 
 @router.get("/email-feed")
-def email_feed(hours: int = 24, limit: int = 100, db: Session = Depends(get_db)):
-    """Recent processed emails regardless of score — for the Inbox Feed dashboard panel."""
-    from datetime import timedelta
-    cutoff = datetime.utcnow() - timedelta(hours=hours)
+def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends(get_db)):
+    """Processed emails for the Inbox Feed dashboard panel (score 1 and 2 only)."""
+    query = db.query(ProcessedEmail).filter(
+        ProcessedEmail.score > 0, ProcessedEmail.score != 3
+    )
+    if hours is not None:
+        from datetime import timedelta
+        cutoff = datetime.utcnow() - timedelta(hours=hours)
+        query = query.filter(ProcessedEmail.processed_at >= cutoff)
     rows = (
-        db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= cutoff, ProcessedEmail.score > 0, ProcessedEmail.score != 3)
+        query
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(limit)
         .all()

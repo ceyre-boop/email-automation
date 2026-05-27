@@ -149,7 +149,7 @@ class GuardianWatchdog:
         )
         for talent_key, count in rows:
             talent_cfg = talent_map.get(talent_key.lower(), {})
-            cap = talent_cfg.get("max_drafts_per_day", cfg.get("default_max_drafts_per_day", 50))
+            cap = talent_cfg.get("max_drafts_per_day", cfg.get("default_max_drafts_per_day", 2000))
             if count >= cap:
                 triggers.append({
                     "type": "talent_pause",
@@ -157,6 +157,27 @@ class GuardianWatchdog:
                     "reason": f"{count} drafts today for {talent_key} exceeds daily cap {cap}",
                     "detail": {"count_today": count, "cap": cap},
                 })
+
+        # Hourly per-talent hard limit (default 1000/hour — primary volume guardian)
+        hourly_limit = cfg.get("per_talent_hourly_hard_limit", 1000)
+        one_hour_ago = datetime.utcnow() - timedelta(hours=1)
+        hourly_rows = (
+            db.query(Draft.talent_key, func.count(Draft.id))
+            .filter(Draft.created_at >= one_hour_ago)
+            .group_by(Draft.talent_key)
+            .all()
+        )
+        for talent_key, hourly_count in hourly_rows:
+            if hourly_count >= hourly_limit:
+                triggers.append({
+                    "type": "per_talent_hourly_hard",
+                    "talent_key": talent_key,
+                    "count": hourly_count,
+                    "limit": hourly_limit,
+                    "reason": f"{hourly_count} drafts in last hour for {talent_key} exceeds hourly cap {hourly_limit}",
+                    "severity": "critical",
+                })
+
         return triggers
 
     def _check_draft_email_ratio(self, db: Session, cfg: dict) -> list[dict]:

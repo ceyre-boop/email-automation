@@ -473,6 +473,22 @@ def draft_reply(
         lines.pop(0)
     text = "\n".join(lines).strip()
 
+    # If GPT returned the full SOP metadata block, extract only the content after "Response:"
+    import re as _re
+    _response_match = _re.search(r"^Response:\s*", text, _re.MULTILINE | _re.IGNORECASE)
+    if _response_match:
+        text = text[_response_match.end():].strip()
+
+    # Strip any remaining leading SOP metadata lines (Classification:, Talent:, etc.)
+    _META_LINE_PREFIXES = (
+        "classification:", "talent:", "matched scenario:",
+        "draft sent:", "remove inbox label:", "apply label:",
+    )
+    lines = text.splitlines()
+    while lines and any(lines[0].strip().lower().startswith(p) for p in _META_LINE_PREFIXES):
+        lines.pop(0)
+    text = "\n".join(lines).strip()
+
     # Check if GPT decided to escalate
     if text.upper().startswith(_ESCALATE_PREFIX.upper()):
         reason = text[len(_ESCALATE_PREFIX):].strip()

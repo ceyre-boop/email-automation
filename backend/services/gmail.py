@@ -888,3 +888,33 @@ def send_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
     except HttpError as exc:
         logger.error("Draft send failed for %s / %s: %s", token_row.talent_key, gmail_draft_id, exc)
         return False
+
+
+def draft_exists_in_gmail(token_row, gmail_draft_id: str, db=None) -> bool:
+    """Returns True if the draft still exists in Gmail Drafts (not yet sent/deleted)."""
+    service = _gmail_service(token_row, db)
+    try:
+        service.users().drafts().get(userId="me", id=gmail_draft_id).execute()
+        return True
+    except HttpError as exc:
+        if exc.resp.status == 404:
+            return False
+        raise
+
+
+def thread_has_sent_reply(token_row, thread_id: str, original_message_id: str, db=None) -> bool:
+    """Returns True if the thread contains a SENT message other than the original."""
+    service = _gmail_service(token_row, db)
+    try:
+        thread = service.users().threads().get(
+            userId="me", id=thread_id, format="metadata",
+            metadataHeaders=["Date"],
+        ).execute()
+        for msg in thread.get("messages", []):
+            if msg["id"] == original_message_id:
+                continue
+            if "SENT" in msg.get("labelIds", []):
+                return True
+        return False
+    except HttpError:
+        return False

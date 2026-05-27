@@ -297,14 +297,15 @@ def on_startup():
     # Auto-poll every 60 seconds + proactive token refresh every 10 minutes
     try:
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian
+        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile
         _scheduler = BackgroundScheduler(daemon=True)
         _scheduler.add_job(_run_poll, "interval", seconds=45, id="auto_poll", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_draft_queue, "interval", seconds=20, id="draft_queue", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, id="backlog_blaster", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
         _scheduler.add_job(_run_guardian, "interval", seconds=60, id="guardian", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_reconcile, "interval", minutes=5, id="reconcile_drafts", replace_existing=True, max_instances=1)
         _scheduler.start()
-        logger.info("Scheduler started — poll 45s, draft queue 20s, backlog blaster 30s, guardian 60s, token refresh 10min.")
+        logger.info("Scheduler started — poll 45s, draft queue 20s, backlog blaster 30s, guardian 60s, token refresh 10min, reconcile 5min.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")

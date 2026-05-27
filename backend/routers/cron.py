@@ -217,6 +217,64 @@ def _run_proactive_refresh():
         db.close()
 
 
+def _run_reconcile():
+    """Reconcile pending drafts against Gmail every 5 minutes."""
+    from backend.models.db import get_session_factory, Draft, DraftStatus, ProcessedEmail, TalentToken, EmailStatus
+    from backend.services import gmail as gmail_svc
+    from datetime import datetime as _dt
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        pending = (
+            db.query(Draft)
+            .filter(Draft.status == DraftStatus.pending, Draft.gmail_draft_id.isnot(None))
+            .all()
+        )
+        sent = discarded = skipped = 0
+        for draft in pending:
+            token = db.query(TalentToken).filter(
+                TalentToken.talent_key.ilike(draft.talent_key),
+                TalentToken.active == True,  # noqa: E712
+            ).first()
+            if not token:
+                continue
+            try:
+                if gmail_svc.draft_exists_in_gmail(token, draft.gmail_draft_id, db=db):
+                    skipped += 1
+                    continue
+                # Draft gone from Gmail — check if it was manually sent
+                if draft.thread_id and gmail_svc.thread_has_sent_reply(
+                    token, draft.thread_id, draft.gmail_message_id, db=db
+                ):
+                    draft.status = DraftStatus.sent
+                    draft.reviewed_at = _dt.utcnow()
+                    draft.reviewed_by = "gmail-reconciler"
+                    pe = db.query(ProcessedEmail).filter(
+                        ProcessedEmail.gmail_message_id == draft.gmail_message_id
+                    ).first()
+                    if pe:
+                        pe.status = EmailStatus.sent
+                        db.add(pe)
+                    gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
+                    sent += 1
+                else:
+                    draft.status = DraftStatus.discarded
+                    draft.reviewed_at = _dt.utcnow()
+                    draft.reviewed_by = "gmail-reconciler"
+                    discarded += 1
+                db.add(draft)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("reconcile: error on draft %s: %s", draft.id, exc)
+        db.commit()
+        if sent or discarded:
+            logger.info("Draft reconciliation: sent=%d discarded=%d skipped=%d", sent, discarded, skipped)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Draft reconciliation failed: %s", exc)
+    finally:
+        db.close()
+
+
 @router.post("/api/admin/blast-backlog", dependencies=[Depends(verify_api_key)])
 def blast_backlog(background_tasks: BackgroundTasks):
     """Blast ALL backlogged Score-3 emails with no draft — no batch limit, runs until empty."""
@@ -249,6 +307,13 @@ def _blast_all_until_empty():
         logger.info("Backlog blast round %d — %d remaining", rounds, remaining)
         _run_draft_queue(batch_size=200)
         time.sleep(2)  # brief pause between rounds to let DB settle
+
+
+@router.post("/cron/reconcile-drafts", dependencies=[Depends(verify_api_key)])
+def trigger_reconcile(background_tasks: BackgroundTasks):
+    """Manually trigger draft reconciliation (detects drafts sent directly from Gmail)."""
+    background_tasks.add_task(_run_reconcile)
+    return {"ok": True, "queued": True}
 
 
 @router.get("/cron/poll-inboxes")
