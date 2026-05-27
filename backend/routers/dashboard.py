@@ -665,7 +665,7 @@ def recover_fallbacks(
     }
 
 
-@router.get("/health/tokens")
+@router.get("/health/tokens", dependencies=[Depends(verify_api_key)])
 def token_health(db: Session = Depends(get_db)):
     """Per-talent token health: consecutive failures, last error, last poll time."""
     rows = db.query(TalentToken).all()

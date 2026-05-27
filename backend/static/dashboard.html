@@ -578,6 +578,7 @@ body {
   animation: fadeUp 0.25s ease-out;
 }
 #toast.show { display: block; }
+#toast.error { background: #dc2626; color: #fff; border-color: #b91c1c; }
 
 /* ─── API key overlay ───────────────────────────────────────────────────── */
 #api-key-overlay {
@@ -979,6 +980,7 @@ const state = {
   emails: [],
   drafts: [],
   context: [],
+  tokenHealth: {},  // { [talent_key_lower]: { active, consecutive_failures, last_error } }
 };
 
 // ── Theme ──────────────────────────────────────────────────────────────────
@@ -1043,7 +1045,7 @@ async function api(method, path, body = null) {
   const controller = new AbortController();
   const _tid = setTimeout(() => controller.abort(), 15000);
   try { res = await fetch(path, { ...opts, signal: controller.signal }); }
-  catch (e) { showToast('Network error: ' + e.message); throw e; }
+  catch (e) { showToast('Network error: ' + e.message, 'error'); throw e; }
   finally { clearTimeout(_tid); }
   if (res.status === 403) {
     sessionStorage.removeItem('inbox_api_key');
@@ -1059,7 +1061,7 @@ async function api(method, path, body = null) {
     let msg;
     try { const j = await res.json(); msg = j.detail || j.message || res.statusText; }
     catch (_) { msg = res.statusText; }
-    if (res.status !== 503) showToast('Error ' + res.status + ': ' + String(msg).slice(0, 120));
+    if (res.status !== 503) showToast('Error ' + res.status + ': ' + String(msg).slice(0, 120), 'error');
     throw new Error(msg);
   }
   return res.json();
@@ -1128,12 +1130,12 @@ function formatRate(r) {
 
 // ── Toast ──────────────────────────────────────────────────────────────────
 let _toastTimer;
-function showToast(msg) {
+function showToast(msg, type = 'default') {
   const t = document.getElementById('toast');
   t.textContent = msg;
-  t.classList.add('show');
+  t.className = type === 'error' ? 'show error' : 'show';
   clearTimeout(_toastTimer);
-  _toastTimer = setTimeout(() => t.classList.remove('show'), 3500);
+  _toastTimer = setTimeout(() => { t.classList.remove('show', 'error'); }, 3500);
 }
 
 // ── Loading overlay ────────────────────────────────────────────────────────
@@ -1191,6 +1193,17 @@ async function refreshData() {
   }
 }
 
+async function loadTokenHealth() {
+  try {
+    const data = await api('GET', '/api/dashboard/health/tokens');
+    state.tokenHealth = {};
+    for (const row of data) {
+      state.tokenHealth[row.talent_key.toLowerCase()] = row;
+    }
+    renderSidebar();
+  } catch (_) {}
+}
+
 async function pollGuardianStatus() {
   try {
     const s = await api('GET', '/api/admin/guardian/status');
@@ -1219,8 +1232,10 @@ async function bootstrap() {
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
   pollGuardianStatus();
+  loadTokenHealth();
   setInterval(refreshData, 60000);
   setInterval(pollGuardianStatus, 30000);
+  setInterval(loadTokenHealth, 60000);
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
@@ -1443,13 +1458,16 @@ function renderSidebar() {
   state.report?.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_real_drafts ?? c.pending_drafts; });
   state.talents.forEach(t => {
     const pending = pendingMap[t.key] || 0;
+    const health = state.tokenHealth[t.key.toLowerCase()];
+    const needsReconnect = health && (!health.active || health.consecutive_failures >= 2);
     const li = document.createElement('li');
     li.className = 'talent-item';
     li.dataset.key = t.key;
     li.innerHTML = `
       <div class="t-avatar">${initial(t.full_name)}</div>
-      <span class="t-name">${esc(t.full_name)}</span>
+      <span class="t-name">${esc(t.full_name)}${needsReconnect ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:5px;vertical-align:middle;" title="Gmail connection broken"></span>' : ''}</span>
       <div class="t-dot ${dotClass(t)}"></div>
+      ${needsReconnect ? `<div style="width:100%;padding:2px 0 0 36px;"><a href="/auth/connect?talent_key=${esc(t.key)}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:#f59e0b;text-decoration:underline;">Reconnect Gmail</a></div>` : ''}
     `;
     li.addEventListener('click', () => openRealGmail(t));
     ul.appendChild(li);
@@ -2210,7 +2228,6 @@ async function approveDraft(id, btn) {
     document.getElementById(`draft-card-${id}`)?.remove();
     renderSidebar();
   } catch(e) {
-    showToast('Send failed: ' + e.message);
     btn.innerHTML = orig;
     btn.disabled = false;
   }
@@ -2535,7 +2552,7 @@ async function feedActionA(talentKey, gmailMessageId, btn) {
     showToast('Draft queued — will appear in Activity Hub shortly.');
     document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
     loadDraftQueue().catch(() => {});
-  } catch(e) { showToast('Failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
+  } catch(e) { btn.innerHTML = orig; btn.disabled = false; }
 }
 
 async function feedActionB(talentKey, gmailMessageId, btn) {
@@ -2545,7 +2562,7 @@ async function feedActionB(talentKey, gmailMessageId, btn) {
     showToast('Kept in inbox for human review.');
     document.getElementById(`feed-row-${gmailMessageId}`)?.remove();
     checkFeedEmpty();
-  } catch(e) { showToast('Failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
+  } catch(e) { btn.innerHTML = orig; btn.disabled = false; }
 }
 
 async function feedActionC(talentKey, gmailMessageId, btn) {
@@ -2555,7 +2572,7 @@ async function feedActionC(talentKey, gmailMessageId, btn) {
     await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/spam`);
     showToast('Archived.');
     document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
-  } catch(e) { showToast('Failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
+  } catch(e) { btn.innerHTML = orig; btn.disabled = false; }
 }
 
 async function retriageBackfill() {
