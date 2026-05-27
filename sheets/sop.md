@@ -169,7 +169,7 @@ Every processed email must result in exactly ONE of the following actions:
 
 - Option A — Approved Response Sent
 - Option B — Ignore / Human Review
-- Option C — Spam
+- Option C — Misc
 
 These actions are mutually exclusive.
 Only one option may be applied per email.
@@ -215,7 +215,7 @@ Important:
 - These emails should remain untouched in the Inbox for manual staff handling.
 
 ---
-Option C — Spam
+Option C — Misc
 This should be rare.
 
 Use ONLY when the email is clearly and unquestionably spam.
@@ -233,7 +233,7 @@ Examples include:
 Action:
 - Draft Created/Sent: No
 - Remove INBOX Label: Yes (only if spam handling is enabled)
-- Apply Label: Spam or move to Spam folder
+- Apply Label: Misc
 
 Important:
 - Spam classification must be extremely conservative.
@@ -250,7 +250,7 @@ Talent: [Talent name, if applicable]
 Matched Scenario: [Scenario name, if applicable]
 Draft Sent: Yes / No
 Remove INBOX Label: Yes / No
-Apply Label: A Initial Response / Revisit / Spam / None
+Apply Label: A Initial Response / Revisit / Misc / None
 CC: [manager email, if applicable]
 Response: [exact approved response, if applicable]
 

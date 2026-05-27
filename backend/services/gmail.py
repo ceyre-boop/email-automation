@@ -501,14 +501,14 @@ def _get_or_create_custom_label(service, label_name: str, *, background_color: s
 
 def archive_as_spam(token_row, message_id: str, db=None, service=None) -> bool:
     """
-    Atomic Option C: remove INBOX/UNREAD and apply Spam label in a single API call.
-    Raises RuntimeError if the Spam label cannot be created — never archives without labeling.
+    Atomic Option C: remove INBOX/UNREAD and apply Misc label in a single API call.
+    Raises RuntimeError if the Misc label cannot be created — never archives without labeling.
     """
     if service is None:
         service = _gmail_service(token_row, db)
-    label_id = _get_or_create_label(service, "Spam", "#e8eaed", "#202124")
+    label_id = _get_or_create_label(service, "Misc", "#e8eaed", "#202124")
     if not label_id:
-        raise RuntimeError(f"Could not obtain Spam label ID for {token_row.talent_key}/{message_id} — refusing to archive without label")
+        raise RuntimeError(f"Could not obtain Misc label ID for {token_row.talent_key}/{message_id} — refusing to archive without label")
     try:
         service.users().messages().modify(
             userId="me",
@@ -726,8 +726,8 @@ def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
 
 # ── Triage labels ─────────────────────────────────────────────────────────────
 
-# Only these two labels may ever be applied. All other label operations are rejected.
-_ALLOWED_LABELS: frozenset[str] = frozenset({"A Initial Response", "Spam"})
+# Only these labels may ever be applied. All other label operations are rejected.
+_ALLOWED_LABELS: frozenset[str] = frozenset({"A Initial Response", "Spam", "Misc"})
 
 _TRIAGE_LABEL_CFG = {
     1: {"name": "Spam", "backgroundColor": "#e8eaed", "textColor": "#202124"},

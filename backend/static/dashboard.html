@@ -2505,11 +2505,11 @@ async function feedActionB(talentKey, gmailMessageId, btn) {
 }
 
 async function feedActionC(talentKey, gmailMessageId, btn) {
-  if (!confirm('Archive as spam?')) return;
+  if (!confirm('Archive?')) return;
   const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
   try {
     await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/spam`);
-    showToast('Archived as spam.');
+    showToast('Archived.');
     document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
   } catch(e) { showToast('Failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
 }
