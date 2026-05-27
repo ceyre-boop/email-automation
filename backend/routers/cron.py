@@ -264,6 +264,18 @@ def _run_reconcile():
                 db.add(draft)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("reconcile: error on draft %s: %s", draft.id, exc)
+        # Second pass: discard pending drafts that were never saved to Gmail
+        no_id_drafts = db.query(Draft).filter(
+            Draft.status == DraftStatus.pending,
+            Draft.gmail_draft_id.is_(None),
+            Draft.is_escalate == False,  # noqa: E712
+        ).all()
+        for draft in no_id_drafts:
+            draft.status = DraftStatus.discarded
+            draft.reviewed_at = _dt.utcnow()
+            draft.reviewed_by = "reconciler-no-draft-id"
+            db.add(draft)
+        discarded += len(no_id_drafts)
         db.commit()
         if sent or discarded:
             logger.info("Draft reconciliation: sent=%d discarded=%d skipped=%d", sent, discarded, skipped)

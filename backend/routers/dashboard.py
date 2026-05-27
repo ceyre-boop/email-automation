@@ -1348,28 +1348,137 @@ def live_drafts(talent_key: str, db: Session = Depends(get_db)):
 def force_draft_email(
     talent_key: str,
     gmail_message_id: str,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
     """
-    Manual override: force GPT to write a draft for any email regardless of its score.
-    Used when the team spots a missed opportunity in the No Draft or trash view.
+    Manual override — Button A: synchronously look up SOP response, create Gmail draft,
+    apply 'A Initial Response' label, and remove email from inbox feed.
     """
+    from backend.services import gmail as gmail_svc
+    from backend.services.reply import draft_reply
+    from backend.models.db import Draft, DraftStatus, InboxEmail, EmailStatus
+
     _validate_talent(talent_key)
     ensure_talent_gmail_enabled(talent_key)
+
     token = db.query(TalentToken).filter(
         TalentToken.talent_key.ilike(talent_key), TalentToken.active == True  # noqa: E712
     ).first()
     if not token:
         raise HTTPException(status_code=400, detail="Gmail not connected for this talent.")
-    email_row = db.query(ProcessedEmail).filter(
+
+    # Load talent config
+    settings = get_settings()
+    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_cfg = talent_map.get(talent_key.lower(), {})
+    talent_name = talent_cfg.get("full_name", talent_key)
+    minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
+
+    # Load InboxEmail row for the email metadata
+    inbox_row = db.query(InboxEmail).filter(
+        InboxEmail.gmail_message_id == gmail_message_id,
+        InboxEmail.talent_key == talent_key.lower(),
+    ).first()
+
+    # Fetch body from Gmail if not cached
+    body_text = (inbox_row.body_text if inbox_row else None) or ""
+    subject = (inbox_row.subject if inbox_row else None) or ""
+    sender = (inbox_row.sender if inbox_row else None) or ""
+    thread_id = (inbox_row.thread_id if inbox_row else None) or gmail_message_id
+    brand_name = (inbox_row.brand_name if inbox_row else None) or ""
+    proposed_rate = (inbox_row.proposed_rate if inbox_row else None) or 0.0
+    offer_type = (inbox_row.offer_type if inbox_row else None) or ""
+    triage_reason = (inbox_row.triage_reason if inbox_row else None) or ""
+    message_id_header = None
+
+    if not body_text:
+        try:
+            detail = gmail_svc.get_message_detail(token, gmail_message_id, db=db)
+            body_text = detail.get("body_text") or ""
+            subject = subject or detail.get("subject") or ""
+            sender = sender or detail.get("sender") or ""
+            thread_id = thread_id or detail.get("thread_id") or gmail_message_id
+        except Exception as exc:
+            logger.warning("force-draft: could not fetch body for %s: %s", gmail_message_id, exc)
+
+    # Run SOP lookup + reply generation
+    result = draft_reply(
+        talent_key=talent_key.lower(),
+        talent_name=talent_name,
+        minimum_rate=minimum_rate,
+        subject=subject,
+        sender=sender,
+        offer_type=offer_type,
+        brand_name=brand_name,
+        proposed_rate=proposed_rate,
+        triage_reason=triage_reason,
+        db=db,
+        body_text=body_text,
+    )
+
+    if result.get("is_escalate"):
+        raise HTTPException(
+            status_code=422,
+            detail=f"Escalated — no SOP match: {result.get('escalate_reason', 'unknown reason')}",
+        )
+
+    draft_text = result["draft_text"]
+    cc_str = result.get("cc_recipients") or None
+    cc_list = [c.strip() for c in cc_str.split(",")] if cc_str else None
+
+    # Save draft to Gmail
+    gmail_draft_id = gmail_svc.create_gmail_draft(
+        token,
+        thread_id=thread_id,
+        reply_to=sender,
+        subject=subject,
+        body=draft_text,
+        db=db,
+        in_reply_to=message_id_header,
+        cc=cc_list,
+    )
+
+    # Save Draft row to DB
+    draft_row = Draft(
+        talent_key=talent_key.lower(),
+        gmail_message_id=gmail_message_id,
+        thread_id=thread_id,
+        sender=sender,
+        subject=subject,
+        brand_name=brand_name,
+        proposed_rate=proposed_rate,
+        offer_type=offer_type,
+        draft_text=draft_text,
+        cc_recipients=cc_str,
+        gmail_draft_id=gmail_draft_id,
+        message_id_header=message_id_header,
+        status=DraftStatus.pending,
+        is_escalate=False,
+        triggered_by_job="force-draft-button",
+    )
+    db.add(draft_row)
+
+    # Apply "A Initial Response" label + remove INBOX on the original email
+    try:
+        gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
+    except Exception as exc:
+        logger.warning("force-draft: label apply failed for %s: %s", gmail_message_id, exc)
+
+    # Update ProcessedEmail score to 3 if it exists
+    pe = db.query(ProcessedEmail).filter(
         ProcessedEmail.gmail_message_id == gmail_message_id
     ).first()
-    if email_row and email_row.score == 2:
-        email_row.score = 3
-        db.commit()
-    background_tasks.add_task(_run_force_blast, talent_key, [gmail_message_id])
-    return {"ok": True, "queued": gmail_message_id}
+    if pe:
+        pe.score = 3
+        pe.status = EmailStatus.draft_saved
+        db.add(pe)
+
+    # Remove from InboxEmail so it leaves the feed
+    if inbox_row:
+        db.delete(inbox_row)
+
+    db.commit()
+    return {"ok": True, "draft_id": draft_row.id, "gmail_draft_id": gmail_draft_id}
 
 
 @router.post("/talents/{talent_key}/emails/{gmail_message_id}/archive")
