@@ -1394,8 +1394,6 @@ async function purgeStaleDrafts() {
 
 async function sendAllForTalent(talentKey, btn) {
   if (!confirm(`Send ALL pending drafts for ${talentKey}? This cannot be undone.`)) return;
-  const confirmation = prompt(`Enter your API key to confirm sending all drafts for ${talentKey}:`);
-  if (!confirmation || confirmation.trim() !== API_KEY) { showToast('Send cancelled — key did not match.'); return; }
   const orig = btn.textContent;
   btn.disabled = true;
   showOverlay('Sending drafts…');
