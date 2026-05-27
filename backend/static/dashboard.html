@@ -969,7 +969,7 @@ body {
 
 <script>
 // ── State ──────────────────────────────────────────────────────────────────
-let API_KEY = localStorage.getItem('inbox_api_key') || '';
+let API_KEY = sessionStorage.getItem('inbox_api_key') || '';
 
 const state = {
   view: 'overview',
@@ -1047,11 +1047,11 @@ async function api(method, path, body = null) {
   try { res = await fetch(path, opts); }
   catch (e) { showToast('Network error: ' + e.message); throw e; }
   if (res.status === 403) {
-    localStorage.removeItem('inbox_api_key');
+    sessionStorage.removeItem('inbox_api_key');
     API_KEY = '';
     try {
       const skr = await fetch('/auth/session-key');
-      if (skr.ok) { const skd = await skr.json(); if (skd.api_key) { API_KEY = skd.api_key; localStorage.setItem('inbox_api_key', skd.api_key); return api(method, path, body); } }
+      if (skr.ok) { const skd = await skr.json(); if (skd.api_key) { API_KEY = skd.api_key; sessionStorage.setItem('inbox_api_key', skd.api_key); return api(method, path, body); } }
     } catch (_) {}
     showApiKeyOverlay();
     throw new Error('Invalid API key');
@@ -1154,7 +1154,7 @@ document.getElementById('btn-api-submit').addEventListener('click', () => {
   const val = document.getElementById('api-key-input').value.trim();
   if (!val) return;
   API_KEY = val;
-  localStorage.setItem('inbox_api_key', val);
+  sessionStorage.setItem('inbox_api_key', val);
   hideApiKeyOverlay();
   bootstrap();
 });
@@ -1214,7 +1214,7 @@ async function bootstrap() {
   if (!API_KEY) {
     try {
       const r = await fetch('/auth/session-key');
-      if (r.ok) { const d = await r.json(); if (d.api_key) { API_KEY = d.api_key; localStorage.setItem('inbox_api_key', d.api_key); } }
+      if (r.ok) { const d = await r.json(); if (d.api_key) { API_KEY = d.api_key; sessionStorage.setItem('inbox_api_key', d.api_key); } }
     } catch (_) {}
   }
   if (!API_KEY) { showApiKeyOverlay(); return; }
@@ -1394,6 +1394,8 @@ async function purgeStaleDrafts() {
 
 async function sendAllForTalent(talentKey, btn) {
   if (!confirm(`Send ALL pending drafts for ${talentKey}? This cannot be undone.`)) return;
+  const confirmation = prompt(`Enter your API key to confirm sending all drafts for ${talentKey}:`);
+  if (!confirmation || confirmation.trim() !== API_KEY) { showToast('Send cancelled — key did not match.'); return; }
   const orig = btn.textContent;
   btn.disabled = true;
   showOverlay('Sending drafts…');

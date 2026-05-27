@@ -458,11 +458,14 @@ def retriage_backfill(db: Session = Depends(get_db)):
 @router.get("/email-feed")
 def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends(get_db)):
     """Processed emails for the Inbox Feed dashboard panel (score 1 and 2 only)."""
+    from sqlalchemy import exists
+    from backend.models.db import InboxEmail
     query = db.query(ProcessedEmail).filter(
-        ProcessedEmail.score > 0, ProcessedEmail.score != 3
+        ProcessedEmail.score > 0, ProcessedEmail.score != 3,
+        # Only show emails still present in Gmail INBOX (reconciler keeps InboxEmail in sync)
+        exists().where(InboxEmail.gmail_message_id == ProcessedEmail.gmail_message_id),
     )
     if hours is not None:
-        from datetime import timedelta
         cutoff = datetime.utcnow() - timedelta(hours=hours)
         query = query.filter(ProcessedEmail.processed_at >= cutoff)
     rows = (

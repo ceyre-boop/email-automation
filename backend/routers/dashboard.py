@@ -510,7 +510,7 @@ def send_all_for_talent(talent_key: str, db: Session = Depends(get_db)):
     from backend.services import gmail as gmail_svc
 
     token = db.query(TalentToken).filter(
-        TalentToken.talent_key == talent_key,
+        TalentToken.talent_key.ilike(talent_key),
         TalentToken.active == True,  # noqa: E712
     ).first()
     if not token:
