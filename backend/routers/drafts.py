@@ -444,6 +444,35 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
     return {"ok": True, "message": "Draft discarded."}
 
 
+@router.post("/{draft_id}/move-to-inbox")
+def move_draft_to_inbox(draft_id: int, body: DiscardBody = DiscardBody(), db: Session = Depends(get_db)):
+    """Activity Hub ↩ Inbox button. Discards draft, restores INBOX label, downgrades score to 2."""
+    from backend.models.db import EmailStatus
+    draft = _get_draft_or_404(db, draft_id)
+    if draft.status not in (DraftStatus.pending,):
+        raise HTTPException(status_code=400, detail=f"Cannot move draft with status '{draft.status}' to inbox.")
+    token = _get_token_or_404(db, draft.talent_key)
+    if draft.gmail_draft_id:
+        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
+    if draft.gmail_message_id:
+        gmail_svc.move_to_inbox(token, draft.gmail_message_id, db=db)
+    pe = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == draft.gmail_message_id
+    ).first()
+    if pe:
+        pe.score = 2
+        pe.status = EmailStatus.pending
+        pe.processed_at = datetime.utcnow()  # refresh so email appears in 24h feed window
+        db.add(pe)
+    draft.status = DraftStatus.discarded
+    draft.reviewed_at = datetime.utcnow()
+    draft.reviewed_by = body.reviewed_by
+    db.add(draft)
+    db.commit()
+    logger.info("Draft %s moved to inbox by %s", draft_id, body.reviewed_by)
+    return {"ok": True}
+
+
 @router.get("/{draft_id}/edit-history")
 def get_edit_history(draft_id: int, db: Session = Depends(get_db)):
     """Full edit log for a single draft."""

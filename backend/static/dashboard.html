@@ -1041,6 +1041,10 @@ async function api(method, path, body = null) {
   if (res.status === 403) {
     localStorage.removeItem('inbox_api_key');
     API_KEY = '';
+    try {
+      const skr = await fetch('/auth/session-key');
+      if (skr.ok) { const skd = await skr.json(); if (skd.api_key) { API_KEY = skd.api_key; localStorage.setItem('inbox_api_key', skd.api_key); return api(method, path, body); } }
+    } catch (_) {}
     showApiKeyOverlay();
     throw new Error('Invalid API key');
   }
@@ -1173,7 +1177,7 @@ async function refreshData() {
       } catch (_) {}
       await loadTalentData(state.selectedTalent, true);
     } else if (state.view === 'overview') {
-      await loadOverview();
+      await loadOverview({ silent: true });
     }
   } finally {
     isRefreshing = false;
@@ -1181,14 +1185,20 @@ async function refreshData() {
 }
 
 async function bootstrap() {
+  if (!API_KEY) {
+    try {
+      const r = await fetch('/auth/session-key');
+      if (r.ok) { const d = await r.json(); if (d.api_key) { API_KEY = d.api_key; localStorage.setItem('inbox_api_key', d.api_key); } }
+    } catch (_) {}
+  }
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
   setInterval(refreshData, 60000);
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
-async function loadOverview() {
-  showOverlay('Loading…');
+async function loadOverview({ silent = false } = {}) {
+  if (!silent) showOverlay('Loading…');
   try {
     const [report, talents] = await Promise.all([
       api('GET', '/api/dashboard/report'),
@@ -1206,7 +1216,7 @@ async function loadOverview() {
     loadHealthScore().catch(() => {});
     loadAnalytics().catch(() => {});
     loadMarco().catch(() => {});
-  } catch (_) {} finally { hideOverlay(); }
+  } catch (_) {} finally { if (!silent) hideOverlay(); }
 }
 
 function showView(name) {
@@ -1215,7 +1225,7 @@ function showView(name) {
   document.getElementById('view-feed').style.display = name === 'feed' ? '' : 'none';
   document.getElementById('nav-overview').classList.toggle('active', name === 'overview');
   document.getElementById('nav-feed').classList.toggle('active', name === 'feed');
-  if (name === 'feed') loadEmailFeed().catch(() => {});
+  if (name === 'feed') loadEmailFeed({ silent: true }).catch(() => {});
   autoTheme(name);
 }
 
@@ -2035,7 +2045,7 @@ async function loadDraftQueue() {
           <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
             ${d.proposed_rate ? `<span style="background:rgba(0,214,143,0.12); border:1px solid rgba(0,214,143,0.25); color:var(--green); border-radius:6px; font-size:10px; font-weight:800; padding:3px 8px; letter-spacing:0.02em;">$${Number(d.proposed_rate).toLocaleString()}</span>` : ''}
             <button onclick="event.stopPropagation(); approveDraft(${d.id}, this)" style="background:rgba(0,214,143,0.15); border:1px solid rgba(0,214,143,0.3); color:var(--green); border-radius:7px; padding:5px 14px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);">✓ Send</button>
-            <button onclick="event.stopPropagation(); discardDraft(${d.id}, this)" style="background:var(--red-dim); border:1px solid var(--red-line); color:var(--red); border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);">✕</button>
+            <button onclick="event.stopPropagation(); moveToInbox(${d.id}, this)" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#60a5fa; border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);" title="Return to Inbox Feed">↩ Inbox</button>
           </div>
         </div>
         ${expanded ? `<div style="border-top:1px solid var(--border); padding:14px 16px; font-size:12px; color:var(--text-2); line-height:1.7; white-space:pre-wrap; font-family:var(--mono); background:var(--surface-3);">${esc(d.draft_text)}</div>` : ''}
@@ -2415,8 +2425,8 @@ async function dismissMarco(id, btn) {
 }
 
 // ── Inbox Feed ─────────────────────────────────────────────────────────────
-async function loadEmailFeed() {
-  showOverlay('Loading inbox feed…');
+async function loadEmailFeed({ silent = false } = {}) {
+  if (!silent) showOverlay('Loading inbox feed…');
   try {
     const rows = await api('GET', '/api/analytics/email-feed?hours=24&limit=100');
     const list = document.getElementById('email-feed-list');
@@ -2427,8 +2437,8 @@ async function loadEmailFeed() {
       return;
     }
     empty.style.display = 'none';
-    const scoreColor = { 1: '#ef4444', 2: '#f59e0b', 3: '#22c55e' };
-    const scoreLabel = { 1: 'Spam', 2: 'Review', 3: 'Draft' };
+    const scoreColor = { 1: '#ef4444', 2: '#f59e0b' };
+    const scoreLabel = { 1: 'Spam', 2: 'Review' };
     list.innerHTML = rows.map(r => {
       const color = scoreColor[r.score] || '#6b7280';
       const label = scoreLabel[r.score] || String(r.score);
@@ -2443,16 +2453,22 @@ async function loadEmailFeed() {
         <span style="color:var(--text-2); min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sender}</span>
         <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
         <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
-        ${r.draft_id
-          ? `<button class="btn btn-primary" style="font-size:11px; padding:2px 8px; white-space:nowrap;" onclick="feedSendDraft(${r.draft_id},this)">Send</button>`
-          : `<button class="btn btn-ghost" style="font-size:11px; padding:2px 8px; white-space:nowrap;" onclick="feedCreateDraft('${r.talent_key}','${r.gmail_message_id}',this)">Create</button>`
-        }
-        <button style="background:none; border:none; color:var(--text-3); cursor:pointer; font-size:16px; line-height:1; padding:0 4px;" onclick="document.getElementById('feed-row-${r.gmail_message_id}').remove(); checkFeedEmpty();" title="Remove from list">&times;</button>
+        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
+          <button onclick="feedActionA('${r.talent_key}','${r.gmail_message_id}',this)"
+            style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
+            title="Force-draft → Activity Hub">A</button>
+          <button onclick="feedActionB('${r.talent_key}','${r.gmail_message_id}',this)"
+            style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
+            title="Keep in inbox for human review">B</button>
+          <button onclick="feedActionC('${r.talent_key}','${r.gmail_message_id}',this)"
+            style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
+            title="Archive as spam">C</button>
+        </div>
       </div>`;
     }).join('');
   } catch(e) {
     showToast('Inbox Feed load failed: ' + e.message);
-  } finally { hideOverlay(); }
+  } finally { if (!silent) hideOverlay(); }
 }
 
 function checkFeedEmpty() {
@@ -2460,39 +2476,42 @@ function checkFeedEmpty() {
   if (!list.children.length) document.getElementById('email-feed-empty').style.display = '';
 }
 
-async function feedSendDraft(draftId, btn) {
-  if (!confirm('Send this draft now?')) return;
-  const orig = btn.innerHTML;
-  btn.innerHTML = '…';
-  btn.disabled = true;
-  showOverlay('Sending draft…');
+async function moveToInbox(id, btn) {
+  if (!confirm('Return to Inbox Feed? Draft will be discarded.')) return;
+  const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
   try {
-    await api('POST', `/api/drafts/${draftId}/approve`, { reviewed_by: 'inbox-feed' });
-    showToast('Sent.');
-    btn.closest('div[id^="feed-row-"]').remove();
-    checkFeedEmpty();
-  } catch(e) {
-    showToast('Send failed: ' + e.message);
-    btn.innerHTML = orig;
-    btn.disabled = false;
-  } finally { hideOverlay(); }
+    await api('POST', `/api/drafts/${id}/move-to-inbox`, { reviewed_by: 'dashboard' });
+    showToast('Email returned to Inbox Feed.');
+    await loadDraftQueue(); renderSidebar();
+  } catch(e) { showToast('Move failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
 }
 
-async function feedCreateDraft(talentKey, gmailMessageId, btn) {
-  const orig = btn.innerHTML;
-  btn.innerHTML = '…';
-  btn.disabled = true;
-  showOverlay('Creating draft…');
+async function feedActionA(talentKey, gmailMessageId, btn) {
+  const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
   try {
     await api('POST', `/api/dashboard/talents/${talentKey}/force-draft/${gmailMessageId}`);
-    showToast('Draft queued — refreshing in a moment…');
-    btn.innerHTML = '✓ Queued';
-    setTimeout(() => loadEmailFeed(), 1500);
-  } catch(e) {
-    showToast('Create failed: ' + e.message);
-    btn.innerHTML = orig;
-    btn.disabled = false;
-  } finally { hideOverlay(); }
+    showToast('Draft queued — will appear in Activity Hub shortly.');
+    document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
+  } catch(e) { showToast('Failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
+}
+
+async function feedActionB(talentKey, gmailMessageId, btn) {
+  const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
+  try {
+    await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/keep-in-inbox`);
+    showToast('Kept in inbox for human review.');
+  } catch(e) { showToast('Failed: ' + e.message); }
+  btn.innerHTML = orig; btn.disabled = false;
+}
+
+async function feedActionC(talentKey, gmailMessageId, btn) {
+  if (!confirm('Archive as spam?')) return;
+  const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
+  try {
+    await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/spam`);
+    showToast('Archived as spam.');
+    document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
+  } catch(e) { showToast('Failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
 }
 
 async function retriageBackfill() {

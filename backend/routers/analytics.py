@@ -462,7 +462,7 @@ def email_feed(hours: int = 24, limit: int = 100, db: Session = Depends(get_db))
     cutoff = datetime.utcnow() - timedelta(hours=hours)
     rows = (
         db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= cutoff, ProcessedEmail.score > 0)
+        .filter(ProcessedEmail.processed_at >= cutoff, ProcessedEmail.score > 0, ProcessedEmail.score != 3)
         .order_by(ProcessedEmail.processed_at.desc())
         .limit(limit)
         .all()

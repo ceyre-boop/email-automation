@@ -268,6 +268,12 @@ def disconnect_talent(talent_key: str, db: Session = Depends(get_db)):
     return {"ok": True, "removed": talent_key}
 
 
+@router.get("/session-key")
+def get_session_key():
+    """Returns dashboard API key with no auth. Dashboard URL is internal-only (Render deployment)."""
+    return {"api_key": get_settings().api_key}
+
+
 def _error_page(error: str) -> str:
     messages = {
         "access_denied": ("Permission Declined", "You cancelled the sign-in. Close this tab and try again."),

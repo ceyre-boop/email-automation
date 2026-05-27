@@ -1403,6 +1403,49 @@ def archive_email(talent_key: str, gmail_message_id: str, db: Session = Depends(
     return {"ok": True}
 
 
+@router.post("/talents/{talent_key}/emails/{gmail_message_id}/keep-in-inbox")
+def keep_in_inbox(talent_key: str, gmail_message_id: str, db: Session = Depends(get_db)):
+    """Inbox Feed B button. Adds INBOX, removes custom labels. Email stays in feed."""
+    from backend.services import gmail as gmail_svc
+    token = (
+        db.query(TalentToken)
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
+        .first()
+    )
+    if not token:
+        raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
+    gmail_svc.restore_inbox_label(token, gmail_message_id, db=db)
+    return {"ok": True}
+
+
+@router.post("/talents/{talent_key}/emails/{gmail_message_id}/spam")
+def mark_as_spam(talent_key: str, gmail_message_id: str, db: Session = Depends(get_db)):
+    """Inbox Feed C button. Archives as spam, updates ProcessedEmail to score=1."""
+    from backend.services import gmail as gmail_svc
+    from backend.models.db import EmailStatus, InboxEmail
+    token = (
+        db.query(TalentToken)
+        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
+        .first()
+    )
+    if not token:
+        raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
+    gmail_svc.archive_as_spam(token, gmail_message_id, db=db)
+    pe = db.query(ProcessedEmail).filter(
+        ProcessedEmail.gmail_message_id == gmail_message_id
+    ).first()
+    if pe:
+        pe.score = 1
+        pe.status = EmailStatus.archived
+        db.add(pe)
+    db.query(InboxEmail).filter(
+        InboxEmail.gmail_message_id == gmail_message_id,
+        InboxEmail.talent_key == talent_key.lower(),
+    ).delete()
+    db.commit()
+    return {"ok": True}
+
+
 # ── Email body (live fetch from Gmail) ────────────────────────────────────────
 
 @router.get("/talents/{talent_key}/emails/{gmail_message_id}/body")

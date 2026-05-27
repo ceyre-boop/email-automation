@@ -545,6 +545,44 @@ def mark_initial_response_sent(token_row, message_id: str, db=None, service=None
         return False
 
 
+def move_to_inbox(token_row, message_id: str, db=None, service=None) -> bool:
+    """Inverse of mark_initial_response_sent. Removes 'A Initial Response', adds INBOX back."""
+    if service is None:
+        service = _gmail_service(token_row, db)
+    label_id = _get_or_create_custom_label(
+        service, "A Initial Response", background_color="#16a765", text_color="#ffffff"
+    )
+    body: dict = {"addLabelIds": ["INBOX"]}
+    if label_id:
+        body["removeLabelIds"] = [label_id]
+    try:
+        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+        return True
+    except HttpError as exc:
+        logger.error("move_to_inbox failed %s/%s: %s", token_row.talent_key, message_id, exc)
+        return False
+
+
+def restore_inbox_label(token_row, message_id: str, db=None, service=None) -> bool:
+    """Adds INBOX, removes 'A Initial Response' and 'Spam' labels. Inbox Feed B-button action."""
+    if service is None:
+        service = _gmail_service(token_row, db)
+    remove_ids = []
+    for name, bg, fg in [("A Initial Response", "#16a765", "#ffffff"), ("Spam", "#e8eaed", "#202124")]:
+        lid = _get_or_create_label(service, name, bg, fg)
+        if lid:
+            remove_ids.append(lid)
+    body: dict = {"addLabelIds": ["INBOX"]}
+    if remove_ids:
+        body["removeLabelIds"] = remove_ids
+    try:
+        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+        return True
+    except HttpError as exc:
+        logger.error("restore_inbox_label failed %s/%s: %s", token_row.talent_key, message_id, exc)
+        return False
+
+
 # ── Drafts ────────────────────────────────────────────────────────────────────
 
 
