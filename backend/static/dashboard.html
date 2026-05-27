@@ -715,7 +715,13 @@ body {
     </div>
   </div>
 
-  <div id="deploy-pill" style="margin:10px 16px 0;">● Live</div>
+  <div style="margin:10px 16px 0; display:flex; align-items:center; justify-content:space-between;">
+    <div id="deploy-pill">● Live</div>
+    <span id="ai-status-dot" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-3);">
+      <span id="ai-dot" style="width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;flex-shrink:0;"></span>
+      <span id="ai-label">AI</span>
+    </span>
+  </div>
 
   <div class="sidebar-nav">
     <button class="nav-btn active" id="nav-overview">
@@ -1184,6 +1190,24 @@ async function refreshData() {
   }
 }
 
+async function pollGuardianStatus() {
+  try {
+    const s = await api('GET', '/api/admin/guardian/status');
+    const dot = document.getElementById('ai-dot');
+    const lbl = document.getElementById('ai-label');
+    if (!dot) return;
+    if (s.ai_enabled) {
+      dot.style.background = 'var(--green)';
+      lbl.textContent = 'AI On';
+      lbl.style.color = 'var(--green)';
+    } else {
+      dot.style.background = 'var(--red)';
+      lbl.textContent = 'AI Off';
+      lbl.style.color = 'var(--red)';
+    }
+  } catch (_) {}
+}
+
 async function bootstrap() {
   if (!API_KEY) {
     try {
@@ -1193,7 +1217,9 @@ async function bootstrap() {
   }
   if (!API_KEY) { showApiKeyOverlay(); return; }
   await loadOverview();
+  pollGuardianStatus();
   setInterval(refreshData, 60000);
+  setInterval(pollGuardianStatus, 30000);
 }
 
 // ── Overview ───────────────────────────────────────────────────────────────
