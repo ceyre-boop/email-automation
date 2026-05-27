@@ -479,14 +479,17 @@ def draft_reply(
     if _response_match:
         text = text[_response_match.end():].strip()
 
-    # Strip any remaining leading SOP metadata lines (Classification:, Talent:, etc.)
+    # Strip any remaining SOP metadata lines from top AND bottom (Classification:, Talent:, etc.)
     _META_LINE_PREFIXES = (
         "classification:", "talent:", "matched scenario:",
         "draft sent:", "remove inbox label:", "apply label:",
+        "rule 11:", "scenario:",
     )
     lines = text.splitlines()
     while lines and any(lines[0].strip().lower().startswith(p) for p in _META_LINE_PREFIXES):
         lines.pop(0)
+    while lines and any(lines[-1].strip().lower().startswith(p) for p in _META_LINE_PREFIXES):
+        lines.pop()
     text = "\n".join(lines).strip()
 
     # Check if GPT decided to escalate

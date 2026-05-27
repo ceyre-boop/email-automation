@@ -1254,14 +1254,17 @@ async function loadOverview({ silent = false } = {}) {
     renderSidebar();
     renderSummaryBar();
     showView('overview');
-    // Wave 2 — cheap endpoints, fire immediately
-    loadDraftQueue().catch(() => {});
-    loadHumanEdited().catch(() => {});
-    loadOrphaned().catch(() => {});
-    loadHealthScore().catch(() => {});
-    loadMarco().catch(() => {});
-    // Wave 3 — heavy analytics, delayed to avoid saturating the single Uvicorn worker
-    setTimeout(() => { loadAnalytics().catch(() => {}); }, 1500);
+    // Wave 2 — staggered 500ms apart to avoid 502 cascade on the single Uvicorn worker
+    const _wave2 = [
+      () => loadDraftQueue().catch(() => {}),
+      () => loadHumanEdited().catch(() => {}),
+      () => loadOrphaned().catch(() => {}),
+      () => loadHealthScore().catch(() => {}),
+      () => loadMarco().catch(() => {}),
+    ];
+    _wave2.forEach((fn, i) => setTimeout(fn, i * 500));
+    // Wave 3 — heavy analytics, fired after all Wave 2 calls have started
+    setTimeout(() => { loadAnalytics().catch(() => {}); }, 3500);
   } catch (_) {} finally { if (!silent) hideOverlay(); }
 }
 
@@ -1410,8 +1413,17 @@ async function purgeStaleDrafts() {
   }
 }
 
+function confirmWithKey(message) {
+  const key = prompt(`${message}\n\nType your API key to confirm:`);
+  if (!key || key.trim() !== API_KEY) {
+    if (key !== null) showToast('Cancelled — key did not match.', 'error');
+    return false;
+  }
+  return true;
+}
+
 async function sendAllForTalent(talentKey, btn) {
-  if (!confirm(`Send ALL pending drafts for ${talentKey}? This cannot be undone.`)) return;
+  if (!confirmWithKey(`Send ALL pending drafts for ${talentKey}?\nThis cannot be undone.`)) return;
   const orig = btn.textContent;
   btn.disabled = true;
   showOverlay('Sending drafts…');
@@ -2104,6 +2116,7 @@ async function loadDraftQueue() {
             ${d.proposed_rate ? `<span style="background:rgba(0,214,143,0.12); border:1px solid rgba(0,214,143,0.25); color:var(--green); border-radius:6px; font-size:10px; font-weight:800; padding:3px 8px; letter-spacing:0.02em;">$${Number(d.proposed_rate).toLocaleString()}</span>` : ''}
             <button onclick="event.stopPropagation(); approveDraft(${d.id}, this)" style="background:rgba(0,214,143,0.15); border:1px solid rgba(0,214,143,0.3); color:var(--green); border-radius:7px; padding:5px 14px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);">✓ Send</button>
             <button onclick="event.stopPropagation(); moveToInbox(${d.id}, this)" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#60a5fa; border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);" title="Return to Inbox Feed">↩ Inbox</button>
+            <button onclick="event.stopPropagation(); dismissDraft(${d.id}, this)" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.25); color:#f87171; border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);" title="Remove from dashboard (keeps Gmail draft)">✕</button>
           </div>
         </div>
         ${expanded ? `<div style="border-top:1px solid var(--border); padding:14px 16px; font-size:12px; color:var(--text-2); line-height:1.7; white-space:pre-wrap; font-family:var(--mono); background:var(--surface-3);">${esc(d.draft_text)}</div>` : ''}
@@ -2482,6 +2495,15 @@ async function dismissMarco(id, btn) {
 }
 
 // ── Inbox Feed ─────────────────────────────────────────────────────────────
+function feedBadge(score, subject) {
+  if (score === 1) return { color: '#6b7280', label: 'SPAM' };
+  if (score === 2) {
+    const isReply = /^re:/i.test((subject || '').trim());
+    return isReply ? { color: '#f59e0b', label: 'REVIEW' } : { color: '#ef4444', label: 'MISSED' };
+  }
+  return { color: '#6b7280', label: String(score) };
+}
+
 async function loadEmailFeed({ silent = false } = {}) {
   if (!silent) showOverlay('Loading inbox feed…');
   try {
@@ -2494,11 +2516,8 @@ async function loadEmailFeed({ silent = false } = {}) {
       return;
     }
     empty.style.display = 'none';
-    const scoreColor = { 1: '#ef4444', 2: '#f59e0b' };
-    const scoreLabel = { 1: 'Spam', 2: 'Review' };
     list.innerHTML = rows.map(r => {
-      const color = scoreColor[r.score] || '#6b7280';
-      const label = scoreLabel[r.score] || String(r.score);
+      const { color, label } = feedBadge(r.score, r.subject);
       const reason = (r.triage_reason || '').slice(0, 90);
       const sender = (r.sender || '').replace(/<.*>/, '').trim().slice(0, 30);
       const subject = (r.subject || '(no subject)').slice(0, 50);
@@ -2531,6 +2550,20 @@ async function loadEmailFeed({ silent = false } = {}) {
 function checkFeedEmpty() {
   const list = document.getElementById('email-feed-list');
   if (!list.children.length) document.getElementById('email-feed-empty').style.display = '';
+}
+
+async function dismissDraft(id, btn) {
+  const card = document.getElementById(`draft-card-${id}`);
+  const orig = btn.innerHTML;
+  btn.innerHTML = '…'; btn.disabled = true;
+  try {
+    await api('POST', `/api/drafts/${id}/dismiss`);
+    if (card) card.remove();
+    renderSidebar();
+  } catch(e) {
+    showToast('Dismiss failed: ' + e.message, 'error');
+    btn.innerHTML = orig; btn.disabled = false;
+  }
 }
 
 async function moveToInbox(id, btn) {

@@ -129,7 +129,7 @@ def list_drafts(
     if status:
         q = q.filter(Draft.status == status)
     else:
-        q = q.filter(Draft.status == DraftStatus.pending)
+        q = q.filter(Draft.status == DraftStatus.pending, Draft.dismissed == False)  # noqa: E712
     if talent_key:
         q = q.filter(Draft.talent_key.ilike(talent_key))
     rows = q.order_by(Draft.created_at.desc()).all()
@@ -544,6 +544,18 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
     db.commit()
     logger.info("Draft %s discarded by %s", draft_id, body.reviewed_by)
     return {"ok": True, "message": "Draft discarded."}
+
+
+@router.post("/{draft_id}/dismiss")
+def dismiss_draft(draft_id: int, db: Session = Depends(get_db)):
+    """Hide draft from Activity Hub. Does NOT touch Gmail or delete the Gmail draft."""
+    draft = _get_draft_or_404(db, draft_id)
+    if draft.status != DraftStatus.pending:
+        raise HTTPException(status_code=400, detail=f"Cannot dismiss draft with status '{draft.status}'.")
+    draft.dismissed = True
+    db.add(draft)
+    db.commit()
+    return {"ok": True}
 
 
 @router.post("/{draft_id}/move-to-inbox")
