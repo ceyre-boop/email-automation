@@ -192,7 +192,7 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
 
         talent_name = talent_cfg.get("full_name", talent_key)
         minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
-        max_drafts = talent_cfg.get("max_drafts")
+        max_drafts = talent_cfg.get("max_drafts_per_day")
 
         # Enforce per-talent draft cap if configured
         if max_drafts is not None:

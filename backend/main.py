@@ -147,7 +147,7 @@ _PRIVACY_HTML = """<!DOCTYPE html>
   <p>We do <strong>not</strong> sell, share, or monetise your data. No emails are sent automatically — all drafts require explicit human approval.</p>
 
   <h2>Data storage</h2>
-  <p>OAuth tokens are stored securely in an encrypted database hosted on Render.com. Email content is processed in memory and not persisted beyond the classification step.</p>
+  <p>OAuth tokens are stored securely in an encrypted database hosted on Render.com. Email metadata and content are stored in an encrypted database to enable inbox management, reply drafting, and audit logging. Data is not shared with third parties.</p>
 
   <h2>Third-party services</h2>
   <ul>

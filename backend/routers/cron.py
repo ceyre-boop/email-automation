@@ -8,12 +8,10 @@ GET  /api/status          → talent connection status overview
 from __future__ import annotations
 
 import logging
-import os
 import threading
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException
-from pydantic import BaseModel
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -21,7 +19,7 @@ from backend.models.db import Draft, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
 from backend.services.oauth import proactive_refresh_all_tokens
 from backend.services.poller import poll_all_inboxes
-from backend.services.talent_access import ensure_talent_gmail_enabled
+
 
 router = APIRouter(tags=["internal"])
 logger = logging.getLogger(__name__)
@@ -316,7 +314,7 @@ def trigger_reconcile(background_tasks: BackgroundTasks):
     return {"ok": True, "queued": True}
 
 
-@router.get("/cron/poll-inboxes")
+@router.get("/cron/poll-inboxes", dependencies=[Depends(verify_api_key)])
 def cron_poll(background_tasks: BackgroundTasks):
     """
     Poll all connected talent inboxes in the background.
@@ -513,86 +511,3 @@ def send_test_email(db: Session = Depends(get_db)):
     return {"ok": True, "sent_from": token_row.talent_key, "sent_from_email": token_row.email, "sent_to": "colineyre222@gmail.com"}
 
 
-class N8nApproveBody(BaseModel):
-    draft_id: int
-    reviewed_by: str = "n8n"
-
-
-@router.post("/api/n8n/approve-draft")
-def n8n_approve_draft(
-    body: N8nApproveBody,
-    x_n8n_secret: str = Header(None),
-    db: Session = Depends(get_db),
-):
-    """
-    Webhook endpoint called by n8n when a manager approves a draft.
-    Protected by X-N8N-Secret header (set N8N_WEBHOOK_SECRET in Render env vars).
-    Idempotent: returns 200 silently if draft is already sent.
-    """
-    expected = os.environ.get("N8N_WEBHOOK_SECRET", "")
-    if expected and x_n8n_secret != expected:
-        raise HTTPException(status_code=403, detail="Invalid n8n webhook secret.")
-
-    draft = db.query(Draft).filter(Draft.id == body.draft_id).first()
-    if not draft:
-        raise HTTPException(status_code=404, detail=f"Draft {body.draft_id} not found.")
-
-    # Idempotent — already sent is a success, not an error
-    if draft.status == DraftStatus.sent:
-        return {"ok": True, "status": "already_sent", "draft_id": body.draft_id}
-
-    if draft.status != DraftStatus.pending:
-        raise HTTPException(status_code=400, detail=f"Draft is '{draft.status}' — cannot approve.")
-
-    ensure_talent_gmail_enabled(draft.talent_key)
-    token = db.query(TalentToken).filter(
-        TalentToken.talent_key.ilike(draft.talent_key),
-        TalentToken.active == True,  # noqa: E712
-    ).first()
-    if not token:
-        raise HTTPException(status_code=400, detail=f"No active Gmail token for {draft.talent_key}.")
-
-    from backend.services import gmail as gmail_svc
-    from backend.services.oauth import TokenRefreshError
-
-    try:
-        cc = gmail_svc.parse_cc_recipients(draft.cc_recipients)
-        success = gmail_svc.send_reply(
-            token_row=token,
-            thread_id=draft.thread_id or "",
-            reply_to=draft.sender or "",
-            subject=draft.subject or "",
-            body=draft.draft_text,
-            db=db,
-            in_reply_to=getattr(draft, "message_id_header", None),
-            cc=cc or None,
-        )
-    except TokenRefreshError:
-        token.active = False
-        db.add(token)
-        db.commit()
-        raise HTTPException(status_code=401, detail=f"Gmail token expired for {draft.talent_key} — reconnect needed.")
-
-    if not success:
-        raise HTTPException(status_code=502, detail="Gmail send failed.")
-
-    if draft.gmail_draft_id:
-        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
-
-    draft.status = DraftStatus.sent
-    draft.reviewed_at = datetime.utcnow()
-    draft.reviewed_by = body.reviewed_by
-    db.add(draft)
-
-    # Sync status on ProcessedEmail so the Sent tab reflects this
-    from backend.models.db import EmailStatus, ProcessedEmail
-    pe = db.query(ProcessedEmail).filter(
-        ProcessedEmail.gmail_message_id == draft.gmail_message_id
-    ).first()
-    if pe:
-        pe.status = EmailStatus.sent
-        db.add(pe)
-
-    db.commit()
-    logger.info("Draft %d approved via n8n by %s", body.draft_id, body.reviewed_by)
-    return {"ok": True, "status": "sent", "draft_id": body.draft_id}

@@ -17,9 +17,10 @@ def verify_api_key(key: str | None = Security(_api_key_header)) -> None:
     """Reject requests that don't supply the correct x-api-key header."""
     expected = get_settings().api_key
     if not expected:
-        # API_KEY not configured — fail open with a warning rather than locking
-        # everyone out during initial setup. Set API_KEY in env to enforce auth.
-        return
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Server misconfigured — API_KEY env var not set.",
+        )
     if key != expected:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
