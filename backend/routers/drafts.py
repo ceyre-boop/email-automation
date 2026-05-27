@@ -461,7 +461,7 @@ def move_draft_to_inbox(draft_id: int, body: DiscardBody = DiscardBody(), db: Se
     ).first()
     if pe:
         pe.score = 2
-        pe.status = EmailStatus.pending
+        pe.status = EmailStatus.flagged
         pe.processed_at = datetime.utcnow()  # refresh so email appears in 24h feed window
         db.add(pe)
     draft.status = DraftStatus.discarded

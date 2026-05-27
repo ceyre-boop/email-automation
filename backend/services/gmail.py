@@ -513,7 +513,14 @@ def archive_as_spam(token_row, message_id: str, db=None, service=None) -> bool:
         service.users().messages().modify(
             userId="me",
             id=message_id,
-            body={"removeLabelIds": ["INBOX", "UNREAD"], "addLabelIds": [label_id]},
+            body={
+                "removeLabelIds": [
+                    "INBOX", "UNREAD",
+                    "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
+                    "CATEGORY_UPDATES", "CATEGORY_FORUMS",
+                ],
+                "addLabelIds": [label_id],
+            },
         ).execute()
         return True
     except HttpError as exc:
@@ -535,7 +542,13 @@ def mark_initial_response_sent(token_row, message_id: str, db=None, service=None
         text_color="#ffffff",
     )
     try:
-        body: dict[str, list[str]] = {"removeLabelIds": ["INBOX", "UNREAD"]}
+        body: dict[str, list[str]] = {
+            "removeLabelIds": [
+                "INBOX", "UNREAD",
+                "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
+                "CATEGORY_UPDATES", "CATEGORY_FORUMS",
+            ]
+        }
         if label_id:
             body["addLabelIds"] = [label_id]
         service.users().messages().modify(userId="me", id=message_id, body=body).execute()
