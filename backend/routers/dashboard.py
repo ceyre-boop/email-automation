@@ -243,56 +243,79 @@ def daily_report(db: Session = Depends(get_db)):
             candidates.append(reset_map[talent_key])
         return max(candidates) if candidates else _fallback_start
 
-    # Load all processed emails since the earliest window we need
+    # SQL aggregation — avoids loading all rows into Python
     earliest = min(_window_for(k) for k in talent_keys_lower) if talent_keys_lower else _fallback_start
-    all_emails = (
-        db.query(ProcessedEmail)
-        .filter(ProcessedEmail.processed_at >= earliest)
-        .all()
-    )
-    emails_by_talent: dict[str, list] = defaultdict(list)
-    for e in all_emails:
-        lkey = _safe_lkey(getattr(e, "talent_key", None))
-        if not lkey or not getattr(e, "processed_at", None):
-            continue
-        emails_by_talent[lkey].append(e)
 
-    # Sent drafts per talent (status='sent') — since today or reset
-    sent_drafts = db.query(Draft).filter(
+    # Score counts per (talent_key, score)
+    email_count_rows = db.query(
+        ProcessedEmail.talent_key,
+        ProcessedEmail.score,
+        func.count().label("cnt"),
+    ).filter(
+        ProcessedEmail.processed_at >= earliest,
+    ).group_by(ProcessedEmail.talent_key, ProcessedEmail.score).all()
+
+    email_score_map: dict[str, dict[int, int]] = defaultdict(lambda: defaultdict(int))
+    for row in email_count_rows:
+        lkey = _safe_lkey(row.talent_key)
+        if lkey:
+            email_score_map[lkey][row.score] += row.cnt
+
+    # Best deal + deal value per talent (only score-3 with a rate)
+    best_deal_rows = db.query(
+        ProcessedEmail.talent_key,
+        ProcessedEmail.brand_name,
+        ProcessedEmail.proposed_rate,
+    ).filter(
+        ProcessedEmail.processed_at >= earliest,
+        ProcessedEmail.score == 3,
+        ProcessedEmail.proposed_rate.isnot(None),
+    ).all()
+
+    best_by_talent: dict[str, object] = {}
+    deal_value_by_talent: dict[str, float] = defaultdict(float)
+    for row in best_deal_rows:
+        lkey = _safe_lkey(row.talent_key)
+        if not lkey:
+            continue
+        deal_value_by_talent[lkey] += row.proposed_rate or 0
+        prev = best_by_talent.get(lkey)
+        if prev is None or (row.proposed_rate or 0) > (prev.proposed_rate or 0):
+            best_by_talent[lkey] = row
+
+    # Sent draft counts per talent
+    sent_count_rows = db.query(
+        Draft.talent_key, func.count().label("cnt")
+    ).filter(
         Draft.status == DraftStatus.sent,
         Draft.reviewed_at >= earliest,
-    ).all()
-    sent_by_talent: dict[str, int] = defaultdict(int)
-    for d in sent_drafts:
-        lkey = _safe_lkey(getattr(d, "talent_key", None))
-        if not lkey:
-            continue
-        sent_by_talent[lkey] += 1
+    ).group_by(Draft.talent_key).all()
+    sent_by_talent: dict[str, int] = {
+        _safe_lkey(r.talent_key): r.cnt for r in sent_count_rows if _safe_lkey(r.talent_key)
+    }
 
-    # Draft backlog — all pending non-escalation drafts regardless of date
-    all_pending = db.query(Draft).filter(
+    # Draft backlog per talent (pending, non-escalate, any date)
+    backlog_count_rows = db.query(
+        Draft.talent_key, func.count().label("cnt")
+    ).filter(
         Draft.status == DraftStatus.pending,
         Draft.is_escalate == False,  # noqa: E712
-    ).all()
-    backlog_by_talent: dict[str, int] = defaultdict(int)
-    for d in all_pending:
-        lkey = _safe_lkey(getattr(d, "talent_key", None))
-        if not lkey:
-            continue
-        backlog_by_talent[lkey] += 1
+    ).group_by(Draft.talent_key).all()
+    backlog_by_talent: dict[str, int] = {
+        _safe_lkey(r.talent_key): r.cnt for r in backlog_count_rows if _safe_lkey(r.talent_key)
+    }
 
-    # New drafts today — pending drafts created since each talent's window start
-    all_pending_with_date = db.query(Draft).filter(
+    # New drafts since window start per talent
+    new_today_count_rows = db.query(
+        Draft.talent_key, func.count().label("cnt")
+    ).filter(
         Draft.status == DraftStatus.pending,
         Draft.is_escalate == False,  # noqa: E712
         Draft.created_at >= earliest,
-    ).all()
-    new_today_by_talent: dict[str, list] = defaultdict(list)
-    for d in all_pending_with_date:
-        lkey = _safe_lkey(getattr(d, "talent_key", None))
-        if not lkey:
-            continue
-        new_today_by_talent[lkey].append(d)
+    ).group_by(Draft.talent_key).all()
+    new_today_by_talent: dict[str, int] = {
+        _safe_lkey(r.talent_key): r.cnt for r in new_today_count_rows if _safe_lkey(r.talent_key)
+    }
 
     total_good = total_uncertain = total_trash = 0
     total_sent = total_draft_backlog = total_new_drafts_today = total_ignore = 0
@@ -302,22 +325,16 @@ def daily_report(db: Session = Depends(get_db)):
     for t_cfg in talent_configs:
         key = t_cfg["key"]
         lkey = key.lower()
-        window = _window_for(lkey)
-        emails = [
-            e for e in emails_by_talent.get(lkey, [])
-            if getattr(e, "processed_at", None) and e.processed_at >= window
-        ]
-
-        count_good = sum(1 for e in emails if e.score == 3)
-        count_uncertain = sum(1 for e in emails if e.score == 2)
-        count_trash = sum(1 for e in emails if e.score == 1)
+        score_map = email_score_map.get(lkey, {})
+        count_good = score_map.get(3, 0)
+        count_uncertain = score_map.get(2, 0)
+        count_trash = score_map.get(1, 0)
         count_sent = sent_by_talent.get(lkey, 0)
         count_backlog = backlog_by_talent.get(lkey, 0)
-        count_new_today = sum(
-            1 for d in new_today_by_talent.get(lkey, [])
-            if getattr(d, "created_at", None) and d.created_at >= window
-        )
+        count_new_today = new_today_by_talent.get(lkey, 0)
         count_ignore = count_trash
+        best = best_by_talent.get(lkey)
+        deal_value = deal_value_by_talent.get(lkey, 0.0)
 
         total_good += count_good
         total_uncertain += count_uncertain
@@ -326,12 +343,7 @@ def daily_report(db: Session = Depends(get_db)):
         total_draft_backlog += count_backlog
         total_new_drafts_today += count_new_today
         total_ignore += count_ignore
-        total_deal_value_today += sum(
-            (e.proposed_rate or 0) for e in emails if e.score == 3 and e.proposed_rate
-        )
-
-        good_with_rate = [e for e in emails if e.score == 3 and e.proposed_rate]
-        best = max(good_with_rate, key=lambda e: e.proposed_rate, default=None)
+        total_deal_value_today += deal_value
 
         cards.append(TalentReportCard(
             talent_key=key,
@@ -344,11 +356,11 @@ def daily_report(db: Session = Depends(get_db)):
             count_drafts=count_backlog,
             new_drafts_today=count_new_today,
             count_ignore=count_ignore,
-            total=len(emails),
+            total=count_good + count_uncertain + count_trash,
             best_deal_brand=best.brand_name if best else None,
             best_deal_rate=best.proposed_rate if best else None,
             pending_drafts=count_backlog,
-            pending_real_drafts=count_new_today,  # sidebar badge = new today
+            pending_real_drafts=count_new_today,
         ))
 
     # ── Calendar-day stats (midnight UTC → now, ignoring manual reset) ──────
