@@ -99,7 +99,7 @@
       "tier": "top",
       "paused": true,
       "_note": "Top earner — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Trin",
@@ -113,7 +113,7 @@
       "tier": "top",
       "paused": true,
       "_note": "Top earner — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Anastasiya",
@@ -125,7 +125,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Hana",
@@ -137,7 +137,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Audur",
@@ -149,7 +149,7 @@
       "minimum_rate_usd": 800,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Britt",
@@ -163,7 +163,7 @@
       "tier": "top",
       "paused": true,
       "_note": "Top earner — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Allee",
@@ -177,7 +177,7 @@
       "tier": "mid",
       "paused": true,
       "_note": "Mid tier — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Katrina",
@@ -193,7 +193,7 @@
       "personal_email": "lizz@gmail.com",
       "_note": "Dual manager escalation: offers above $650 go to Cara; at or below $650 go to Chenni.",
       "paused": true,
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Jenn",
@@ -205,7 +205,7 @@
       "minimum_rate_usd": 500,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Angela",
@@ -217,7 +217,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Colleen",
@@ -231,7 +231,7 @@
       "tier": "mid",
       "paused": true,
       "_note": "Mid tier — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Alana",
@@ -245,7 +245,7 @@
       "tier": "mid",
       "paused": true,
       "_note": "Mid tier — human review only. Auto-draft disabled.",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Grayson",
@@ -257,7 +257,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Kylika",
@@ -269,7 +269,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Skyler",
@@ -281,7 +281,7 @@
       "minimum_rate_usd": 300,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     },
     {
       "key": "Wesley",
@@ -293,7 +293,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
-      "max_drafts_per_day": 50
+      "max_drafts_per_day": 2000
     }
   ],
   "make": {
