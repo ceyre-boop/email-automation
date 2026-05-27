@@ -790,6 +790,7 @@ body {
         </div>
         <div style="display:flex; gap:6px;">
           <button class="btn btn-ghost" onclick="loadDraftQueue()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; padding:4px 10px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
         </div>
       </div>
       <div id="draft-queue-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -930,6 +931,7 @@ body {
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-ghost" onclick="loadEmailFeed()" style="font-size:11px;">↻ Refresh</button>
+        <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
         <button class="btn btn-ghost" onclick="retriageBackfill()" style="font-size:11px; border-color:rgba(251,191,36,0.5); color:#f59e0b;">⟳ Re-triage Score 2</button>
       </div>
     </div>
@@ -1352,6 +1354,16 @@ async function resetAllBadges() {
   } catch (e) {
     showToast('Reset failed — ' + e.message);
   } finally { hideOverlay(); }
+}
+
+async function syncWithGmail(btn) {
+  const orig = btn.innerHTML; btn.innerHTML = '⏳ Syncing…'; btn.disabled = true;
+  try {
+    await api('POST', '/api/sync/reconcile');
+    showToast('Gmail sync started — refreshing in 3s…');
+    setTimeout(() => { loadDraftQueue().catch(()=>{}); loadEmailFeed && loadEmailFeed(); }, 3000);
+  } catch(e) { showToast('Sync failed: ' + (e.message || e)); }
+  finally { btn.innerHTML = orig; btn.disabled = false; }
 }
 
 async function purgeStaleDrafts() {

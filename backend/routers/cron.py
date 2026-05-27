@@ -273,6 +273,76 @@ def _run_reconcile():
         db.close()
 
 
+def _run_inbox_reconcile():
+    """
+    Compare InboxEmail DB rows against actual Gmail INBOX contents for each talent.
+    Delete rows whose message is no longer in INBOX (archived, replied, or moved manually).
+    Runs hourly via scheduler; also triggered by POST /api/sync/reconcile.
+    """
+    from backend.models.db import get_session_factory, InboxEmail, TalentToken
+    from backend.services import gmail as gmail_svc
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+        total_removed = 0
+        for token in tokens:
+            try:
+                service = gmail_svc.build_service(token, db)
+                # Fetch all current INBOX message IDs for this talent in one paginated pass
+                inbox_ids: set[str] = set()
+                page_token = None
+                while True:
+                    kwargs: dict = {"userId": "me", "labelIds": ["INBOX"], "maxResults": 500}
+                    if page_token:
+                        kwargs["pageToken"] = page_token
+                    result = service.users().messages().list(**kwargs).execute()
+                    for msg in result.get("messages", []):
+                        inbox_ids.add(msg["id"])
+                    page_token = result.get("nextPageToken")
+                    if not page_token:
+                        break
+
+                # Delete InboxEmail rows no longer in Gmail INBOX
+                db_rows = db.query(InboxEmail).filter(
+                    InboxEmail.talent_key == token.talent_key.lower()
+                ).all()
+                removed = 0
+                for row in db_rows:
+                    if row.gmail_message_id not in inbox_ids:
+                        db.delete(row)
+                        removed += 1
+                if removed:
+                    db.commit()
+                    total_removed += removed
+                    logger.info(
+                        "inbox_reconcile: %s removed=%d kept=%d",
+                        token.talent_key, removed, len(db_rows) - removed,
+                    )
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("inbox_reconcile: error for %s: %s", token.talent_key, exc)
+        if total_removed:
+            logger.info("inbox_reconcile complete: total_removed=%d", total_removed)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("inbox_reconcile failed: %s", exc)
+    finally:
+        db.close()
+
+
+def _run_full_reconcile():
+    """Run draft reconcile + inbox reconcile together. Called by the sync endpoint."""
+    _run_reconcile()
+    _run_inbox_reconcile()
+
+
+@router.post("/api/sync/reconcile", dependencies=[Depends(verify_api_key)])
+def trigger_reconcile(background_tasks: BackgroundTasks):
+    """On-demand Gmail sync: reconcile pending drafts and inbox emails against real Gmail state."""
+    background_tasks.add_task(_run_full_reconcile)
+    return {"status": "reconciliation started"}
+
+
 @router.post("/api/admin/blast-backlog", dependencies=[Depends(verify_api_key)])
 def blast_backlog(background_tasks: BackgroundTasks):
     """Blast ALL backlogged Score-3 emails with no draft — no batch limit, runs until empty."""
