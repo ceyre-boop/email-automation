@@ -1414,13 +1414,15 @@ def keep_in_inbox(talent_key: str, gmail_message_id: str, db: Session = Depends(
     )
     if not token:
         raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
-    gmail_svc.restore_inbox_label(token, gmail_message_id, db=db)
+    ok = gmail_svc.restore_inbox_label(token, gmail_message_id, db=db)
+    if not ok:
+        raise HTTPException(status_code=502, detail="Gmail label restore failed — token may need refresh.")
     return {"ok": True}
 
 
 @router.post("/talents/{talent_key}/emails/{gmail_message_id}/spam")
 def mark_as_spam(talent_key: str, gmail_message_id: str, db: Session = Depends(get_db)):
-    """Inbox Feed C button. Archives as spam, updates ProcessedEmail to score=1."""
+    """Inbox Feed C button. Archives with Misc label, updates ProcessedEmail to score=1."""
     from backend.services import gmail as gmail_svc
     from backend.models.db import EmailStatus, InboxEmail
     token = (
@@ -1430,7 +1432,13 @@ def mark_as_spam(talent_key: str, gmail_message_id: str, db: Session = Depends(g
     )
     if not token:
         raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
-    gmail_svc.archive_as_spam(token, gmail_message_id, db=db)
+    try:
+        ok = gmail_svc.archive_as_spam(token, gmail_message_id, db=db)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    if not ok:
+        raise HTTPException(status_code=502, detail="Gmail archive failed — token may need refresh.")
+    # Only update DB after confirmed Gmail success
     pe = db.query(ProcessedEmail).filter(
         ProcessedEmail.gmail_message_id == gmail_message_id
     ).first()

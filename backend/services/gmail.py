@@ -654,10 +654,10 @@ def send_reply(
     db=None,
     in_reply_to: str | None = None,
     cc: list[str] | None = None,
-) -> bool:
+) -> tuple[bool, str]:
     """
     Send a reply email as the talent.
-    Used when an agency reviewer approves a draft.
+    Returns (True, "") on success or (False, error_detail) on failure.
     """
     service = _gmail_service(token_row, db)
     plain_body, html_body = _render_email_body(body or "")
@@ -677,10 +677,11 @@ def send_reply(
             userId="me",
             body={"raw": raw, "threadId": thread_id},
         ).execute()
-        return True
+        return True, ""
     except HttpError as exc:
-        logger.error("Send failed for %s: %s", token_row.talent_key, exc)
-        return False
+        detail = str(exc)
+        logger.error("Send failed for %s: %s", token_row.talent_key, detail)
+        return False, detail
 
 
 def send_standalone_message(token_row, to: str, subject: str, body: str, db=None) -> bool:

@@ -322,7 +322,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
 
     try:
         cc = parse_cc_recipients(draft.cc_recipients)
-        success = gmail_svc.send_reply(
+        success, send_error = gmail_svc.send_reply(
             token_row=token,
             thread_id=draft.thread_id or "",
             reply_to=draft.sender or "",
@@ -339,7 +339,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
         raise HTTPException(status_code=401, detail="Gmail token expired — talent must reconnect.")
 
     if not success:
-        raise HTTPException(status_code=502, detail="Gmail send failed — check token and try again.")
+        raise HTTPException(status_code=502, detail=f"Gmail send failed: {send_error}")
 
     if draft.gmail_message_id:
         gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
