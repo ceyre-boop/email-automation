@@ -263,6 +263,22 @@ def list_unread_inbox_messages(token_row, db=None, max_results: int = 100) -> li
     return result.get("messages", [])
 
 
+def list_spam_messages(token_row, db=None, max_results: int = 50) -> list[dict]:
+    """Return messages currently in the SPAM folder. No UNREAD filter — spam items may already be read."""
+    service = _gmail_service(token_row, db)
+    try:
+        result = (
+            service.users()
+            .messages()
+            .list(userId="me", labelIds=["SPAM"], maxResults=max_results)
+            .execute()
+        )
+    except HttpError as exc:
+        logger.error("Gmail spam list error for %s: %s", token_row.talent_key, exc)
+        return []
+    return result.get("messages", [])
+
+
 def get_message_headers(token_row, message_id: str, db=None) -> dict[str, Any]:
     """
     Fetch only headers (subject, from, date) + labels for a message — no body.

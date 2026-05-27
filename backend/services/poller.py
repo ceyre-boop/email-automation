@@ -293,6 +293,16 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
         token_row.last_poll_at = datetime.utcnow()
         db.add(token_row)
         db.commit()
+
+        # Spam folder rescue — draft replies for score=3 emails missed by INBOX filter
+        try:
+            spam_drafted = _spam_sweep_for_talent(token_row, talent_cfg, db)
+            if spam_drafted:
+                logger.info("spam_sweep: %d draft(s) created for %s", spam_drafted, talent_key)
+                summary["drafted"] = summary.get("drafted", 0) + spam_drafted
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("spam_sweep failed for %s: %s", talent_key, exc)
+
         _record_poll_health(db, talent_key, emails_found, emails_processed_count, None,
                             int((time.monotonic() - poll_start) * 1000))
         return summary
@@ -306,6 +316,146 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
     finally:
         _poll_locks[talent_key] = False
         db.close()
+
+
+def _spam_sweep_for_talent(token_row, talent_cfg: dict, db: Session) -> int:
+    """
+    Scan the talent's SPAM folder and draft replies for score=3 emails.
+    Score=1/2: write ProcessedEmail row to skip on next cycle.
+    Score=3: triage + reply + Gmail draft, no label changes.
+    Returns count of drafts created.
+    """
+    talent_key = talent_cfg["key"]
+    messages = gmail_svc.list_spam_messages(token_row, db=db)
+    if not messages:
+        return 0
+
+    all_ids = [m["id"] for m in messages]
+    already_done = _batch_already_processed_ids(db, all_ids)
+    pending = [m for m in messages if m["id"] not in already_done]
+    if not pending:
+        return 0
+
+    talent_name = talent_cfg.get("full_name", talent_key)
+    minimum_rate = float(talent_cfg.get("minimum_rate_usd", 0))
+    service = gmail_svc._gmail_service(token_row, db)
+    drafted = 0
+
+    for msg in pending:
+        message_id = msg["id"]
+        try:
+            detail = gmail_svc.get_message_detail(token_row, message_id, db=db, service=service)
+            if not detail:
+                continue
+            subject = detail.get("subject", "")
+            sender = detail.get("sender", "")
+            sender_domain = detail.get("sender_domain", "")
+            body = detail.get("body_text", "")
+            thread_id = detail.get("thread_id", msg.get("threadId", ""))
+            message_id_header = detail.get("message_id_header", "")
+            email_date = detail.get("email_date")
+
+            triage_result = triage_svc.triage_email(
+                talent_key=talent_key,
+                talent_name=talent_name,
+                minimum_rate=minimum_rate,
+                subject=subject,
+                sender=sender,
+                sender_domain=sender_domain,
+                body=body,
+            )
+            score = triage_result.get("score", 1)
+            brand_name = triage_result.get("brand_name")
+            proposed_rate = triage_result.get("proposed_rate")
+            offer_type = triage_result.get("offer_type")
+            reason = triage_result.get("reason", "")
+
+            if score != 3:
+                _record_processed(
+                    db, talent_key, message_id, thread_id, sender, subject,
+                    score, brand_name, proposed_rate, offer_type, reason,
+                    EmailStatus.archived if score == 1 else EmailStatus.flagged,
+                    body_text=body, email_date=email_date, sender_domain=sender_domain,
+                )
+                db.commit()
+                continue
+
+            reply_result = reply_svc.draft_reply(
+                talent_key=talent_key,
+                talent_name=talent_name,
+                minimum_rate=minimum_rate,
+                subject=subject,
+                sender=sender,
+                offer_type=offer_type,
+                brand_name=brand_name,
+                proposed_rate=proposed_rate,
+                triage_reason=reason,
+                db=db,
+                body_text=body,
+            )
+            if reply_result.get("is_escalate"):
+                _record_processed(
+                    db, talent_key, message_id, thread_id, sender, subject,
+                    score, brand_name, proposed_rate, offer_type, reason,
+                    EmailStatus.flagged,
+                    body_text=body, email_date=email_date, sender_domain=sender_domain,
+                )
+                db.commit()
+                continue
+
+            draft_text = reply_result["draft_text"]
+            cc_str = reply_result.get("cc_recipients")
+            cc_list = [e.strip() for e in cc_str.split(",")] if cc_str else None
+
+            gmail_draft_id = gmail_svc.create_gmail_draft(
+                token_row,
+                thread_id=thread_id,
+                reply_to=sender,
+                subject=subject,
+                body=draft_text,
+                cc=cc_list,
+                db=db,
+                in_reply_to=message_id_header or None,
+                service=service,
+            )
+            if not gmail_draft_id:
+                logger.warning("spam_sweep: draft creation returned None for %s / %s", talent_key, message_id)
+                continue
+
+            db.add(Draft(
+                talent_key=talent_key,
+                gmail_message_id=message_id,
+                thread_id=thread_id,
+                sender=sender,
+                subject=subject,
+                brand_name=brand_name,
+                proposed_rate=proposed_rate,
+                offer_type=offer_type,
+                draft_text=draft_text,
+                cc_recipients=cc_str,
+                gmail_draft_id=gmail_draft_id,
+                message_id_header=message_id_header or None,
+                status=DraftStatus.pending,
+                triggered_by_job="spam_sweep",
+            ))
+            _record_processed(
+                db, talent_key, message_id, thread_id, sender, subject,
+                score, brand_name, proposed_rate, offer_type, reason,
+                EmailStatus.draft_saved,
+                body_text=body, email_date=email_date, sender_domain=sender_domain,
+            )
+            db.commit()
+            drafted += 1
+            logger.info("spam_sweep: drafted reply for %s / %s (%s)", talent_key, message_id, sender)
+
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("spam_sweep error for %s / %s: %s", talent_key, message_id, exc)
+            try:
+                db.rollback()
+            except Exception:  # noqa: BLE001
+                pass
+
+    return drafted
 
 
 def _process_message_in_thread(
