@@ -1040,8 +1040,11 @@ async function api(method, path, body = null) {
   const opts = { method, headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   let res;
-  try { res = await fetch(path, opts); }
+  const controller = new AbortController();
+  const _tid = setTimeout(() => controller.abort(), 15000);
+  try { res = await fetch(path, { ...opts, signal: controller.signal }); }
   catch (e) { showToast('Network error: ' + e.message); throw e; }
+  finally { clearTimeout(_tid); }
   if (res.status === 403) {
     sessionStorage.removeItem('inbox_api_key');
     API_KEY = '';
@@ -1170,12 +1173,12 @@ async function refreshData() {
     if (state.view === 'gmail' && state.selectedTalent) {
       // User is in a talent inbox — silently refresh email list only, never redirect
       try {
-        const [report, talents] = await Promise.all([
+        const [rr, tr] = await Promise.allSettled([
           api('GET', '/api/dashboard/report'),
           api('GET', '/api/dashboard/talents'),
         ]);
-        state.report = report;
-        state.talents = talents;
+        if (rr.status === 'fulfilled') state.report = rr.value;
+        if (tr.status === 'fulfilled') state.talents = tr.value;
         renderSidebar();
         if (state.view === 'overview') loadDraftQueue().catch(() => {});
       } catch (_) {}
@@ -1224,10 +1227,13 @@ async function bootstrap() {
 async function loadOverview({ silent = false } = {}) {
   if (!silent) showOverlay('Loading…');
   try {
-    const [report, talents] = await Promise.all([
+    const [reportResult, talentsResult] = await Promise.allSettled([
       api('GET', '/api/dashboard/report'),
       api('GET', '/api/dashboard/talents'),
     ]);
+    const report = reportResult.status === 'fulfilled' ? reportResult.value : { talents: [], total_good: 0, total_uncertain: 0, total_trash: 0, total_emails: 0, total_sent: 0, total_draft_backlog: 0, total_ignore: 0, total_replies_today: 0 };
+    const talents = talentsResult.status === 'fulfilled' ? talentsResult.value : [];
+    if (reportResult.status === 'rejected') showToast('Dashboard stats unavailable — retrying in 60s');
     state.report = report;
     state.talents = talents;
     renderSidebar();

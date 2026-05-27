@@ -373,10 +373,16 @@ def daily_report(db: Session = Depends(get_db)):
 
     # Reply emails: inbound today on threads where we previously sent — excluding
     # threads we've already drafted/sent a follow-up for today (already handled).
+    _ninety_days_ago = datetime.utcnow() - timedelta(days=90)
     sent_thread_ids = [
         r[0] for r in db.query(Draft.thread_id)
-        .filter(Draft.status == DraftStatus.sent, Draft.thread_id.isnot(None))
+        .filter(
+            Draft.status == DraftStatus.sent,
+            Draft.thread_id.isnot(None),
+            Draft.reviewed_at >= _ninety_days_ago,
+        )
         .distinct()
+        .limit(500)
         .all()
     ]
     replies_today = 0
