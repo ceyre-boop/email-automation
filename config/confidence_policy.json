@@ -107,7 +107,7 @@
     "Michaela": {
       "rule": "Dual manager escalation + floor threshold",
       "condition_a": "If proposed_rate_usd < 1000",
-      "action_a": "Route to Score 1 behavior (archive, no reply). The offer is below even the 'Revisit' threshold.",
+      "action_a": "Route to Score 1 behavior (archive, no reply). The offer is below the minimum rate floor.",
       "condition_b": "If proposed_rate_usd >= 1000 AND proposed_rate_usd <= 4000",
       "action_b": "Route to ESCALATE with note: 'Offer at/below $4,000 — CC Chenni per Michaela's SOP'",
       "condition_c": "If proposed_rate_usd > 4000",

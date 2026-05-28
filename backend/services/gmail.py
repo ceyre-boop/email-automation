@@ -489,6 +489,7 @@ def mark_as_read(token_row, message_id: str, db=None, service=None) -> bool:
 
 def _get_or_create_custom_label(service, label_name: str, *, background_color: str, text_color: str) -> str | None:
     """Return a Gmail user-label ID, creating it if needed. Only whitelisted labels are permitted."""
+    _assert_label_not_blocked(label_name)
     if label_name not in _ALLOWED_LABELS:
         logger.warning("LABEL GUARD: rejected unauthorized label '%s' — only %s are permitted", label_name, sorted(_ALLOWED_LABELS))
         return None
@@ -750,6 +751,22 @@ def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
 # Only these labels may ever be applied. All other label operations are rejected.
 _ALLOWED_LABELS: frozenset[str] = frozenset({"A Initial Response", "Spam", "Misc"})
 
+# These labels are permanently forbidden — applying any of them raises immediately.
+# Belt + suspenders: even if a label somehow exists in Gmail already, it can never
+# be applied through any code path in this file.
+_BLOCKED_LABELS: frozenset[str] = frozenset({
+    "Revisit", "Known Brand", "Nicole Review", "Draft Sent"
+})
+
+
+def _assert_label_not_blocked(label_name: str) -> None:
+    """Raise loudly if label_name is on the hard blocklist. Call before any label operation."""
+    if label_name in _BLOCKED_LABELS:
+        raise ValueError(
+            f"LABEL BLOCKLIST: refusing to create/apply blocked label '{label_name}' — "
+            f"blocked set: {sorted(_BLOCKED_LABELS)}"
+        )
+
 _TRIAGE_LABEL_CFG = {
     1: {"name": "Spam", "backgroundColor": "#e8eaed", "textColor": "#202124"},
 }
@@ -768,6 +785,7 @@ _MANAGER_LABEL_DEFAULT_COLOR = {"backgroundColor": "#e8eaed", "textColor": "#202
 
 def _get_or_create_label(service, name: str, bg: str, fg: str) -> str | None:
     """Return (creating if needed) a Gmail label ID by exact name. Only whitelisted labels are permitted."""
+    _assert_label_not_blocked(name)
     if name not in _ALLOWED_LABELS:
         logger.warning("LABEL GUARD: rejected unauthorized label '%s' — only %s are permitted", name, sorted(_ALLOWED_LABELS))
         return None
@@ -814,8 +832,8 @@ def apply_triage_label(token_row, message_id: str, score: int, db=None, service=
         label_id = _get_or_create_triage_label(svc, score)
         if label_id:
             _apply_label_ids(svc, message_id, [label_id])
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.error("apply_triage_label blocked or failed for %s / %s: %s", token_row.talent_key, message_id, exc)
 
 
 def apply_extra_label(token_row, message_id: str, label_key: str, db=None, service=None) -> None:
@@ -828,8 +846,8 @@ def apply_extra_label(token_row, message_id: str, label_key: str, db=None, servi
         label_id = _get_or_create_label(svc, cfg["name"], cfg["backgroundColor"], cfg["textColor"])
         if label_id:
             _apply_label_ids(svc, message_id, [label_id])
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.error("apply_extra_label blocked or failed for %s / %s (key=%s): %s", token_row.talent_key, message_id, label_key, exc)
 
 
 def apply_manager_review_label(token_row, message_id: str, manager_name: str, db=None, service=None) -> None:
@@ -838,13 +856,14 @@ def apply_manager_review_label(token_row, message_id: str, manager_name: str, db
         if not manager_name:
             return
         name = f"{manager_name} Review"
+        _assert_label_not_blocked(name)
         color = _MANAGER_LABEL_COLORS.get(manager_name, _MANAGER_LABEL_DEFAULT_COLOR)
         svc = service or _gmail_service(token_row, db)
         label_id = _get_or_create_label(svc, name, color["backgroundColor"], color["textColor"])
         if label_id:
             _apply_label_ids(svc, message_id, [label_id])
-    except Exception:  # noqa: BLE001
-        pass
+    except Exception as exc:  # noqa: BLE001
+        logger.error("apply_manager_review_label blocked or failed for %s / %s (manager=%s): %s", token_row.talent_key, message_id, manager_name, exc)
 
 
 def delete_gmail_draft(token_row, gmail_draft_id: str, db=None) -> bool:
