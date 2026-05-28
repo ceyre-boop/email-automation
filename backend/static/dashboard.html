@@ -1043,7 +1043,7 @@ async function api(method, path, body = null) {
   if (body) opts.body = JSON.stringify(body);
   let res;
   const controller = new AbortController();
-  const _tid = setTimeout(() => controller.abort(), 15000);
+  const _tid = setTimeout(() => controller.abort(), 30000);
   try { res = await fetch(path, { ...opts, signal: controller.signal }); }
   catch (e) { showToast('Network error: ' + e.message, 'error'); throw e; }
   finally { clearTimeout(_tid); }

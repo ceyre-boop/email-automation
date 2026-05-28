@@ -294,19 +294,39 @@ def on_startup():
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
 
-    # Auto-poll every 60 seconds + proactive token refresh every 10 minutes
+    # Auto-poll + proactive token refresh + draft queue, etc.
+    # Staggered start_date offsets so the 7 jobs don't all fire on the same tick
+    # at boot, and per-job `jitter` keeps them drifting apart over time —
+    # prevents the single Uvicorn worker from getting bursted into 15s dashboard
+    # fetch timeouts when several jobs and a UI poll land simultaneously.
     try:
+        from datetime import datetime, timedelta
         from apscheduler.schedulers.background import BackgroundScheduler
         from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile
         _scheduler = BackgroundScheduler(daemon=True)
-        _scheduler.add_job(_run_poll, "interval", seconds=45, id="auto_poll", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_draft_queue, "interval", seconds=20, id="draft_queue", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, id="backlog_blaster", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, id="token_refresh", replace_existing=True)
-        _scheduler.add_job(_run_guardian, "interval", seconds=60, id="guardian", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_reconcile, "interval", minutes=5, id="reconcile_drafts", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_inbox_reconcile, "interval", hours=1, id="inbox_reconcile", replace_existing=True, max_instances=1)
+        now = datetime.now()
+        _scheduler.add_job(_run_poll, "interval", seconds=45, jitter=10,
+            next_run_time=now + timedelta(seconds=5),
+            id="auto_poll", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_draft_queue, "interval", seconds=20, jitter=5,
+            next_run_time=now + timedelta(seconds=12),
+            id="draft_queue", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, jitter=7,
+            next_run_time=now + timedelta(seconds=22),
+            id="backlog_blaster", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_guardian, "interval", seconds=60, jitter=15,
+            next_run_time=now + timedelta(seconds=35),
+            id="guardian", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_reconcile, "interval", minutes=5, jitter=30,
+            next_run_time=now + timedelta(seconds=90),
+            id="reconcile_drafts", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, jitter=60,
+            next_run_time=now + timedelta(minutes=3),
+            id="token_refresh", replace_existing=True)
+        _scheduler.add_job(_run_inbox_reconcile, "interval", hours=1,
+            next_run_time=now + timedelta(minutes=15),
+            id="inbox_reconcile", replace_existing=True, max_instances=1)
         _scheduler.start()
-        logger.info("Scheduler started — poll 45s, draft queue 20s, backlog blaster 30s, guardian 60s, token refresh 10min, reconcile 5min, inbox reconcile 1hr.")
+        logger.info("Scheduler started (staggered) — poll 45s±10, draft queue 20s±5, backlog blaster 30s±7, guardian 60s±15, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")

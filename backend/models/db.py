@@ -17,7 +17,6 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
-from sqlalchemy.pool import NullPool
 
 from backend.core.config import get_settings
 
@@ -308,12 +307,36 @@ class GuardianAuditLog(Base):
 # These are created lazily so tests can override DATABASE_URL before import.
 
 
+_engine = None
+_session_factory = None
+
+
 def _make_engine():
-    settings = get_settings()
-    db_url = settings.database_url.replace("postgres://", "postgresql://", 1)
-    # NullPool: open/close a connection per request — prevents exhausting
-    # Supabase Session Pooler's limited free-tier connection slots.
-    return create_engine(db_url, poolclass=NullPool)
+    global _engine
+    if _engine is None:
+        settings = get_settings()
+        db_url = settings.database_url.replace("postgres://", "postgresql://", 1)
+        # QueuePool with pre-ping: reuse connections across requests/jobs to stop
+        # the connection-establish churn against Supabase pooler that was causing
+        # dashboard fetches to time out during peak scheduler activity.
+        _engine = create_engine(
+            db_url,
+            pool_size=5,
+            max_overflow=10,
+            pool_timeout=10,
+            pool_recycle=300,
+            pool_pre_ping=True,
+        )
+    return _engine
+
+
+def reset_engine() -> None:
+    """Drop the cached engine + session factory. Tests call this when they swap DATABASE_URL."""
+    global _engine, _session_factory
+    if _engine is not None:
+        _engine.dispose()
+    _engine = None
+    _session_factory = None
 
 
 def get_engine():
@@ -321,8 +344,10 @@ def get_engine():
 
 
 def get_session_factory():
-    engine = _make_engine()
-    return sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    global _session_factory
+    if _session_factory is None:
+        _session_factory = sessionmaker(autocommit=False, autoflush=False, bind=_make_engine())
+    return _session_factory
 
 
 def create_tables():
