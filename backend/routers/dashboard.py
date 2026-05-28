@@ -2448,141 +2448,125 @@ def clear_all_inboxes(
     }
 
 
+def _run_cleanup_revisit_label() -> None:
+    """Background worker: scan all inboxes, remove Revisit label, restore INBOX, log results."""
+    import time as _time
+    from backend.models.db import get_session_factory
+    from backend.services import gmail as gmail_svc
+
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+        if not tokens:
+            logger.warning("cleanup-revisit-label: no connected tokens found")
+            return
+
+        total_restored = 0
+
+        for token in tokens:
+            talent_key = token.talent_key
+            restored = 0
+            errors = 0
+
+            try:
+                service = gmail_svc.build_service(token, db)
+            except Exception as exc:
+                logger.error("cleanup-revisit-label: could not build service for %s: %s", talent_key, exc)
+                continue
+
+            try:
+                labels_resp = service.users().labels().list(userId="me").execute()
+            except Exception as exc:
+                logger.error("cleanup-revisit-label: label list failed for %s: %s", talent_key, exc)
+                continue
+
+            revisit_label_id: str | None = None
+            for lbl in labels_resp.get("labels", []):
+                if lbl.get("name", "").lower() == "revisit":
+                    revisit_label_id = lbl["id"]
+                    break
+
+            if not revisit_label_id:
+                logger.info("cleanup-revisit-label: no Revisit label for %s — skipping", talent_key)
+                continue
+
+            logger.warning(
+                "cleanup-revisit-label: found Revisit label (id=%s) for %s — scanning all messages",
+                revisit_label_id, talent_key,
+            )
+
+            page_token_gmail = None
+            while True:
+                kwargs: dict = {"userId": "me", "labelIds": [revisit_label_id], "maxResults": 500}
+                if page_token_gmail:
+                    kwargs["pageToken"] = page_token_gmail
+                try:
+                    resp = service.users().messages().list(**kwargs).execute()
+                except Exception as exc:
+                    logger.error("cleanup-revisit-label: messages.list failed for %s: %s", talent_key, exc)
+                    errors += 1
+                    break
+
+                for msg in resp.get("messages", []):
+                    msg_id = msg["id"]
+                    subject = sender = date_str = ""
+                    try:
+                        meta = service.users().messages().get(
+                            userId="me", id=msg_id, format="metadata",
+                            metadataHeaders=["Subject", "From", "Date"],
+                        ).execute()
+                        headers = {h["name"]: h["value"] for h in meta.get("payload", {}).get("headers", [])}
+                        subject = headers.get("Subject", "")
+                        sender = headers.get("From", "")
+                        date_str = headers.get("Date", "")
+                    except Exception:
+                        pass
+
+                    try:
+                        service.users().messages().modify(
+                            userId="me",
+                            id=msg_id,
+                            body={"addLabelIds": ["INBOX"], "removeLabelIds": [revisit_label_id]},
+                        ).execute()
+                        restored += 1
+                        logger.warning(
+                            "cleanup-revisit-label RESTORED | talent=%s | subject=%r | from=%s | date=%s | id=%s",
+                            talent_key, subject, sender, date_str, msg_id,
+                        )
+                    except Exception as exc:
+                        logger.error(
+                            "cleanup-revisit-label: restore failed for %s / %s: %s",
+                            talent_key, msg_id, exc,
+                        )
+                        errors += 1
+
+                    _time.sleep(0.05)
+
+                page_token_gmail = resp.get("nextPageToken")
+                if not page_token_gmail:
+                    break
+
+            total_restored += restored
+            logger.warning(
+                "cleanup-revisit-label: %s done — restored=%d errors=%d",
+                talent_key, restored, errors,
+            )
+
+        logger.warning("cleanup-revisit-label COMPLETE — total restored: %d", total_restored)
+    finally:
+        db.close()
+
+
 @router.post("/cleanup-revisit-label")
 def cleanup_revisit_label(
-    db: Session = Depends(get_db),
+    background_tasks: BackgroundTasks,
     _: str = Depends(verify_api_key),
 ):
     """
     One-time cleanup: find every email across all talent inboxes that carries a
     'Revisit' label (or any case variant), remove the label, and restore INBOX.
-    Returns a log of every affected email so Marco can review what was missed.
+    Runs in background — check Render logs for per-email RESTORED lines and final count.
     """
-    import time as _time
-    from backend.services import gmail as gmail_svc
-
-    tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
-    if not tokens:
-        return {"affected_count": 0, "log": [], "talent_results": []}
-
-    affected_log: list[dict] = []
-    talent_results: list[dict] = []
-
-    for token in tokens:
-        talent_key = token.talent_key
-        restored = 0
-        errors = 0
-
-        try:
-            service = gmail_svc.build_service(token, db)
-        except Exception as exc:
-            logger.error("cleanup-revisit-label: could not build service for %s: %s", talent_key, exc)
-            talent_results.append({"talent": talent_key, "restored": 0, "errors": 1, "note": str(exc)})
-            continue
-
-        # Find the Revisit label ID (exact name match, case-insensitive)
-        try:
-            labels_resp = service.users().labels().list(userId="me").execute()
-        except Exception as exc:
-            logger.error("cleanup-revisit-label: label list failed for %s: %s", talent_key, exc)
-            talent_results.append({"talent": talent_key, "restored": 0, "errors": 1, "note": str(exc)})
-            continue
-
-        revisit_label_id: str | None = None
-        for lbl in labels_resp.get("labels", []):
-            if lbl.get("name", "").lower() == "revisit":
-                revisit_label_id = lbl["id"]
-                break
-
-        if not revisit_label_id:
-            logger.info("cleanup-revisit-label: no 'Revisit' label found for %s — skipping", talent_key)
-            talent_results.append({"talent": talent_key, "restored": 0, "errors": 0, "note": "no Revisit label"})
-            continue
-
-        logger.warning(
-            "cleanup-revisit-label: found Revisit label (id=%s) for %s — scanning all messages",
-            revisit_label_id, talent_key,
-        )
-
-        # Paginate through all messages carrying the Revisit label
-        page_token_gmail = None
-        while True:
-            kwargs: dict = {
-                "userId": "me",
-                "labelIds": [revisit_label_id],
-                "maxResults": 500,
-            }
-            if page_token_gmail:
-                kwargs["pageToken"] = page_token_gmail
-
-            try:
-                resp = service.users().messages().list(**kwargs).execute()
-            except Exception as exc:
-                logger.error("cleanup-revisit-label: messages.list failed for %s: %s", talent_key, exc)
-                errors += 1
-                break
-
-            for msg in resp.get("messages", []):
-                msg_id = msg["id"]
-                # Fetch metadata for the log
-                subject = sender = date_str = ""
-                try:
-                    meta = service.users().messages().get(
-                        userId="me", id=msg_id, format="metadata",
-                        metadataHeaders=["Subject", "From", "Date"],
-                    ).execute()
-                    headers = {h["name"]: h["value"] for h in meta.get("payload", {}).get("headers", [])}
-                    subject = headers.get("Subject", "")
-                    sender = headers.get("From", "")
-                    date_str = headers.get("Date", "")
-                except Exception:
-                    pass
-
-                # Remove Revisit label + restore INBOX
-                try:
-                    service.users().messages().modify(
-                        userId="me",
-                        id=msg_id,
-                        body={
-                            "addLabelIds": ["INBOX"],
-                            "removeLabelIds": [revisit_label_id],
-                        },
-                    ).execute()
-                    restored += 1
-                    affected_log.append({
-                        "talent": talent_key,
-                        "gmail_message_id": msg_id,
-                        "subject": subject,
-                        "sender": sender,
-                        "date": date_str,
-                    })
-                    logger.info(
-                        "cleanup-revisit-label: restored %s / %s — '%s' from %s",
-                        talent_key, msg_id, subject, sender,
-                    )
-                except Exception as exc:
-                    logger.error(
-                        "cleanup-revisit-label: restore failed for %s / %s: %s",
-                        talent_key, msg_id, exc,
-                    )
-                    errors += 1
-
-                _time.sleep(0.05)  # 50 ms — avoid Gmail API quota
-
-            page_token_gmail = resp.get("nextPageToken")
-            if not page_token_gmail:
-                break
-
-        talent_results.append({"talent": talent_key, "restored": restored, "errors": errors})
-        logger.warning(
-            "cleanup-revisit-label: %s complete — restored %d, errors %d",
-            talent_key, restored, errors,
-        )
-
-    total = sum(r["restored"] for r in talent_results)
-    logger.warning("cleanup-revisit-label DONE — total restored: %d across %d accounts", total, len(talent_results))
-    return {
-        "affected_count": total,
-        "log": affected_log,
-        "talent_results": talent_results,
-    }
+    background_tasks.add_task(_run_cleanup_revisit_label)
+    return {"status": "started", "message": "Cleanup running in background — check Render logs for results"}
