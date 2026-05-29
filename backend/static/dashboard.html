@@ -2495,7 +2495,10 @@ async function dismissMarco(id, btn) {
 }
 
 // ── Inbox Feed ─────────────────────────────────────────────────────────────
-function feedBadge(score, subject) {
+function feedBadge(r) {
+  if (r.is_lost) return { color: '#ef4444', label: 'LOST' };
+  const score = r.score;
+  const subject = r.subject;
   if (score === 1) return { color: '#6b7280', label: 'SPAM' };
   if (score === 2) {
     const isReply = /^re:/i.test((subject || '').trim());
@@ -2517,12 +2520,13 @@ async function loadEmailFeed({ silent = false } = {}) {
     }
     empty.style.display = 'none';
     list.innerHTML = rows.map(r => {
-      const { color, label } = feedBadge(r.score, r.subject);
+      const { color, label } = feedBadge(r);
       const reason = (r.triage_reason || '').slice(0, 90);
       const sender = (r.sender || '').replace(/<.*>/, '').trim().slice(0, 30);
       const subject = (r.subject || '(no subject)').slice(0, 50);
       const talentObj = (state.talents || []).find(t => t.key === r.talent_key);
       const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (r.talent_key || '?');
+      const aTitle = r.is_lost ? 'Regenerate draft → Activity Hub' : 'Force-draft → Activity Hub';
       return `<div id="feed-row-${r.gmail_message_id}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--surface-2,#1a1a1a); border-radius:8px; font-size:12px;">
         <span style="background:var(--surface-3,#222); color:var(--text-2); font-size:10px; font-weight:600; padding:2px 7px; border-radius:99px; white-space:nowrap; min-width:60px; text-align:center;">${esc(talentLabel)}</span>
         <span style="background:${color}22; color:${color}; font-weight:700; font-size:10px; padding:2px 7px; border-radius:99px; white-space:nowrap;">${label}</span>
@@ -2530,9 +2534,9 @@ async function loadEmailFeed({ silent = false } = {}) {
         <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
         <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
         <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
-          <button onclick="feedActionA('${r.talent_key}','${r.gmail_message_id}',this)"
+          <button onclick="feedActionA('${r.talent_key}','${r.gmail_message_id}',this,${r.is_lost ? 'true' : 'false'})"
             style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
-            title="Force-draft → Activity Hub">A</button>
+            title="${aTitle}">A</button>
           <button onclick="feedActionB('${r.talent_key}','${r.gmail_message_id}',this)"
             style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
             title="Keep in inbox for human review">B</button>
@@ -2578,11 +2582,16 @@ async function moveToInbox(id, btn) {
   } catch(e) { showToast('Move failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
 }
 
-async function feedActionA(talentKey, gmailMessageId, btn) {
+async function feedActionA(talentKey, gmailMessageId, btn, isLost) {
   const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
   try {
-    await api('POST', `/api/dashboard/talents/${talentKey}/force-draft/${gmailMessageId}`);
-    showToast('Draft queued — will appear in Activity Hub shortly.');
+    const path = isLost
+      ? `/api/drafts/orphaned/${gmailMessageId}/regenerate`
+      : `/api/dashboard/talents/${talentKey}/force-draft/${gmailMessageId}`;
+    await api('POST', path);
+    showToast(isLost
+      ? 'Regenerating LOST draft — will appear in Activity Hub shortly.'
+      : 'Draft queued — will appear in Activity Hub shortly.');
     document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
     loadDraftQueue().catch(() => {});
   } catch(e) { btn.innerHTML = orig; btn.disabled = false; }

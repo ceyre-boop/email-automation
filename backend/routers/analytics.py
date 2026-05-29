@@ -448,25 +448,69 @@ def retriage_backfill(db: Session = Depends(get_db)):
 
 @router.get("/email-feed")
 def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends(get_db)):
-    """Processed emails for the Inbox Feed dashboard panel (score 1 and 2 only)."""
-    from sqlalchemy import exists
+    """Inbox Feed rows: scores 1 & 2 (current behaviour) plus Score-3 LOST rows —
+    Score 3 emails with no draft and no 'A Initial Response' label in Gmail.
+    LOST rows carry is_lost=true so the dashboard can route the [A] button to the
+    Regenerate endpoint instead of force-draft."""
+    from sqlalchemy import exists, select
     from backend.models.db import InboxEmail
-    query = db.query(ProcessedEmail).filter(
+    from backend.services import gmail as gmail_svc
+
+    cutoff = datetime.utcnow() - timedelta(hours=hours) if hours is not None else None
+
+    # Score 1 / 2 rows — existing behaviour
+    base_q = db.query(ProcessedEmail).filter(
         ProcessedEmail.score > 0, ProcessedEmail.score != 3,
-        # Only show emails still present in Gmail INBOX (reconciler keeps InboxEmail in sync)
         exists().where(InboxEmail.gmail_message_id == ProcessedEmail.gmail_message_id),
     )
-    if hours is not None:
-        cutoff = datetime.utcnow() - timedelta(hours=hours)
-        query = query.filter(ProcessedEmail.processed_at >= cutoff)
-    rows = (
-        query
-        .order_by(ProcessedEmail.processed_at.desc())
-        .limit(limit)
-        .all()
+    if cutoff is not None:
+        base_q = base_q.filter(ProcessedEmail.processed_at >= cutoff)
+    base_rows = base_q.order_by(ProcessedEmail.processed_at.desc()).limit(limit).all()
+
+    # Score 3 LOST candidates — no draft, not archived, still in INBOX (joined for label_ids)
+    drafted_subq = select(Draft.gmail_message_id)
+    lost_q = (
+        db.query(ProcessedEmail, InboxEmail.label_ids)
+        .join(InboxEmail, InboxEmail.gmail_message_id == ProcessedEmail.gmail_message_id)
+        .filter(
+            ProcessedEmail.score == 3,
+            ProcessedEmail.status != "archived",
+            ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+        )
     )
-    # Look up pending drafts for these emails in one query
-    message_ids = [r.gmail_message_id for r in rows if r.gmail_message_id]
+    if cutoff is not None:
+        lost_q = lost_q.filter(ProcessedEmail.processed_at >= cutoff)
+    lost_candidates = lost_q.order_by(ProcessedEmail.processed_at.desc()).limit(limit).all()
+
+    # Resolve "A Initial Response" label ID per talent (one labels.list call each).
+    # On failure or absent label → None, which means no rows get filtered out for that
+    # talent (safer default — surface them as LOST so Marco sees them).
+    air_label_by_talent: dict[str, str | None] = {}
+    talent_keys = {pe.talent_key for pe, _ in lost_candidates if pe.talent_key}
+    if talent_keys:
+        tokens = (
+            db.query(TalentToken)
+            .filter(TalentToken.talent_key.in_(talent_keys), TalentToken.active == True)  # noqa: E712
+            .all()
+        )
+        for token in tokens:
+            try:
+                svc = gmail_svc.build_service(token, db)
+                air_label_by_talent[token.talent_key] = gmail_svc.get_label_id_by_name(svc, "A Initial Response")
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("email-feed: label lookup failed for %s: %s", token.talent_key, exc)
+                air_label_by_talent[token.talent_key] = None
+
+    lost_rows: list[ProcessedEmail] = []
+    for pe, label_ids in lost_candidates:
+        air_id = air_label_by_talent.get(pe.talent_key)
+        ids = set((label_ids or "").split(",")) if label_ids else set()
+        if air_id and air_id in ids:
+            continue
+        lost_rows.append(pe)
+
+    # One draft-id lookup for score 1/2 rows (LOST rows by definition have none)
+    message_ids = [r.gmail_message_id for r in base_rows if r.gmail_message_id]
     draft_map: dict[str, int] = {}
     if message_ids:
         drafts = (
@@ -476,8 +520,8 @@ def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends
         )
         draft_map = {d.gmail_message_id: d.id for d in drafts}
 
-    return [
-        {
+    def _serialize(r: ProcessedEmail, is_lost: bool) -> dict:
+        return {
             "gmail_message_id": r.gmail_message_id,
             "talent_key": r.talent_key,
             "sender": r.sender,
@@ -487,9 +531,12 @@ def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends
             "status": r.status if isinstance(r.status, str) else r.status.value,
             "processed_at": r.processed_at.isoformat() if r.processed_at else None,
             "draft_id": draft_map.get(r.gmail_message_id),
+            "is_lost": is_lost,
         }
-        for r in rows
-    ]
+
+    merged = [_serialize(r, False) for r in base_rows] + [_serialize(r, True) for r in lost_rows]
+    merged.sort(key=lambda x: x["processed_at"] or "", reverse=True)
+    return merged[:limit]
 
 
 @router.get("/sop-audit")

@@ -783,6 +783,18 @@ _MANAGER_LABEL_COLORS = {
 _MANAGER_LABEL_DEFAULT_COLOR = {"backgroundColor": "#e8eaed", "textColor": "#202124"}
 
 
+def get_label_id_by_name(service, label_name: str) -> str | None:
+    """Return the Gmail label ID for an exact label name, or None if absent or on API error."""
+    try:
+        existing = service.users().labels().list(userId="me").execute()
+        for lbl in existing.get("labels", []):
+            if lbl.get("name") == label_name:
+                return lbl["id"]
+    except Exception:
+        return None
+    return None
+
+
 def _get_or_create_label(service, name: str, bg: str, fg: str) -> str | None:
     """Return (creating if needed) a Gmail label ID by exact name. Only whitelisted labels are permitted."""
     _assert_label_not_blocked(name)
