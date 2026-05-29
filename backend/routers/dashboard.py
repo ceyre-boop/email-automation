@@ -35,6 +35,7 @@ from backend.models.db import (
     TriageAudit,
 )
 from backend.routers.deps import get_db, verify_api_key
+from backend.services.oauth import TokenRefreshError
 from backend.services.talent_access import ensure_talent_gmail_enabled, is_talent_paused
 
 router = APIRouter(
@@ -1409,95 +1410,116 @@ def force_draft_email(
     triage_reason = (inbox_row.triage_reason if inbox_row else None) or ""
     message_id_header = None
 
-    if not body_text:
-        try:
-            detail = gmail_svc.get_message_detail(token, gmail_message_id, db=db)
-            body_text = detail.get("body_text") or ""
-            subject = subject or detail.get("subject") or ""
-            sender = sender or detail.get("sender") or ""
-            thread_id = thread_id or detail.get("thread_id") or gmail_message_id
-        except Exception as exc:
-            logger.warning("force-draft: could not fetch body for %s: %s", gmail_message_id, exc)
+    try:
+        if not body_text:
+            try:
+                detail = gmail_svc.get_message_detail(token, gmail_message_id, db=db)
+                body_text = detail.get("body_text") or ""
+                subject = subject or detail.get("subject") or ""
+                sender = sender or detail.get("sender") or ""
+                thread_id = thread_id or detail.get("thread_id") or gmail_message_id
+            except TokenRefreshError:
+                raise
+            except Exception as exc:
+                logger.warning("force-draft: could not fetch body for %s: %s", gmail_message_id, exc)
 
-    # Run SOP lookup + reply generation
-    result = draft_reply(
-        talent_key=talent_key.lower(),
-        talent_name=talent_name,
-        minimum_rate=minimum_rate,
-        subject=subject,
-        sender=sender,
-        offer_type=offer_type,
-        brand_name=brand_name,
-        proposed_rate=proposed_rate,
-        triage_reason=triage_reason,
-        db=db,
-        body_text=body_text,
-    )
-
-    if result.get("is_escalate"):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Escalated — no SOP match: {result.get('escalate_reason', 'unknown reason')}",
+        # Run SOP lookup + reply generation
+        result = draft_reply(
+            talent_key=talent_key.lower(),
+            talent_name=talent_name,
+            minimum_rate=minimum_rate,
+            subject=subject,
+            sender=sender,
+            offer_type=offer_type,
+            brand_name=brand_name,
+            proposed_rate=proposed_rate,
+            triage_reason=triage_reason,
+            db=db,
+            body_text=body_text,
         )
 
-    draft_text = result["draft_text"]
-    cc_str = result.get("cc_recipients") or None
-    cc_list = [c.strip() for c in cc_str.split(",")] if cc_str else None
+        if result.get("is_escalate"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Escalated — no SOP match: {result.get('escalate_reason', 'unknown reason')}",
+            )
 
-    # Save draft to Gmail
-    gmail_draft_id = gmail_svc.create_gmail_draft(
-        token,
-        thread_id=thread_id,
-        reply_to=sender,
-        subject=subject,
-        body=draft_text,
-        db=db,
-        in_reply_to=message_id_header,
-        cc=cc_list,
-    )
-    if not gmail_draft_id:
-        raise HTTPException(status_code=502, detail="Gmail draft creation failed — token may need refresh.")
+        draft_text = result["draft_text"]
+        cc_str = result.get("cc_recipients") or None
+        cc_list = [c.strip() for c in cc_str.split(",")] if cc_str else None
 
-    # Save Draft row to DB
-    draft_row = Draft(
-        talent_key=talent_key.lower(),
-        gmail_message_id=gmail_message_id,
-        thread_id=thread_id,
-        sender=sender,
-        subject=subject,
-        brand_name=brand_name,
-        proposed_rate=proposed_rate,
-        offer_type=offer_type,
-        draft_text=draft_text,
-        cc_recipients=cc_str,
-        gmail_draft_id=gmail_draft_id,
-        message_id_header=message_id_header,
-        status=DraftStatus.pending,
-        is_escalate=False,
-        triggered_by_job="force-draft-button",
-    )
-    db.add(draft_row)
+        # Save draft to Gmail
+        gmail_draft_id = gmail_svc.create_gmail_draft(
+            token,
+            thread_id=thread_id,
+            reply_to=sender,
+            subject=subject,
+            body=draft_text,
+            db=db,
+            in_reply_to=message_id_header,
+            cc=cc_list,
+        )
+        if not gmail_draft_id:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Gmail draft creation failed for {talent_key}/{gmail_message_id} — see server logs for status + reason.",
+            )
 
-    # Apply "A Initial Response" label + remove INBOX on the original email
-    labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
-    if not labeled:
-        logger.warning("force-draft: mark_initial_response_sent returned False for %s", gmail_message_id)
+        # Save Draft row to DB
+        draft_row = Draft(
+            talent_key=talent_key.lower(),
+            gmail_message_id=gmail_message_id,
+            thread_id=thread_id,
+            sender=sender,
+            subject=subject,
+            brand_name=brand_name,
+            proposed_rate=proposed_rate,
+            offer_type=offer_type,
+            draft_text=draft_text,
+            cc_recipients=cc_str,
+            gmail_draft_id=gmail_draft_id,
+            message_id_header=message_id_header,
+            status=DraftStatus.pending,
+            is_escalate=False,
+            triggered_by_job="force-draft-button",
+        )
+        db.add(draft_row)
 
-    # Update ProcessedEmail score to 3 if it exists
-    pe = db.query(ProcessedEmail).filter(
-        ProcessedEmail.gmail_message_id == gmail_message_id
-    ).first()
-    if pe:
-        pe.score = 3
-        pe.status = EmailStatus.draft_saved
-        db.add(pe)
+        # Apply "A Initial Response" label + remove INBOX on the original email
+        labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
+        if not labeled:
+            logger.warning("force-draft: mark_initial_response_sent returned False for %s", gmail_message_id)
 
-    # Remove from InboxEmail so it leaves the feed
-    if inbox_row:
-        db.delete(inbox_row)
+        # Update ProcessedEmail score to 3 if it exists
+        pe = db.query(ProcessedEmail).filter(
+            ProcessedEmail.gmail_message_id == gmail_message_id
+        ).first()
+        if pe:
+            pe.score = 3
+            pe.status = EmailStatus.draft_saved
+            db.add(pe)
 
-    db.commit()
-    return {"ok": True, "draft_id": draft_row.id, "gmail_draft_id": gmail_draft_id}
+        # Remove from InboxEmail so it leaves the feed
+        if inbox_row:
+            db.delete(inbox_row)
+
+        db.commit()
+        return {"ok": True, "draft_id": draft_row.id, "gmail_draft_id": gmail_draft_id}
+    except TokenRefreshError as exc:
+        # Drop any uncommitted draft/PE/InboxEmail changes, then mark token inactive on a clean session.
+        db.rollback()
+        tok = db.query(TalentToken).filter(TalentToken.talent_key.ilike(talent_key)).first()
+        if tok:
+            tok.active = False
+            tok.consecutive_failures = (tok.consecutive_failures or 0) + 1
+            tok.last_error = f"force-draft: {exc}"
+            db.add(tok)
+            db.commit()
+        logger.error("force-draft: token refresh failed for %s — deactivated: %s", talent_key, exc)
+        raise HTTPException(
+            status_code=401,
+            detail=f"Gmail token expired for {talent_key} — reconnect required.",
+        )
 
 
 @router.post("/talents/{talent_key}/emails/{gmail_message_id}/archive")

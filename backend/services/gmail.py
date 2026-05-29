@@ -662,7 +662,19 @@ def create_gmail_draft(
         )
         return draft.get("id")
     except HttpError as exc:
-        logger.error("Draft creation failed for %s: %s", token_row.talent_key, exc)
+        status = getattr(getattr(exc, "resp", None), "status", "unknown")
+        reason = getattr(exc, "reason", None) or "unknown"
+        body_snippet = ""
+        raw = getattr(exc, "content", b"") or b""
+        if raw:
+            try:
+                body_snippet = raw[:240].decode("utf-8", "ignore")
+            except Exception:
+                body_snippet = "<unreadable>"
+        logger.error(
+            "Draft creation failed for %s — status=%s reason=%s body=%s",
+            token_row.talent_key, status, reason, body_snippet,
+        )
         return None
 
 

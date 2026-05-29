@@ -315,87 +315,107 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
     sender = pe.sender or (inbox_row.sender if inbox_row else "") or ""
     thread_id = pe.thread_id or (inbox_row.thread_id if inbox_row else None) or gmail_message_id
 
-    if not body_text:
-        try:
-            detail = gmail_svc.get_message_detail(token, gmail_message_id, db=db)
-            body_text = detail.get("body_text") or ""
-            subject = subject or detail.get("subject") or ""
-            sender = sender or detail.get("sender") or ""
-            thread_id = thread_id or detail.get("thread_id") or gmail_message_id
-        except Exception as exc:
-            logger.warning("regenerate: could not fetch body for %s: %s", gmail_message_id, exc)
+    try:
+        if not body_text:
+            try:
+                detail = gmail_svc.get_message_detail(token, gmail_message_id, db=db)
+                body_text = detail.get("body_text") or ""
+                subject = subject or detail.get("subject") or ""
+                sender = sender or detail.get("sender") or ""
+                thread_id = thread_id or detail.get("thread_id") or gmail_message_id
+            except TokenRefreshError:
+                raise
+            except Exception as exc:
+                logger.warning("regenerate: could not fetch body for %s: %s", gmail_message_id, exc)
 
-    result = draft_reply(
-        talent_key=pe.talent_key.lower(),
-        talent_name=talent_name,
-        minimum_rate=minimum_rate,
-        subject=subject,
-        sender=sender,
-        offer_type=pe.offer_type or "",
-        brand_name=pe.brand_name or "",
-        proposed_rate=pe.proposed_rate or 0.0,
-        triage_reason=pe.triage_reason or "",
-        db=db,
-        body_text=body_text,
-    )
-
-    if result.get("is_escalate"):
-        raise HTTPException(
-            status_code=422,
-            detail=f"Escalated — no SOP match: {result.get('escalate_reason', 'unknown reason')}",
+        result = draft_reply(
+            talent_key=pe.talent_key.lower(),
+            talent_name=talent_name,
+            minimum_rate=minimum_rate,
+            subject=subject,
+            sender=sender,
+            offer_type=pe.offer_type or "",
+            brand_name=pe.brand_name or "",
+            proposed_rate=pe.proposed_rate or 0.0,
+            triage_reason=pe.triage_reason or "",
+            db=db,
+            body_text=body_text,
         )
 
-    draft_text = result["draft_text"]
-    cc_str = result.get("cc_recipients") or None
-    cc_list = [c.strip() for c in cc_str.split(",")] if cc_str else None
+        if result.get("is_escalate"):
+            raise HTTPException(
+                status_code=422,
+                detail=f"Escalated — no SOP match: {result.get('escalate_reason', 'unknown reason')}",
+            )
 
-    gmail_draft_id = gmail_svc.create_gmail_draft(
-        token,
-        thread_id=thread_id,
-        reply_to=sender,
-        subject=subject,
-        body=draft_text,
-        db=db,
-        in_reply_to=None,
-        cc=cc_list,
-    )
-    if not gmail_draft_id:
-        raise HTTPException(status_code=502, detail="Gmail draft creation failed — token may need refresh.")
+        draft_text = result["draft_text"]
+        cc_str = result.get("cc_recipients") or None
+        cc_list = [c.strip() for c in cc_str.split(",")] if cc_str else None
 
-    # Discard old pending drafts for this email before saving new one
-    old_drafts = db.query(Draft).filter(
-        Draft.gmail_message_id == gmail_message_id,
-        Draft.status == DraftStatus.pending,
-    ).all()
-    for old in old_drafts:
-        old.status = DraftStatus.discarded
-        db.add(old)
+        gmail_draft_id = gmail_svc.create_gmail_draft(
+            token,
+            thread_id=thread_id,
+            reply_to=sender,
+            subject=subject,
+            body=draft_text,
+            db=db,
+            in_reply_to=None,
+            cc=cc_list,
+        )
+        if not gmail_draft_id:
+            raise HTTPException(
+                status_code=502,
+                detail=f"Gmail draft creation failed for {pe.talent_key}/{gmail_message_id} — see server logs for status + reason.",
+            )
 
-    draft_row = Draft(
-        talent_key=pe.talent_key.lower(),
-        gmail_message_id=gmail_message_id,
-        thread_id=thread_id,
-        sender=sender,
-        subject=subject,
-        brand_name=pe.brand_name,
-        proposed_rate=pe.proposed_rate,
-        offer_type=pe.offer_type,
-        draft_text=draft_text,
-        cc_recipients=cc_str,
-        gmail_draft_id=gmail_draft_id,
-        message_id_header=None,
-        status=DraftStatus.pending,
-        is_escalate=False,
-        triggered_by_job="regenerate-button",
-    )
-    db.add(draft_row)
+        # Discard old pending drafts for this email before saving new one
+        old_drafts = db.query(Draft).filter(
+            Draft.gmail_message_id == gmail_message_id,
+            Draft.status == DraftStatus.pending,
+        ).all()
+        for old in old_drafts:
+            old.status = DraftStatus.discarded
+            db.add(old)
 
-    labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
-    if not labeled:
-        logger.warning("regenerate: mark_initial_response_sent returned False for %s", gmail_message_id)
+        draft_row = Draft(
+            talent_key=pe.talent_key.lower(),
+            gmail_message_id=gmail_message_id,
+            thread_id=thread_id,
+            sender=sender,
+            subject=subject,
+            brand_name=pe.brand_name,
+            proposed_rate=pe.proposed_rate,
+            offer_type=pe.offer_type,
+            draft_text=draft_text,
+            cc_recipients=cc_str,
+            gmail_draft_id=gmail_draft_id,
+            message_id_header=None,
+            status=DraftStatus.pending,
+            is_escalate=False,
+            triggered_by_job="regenerate-button",
+        )
+        db.add(draft_row)
 
-    db.commit()
-    return {"ok": True, "draft_id": draft_row.id, "gmail_draft_id": gmail_draft_id}
+        labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
+        if not labeled:
+            logger.warning("regenerate: mark_initial_response_sent returned False for %s", gmail_message_id)
+
+        db.commit()
+        return {"ok": True, "draft_id": draft_row.id, "gmail_draft_id": gmail_draft_id}
+    except TokenRefreshError as exc:
+        db.rollback()
+        tok = db.query(TalentToken).filter(TalentToken.talent_key.ilike(pe.talent_key)).first()
+        if tok:
+            tok.active = False
+            tok.consecutive_failures = (tok.consecutive_failures or 0) + 1
+            tok.last_error = f"regenerate: {exc}"
+            db.add(tok)
+            db.commit()
+        logger.error("regenerate: token refresh failed for %s — deactivated: %s", pe.talent_key, exc)
+        raise HTTPException(
+            status_code=401,
+            detail=f"Gmail token expired for {pe.talent_key} — reconnect required.",
+        )
 
 
 @router.get("/{draft_id}")

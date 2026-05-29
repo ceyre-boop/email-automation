@@ -2527,6 +2527,11 @@ async function loadEmailFeed({ silent = false } = {}) {
       const talentObj = (state.talents || []).find(t => t.key === r.talent_key);
       const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (r.talent_key || '?');
       const aTitle = r.is_lost ? 'Regenerate draft → Activity Hub' : 'Force-draft → Activity Hub';
+      // Hide Draft button on ongoing threads and uncertain rows — drafting there is never correct.
+      const archiveOnly = r.score === 2 || /ongoing thread|prior sent activity/i.test(r.triage_reason || '');
+      const draftBtn = archiveOnly ? '' : `<button onclick="feedDraft('${r.talent_key}','${r.gmail_message_id}',this,${r.is_lost ? 'true' : 'false'})"
+            style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;"
+            title="${aTitle}">Draft</button>`;
       return `<div id="feed-row-${r.gmail_message_id}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--surface-2,#1a1a1a); border-radius:8px; font-size:12px;">
         <span style="background:var(--surface-3,#222); color:var(--text-2); font-size:10px; font-weight:600; padding:2px 7px; border-radius:99px; white-space:nowrap; min-width:60px; text-align:center;">${esc(talentLabel)}</span>
         <span style="background:${color}22; color:${color}; font-weight:700; font-size:10px; padding:2px 7px; border-radius:99px; white-space:nowrap;">${label}</span>
@@ -2534,9 +2539,7 @@ async function loadEmailFeed({ silent = false } = {}) {
         <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
         <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
         <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
-          <button onclick="feedDraft('${r.talent_key}','${r.gmail_message_id}',this,${r.is_lost ? 'true' : 'false'})"
-            style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;"
-            title="${aTitle}">Draft</button>
+          ${draftBtn}
           <button onclick="feedArchive('${r.talent_key}','${r.gmail_message_id}',this)"
             style="background:rgba(156,163,175,0.15);border:1px solid rgba(156,163,175,0.3);color:#9ca3af;border-radius:6px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;"
             title="Remove from Gmail INBOX (no draft, no label)">Archive</button>
