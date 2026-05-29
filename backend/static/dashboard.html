@@ -2533,16 +2533,13 @@ async function loadEmailFeed({ silent = false } = {}) {
         <span style="color:var(--text-2); min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sender}</span>
         <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
         <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
-        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
-          <button onclick="feedActionA('${r.talent_key}','${r.gmail_message_id}',this,${r.is_lost ? 'true' : 'false'})"
-            style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
-            title="${aTitle}">A</button>
-          <button onclick="feedActionB('${r.talent_key}','${r.gmail_message_id}',this)"
-            style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
-            title="Keep in inbox for human review">B</button>
-          <button onclick="feedActionC('${r.talent_key}','${r.gmail_message_id}',this)"
-            style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
-            title="Archive as spam">C</button>
+        <div style="display:flex;gap:6px;align-items:center;flex-shrink:0;">
+          <button onclick="feedDraft('${r.talent_key}','${r.gmail_message_id}',this,${r.is_lost ? 'true' : 'false'})"
+            style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;"
+            title="${aTitle}">Draft</button>
+          <button onclick="feedArchive('${r.talent_key}','${r.gmail_message_id}',this)"
+            style="background:rgba(156,163,175,0.15);border:1px solid rgba(156,163,175,0.3);color:#9ca3af;border-radius:6px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;"
+            title="Remove from Gmail INBOX (no draft, no label)">Archive</button>
         </div>
       </div>`;
     }).join('');
@@ -2582,7 +2579,7 @@ async function moveToInbox(id, btn) {
   } catch(e) { showToast('Move failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
 }
 
-async function feedActionA(talentKey, gmailMessageId, btn, isLost) {
+async function feedDraft(talentKey, gmailMessageId, btn, isLost) {
   const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
   try {
     const path = isLost
@@ -2597,21 +2594,10 @@ async function feedActionA(talentKey, gmailMessageId, btn, isLost) {
   } catch(e) { btn.innerHTML = orig; btn.disabled = false; }
 }
 
-async function feedActionB(talentKey, gmailMessageId, btn) {
+async function feedArchive(talentKey, gmailMessageId, btn) {
   const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
   try {
-    await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/keep-in-inbox`);
-    showToast('Kept in inbox for human review.');
-    document.getElementById(`feed-row-${gmailMessageId}`)?.remove();
-    checkFeedEmpty();
-  } catch(e) { btn.innerHTML = orig; btn.disabled = false; }
-}
-
-async function feedActionC(talentKey, gmailMessageId, btn) {
-  if (!confirm('Archive?')) return;
-  const orig = btn.innerHTML; btn.innerHTML = '…'; btn.disabled = true;
-  try {
-    await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/spam`);
+    await api('POST', `/api/dashboard/talents/${talentKey}/emails/${gmailMessageId}/archive`);
     showToast('Archived.');
     document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
   } catch(e) { btn.innerHTML = orig; btn.disabled = false; }
