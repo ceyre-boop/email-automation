@@ -32,17 +32,25 @@ Talent matching is mandatory.
 
 This workflow is for INITIAL inbound emails only.
 
-- Draft responses only for first-time inbound emails or new deal inquiries.
-- If the email is part of an ongoing thread, follow-up, negotiation, or reply after the initial response, do not draft a response.
-- Return:
+Eligible initial inbound emails are determined by the automation trigger conditions before this workflow runs.
 
-Classification: Human Admin Required  
-Reason: This appears to be a follow-up or ongoing conversation.  
-Draft Sent: No  
-Remove INBOX Label: Yes  
-Apply Label: Revisit
+As an additional safeguard, the workflow should only process emails where:
 
-5. Default to Initial Approved Response
+- Gmail thread message count = 1
+
+If the Gmail thread message count is greater than 1:
+
+- do not create a draft
+- do not remove the INBOX label
+- do not apply any label
+- leave the email untouched in the INBOX for human review
+
+Output:
+Classification: Human Admin Required
+Reason: Existing email thread detected.
+Draft Created: No
+Remove INBOX Label: No
+Apply Label: None 5. Default to Initial Approved Response
 
 Each talent has an Initial Approved Response.
 
@@ -50,15 +58,15 @@ Each talent has an Initial Approved Response.
 - Only choose another approved response if the email clearly matches a more specific scenario.
 - Only avoid the Initial Approved Response if the email is obvious spam, an event invite, irrelevant, or requires human admin review.
 
-6. Conservative Spam Handling
+6. Spam Handling
 
-Err on the side of responding.
+Spam handling is managed by Google/Gmail, not by this automation.
 
-- Only classify as Spam if the email is clearly and truly spam.
-- Do not classify as Spam merely because the email is vague, low-budget, generic, poorly written, or from an unfamiliar sender.
-- Spam indicators include phishing, scams, suspicious links, unrelated service pitches, fake invoices, malware, adult/illegal content, or obvious automated junk.
-- If there is any reasonable chance the email is a real brand, agency, PR, collaboration, gifting, partnership, event-related brand inquiry, or paid inquiry, do not mark as Spam.
-- If uncertain, use the Initial Approved Response or Human Admin Required.
+- Do not classify emails as Spam.
+- Do not move emails to Spam.
+- Do not apply a Spam label.
+- Do not trash or delete emails.
+- If an email reaches this workflow, process it according to the normal workflow rules.
 
 7. Event / Appearance / Speaking Invite Emails
 
@@ -158,28 +166,24 @@ This workflow applies only to eligible initial inbound emails currently in the I
 
 Eligible emails are determined by the automation trigger conditions before this workflow runs.
 
-If an email reaches this workflow, process it through exactly ONE of the following actions:
+Every processed email must result in exactly ONE of the following outcomes:
 
-- Option A — Approved Response Sent
-- Option B — Ignore / Human Review
-- Option C — Spam
+- Option A — Draft Created
+- Option B — No Draft / Human Review
 
 These actions are mutually exclusive.
 Only one option may be applied per email.
 
-Do not apply Option A, B, or C to non-INBOX emails.
-Do not create or apply any labels except the labels explicitly stated in Option A, B, or C.
+No labels may be created, applied, inferred, or modified except the explicitly approved label:
+A Initial Response
 
 ---
 
-Option A — Approved Response Sent (Default Action)
-This is the default and preferred outcome for valid inbound opportunities.
-
+Option A — Draft Created
 Use when:
 
 - an approved response is matched
-- a draft and/or reply is successfully created or sent
-- the email appears to be a legitimate partnership, collaboration, PR, gifting, campaign, or business opportunity
+- an email draft is generated
 
 Action:
 
@@ -189,77 +193,42 @@ Action:
 
 Important:
 
-- This should be the most common automation outcome.
-- When uncertain between responding or ignoring, prefer Option A.
-- It is better to send an initial approved response than to accidentally ignore a legitimate opportunity.
-
----
-
-Option B — Ignore / Human Review
-Use when:
-
+- The INBOX label should ONLY be removed when a draft is generated.
+- The A Initial Response label must be applied every time a draft is generated.
+- No other labels may be applied.
+  Option B — No Draft / Human Review
+  Use when:
+- no draft is generated
+- the email is ignored
 - the email requires human review
-- the email is part of an ongoing thread or negotiation
 - the email is an event / appearance / speaking invite
 - the email originated from the talent’s personal email
-- the email should not receive an automated response
-- the email is intentionally being ignored but should remain visible for staff review
+- the email should remain visible for staff review
 
 Action:
 
-- Draft Created/Sent: No
+- Draft Created: No
 - Remove INBOX Label: No
 - Apply Label: None
 - Leave email in INBOX exactly as is
 
 Important:
 
-- Emails under Option B are NOT spam.
-- Do not archive, relabel, trash, or move these emails.
-- These emails should remain untouched in the Inbox for manual staff handling.
-
----
-
-Option C — Spam
-This should be rare.
-
-Use ONLY when the email is clearly and unquestionably spam.
-
-Examples include:
-
-- phishing attempts
-- malware or suspicious attachments
-- fake invoices
-- unrelated SEO/web/design service spam
-- obvious automated junk
-- scams
-- adult/illegal content
-- malicious or deceptive messages
-
-Action:
-
-- Draft Created/Sent: No
-- Remove INBOX Label: Yes (only if spam handling is enabled)
-- Apply Label: Spam or move to Spam folder
-
-Important:
-
-- Spam classification must be extremely conservative.
-- If there is any reasonable possibility the email is a legitimate business inquiry, do NOT use Option C.
-- When uncertain, prefer Option A or Option B.
-- False positives are worse than replying to a questionable email.
+- Do not archive, relabel, trash, move, or modify these emails.
+- Do not apply any other label.
+- Leave the email untouched in the Inbox.
 
 11. Required Output Format
 
 Every processed email must clearly state:
 
-Classification: Approved Response / Ignore / Human Admin Required / Spam  
-Talent: [Talent name, if applicable]  
-Matched Scenario: [Scenario name, if applicable]  
-Draft Sent: Yes / No  
-Remove INBOX Label: Yes / No  
-Apply Label: A Initial Response / Revisit / Spam / None  
-CC: [manager email, if applicable]  
+Classification: Approved Response / Ignore / Human Admin Required
+Talent: [Talent name, if applicable]
+Matched Scenario: [Scenario name, if applicable]
+Draft Created: Yes / No
+Remove INBOX Label: Yes / No
+Apply Label: A Initial Response / None
+CC: [manager email, if applicable]
 Response: [exact approved response, if applicable]
 
 Talent: Katrina Moore
@@ -347,7 +316,7 @@ Approved Response:
 
 We’ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
-Personal Email: ugcbyanastasiya@gmail.com
+Personal Emails: ugcbyanastasiya@gmail.com, anastasiyaraytts@gmail.com
 
 Talent: Wesley Barker
 
