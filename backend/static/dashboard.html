@@ -2527,8 +2527,8 @@ async function loadEmailFeed({ silent = false } = {}) {
       const talentObj = (state.talents || []).find(t => t.key === r.talent_key);
       const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (r.talent_key || '?');
       const aTitle = r.is_lost ? 'Regenerate draft → Activity Hub' : 'Force-draft → Activity Hub';
-      // Hide Draft button on ongoing threads and uncertain rows — drafting there is never correct.
-      const archiveOnly = r.score === 2 || /ongoing thread|prior sent activity/i.test(r.triage_reason || '');
+      // Hide Draft button only when Gmail thread already has prior messages (real reply chain).
+      const archiveOnly = (r.thread_message_count || 1) > 1;
       const draftBtn = archiveOnly ? '' : `<button onclick="feedDraft('${r.talent_key}','${r.gmail_message_id}',this,${r.is_lost ? 'true' : 'false'})"
             style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 12px;font-size:11px;font-weight:700;cursor:pointer;"
             title="${aTitle}">Draft</button>`;

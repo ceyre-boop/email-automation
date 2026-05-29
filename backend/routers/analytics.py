@@ -482,24 +482,35 @@ def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends
         lost_q = lost_q.filter(ProcessedEmail.processed_at >= cutoff)
     lost_candidates = lost_q.order_by(ProcessedEmail.processed_at.desc()).limit(limit).all()
 
-    # Resolve "A Initial Response" label ID per talent (one labels.list call each).
-    # On failure or absent label → None, which means no rows get filtered out for that
-    # talent (safer default — surface them as LOST so Marco sees them).
-    air_label_by_talent: dict[str, str | None] = {}
-    talent_keys = {pe.talent_key for pe, _ in lost_candidates if pe.talent_key}
-    if talent_keys:
+    # Build per-talent Gmail service ONCE — used for both LOST label lookup and the
+    # thread-message-count fetch below. Failures yield no service for that talent
+    # (we degrade gracefully: no LOST filtering, thread count defaults to 1).
+    service_by_talent: dict[str, object] = {}
+    all_talent_keys = (
+        {pe.talent_key for pe in base_rows if pe.talent_key}
+        | {pe.talent_key for pe, _ in lost_candidates if pe.talent_key}
+    )
+    if all_talent_keys:
         tokens = (
             db.query(TalentToken)
-            .filter(TalentToken.talent_key.in_(talent_keys), TalentToken.active == True)  # noqa: E712
+            .filter(TalentToken.talent_key.in_(all_talent_keys), TalentToken.active == True)  # noqa: E712
             .all()
         )
         for token in tokens:
             try:
-                svc = gmail_svc.build_service(token, db)
-                air_label_by_talent[token.talent_key] = gmail_svc.get_label_id_by_name(svc, "A Initial Response")
+                service_by_talent[token.talent_key] = gmail_svc.build_service(token, db)
             except Exception as exc:  # noqa: BLE001
-                logger.warning("email-feed: label lookup failed for %s: %s", token.talent_key, exc)
-                air_label_by_talent[token.talent_key] = None
+                logger.warning("email-feed: build_service failed for %s: %s", token.talent_key, exc)
+
+    # Resolve "A Initial Response" label ID per talent with LOST candidates.
+    air_label_by_talent: dict[str, str | None] = {}
+    for tk in {pe.talent_key for pe, _ in lost_candidates if pe.talent_key}:
+        svc = service_by_talent.get(tk)
+        try:
+            air_label_by_talent[tk] = gmail_svc.get_label_id_by_name(svc, "A Initial Response") if svc else None
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("email-feed: label lookup failed for %s: %s", tk, exc)
+            air_label_by_talent[tk] = None
 
     lost_rows: list[ProcessedEmail] = []
     for pe, label_ids in lost_candidates:
@@ -520,7 +531,41 @@ def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends
         )
         draft_map = {d.gmail_message_id: d.id for d in drafts}
 
+    # Parallel-fetch Gmail thread message counts. Used by the dashboard to gate the
+    # Draft button: count > 1 means the thread already has prior activity (inbound
+    # reply or manual sent reply) and Drafting on it is never correct.
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+
+    thread_pairs: set[tuple[str, str]] = set()
+    for r in list(base_rows) + lost_rows:
+        if r.talent_key and r.thread_id:
+            thread_pairs.add((r.talent_key, r.thread_id))
+
+    thread_count_map: dict[tuple[str, str], int] = {}
+
+    def _fetch_thread_count(talent_key: str, thread_id: str) -> tuple[tuple[str, str], int]:
+        svc = service_by_talent.get(talent_key)
+        if svc is None:
+            return (talent_key, thread_id), 1
+        try:
+            thread = svc.users().threads().get(userId="me", id=thread_id, format="minimal").execute()
+            return (talent_key, thread_id), max(len(thread.get("messages", [])), 1)
+        except Exception:
+            return (talent_key, thread_id), 1
+
+    if thread_pairs:
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            futures = [pool.submit(_fetch_thread_count, tk, tid) for tk, tid in thread_pairs]
+            for fut in as_completed(futures):
+                try:
+                    key, count = fut.result(timeout=5)
+                    thread_count_map[key] = count
+                except Exception:
+                    # Timed-out / errored fetches default to count=1 via missing key.
+                    pass
+
     def _serialize(r: ProcessedEmail, is_lost: bool) -> dict:
+        tc = thread_count_map.get((r.talent_key, r.thread_id), 1) if r.thread_id else 1
         return {
             "gmail_message_id": r.gmail_message_id,
             "talent_key": r.talent_key,
@@ -532,6 +577,7 @@ def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends
             "processed_at": r.processed_at.isoformat() if r.processed_at else None,
             "draft_id": draft_map.get(r.gmail_message_id),
             "is_lost": is_lost,
+            "thread_message_count": tc,
         }
 
     merged = [_serialize(r, False) for r in base_rows] + [_serialize(r, True) for r in lost_rows]
