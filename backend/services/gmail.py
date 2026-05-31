@@ -21,6 +21,15 @@ from googleapiclient.errors import HttpError
 
 from backend.services.oauth import TokenRefreshError, credentials_from_token_row, refresh_if_needed
 
+
+class GmailDraftError(Exception):
+    """Raised when Gmail's drafts.create API returns an HttpError."""
+    def __init__(self, status: str, reason: str, body_snippet: str = ""):
+        self.status = status
+        self.reason = reason
+        self.body_snippet = body_snippet
+        super().__init__(f"Gmail draft API error {status}: {reason}")
+
 logger = logging.getLogger(__name__)
 
 _RAW_URL_RE = re.compile(r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])")
@@ -675,7 +684,7 @@ def create_gmail_draft(
             "Draft creation failed for %s — status=%s reason=%s body=%s",
             token_row.talent_key, status, reason, body_snippet,
         )
-        return None
+        raise GmailDraftError(str(status), str(reason), body_snippet)
 
 
 def send_reply(

@@ -381,20 +381,21 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
         cc_str = result.get("cc_recipients") or None
         cc_list = [c.strip() for c in cc_str.split(",")] if cc_str else None
 
-        gmail_draft_id = gmail_svc.create_gmail_draft(
-            token,
-            thread_id=thread_id,
-            reply_to=sender,
-            subject=subject,
-            body=draft_text,
-            db=db,
-            in_reply_to=None,
-            cc=cc_list,
-        )
-        if not gmail_draft_id:
+        try:
+            gmail_draft_id = gmail_svc.create_gmail_draft(
+                token,
+                thread_id=thread_id,
+                reply_to=sender,
+                subject=subject,
+                body=draft_text,
+                db=db,
+                in_reply_to=None,
+                cc=cc_list,
+            )
+        except gmail_svc.GmailDraftError as exc:
             raise HTTPException(
                 status_code=502,
-                detail=f"Gmail draft creation failed for {pe.talent_key}/{gmail_message_id} — see server logs for status + reason.",
+                detail=f"Gmail draft creation failed for {pe.talent_key} — status={exc.status} reason={exc.reason}",
             )
 
         # Discard old pending drafts for this email before saving new one
@@ -557,16 +558,22 @@ def edit_draft(draft_id: int, body: EditBody, db: Session = Depends(get_db)):
     if draft.gmail_draft_id:
         token = _get_token_or_404(db, draft.talent_key)
         gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
-        new_gmail_draft_id = gmail_svc.create_gmail_draft(
-            token,
-            thread_id=draft.thread_id or "",
-            reply_to=draft.sender or "",
-            subject=draft.subject or "",
-            body=body.draft_text,
-            db=db,
-            cc=parse_cc_recipients(draft.cc_recipients) or None,
-        )
-        draft.gmail_draft_id = new_gmail_draft_id
+        try:
+            new_gmail_draft_id = gmail_svc.create_gmail_draft(
+                token,
+                thread_id=draft.thread_id or "",
+                reply_to=draft.sender or "",
+                subject=draft.subject or "",
+                body=body.draft_text,
+                db=db,
+                cc=parse_cc_recipients(draft.cc_recipients) or None,
+            )
+            draft.gmail_draft_id = new_gmail_draft_id
+        except gmail_svc.GmailDraftError as exc:
+            logger.warning(
+                "update_draft: Gmail draft recreate failed for %s — status=%s reason=%s",
+                draft.talent_key, exc.status, exc.reason,
+            )
 
     db.add(draft)
     db.commit()

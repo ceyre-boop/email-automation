@@ -398,19 +398,23 @@ def _spam_sweep_for_talent(token_row, talent_cfg: dict, db: Session) -> int:
             cc_str = reply_result.get("cc_recipients")
             cc_list = [e.strip() for e in cc_str.split(",")] if cc_str else None
 
-            gmail_draft_id = gmail_svc.create_gmail_draft(
-                token_row,
-                thread_id=thread_id,
-                reply_to=sender,
-                subject=subject,
-                body=draft_text,
-                cc=cc_list,
-                db=db,
-                in_reply_to=message_id_header or None,
-                service=service,
-            )
-            if not gmail_draft_id:
-                logger.warning("spam_sweep: draft creation returned None for %s / %s", talent_key, message_id)
+            try:
+                gmail_draft_id = gmail_svc.create_gmail_draft(
+                    token_row,
+                    thread_id=thread_id,
+                    reply_to=sender,
+                    subject=subject,
+                    body=draft_text,
+                    cc=cc_list,
+                    db=db,
+                    in_reply_to=message_id_header or None,
+                    service=service,
+                )
+            except gmail_svc.GmailDraftError as exc:
+                logger.warning(
+                    "spam_sweep: draft creation failed for %s / %s — status=%s reason=%s",
+                    talent_key, message_id, exc.status, exc.reason,
+                )
                 continue
 
             db.add(Draft(
@@ -756,26 +760,27 @@ def _process_one_message(
         # Save as Gmail Draft in the talent's inbox (unless GPT escalated)
         gmail_draft_id: str | None = None
         if not is_escalate and draft_mode:
-            gmail_draft_id = gmail_svc.create_gmail_draft(
-                token_row,
-                thread_id=thread_id,
-                reply_to=sender,
-                subject=subject,
-                body=draft_text,
-                cc=cc_list or None,
-                db=db,
-                in_reply_to=message_id_header or None,
-                service=service,
-            )
-            # Gmail API failed — escalate so it routes to human review instead of
-            # sitting as a phantom "pending" draft that will fail on approve.
-            if gmail_draft_id is None:
+            try:
+                gmail_draft_id = gmail_svc.create_gmail_draft(
+                    token_row,
+                    thread_id=thread_id,
+                    reply_to=sender,
+                    subject=subject,
+                    body=draft_text,
+                    cc=cc_list or None,
+                    db=db,
+                    in_reply_to=message_id_header or None,
+                    service=service,
+                )
+            except gmail_svc.GmailDraftError as exc:
+                # Gmail API failed — escalate so it routes to human review instead of
+                # sitting as a phantom "pending" draft that will fail on approve.
                 logger.warning(
-                    "Gmail draft creation failed for %s / %s — escalating to human review",
-                    talent_key, message_id,
+                    "Gmail draft creation failed for %s / %s — status=%s reason=%s — escalating",
+                    talent_key, message_id, exc.status, exc.reason,
                 )
                 is_escalate = True
-                escalate_reason = "Gmail draft creation failed — check talent OAuth / Gmail API"
+                escalate_reason = f"Gmail draft creation failed (status={exc.status} reason={exc.reason})"
 
         if is_escalate:
             # ── Option B: GPT escalated or Gmail draft creation failed ──────────
