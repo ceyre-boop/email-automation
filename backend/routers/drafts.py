@@ -316,6 +316,35 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
     thread_id = pe.thread_id or (inbox_row.thread_id if inbox_row else None) or gmail_message_id
 
     try:
+        # Verify the Gmail message still exists before spending GPT tokens.
+        # get_message_headers returns {} on any HttpError (including 404 for deleted messages).
+        msg_check = gmail_svc.get_message_headers(token, gmail_message_id, db=db)
+        if not msg_check:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Gmail message {gmail_message_id} no longer exists — it may have been deleted or permanently archived. Archive this email to remove it from the orphaned list.",
+            )
+        # Use authoritative thread_id from Gmail to avoid stale DB value
+        if msg_check.get("thread_id"):
+            thread_id = msg_check["thread_id"]
+    except HTTPException:
+        raise
+    except TokenRefreshError as exc:
+        db.rollback()
+        tok = db.query(TalentToken).filter(TalentToken.talent_key.ilike(pe.talent_key)).first()
+        if tok:
+            tok.active = False
+            tok.consecutive_failures = (tok.consecutive_failures or 0) + 1
+            tok.last_error = f"regenerate: {exc}"
+            db.add(tok)
+            db.commit()
+        logger.error("regenerate: token refresh failed (pre-check) for %s — deactivated: %s", pe.talent_key, exc)
+        raise HTTPException(
+            status_code=401,
+            detail=f"Gmail token expired for {pe.talent_key} — reconnect required.",
+        )
+
+    try:
         if not body_text:
             try:
                 detail = gmail_svc.get_message_detail(token, gmail_message_id, db=db)
