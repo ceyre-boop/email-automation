@@ -793,6 +793,16 @@ body {
       <div id="draft-queue-list" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
 
+    <!-- ── Recently Sent ─────────────────────────────────────────────────── -->
+    <div class="fade-up" style="margin-bottom:20px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:16px 20px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div class="section-head" style="margin-bottom:0;">Recently Sent</div>
+        <button class="btn btn-ghost" onclick="loadRecentlySent()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+      </div>
+      <div id="recently-sent-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+      <div id="recently-sent-empty" style="display:none; text-align:center; padding:24px 0; color:var(--text-3); font-size:12px;">No sent drafts yet.</div>
+    </div>
+
     <!-- ── System Health ──────────────────────────────────────────────────── -->
     <div id="system-health-bar" class="fade-up" style="margin-bottom:20px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px 20px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
       <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
@@ -1257,6 +1267,7 @@ async function loadOverview({ silent = false } = {}) {
     // Wave 2 — staggered 500ms apart to avoid 502 cascade on the single Uvicorn worker
     const _wave2 = [
       () => loadDraftQueue().catch(() => {}),
+      () => loadRecentlySent().catch(() => {}),
       () => loadHumanEdited().catch(() => {}),
       () => loadOrphaned().catch(() => {}),
       () => loadHealthScore().catch(() => {}),
@@ -2124,6 +2135,36 @@ async function loadDraftQueue() {
     }).join('');
   } catch(e) {
     document.getElementById('draft-queue-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load drafts: ${esc(e.message)}</div>`;
+  }
+}
+
+// ── Recently Sent ────────────────────────────────────────────────────────────
+async function loadRecentlySent() {
+  try {
+    const rows = await api('GET', '/api/drafts?status=sent&limit=20');
+    const list = document.getElementById('recently-sent-list');
+    const empty = document.getElementById('recently-sent-empty');
+    if (!rows || !rows.length) {
+      list.innerHTML = '';
+      empty.style.display = '';
+      return;
+    }
+    empty.style.display = 'none';
+    list.innerHTML = rows.map(d => {
+      const talentObj = (state.talents || []).find(t => t.key === d.talent_key);
+      const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (d.talent_key || '?');
+      const ts = d.reviewed_at ? fmtDateIso(d.reviewed_at) : (d.created_at ? fmtDateIso(d.created_at) : '');
+      const autoBadge = d.triggered_by_job === 'auto_send'
+        ? `<span style="background:rgba(0,214,143,0.12);color:var(--green);border:1px solid rgba(0,214,143,0.25);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;margin-left:4px;">AUTO</span>`
+        : '';
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:12px;background:var(--surface-3);">
+        <span style="background:var(--surface-2);color:var(--text-2);font-size:10px;font-weight:600;padding:1px 6px;border-radius:99px;white-space:nowrap;min-width:52px;text-align:center;">${esc(talentLabel)}</span>
+        <span style="flex:1;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(d.subject||'').replace(/"/g,'&quot;')}">${esc((d.subject||'(no subject)').slice(0,60))}</span>
+        <span style="color:var(--text-3);white-space:nowrap;font-size:11px;">${esc(ts)}${autoBadge}</span>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    document.getElementById('recently-sent-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:8px;">Failed to load: ${esc(e.message)}</div>`;
   }
 }
 

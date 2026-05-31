@@ -112,6 +112,8 @@ def _draft_to_dict(r: Draft, triage_reason: str | None = None) -> dict:
         "is_escalate": bool(r.is_escalate),
         "escalate_reason": r.escalate_reason,
         "created_at": r.created_at.isoformat() if r.created_at else None,
+        "reviewed_at": r.reviewed_at.isoformat() if r.reviewed_at else None,
+        "triggered_by_job": r.triggered_by_job,
         "human_edited": bool(getattr(r, "human_edited", False) or False),
         "human_edited_at": r.human_edited_at.isoformat() if getattr(r, "human_edited_at", None) else None,
         "human_edited_by": getattr(r, "human_edited_by", None),
@@ -122,6 +124,7 @@ def _draft_to_dict(r: Draft, triage_reason: str | None = None) -> dict:
 def list_drafts(
     status: Optional[str] = Query(None, description="Filter by status: pending, approved, sent, discarded"),
     talent_key: Optional[str] = Query(None, description="Filter by talent"),
+    limit: Optional[int] = Query(None, description="Max rows to return"),
     db: Session = Depends(get_db),
 ):
     """Return all drafts, newest first. Defaults to pending only."""
@@ -132,7 +135,8 @@ def list_drafts(
         q = q.filter(Draft.status == DraftStatus.pending, Draft.dismissed == False)  # noqa: E712
     if talent_key:
         q = q.filter(Draft.talent_key.ilike(talent_key))
-    rows = q.order_by(Draft.created_at.desc()).all()
+    q = q.order_by(Draft.created_at.desc())
+    rows = q.limit(limit).all() if limit else q.all()
     msg_ids = [r.gmail_message_id for r in rows if r.gmail_message_id]
     processed_rows = (
         db.query(ProcessedEmail)

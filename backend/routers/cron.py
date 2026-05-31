@@ -348,6 +348,20 @@ def _run_full_reconcile():
     _run_inbox_reconcile()
 
 
+def _run_auto_send():
+    """Auto-send qualifying pending drafts after the configured hold period."""
+    from backend.models.db import get_session_factory
+    from backend.services.auto_send import run_auto_send
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        run_auto_send(db)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Auto-send job failed: %s", exc)
+    finally:
+        db.close()
+
+
 @router.post("/api/sync/reconcile", dependencies=[Depends(verify_api_key)])
 def trigger_reconcile(background_tasks: BackgroundTasks):
     """On-demand Gmail sync: reconcile pending drafts and inbox emails against real Gmail state."""

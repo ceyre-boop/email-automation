@@ -302,7 +302,7 @@ def on_startup():
     try:
         from datetime import datetime, timedelta
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile
+        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send
         _scheduler = BackgroundScheduler(daemon=True)
         now = datetime.now()
         _scheduler.add_job(_run_poll, "interval", seconds=45, jitter=10,
@@ -317,6 +317,9 @@ def on_startup():
         _scheduler.add_job(_run_guardian, "interval", seconds=60, jitter=15,
             next_run_time=now + timedelta(seconds=35),
             id="guardian", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_auto_send, "interval", seconds=60, jitter=10,
+            next_run_time=now + timedelta(seconds=47),
+            id="auto_send", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_reconcile, "interval", minutes=5, jitter=30,
             next_run_time=now + timedelta(seconds=90),
             id="reconcile_drafts", replace_existing=True, max_instances=1)
@@ -327,6 +330,6 @@ def on_startup():
             next_run_time=now + timedelta(minutes=15),
             id="inbox_reconcile", replace_existing=True, max_instances=1)
         _scheduler.start()
-        logger.info("Scheduler started (staggered) — poll 45s±10, draft queue 20s±5, backlog blaster 30s±7, guardian 60s±15, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr.")
+        logger.info("Scheduler started (staggered) — poll 45s±10, draft queue 20s±5, backlog blaster 30s±7, guardian 60s±15, auto_send 60s±10, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")
