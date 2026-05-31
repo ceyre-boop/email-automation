@@ -11,9 +11,10 @@ import html
 import logging
 import re
 from datetime import datetime, timezone
+from email.header import Header
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from email.utils import parsedate_to_datetime
+from email.utils import formataddr, parseaddr, parsedate_to_datetime
 from typing import Any
 
 from googleapiclient.discovery import build
@@ -31,6 +32,19 @@ class GmailDraftError(Exception):
         super().__init__(f"Gmail draft API error {status}: {reason}")
 
 logger = logging.getLogger(__name__)
+
+
+def _safe_address(addr_str: str) -> str:
+    """RFC 2047-encode the display name if it contains non-ASCII characters.
+
+    Gmail's API rejects MIME headers with raw non-ASCII bytes. Senders from
+    Chinese/Korean/accented-name domains must be encoded before insertion.
+    """
+    name, addr = parseaddr(addr_str)
+    if name and not name.isascii():
+        name = Header(name, "utf-8").encode()
+    return formataddr((name, addr)) if name else addr
+
 
 _RAW_URL_RE = re.compile(r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])")
 
@@ -651,9 +665,9 @@ def create_gmail_draft(
     mime_msg = MIMEMultipart("alternative")
     mime_msg.attach(MIMEText(plain_body, "plain"))
     mime_msg.attach(MIMEText(html_body, "html"))
-    mime_msg["To"] = reply_to
+    mime_msg["To"] = _safe_address(reply_to)
     if cc:
-        mime_msg["Cc"] = ", ".join(cc)
+        mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
@@ -706,9 +720,9 @@ def send_reply(
     mime_msg = MIMEMultipart("alternative")
     mime_msg.attach(MIMEText(plain_body, "plain"))
     mime_msg.attach(MIMEText(html_body, "html"))
-    mime_msg["To"] = reply_to
+    mime_msg["To"] = _safe_address(reply_to)
     if cc:
-        mime_msg["Cc"] = ", ".join(cc)
+        mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
@@ -731,7 +745,7 @@ def send_standalone_message(token_row, to: str, subject: str, body: str, db=None
     service = _gmail_service(token_row, db)
     mime_msg = MIMEText(body, "plain")
     mime_msg["From"] = "Colin <colineyre222@gmail.com>"
-    mime_msg["To"] = to
+    mime_msg["To"] = _safe_address(to)
     mime_msg["Subject"] = subject
     raw = base64.urlsafe_b64encode(mime_msg.as_bytes()).decode()
     try:
