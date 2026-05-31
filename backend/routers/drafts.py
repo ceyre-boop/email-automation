@@ -446,6 +446,13 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
             status_code=401,
             detail=f"Gmail token expired for {pe.talent_key} — reconnect required.",
         )
+    except Exception as exc:
+        db.rollback()
+        logger.error("regenerate: unexpected error for %s/%s — %s: %s", pe.talent_key, gmail_message_id, type(exc).__name__, exc)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Unexpected error: {type(exc).__name__}: {exc}",
+        )
 
 
 @router.get("/{draft_id}")
