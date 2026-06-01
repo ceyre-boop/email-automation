@@ -793,6 +793,22 @@ body {
       <div id="draft-queue-list" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
 
+    <!-- ── Orphaned Emails (Draft Recovery) ─────────────────────────────── -->
+    <div class="fade-up" style="margin-bottom:24px;" id="orphaned-section">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <div style="display:flex; align-items:center; gap:10px;">
+          <div class="section-head" style="margin-bottom:0;">Lost Drafts</div>
+          <span id="orphaned-count" style="background:var(--red-dim); color:var(--red); border:1px solid var(--red-line); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
+          <span style="font-size:11px; color:var(--text-3);">Score 3 emails with no draft — click Regenerate to recover</span>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-ghost" onclick="loadOrphaned()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+          <button id="trash-all-btn" class="btn" onclick="trashAllOrphaned(this)" style="font-size:11px; padding:4px 10px; background:var(--red); color:#fff; border:none;">🗑 Trash All</button>
+        </div>
+      </div>
+      <div id="orphaned-list" style="display:flex; flex-direction:column; gap:8px;"></div>
+    </div>
+
     <!-- ── Recently Sent ─────────────────────────────────────────────────── -->
     <div class="fade-up" style="margin-bottom:20px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:16px 20px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
@@ -891,22 +907,6 @@ body {
         <button class="btn btn-ghost" onclick="loadHumanEdited()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
       </div>
       <div id="human-edited-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-    </div>
-
-    <!-- ── Orphaned Emails (Draft Recovery) ─────────────────────────────── -->
-    <div class="fade-up" style="margin-bottom:24px;" id="orphaned-section">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div class="section-head" style="margin-bottom:0;">Lost Drafts</div>
-          <span id="orphaned-count" style="background:var(--red-dim); color:var(--red); border:1px solid var(--red-line); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
-          <span style="font-size:11px; color:var(--text-3);">Score 3 emails with no draft — click Regenerate to recover</span>
-        </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-ghost" onclick="loadOrphaned()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
-          <button id="trash-all-btn" class="btn" onclick="trashAllOrphaned(this)" style="font-size:11px; padding:4px 10px; background:var(--red); color:#fff; border:none;">🗑 Trash All</button>
-        </div>
-      </div>
-      <div id="orphaned-list" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
 
     <!-- ── Marco section ───────────────────────────────────────────────── -->
