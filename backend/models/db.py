@@ -18,6 +18,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
+from sqlalchemy.pool import NullPool
 
 from backend.core.config import get_settings
 
@@ -321,14 +322,16 @@ def _make_engine():
     if _engine is None:
         settings = get_settings()
         db_url = settings.database_url.replace("postgres://", "postgresql://", 1)
-        # QueuePool with pre-ping: reuse connections across requests/jobs to stop
-        # the connection-establish churn against Supabase pooler that was causing
-        # dashboard fetches to time out during peak scheduler activity.
+        # Peak connection demand: 1 + (5 talent workers × 4 sessions each) = ~21 for poll,
+        # + 6 for draft queue + 5 for other jobs/HTTP = ~32 peak. pool_size=10 + overflow=15
+        # gives 25 hard cap, which fits with the reduced MAX_TALENT_WORKERS=5 and
+        # MAX_CONCURRENT_EMAILS=3 in poller.py. Increasing these limits further would
+        # require Supabase connection limit audit first (free tier: ~60 concurrent).
         _engine = create_engine(
             db_url,
-            pool_size=5,
-            max_overflow=10,
-            pool_timeout=10,
+            pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
+            max_overflow=15,    # was 10 — total cap: 25
+            pool_timeout=15,    # was 10 — extra breathing room under load
             pool_recycle=300,
             pool_pre_ping=True,
         )
@@ -408,11 +411,27 @@ def create_tables():
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
         "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'",
-        "DELETE FROM processed_emails WHERE score = 0 AND processed_at < NOW() - INTERVAL '10 minutes'",
+        # NOTE: score=0 ghost-row cleanup removed from startup — it can lock processed_emails
+        # on a large table and delay port binding, causing Render R10 boot timeouts.
+        # This cleanup now runs inside _run_guardian() (cron.py) at +35s after startup.
     ]
-    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        for stmt in _MIGRATION_STMTS:
-            try:
-                conn.execute(text(stmt))
-            except Exception as _e:
-                logger.warning("DB migration warning (non-fatal): %s", _e)
+    # Dedicated NullPool migration engine — does NOT draw from the application QueuePool.
+    # Each migration statement gets its own connection that is closed immediately after.
+    # statement_timeout=25000ms hard-caps any single DDL so a blocked ALTER TABLE or
+    # ALTER TYPE cannot hang the startup indefinitely and trigger a Render restart.
+    settings = get_settings()
+    mig_url = settings.database_url.replace("postgres://", "postgresql://", 1)
+    _mig_engine = create_engine(
+        mig_url,
+        poolclass=NullPool,
+        connect_args={"options": "-c statement_timeout=25000"},
+    )
+    try:
+        with _mig_engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            for stmt in _MIGRATION_STMTS:
+                try:
+                    conn.execute(text(stmt))
+                except Exception as _e:
+                    logger.warning("DB migration warning (non-fatal): %s", _e)
+    finally:
+        _mig_engine.dispose()

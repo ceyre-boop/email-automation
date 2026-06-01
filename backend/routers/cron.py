@@ -155,8 +155,9 @@ def _run_draft_queue_inner(batch_size: int = 60):
             finally:
                 thread_db.close()
 
-        # Capped at 10 workers — 50 was the source of the May 23 runaway draft incident
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        # 5 workers → 6 peak DB sessions (1 main + 5 workers). Was 10 (11 sessions).
+        # Commit 3 target: release session before Gmail I/O to reduce lock hold time.
+        with ThreadPoolExecutor(max_workers=5) as executor:
             futures = [executor.submit(_draft_one, row) for row in candidates]
             for f in futures:
                 try:
@@ -190,10 +191,22 @@ def _run_guardian():
     from backend.models.db import get_session_factory
     import backend.main as _main_module
     from backend.services.guardian import GuardianWatchdog
+    from sqlalchemy import text as _text
     SessionLocal = get_session_factory()
     db = SessionLocal()
     try:
         GuardianWatchdog(scheduler=_main_module._scheduler).run(db)
+        # Cleanup score=0 ghost rows from crashed poll cycles.
+        # Moved here from create_tables() startup — locking processed_emails at boot
+        # was delaying port binding and triggering Render R10 restart timeouts.
+        try:
+            db.execute(_text(
+                "DELETE FROM processed_emails WHERE score = 0 "
+                "AND processed_at < NOW() - INTERVAL '10 minutes'"
+            ))
+            db.commit()
+        except Exception:  # noqa: BLE001
+            db.rollback()
     except Exception as exc:  # noqa: BLE001
         logger.error("Guardian watchdog failed: %s", exc)
     finally:

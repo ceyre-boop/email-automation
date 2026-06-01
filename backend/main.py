@@ -309,10 +309,10 @@ def on_startup():
             next_run_time=now + timedelta(seconds=5),
             id="auto_poll", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_draft_queue, "interval", seconds=20, jitter=5,
-            next_run_time=now + timedelta(seconds=12),
+            next_run_time=now + timedelta(seconds=90),  # was 12s — now waits for first poll to complete
             id="draft_queue", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, jitter=7,
-            next_run_time=now + timedelta(seconds=22),
+            next_run_time=now + timedelta(seconds=120),  # was 22s — staggered after draft_queue
             id="backlog_blaster", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_guardian, "interval", seconds=60, jitter=15,
             next_run_time=now + timedelta(seconds=35),
@@ -325,11 +325,11 @@ def on_startup():
             id="reconcile_drafts", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_proactive_refresh, "interval", minutes=10, jitter=60,
             next_run_time=now + timedelta(minutes=3),
-            id="token_refresh", replace_existing=True)
+            id="token_refresh", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_inbox_reconcile, "interval", hours=1,
             next_run_time=now + timedelta(minutes=15),
             id="inbox_reconcile", replace_existing=True, max_instances=1)
         _scheduler.start()
-        logger.info("Scheduler started (staggered) — poll 45s±10, draft queue 20s±5, backlog blaster 30s±7, guardian 60s±15, auto_send 60s±10, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr.")
+        logger.info("Scheduler started — poll +5s/45s±10, draft queue +90s/20s±5, backlog blaster +120s/30s±7, guardian +35s/60s±15, auto_send +47s/60s±10, reconcile +90s/5min±30, token refresh +3min/10min±60, inbox reconcile +15min/1hr.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")

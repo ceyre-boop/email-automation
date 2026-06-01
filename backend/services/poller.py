@@ -33,9 +33,13 @@ logger = logging.getLogger(__name__)
 
 BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle
 
-# Concurrency — Transaction Pooler (port 6543) supports hundreds of connections.
-MAX_CONCURRENT_EMAILS = 10   # capped at 10 — 50 caused the May 23 runaway draft incident
-MAX_TALENT_WORKERS = 10      # up from 8
+# Concurrency — reduced to prevent QueuePool exhaustion.
+# Peak DB connections per poll: 1 parent + (MAX_TALENT_WORKERS × (1+MAX_CONCURRENT_EMAILS))
+# = 1 + (5 × 4) = 21. Combined with draft queue (6) + other jobs (5) + HTTP (3) = ~35 peak,
+# which fits within pool_size=10 + max_overflow=15 = 25 hard cap (connections time-share).
+# Commit 3 target: release DB session before Gmail API I/O to drop this to ~10 peak.
+MAX_CONCURRENT_EMAILS = 3    # was 10 — each holds a session during Gmail API I/O
+MAX_TALENT_WORKERS = 5       # was 10 — halves talent-level parallelism
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
