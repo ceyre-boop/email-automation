@@ -47,10 +47,6 @@ def run_pre_send_checks(draft: Draft, db: Session) -> tuple[bool, str | None]:
         if marker.lower() in body_lower:
             return False, f"SOP metadata found in draft body: '{marker}'"
 
-    # Check 3 — no raw markdown hyperlinks
-    if re.search(r'\[.+?\]\(https?://', body):
-        return False, "Draft contains unrendered markdown link syntax [text](url)"
-
     # Check 4 — CC addresses not embedded in body
     cc_list = parse_cc_recipients(draft.cc_recipients) or []
     for addr in cc_list:
