@@ -117,6 +117,8 @@ def _draft_to_dict(r: Draft, triage_reason: str | None = None) -> dict:
         "human_edited": bool(getattr(r, "human_edited", False) or False),
         "human_edited_at": r.human_edited_at.isoformat() if getattr(r, "human_edited_at", None) else None,
         "human_edited_by": getattr(r, "human_edited_by", None),
+        "validation_failed": bool(getattr(r, "validation_failed", False) or False),
+        "validation_error": getattr(r, "validation_error", None),
     }
 
 
@@ -483,6 +485,18 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
 
     token = _get_token_or_404(db, draft.talent_key)
 
+    from backend.services.validation import run_pre_send_checks
+    _ok, _err = run_pre_send_checks(draft, db)
+    if not _ok:
+        draft.validation_failed = True
+        draft.validation_error = _err
+        db.add(draft)
+        db.commit()
+        raise HTTPException(
+            status_code=422,
+            detail=f"Draft failed pre-send validation: {_err}",
+        )
+
     try:
         cc = parse_cc_recipients(draft.cc_recipients)
         success, send_error = gmail_svc.send_reply(
@@ -563,6 +577,8 @@ def edit_draft(draft_id: int, body: EditBody, db: Session = Depends(get_db)):
     draft.draft_text = body.draft_text
     draft.reviewed_by = body.reviewed_by
     draft.human_edited = True
+    draft.validation_failed = False
+    draft.validation_error = None
     draft.human_edited_at = datetime.utcnow()
     draft.human_edited_by = body.reviewed_by
     # If there's an existing Gmail draft, delete it and recreate with new text

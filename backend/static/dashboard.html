@@ -1797,7 +1797,7 @@ function renderDraftOnlyPane(draft) {
       <textarea class="ai-textarea" id="at-${draft.gmail_draft_id}">${esc(draft.body_text || '')}</textarea>
       <div class="ai-footer">
         <button class="btn btn-ghost" onclick="resetReadingPane()">Close</button>
-        <button class="btn btn-primary" id="bs-${draft.gmail_draft_id}" ${isEscalate ? 'disabled' : ''}>Send Reply ✉</button>
+        <button class="btn btn-primary" id="bs-${draft.gmail_draft_id}" ${isEscalate || draft.validation_failed ? 'disabled' : ''}>Send Reply ✉</button>
       </div>
     </div>
   `;
@@ -1921,7 +1921,7 @@ function renderDraftCompose(draft, email) {
       <div class="ai-footer">
         <button class="btn btn-ghost" id="btn-discard-${draft.id}">Discard</button>
         <button class="btn btn-ghost" id="btn-save-${draft.id}">Save Edits</button>
-        <button class="btn btn-primary" id="btn-send-${draft.id}" ${isEscalate ? 'disabled' : ''}>Send Reply ✉</button>
+        <button class="btn btn-primary" id="btn-send-${draft.id}" ${isEscalate || draft.validation_failed ? 'disabled' : ''}>Send Reply ✉</button>
       </div>
     </div>
   `;
@@ -2109,6 +2109,7 @@ async function loadDraftQueue() {
       const rate = d.proposed_rate ? ` · $${d.proposed_rate.toLocaleString()}` : '';
       const escalate = d.is_escalate ? `<span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">ESCALATION</span>` : '';
       const humanEdited = d.human_edited ? `<span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">✎ EDITED</span>` : '';
+      const invalidBadge = d.validation_failed ? `<span style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;" title="${(d.validation_error||'').replace(/"/g,'&quot;')}">INVALID</span>` : '';
       return `
       <div id="draft-card-${d.id}" style="background:var(--surface-2); border:1px solid ${d.human_edited ? 'rgba(255,179,0,0.3)' : 'var(--border)'}; border-radius:10px; overflow:hidden;">
         <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer;" onclick="toggleDraftExpand(${d.id})">
@@ -2118,6 +2119,7 @@ async function loadDraftQueue() {
               <span style="font-size:12px; font-weight:700; color:var(--text);">${esc(d.talent_key)}</span>
               ${escalate}
               ${humanEdited}
+              ${invalidBadge}
               ${d.brand_name ? `<span style="font-size:11px; color:var(--green);">${esc(d.brand_name)}${rate}</span>` : ''}
             </div>
             <div style="font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(senderName)} — ${esc(d.subject || '(no subject)')}</div>
@@ -2125,7 +2127,7 @@ async function loadDraftQueue() {
           </div>
           <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
             ${d.proposed_rate ? `<span style="background:rgba(0,214,143,0.12); border:1px solid rgba(0,214,143,0.25); color:var(--green); border-radius:6px; font-size:10px; font-weight:800; padding:3px 8px; letter-spacing:0.02em;">$${Number(d.proposed_rate).toLocaleString()}</span>` : ''}
-            <button onclick="event.stopPropagation(); approveDraft(${d.id}, this)" style="background:rgba(0,214,143,0.15); border:1px solid rgba(0,214,143,0.3); color:var(--green); border-radius:7px; padding:5px 14px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);">✓ Send</button>
+            <button onclick="event.stopPropagation(); ${d.is_escalate || d.validation_failed ? '' : `approveDraft(${d.id}, this)`}" ${d.is_escalate || d.validation_failed ? 'disabled' : ''} style="background:rgba(0,214,143,0.15); border:1px solid rgba(0,214,143,0.3); color:var(--green); border-radius:7px; padding:5px 14px; font-size:11px; font-weight:700; cursor:${d.is_escalate || d.validation_failed ? 'not-allowed' : 'pointer'}; font-family:var(--sans); opacity:${d.is_escalate || d.validation_failed ? '0.45' : '1'};">✓ Send</button>
             <button onclick="event.stopPropagation(); moveToInbox(${d.id}, this)" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#60a5fa; border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);" title="Return to Inbox Feed">↩ Inbox</button>
             <button onclick="event.stopPropagation(); dismissDraft(${d.id}, this)" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.25); color:#f87171; border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);" title="Remove from dashboard (keeps Gmail draft)">✕</button>
           </div>

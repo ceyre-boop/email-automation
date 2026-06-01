@@ -157,6 +157,8 @@ class Draft(Base):
     original_draft_text: Mapped[str | None] = mapped_column(Text)  # AI original before any edits
     triggered_by_job: Mapped[str | None] = mapped_column(String(32))
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    validation_failed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    validation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
 
 class DraftEditLog(Base):
@@ -408,6 +410,8 @@ def create_tables():
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS original_draft_text TEXT",
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS triggered_by_job VARCHAR(32)",
             "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS dismissed BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_failed BOOLEAN NOT NULL DEFAULT FALSE",
+            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_error TEXT",
         ]:
             try:
                 conn.execute(text(stmt))

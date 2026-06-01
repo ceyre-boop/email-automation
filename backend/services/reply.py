@@ -556,3 +556,18 @@ def _escalate_result(reason: str) -> dict:
         "escalate_reason": reason,
         "cc_recipients": None,
     }
+
+
+def get_all_approved_responses(talent_name: str) -> list[str]:
+    """All **Approved Response:** blocks for a talent — used by pre-send validation."""
+    section = _get_talent_section_raw(talent_name)
+    if not section:
+        return []
+    responses = []
+    for m in re.finditer(r"\*\*Approved Response:\*\*\s*\n", section):
+        rest = section[m.end():]
+        end = re.search(r"\n###\s", rest)
+        text = rest[:end.start()].strip() if end else rest.strip()
+        if text:
+            responses.append(text)
+    return responses

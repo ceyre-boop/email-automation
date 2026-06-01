@@ -85,6 +85,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
             Draft.created_at < cutoff,
             Draft.human_edited == False,  # noqa: E712
             Draft.dismissed == False,  # noqa: E712
+            Draft.validation_failed != True,  # noqa: E712
         )
         .order_by(Draft.created_at.asc())
         .all()
@@ -110,6 +111,20 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
 
         # Already-sent guard
         if draft.reviewed_at is not None:
+            continue
+
+        # Pre-send validation gate
+        from backend.services.validation import run_pre_send_checks
+        ok, err = run_pre_send_checks(draft, db)
+        if not ok:
+            draft.validation_failed = True
+            draft.validation_error = err
+            db.add(draft)
+            db.commit()
+            logger.warning(
+                "auto_send: validation failed for draft %d (%s): %s",
+                draft.id, draft.talent_key, err,
+            )
             continue
 
         # Thread count guard: skip if the thread has prior activity
