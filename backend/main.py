@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import html as html_lib
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -285,12 +286,15 @@ def on_startup():
         logger.warning("Cache clear on startup failed (non-fatal).")
 
     if settings.database_url:
-        logger.info("Creating database tables if they don't exist…")
-        try:
-            create_tables()
-            logger.info("Startup complete.")
-        except Exception:
-            logger.exception("Could not create/verify database tables — check DATABASE_URL")
+        if os.getenv("SKIP_MIGRATIONS"):
+            logger.warning("SKIP_MIGRATIONS=true — skipping create_tables(). DB schema must already be current.")
+        else:
+            logger.info("Creating database tables if they don't exist…")
+            try:
+                create_tables()
+                logger.info("Startup complete.")
+            except Exception:
+                logger.exception("Could not create/verify database tables — check DATABASE_URL")
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
 
