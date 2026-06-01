@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import enum
+import logging
 from datetime import datetime
 
 from sqlalchemy import (
@@ -19,6 +20,8 @@ from sqlalchemy import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
 
 from backend.core.config import get_settings
+
+logger = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -356,110 +359,60 @@ def create_tables():
     """Create all tables and run additive column migrations (idempotent)."""
     engine = _make_engine()
     Base.metadata.create_all(engine)
-    # Add body_text column to existing tables that predate it
-    with engine.connect() as conn:
-        try:
-            conn.execute(text(
-                "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS body_text TEXT"
-            ))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text(
-                "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS email_date TIMESTAMP"
-            ))
-            conn.commit()
-        except Exception:
-            pass
-        try:
-            conn.execute(text(
-                """
-                CREATE TABLE IF NOT EXISTS guardian_audit_log (
-                    id SERIAL PRIMARY KEY,
-                    action VARCHAR(64) NOT NULL,
-                    talent_key VARCHAR(64),
-                    reason TEXT NOT NULL,
-                    detail TEXT,
-                    triggered_by VARCHAR(64) NOT NULL DEFAULT 'guardian',
-                    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-                )
-                """
-            ))
-            conn.commit()
-        except Exception:
-            pass
-        # Token health tracking columns
-        for stmt in [
-            "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMP",
-            "ALTER TABLE talents ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER DEFAULT 0",
-            "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_error TEXT",
-            # Inbox body fetch resilience
-            "ALTER TABLE inbox_emails ADD COLUMN IF NOT EXISTS body_fetch_attempts INTEGER DEFAULT 0",
-            "ALTER TABLE inbox_emails ADD COLUMN IF NOT EXISTS body_fetch_failed BOOLEAN DEFAULT FALSE",
-            # Manager context scoping + voice profiles
-            "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS talent_key TEXT",
-            "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS voice_profile TEXT",
-            # Email threading: store original Message-ID header so approved replies thread correctly
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS cc_recipients TEXT",
-            # Human-touch audit columns
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_at TIMESTAMP",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_by VARCHAR(128)",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS original_draft_text TEXT",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS triggered_by_job VARCHAR(32)",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS dismissed BOOLEAN NOT NULL DEFAULT FALSE",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_failed BOOLEAN NOT NULL DEFAULT FALSE",
-            "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_error TEXT",
-        ]:
+    # Additive column migrations — AUTOCOMMIT so each statement is its own transaction.
+    # Previously used a single shared connection where one failure aborted all subsequent
+    # statements silently. AUTOCOMMIT isolates failures: a DDL error on one statement
+    # (e.g. ALTER TYPE inside a transaction) does not affect the ones that follow.
+    _MIGRATION_STMTS = [
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS body_text TEXT",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS email_date TIMESTAMP",
+        """CREATE TABLE IF NOT EXISTS guardian_audit_log (
+            id SERIAL PRIMARY KEY,
+            action VARCHAR(64) NOT NULL,
+            talent_key VARCHAR(64),
+            reason TEXT NOT NULL,
+            detail TEXT,
+            triggered_by VARCHAR(64) NOT NULL DEFAULT 'guardian',
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_poll_at TIMESTAMP",
+        "ALTER TABLE talents ADD COLUMN IF NOT EXISTS consecutive_failures INTEGER DEFAULT 0",
+        "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_error TEXT",
+        "ALTER TABLE inbox_emails ADD COLUMN IF NOT EXISTS body_fetch_attempts INTEGER DEFAULT 0",
+        "ALTER TABLE inbox_emails ADD COLUMN IF NOT EXISTS body_fetch_failed BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS talent_key TEXT",
+        "ALTER TABLE manager_context ADD COLUMN IF NOT EXISTS voice_profile TEXT",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS message_id_header VARCHAR(512)",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS cc_recipients TEXT",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_at TIMESTAMP",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS human_edited_by VARCHAR(128)",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS original_draft_text TEXT",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS triggered_by_job VARCHAR(32)",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS dismissed BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_failed BOOLEAN NOT NULL DEFAULT FALSE",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_error TEXT",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_drafts_gmail_message_id ON drafts (gmail_message_id)",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS sender_domain VARCHAR(256)",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS email_length INTEGER",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS sentiment_score INTEGER",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS urgency_score INTEGER",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS risk_score INTEGER",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS is_thread BOOLEAN",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS has_attachments BOOLEAN",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS has_links BOOLEAN",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS alternatives_considered TEXT",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_classify_ms INTEGER",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_draft_ms INTEGER",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
+        "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'",
+        "DELETE FROM processed_emails WHERE score = 0 AND processed_at < NOW() - INTERVAL '10 minutes'",
+    ]
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        for stmt in _MIGRATION_STMTS:
             try:
                 conn.execute(text(stmt))
-                conn.commit()
-            except Exception:
-                pass
-        # Unique index on drafts.gmail_message_id — prevents duplicate drafts across poll cycles
-        try:
-            conn.execute(text(
-                "CREATE UNIQUE INDEX IF NOT EXISTS uq_drafts_gmail_message_id "
-                "ON drafts (gmail_message_id)"
-            ))
-            conn.commit()
-        except Exception:
-            pass
-        # Extended log schema columns on processed_emails
-        for stmt in [
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS sender_domain VARCHAR(256)",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS email_length INTEGER",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS sentiment_score INTEGER",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS urgency_score INTEGER",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS risk_score INTEGER",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS is_thread BOOLEAN",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS has_attachments BOOLEAN",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS has_links BOOLEAN",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS alternatives_considered TEXT",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_classify_ms INTEGER",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_draft_ms INTEGER",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
-            "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
-        ]:
-            try:
-                conn.execute(text(stmt))
-                conn.commit()
-            except Exception:
-                pass
-        # Add 'processing' value to the emailstatus enum type (idempotent — fails silently if already exists)
-        try:
-            conn.execute(text("ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'"))
-            conn.commit()
-        except Exception:
-            pass
-        # Clean up ghost claim rows stuck at score=0 from crashed poll cycles
-        try:
-            conn.execute(text(
-                "DELETE FROM processed_emails WHERE score = 0 "
-                "AND processed_at < NOW() - INTERVAL '10 minutes'"
-            ))
-            conn.commit()
-        except Exception:
-            pass
+            except Exception as _e:
+                logger.warning("DB migration warning (non-fatal): %s", _e)
