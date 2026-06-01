@@ -128,6 +128,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": ["ugcbyanastasiya@gmail.com", "anastasiyaraytts@gmail.com"],
       "max_drafts_per_day": 2000
     },
     {
@@ -140,6 +141,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "hanaisfinechina@gmail.com",
       "max_drafts_per_day": 2000
     },
     {
@@ -152,6 +154,7 @@
       "minimum_rate_usd": 800,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "thebanksedit@gmail.com",
       "max_drafts_per_day": 2000
     },
     {
@@ -193,7 +196,7 @@
       "category": "Fashion",
       "minimum_rate_usd": 300,
       "rate_unit": "per video",
-      "personal_email": "lizz@gmail.com",
+      "personal_email": "katrinamoore621@gmail.com",
       "_note": "Dual manager escalation: offers above $650 go to Cara; at or below $650 go to Chenni.",
       "paused": true,
       "max_drafts_per_day": 2000
@@ -208,6 +211,7 @@
       "minimum_rate_usd": 500,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "jenn@jennlyles.com",
       "max_drafts_per_day": 2000
     },
     {
@@ -220,6 +224,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "angelacallisto123@gmail.com",
       "max_drafts_per_day": 2000
     },
     {
@@ -260,6 +265,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "graysonfinks@gmail.com",
       "max_drafts_per_day": 2000
     },
     {
@@ -272,6 +278,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "kylikacollabs@gmail.com",
       "max_drafts_per_day": 2000
     },
     {
@@ -296,6 +303,7 @@
       "minimum_rate_usd": 750,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "wesleybarkerbookings@gmail.com",
       "max_drafts_per_day": 2000
     }
   ],

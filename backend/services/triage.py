@@ -271,18 +271,24 @@ def triage_email(
     )
 
     # ── Pre-filter: personal email forward (Rule 8) ───────────────────────────
-    # If the inbound sender matches the talent's personal email, leave in INBOX untouched.
+    # If the inbound sender matches any of the talent's personal emails, leave in INBOX.
+    # personal_email may be a string (single address), comma-separated string, or a JSON array.
     sender_lower = sender.lower()
     personal_email = talent_cfg.get("personal_email", "")
-    if personal_email and sender_lower == personal_email.lower():
-        logger.info(
-            "Pre-filter: personal email match for %s (%s) → ignore, leave in INBOX",
-            talent_key, sender,
-        )
-        return _ignore_leave_inbox(
-            "Email originated from talent personal email — left in INBOX for human review.",
-            "Personal Email Forward",
-        )
+    if personal_email:
+        if isinstance(personal_email, list):
+            personal_emails = [e.strip().lower() for e in personal_email if e.strip()]
+        else:
+            personal_emails = [e.strip().lower() for e in personal_email.split(",") if e.strip()]
+        if sender_lower in personal_emails:
+            logger.info(
+                "Pre-filter: personal email match for %s (%s) → ignore, leave in INBOX",
+                talent_key, sender,
+            )
+            return _ignore_leave_inbox(
+                "Email originated from talent personal email — left in INBOX for human review.",
+                "Personal Email Forward",
+            )
     rate_unit = talent_cfg.get("rate_unit", "per video")
     rate_note = (
         f"This talent's rate is {rate_unit}. The minimum rate listed above is "
