@@ -47,6 +47,7 @@ Use for: confirmed misdirected emails, true duplicates, clear standalone event i
 
 **Score 1 — TRASH (clear spam only)**
 Use ONLY for: phishing attempts, fake prize/lottery notifications, suspicious external links with no brand identity, SEO/web/design service pitches, fake invoices, malware, adult/illegal content, obvious mass automated junk. Known spam senders: Superordinary, Grail, Nextwave. Free personal email domains (gmail.com, yahoo.com, hotmail.com, outlook.com) with zero company name or brand context in the body.
+Also score 1 for: emails where the sender name closely matches the talent name ({{TALENT_NAME}}) — these are self-forwards where the talent emailed their own inbox, not a brand reaching out.
 
 ---
 

@@ -85,6 +85,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
             Draft.created_at < cutoff,
             Draft.human_edited == False,  # noqa: E712
             Draft.dismissed == False,  # noqa: E712
+            Draft.is_escalate == False,  # noqa: E712
             Draft.validation_failed != True,  # noqa: E712
         )
         .order_by(Draft.created_at.asc())
