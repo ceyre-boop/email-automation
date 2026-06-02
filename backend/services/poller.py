@@ -843,9 +843,6 @@ def _process_one_message(
             except Exception:  # noqa: BLE001
                 pass
 
-            # SOP Rule 10A: remove INBOX/UNREAD and apply "A Initial Response" label
-            gmail_svc.mark_initial_response_sent(token_row, message_id, db=db, service=service)
-            gmail_svc.mark_as_read(token_row, message_id, db=db, service=service)
             _safe_log_sheet(
                 talent_key, sender, subject, score, brand_name, proposed_rate,
                 offer_type, "draft_saved", reason,
