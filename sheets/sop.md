@@ -1,5 +1,5 @@
 Talent Email AI Guidelines
-Global Rules — Mandatory
+Part 1 — Global Workflow Rules
 
 1. Workflow Eligibility
 
@@ -20,7 +20,21 @@ The SOP document must be followed explicitly.
 - Do not combine multiple approved responses.
 - Do not add extra commentary inside the email draft.
 
-3. Talent Matching
+3. Draft Creation Restriction
+
+A draft may be created ONLY when Classification = Approved Response.
+
+If Classification = Ignore or Human Admin Required:
+
+- do not create a draft
+- do not create an email body
+- do not place the reason into a draft
+- do not send anything
+- leave the email in INBOX
+- apply no labels
+
+Reasons, classifications, and internal notes are automation metadata only.
+They must never be used as customer-facing email content. 4. Talent Matching
 
 Talent matching is mandatory.
 
@@ -28,9 +42,9 @@ Talent matching is mandatory.
 - Always identify the correct talent before selecting a response.
 - Never use one talent’s response for another talent.
 
-4. Initial Inbound Emails Only
+5. Initial Inbound Emails Only
 
-This workflow is for INITIAL inbound emails only.
+This workflow is for initial inbound emails only.
 
 Eligible initial inbound emails are determined by the automation trigger conditions before this workflow runs.
 
@@ -38,27 +52,20 @@ As an additional safeguard, the workflow should only process emails where:
 
 - Gmail thread message count = 1
 
-If the Gmail thread message count is greater than 1:
+If Gmail thread message count is greater than 1:
 
-- do not create a draft
-- do not remove the INBOX label
-- do not apply any label
-- leave the email untouched in the INBOX for human review
+- Classification: Human Admin Required
+- Apply Option B under Rule 11
 
-Output:
-Classification: Human Admin Required
-Reason: Existing email thread detected.
-Draft Created: No
-Remove INBOX Label: No
-Apply Label: None 5. Default to Initial Approved Response
+6. Default to Initial Approved Response
 
 Each talent has an Initial Approved Response.
 
 - Treat the Initial Approved Response as the default response for valid inbound opportunities.
 - Only choose another approved response if the email clearly matches a more specific scenario.
-- Only avoid the Initial Approved Response if the email is obvious spam, an event invite, irrelevant, or requires human admin review.
+- Only avoid the Initial Approved Response if the email matches a no-draft rule, such as Event Invite, Personal Email, Human Admin Required, or workflow ineligibility.
 
-6. Spam Handling
+7. Spam Handling
 
 Spam handling is managed by Google/Gmail, not by this automation.
 
@@ -68,60 +75,33 @@ Spam handling is managed by Google/Gmail, not by this automation.
 - Do not trash or delete emails.
 - If an email reaches this workflow, process it according to the normal workflow rules.
 
-7. Event / Appearance / Speaking Invite Emails
+8. Event / Appearance / Speaking Invite Emails
 
-Any email primarily related to an event, appearance, travel invite, or speaking engagement should be ignored and left in INBOX for human review.
+Only classify an email as an event invite when the primary request is for the talent to attend, appear at, travel to, or speak at an event.
 
-Use when:
+Use when the email clearly asks the talent to:
 
-- creator is invited to an online or in-person event
-- creator is invited to an appearance, meetup, launch, dinner, festival, premiere, brand trip, or social gathering
-- creator is offered travel accommodations or lodging related to an event
-- creator is invited to be a guest speaker, panelist, workshop host, mentor, judge, moderator, or masterclass participant
-- creator is invited to participate in TikTok-hosted events, creator summits, speaking panels, educational sessions, or platform activations
-- the primary purpose of the email is attendance, participation, or appearance at an event rather than a paid content campaign
+- attend an in-person or virtual event
+- make an appearance at an event
+- travel for an event, trip, activation, launch, panel, summit, conference, dinner, meetup, premiere, festival, or workshop
+- speak, teach, moderate, judge, present, or participate in a panel, masterclass, webinar, summit, or workshop
 
-Do not use when:
+Do NOT use this rule for normal brand partnership or content collaboration inquiries.
 
-- the email is primarily about a paid brand partnership or sponsored content deliverable
-- an event or speaking engagement is not clearly mentioned
-- the creator is being asked to create sponsored social content as the primary deliverable
-- the event is secondary to a broader paid campaign discussion
+The words “collab,” “collaboration,” “campaign,” “partnership,” “creator,” “brand,” “TikTok,” “Instagram,” “content,” or “UGC” do NOT make an email an event invite by themselves.
 
-Rules:
+If the email asks about sponsored content, paid deliverables, gifted product, rates, media kit, posts, videos, TikToks, Reels, Stories, UGC, usage rights, whitelisting, or campaign deliverables, it should be treated as a brand partnership inquiry unless there is a clear event attendance/speaking request.
 
-- Do not create a draft or reply.
-- Do not classify as Spam.
-- Do not relabel or archive the email.
-- Leave the email in INBOX for human admin review.
+If uncertain, do NOT classify as Event Invite.
+Continue to response matching and use Scenario A by default.
 
-Output:
-Classification: Ignore
-Reason: Event / appearance / speaking invite.
-Draft Sent: No
-Remove INBOX Label: No
-Apply Label: None
-Action: Leave in INBOX 8. Talent Personal Email Handling
+If this rule applies, classify the email as Ignore. 9. Talent Personal Email Handling
 
-Each talent may include a Scenario C containing their personal email address.If the sender email matches any email listed under Scenario C for the matched talent, apply the Scenario C handling rules.
+Each talent may include a Scenario C containing one or more personal email addresses.
 
-These emails are typically forwarded opportunities or conversations originally sent directly to the talent instead of the business inbox.
+If the inbound sender email matches any email listed under Scenario C for the matched talent, classify the email as Ignore.
 
-Rules:
-
-- If the inbound sender matches the personal email listed in Scenario C for the matched talent:
-  • do not create a draft or reply
-  • do not classify as Spam
-  • do not relabel or archive the email
-  • leave the email in INBOX for human admin review
-
-Output:
-Classification: Ignore
-Reason: Email originated from talent personal email.
-Draft Sent: No
-Remove INBOX Label: No
-Apply Label: None
-Action: Leave in INBOX 9. Formatting, Hyperlinks, and Internal Instructions
+These emails are typically forwarded opportunities or conversations originally sent directly to the talent instead of the business inbox. 10. Formatting, Hyperlinks, and Internal Instructions
 
 Approved responses may contain formatting markup and internal routing instructions.
 
@@ -160,7 +140,7 @@ Formatting behavior:
 - Render hyperlinks correctly.
 - If formatting cannot be rendered, remove markup and render the plain text only.
 
-10. Inbox Handling After Classification
+11. Inbox Handling After Classification
 
 This workflow applies only to eligible initial inbound emails currently in the INBOX.
 
@@ -170,6 +150,8 @@ Every processed email must result in exactly ONE of the following outcomes:
 
 - Option A — Draft Created
 - Option B — No Draft / Human Review
+
+Operational actions are controlled only by Rule 11. Other rules and scenarios determine classification only.
 
 These actions are mutually exclusive.
 Only one option may be applied per email.
@@ -218,32 +200,82 @@ Important:
 - Do not apply any other label.
 - Leave the email untouched in the Inbox.
 
-11. Required Output Format
+12. Required Output Format
+
+The Required Output Format is automation metadata only and must never be used as the email draft body.
 
 Every processed email must clearly state:
 
 Classification: Approved Response / Ignore / Human Admin Required
-Talent: [Talent name, if applicable]
-Matched Scenario: [Scenario name, if applicable]
 Draft Created: Yes / No
-Remove INBOX Label: Yes / No
-Apply Label: A Initial Response / None
-CC: [manager email, if applicable]
-Response: [exact approved response, if applicable]
+Send Draft: Yes / No
+Talent: [talent name, if applicable]
+Matched Scenario: [A / B / C / Event Invite / None]
+Internal Reason: [internal only, never draft body]
+Email Body: [only include when Classification = Approved Response]
 
-Approved Scenarios & Responses
+Email Body must be blank unless Classification = Approved Response.
 
-Response Matching Hierarchy
+Part 2 — Approved Response Matching
+
+13. Response Matching Hierarchy
 
 When selecting an approved response:
 
 1. Apply all Global Rules first.
-2. Check whether the email matches a talent-specific Scenario C (Personal Email).
-3. Check whether the email matches any other talent-specific scenario.
+2. Check whether the email matches Scenario C: Personal Email.
+3. Check whether the email clearly matches Scenario B: Bundle Rate Requested.
 4. Use the most specific matching scenario.
-5. If no specific scenario matches, use Scenario A: Initial Inbound (Default Response).
+5. If no specific scenario matches, use Scenario A: Initial Inbound Default Response.
 6. Scenario A is the default fallback response for all eligible inbound inquiries.
-   Talent: Katrina Moore
+
+There should be no “no matching scenario” outcome after the correct talent has been identified.
+
+Only return “no match” if:
+
+- the correct talent cannot be identified
+- the email is outside workflow eligibility
+- the email matches a global no-draft rule
+
+If the talent is identified and no specific scenario applies, use Scenario A.
+13A. Scenario A — Initial Inbound Default Response
+Scenario A is the default approved response for all eligible initial inbound emails when the correct talent is identified and no more specific scenario applies.
+
+Use Scenario A when:
+
+- the email is an eligible initial inbound inquiry
+- the correct talent is identified
+- Scenario B does not clearly apply
+- Scenario C does not apply
+- no global no-draft rule applies
+
+If uncertain between Scenario A and another approved response, use Scenario A.
+13B. Scenario B — Bundle Rate Requested
+Scenario B applies when the inbound email asks for:
+
+- multiple videos
+- multiple posts
+- bundle pricing
+- package pricing
+- multi-post pricing
+- several deliverables from the same talent
+
+If Scenario B applies, use that talent’s Scenario B approved response.
+
+If Scenario B does not clearly apply, use Scenario A by default.
+13C. Scenario C — Personal Email
+Scenario C applies when the sender email matches any personal email listed under that talent’s Scenario C section.
+
+If Scenario C applies:
+
+- classify the email as Ignore
+- do not use Scenario A or Scenario B
+
+Operational handling is controlled by Rule 11: Inbox Handling After Classification.
+
+Part 3 — Talent Approved Responses
+
+Talent: Katrina Moore
 
 Manager: Chenni Li
 Scenario A: Initial Inbound (Default Response)
@@ -257,11 +289,6 @@ Katrina's pricing reflects her extremely high **conversion rate**. Her monthly G
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario B: Initial Inbound (Bundle Rate Requested)
-Use when:
-
-- asking for multiple videos/posts
-- asking for package pricing
-
 Approved Response:
 [Katrina's](https://www.tiktok.com/@katrinagmoore) standard rate is $500 per video! Below is her bundle pricing:
 
@@ -372,7 +399,7 @@ Approved Response:
     5 videos (85%) → $2,100
     10 videos (75%) → $3,750
 
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!"
+We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: jenn@jennlyles.com
 
@@ -488,3 +515,8 @@ Thank you so much for reaching out about a potential partnership with Skyler!! I
 Skyler’s pricing reflects her high quality content + the access you'll get to the community of music fans on TikTok!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario B: Initial Inbound (Bundle Rate Requested)
+Approved Response:
+[Not provided - Use Scenario A]
+Scenario C: Personal Email Forward
+Personal Email: crashingskydrummer@gmail.com
