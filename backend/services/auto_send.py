@@ -128,16 +128,18 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
             )
             continue
 
-        # Thread count guard: skip if the thread has prior activity
+        # Thread count guard: skip if thread already has a real sent reply (not just our draft)
         if draft.thread_id:
             try:
                 thread = service.users().threads().get(
-                    userId="me", id=draft.thread_id, format="minimal"
+                    userId="me", id=draft.thread_id, format="metadata"
                 ).execute()
-                if len(thread.get("messages", [])) > 1:
+                messages = thread.get("messages", [])
+                sent_messages = [m for m in messages if "DRAFT" not in m.get("labelIds", [])]
+                if len(sent_messages) > 1:
                     logger.info(
-                        "auto_send: thread %s has %d messages — skipping draft %d",
-                        draft.thread_id, len(thread.get("messages", [])), draft.id,
+                        "auto_send: thread %s has %d sent messages — skipping draft %d",
+                        draft.thread_id, len(sent_messages), draft.id,
                     )
                     continue
             except Exception as exc:  # noqa: BLE001
