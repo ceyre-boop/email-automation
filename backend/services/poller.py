@@ -843,6 +843,8 @@ def _process_one_message(
             except Exception:  # noqa: BLE001
                 pass
 
+            # SOP Rule 11 Option A: remove INBOX at draft creation (label applied post-send only)
+            gmail_svc.remove_from_inbox(token_row, message_id, db=db, service=service)
             _safe_log_sheet(
                 talent_key, sender, subject, score, brand_name, proposed_rate,
                 offer_type, "draft_saved", reason,

@@ -570,11 +570,27 @@ def archive_as_spam(token_row, message_id: str, db=None, service=None) -> bool:
         return False
 
 
+def remove_from_inbox(token_row, message_id: str, db=None, service=None) -> bool:
+    """Remove INBOX/UNREAD/category labels at draft creation time. No label applied."""
+    if service is None:
+        service = _gmail_service(token_row, db)
+    try:
+        service.users().messages().modify(
+            userId="me", id=message_id,
+            body={"removeLabelIds": [
+                "INBOX", "UNREAD",
+                "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
+                "CATEGORY_UPDATES", "CATEGORY_FORUMS",
+            ]},
+        ).execute()
+        return True
+    except HttpError as exc:
+        logger.error("remove_from_inbox failed for %s / %s: %s", token_row.talent_key, message_id, exc)
+        return False
+
+
 def mark_initial_response_sent(token_row, message_id: str, db=None, service=None) -> bool:
-    """
-    Remove INBOX/UNREAD and add the A Initial Response label.
-    Applied only after a reply has actually been sent.
-    """
+    """Apply A Initial Response label after a reply has been sent. INBOX already removed at draft creation."""
     if service is None:
         service = _gmail_service(token_row, db)
     label_id = _get_or_create_custom_label(
@@ -584,16 +600,11 @@ def mark_initial_response_sent(token_row, message_id: str, db=None, service=None
         text_color="#ffffff",
     )
     try:
-        body: dict[str, list[str]] = {
-            "removeLabelIds": [
-                "INBOX", "UNREAD",
-                "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
-                "CATEGORY_UPDATES", "CATEGORY_FORUMS",
-            ]
-        }
         if label_id:
-            body["addLabelIds"] = [label_id]
-        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+            service.users().messages().modify(
+                userId="me", id=message_id,
+                body={"addLabelIds": [label_id]},
+            ).execute()
         return True
     except HttpError as exc:
         logger.error("Initial-response label update failed for %s / %s: %s", token_row.talent_key, message_id, exc)

@@ -148,13 +148,12 @@ Eligible emails are determined by the automation trigger conditions before this 
 
 Every processed email must result in exactly ONE of the following outcomes:
 
-- Option A — Draft Created
-- Option B — No Draft / Human Review
+Option A — Draft Created
+Option B — No Draft / Human Review
 
 Operational actions are controlled only by Rule 11. Other rules and scenarios determine classification only.
 
-These actions are mutually exclusive.
-Only one option may be applied per email.
+These actions are mutually exclusive. Only one option may be applied per email.
 
 No labels may be created, applied, inferred, or modified except the explicitly approved label:
 A Initial Response
@@ -167,16 +166,17 @@ Use when:
 - an approved response is matched
 - an email draft is generated
 
-Action:
+Action at draft creation:
 
 - Draft Created: Yes
 - Remove INBOX Label: Yes
-- Apply Label: A Initial Response
+- Apply Label: None
 
 Important:
 
-- The INBOX label should ONLY be removed when a draft is generated.
-- The A Initial Response label must be applied every time a draft is generated.
+- The INBOX label should be removed when an approved response draft is created.
+- Do not apply A Initial Response at draft creation.
+- A Initial Response may only be applied after the draft is successfully sent.
 - No other labels may be applied.
   Option B — No Draft / Human Review
   Use when:
@@ -213,6 +213,9 @@ Talent: [talent name, if applicable]
 Matched Scenario: [A / B / C / Event Invite / None]
 Internal Reason: [internal only, never draft body]
 Email Body: [only include when Classification = Approved Response]
+Remove INBOX Label: Yes / No
+Apply Label at Draft Creation: None
+Apply Label After Successful Send: A Initial Response / None
 
 Email Body must be blank unless Classification = Approved Response.
 
