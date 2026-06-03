@@ -378,10 +378,15 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
         )
 
         if result.get("is_escalate"):
-            raise HTTPException(
-                status_code=422,
-                detail=f"Escalated — no SOP match: {result.get('escalate_reason', 'unknown reason')}",
-            )
+            from backend.services.reply import get_scenario_a_response
+            fallback_text = get_scenario_a_response(talent_name)
+            if not fallback_text:
+                raise HTTPException(
+                    status_code=422,
+                    detail=f"No Scenario A found for {talent_name} — check SOP has an approved section for this talent.",
+                )
+            logger.info("regenerate: GPT escalated for %s — using Scenario A fallback", pe.talent_key)
+            result = {"draft_text": fallback_text, "is_escalate": False, "escalate_reason": None, "cc_recipients": None}
 
         draft_text = result["draft_text"]
         cc_str = result.get("cc_recipients") or None

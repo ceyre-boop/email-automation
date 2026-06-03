@@ -36,29 +36,29 @@ def _get_talent_sop_section(talent_name: str) -> str:
     """
     Extract just the relevant talent section from sop.md.
     Sends only global rules + the one talent block to GPT — keeps tokens minimal.
+    Supports both markdown-headed format (## Talent:) and plain format (Talent:).
     """
     md = _load_sop_md()
     if not md:
         return ""
 
-    # Extract global rules (everything before the first ## Talent: heading)
-    talent_heading_match = re.search(r"\n## Talent: ", md)
+    # Extract global rules (everything before the first Talent: heading)
+    talent_heading_match = re.search(r"\n(?:## )?Talent: ", md)
     global_rules = md[:talent_heading_match.start()].strip() if talent_heading_match else md
 
-    # Find this talent's section
-    pattern = rf"\n## Talent: {re.escape(talent_name)}\n"
-    start = re.search(pattern, md)
-    if not start:
-        # Try partial match (first name only)
-        first_name = talent_name.split()[0]
-        pattern = rf"\n## Talent: {re.escape(first_name)}"
+    # Find this talent's section (try full name, then first name only)
+    start = None
+    for query in (talent_name, talent_name.split()[0]):
+        pattern = rf"\n(?:## )?Talent: {re.escape(query)}"
         start = re.search(pattern, md)
+        if start:
+            break
 
     if not start:
         return global_rules  # talent section not found — GPT will escalate
 
     # Find the next talent section to know where this one ends
-    next_talent = re.search(r"\n## Talent: ", md[start.end():])
+    next_talent = re.search(r"\n(?:## )?Talent: ", md[start.end():])
     if next_talent:
         talent_section = md[start.start():start.end() + next_talent.start()]
     else:
@@ -75,16 +75,17 @@ _ESCALATE_PREFIX = "ESCALATE:"
 
 def _get_talent_section_raw(talent_name: str) -> str | None:
     """
-    Return just the '## Talent: X' block from sop.md — no global rules prepended.
+    Return just the Talent: X block from sop.md — no global rules prepended.
+    Supports both '## Talent:' (markdown) and plain 'Talent:' formats.
     Tries full name first, then first name only.
     """
     md = _load_sop_md()
     if not md:
         return None
     for query in (talent_name, talent_name.split()[0]):
-        match = re.search(rf"\n## Talent: {re.escape(query)}", md, re.IGNORECASE)
+        match = re.search(rf"\n(?:## )?Talent: {re.escape(query)}", md, re.IGNORECASE)
         if match:
-            next_section = re.search(r"\n## ", md[match.end():])
+            next_section = re.search(r"\n(?:## )?Talent: ", md[match.end():])
             if next_section:
                 return md[match.start() : match.end() + next_section.start()]
             return md[match.start():]
@@ -97,27 +98,28 @@ def _extract_approved_response(
     strip_cc: bool = True,
 ) -> str | None:
     """
-    Find the ### scenario heading containing heading_fragment (case-insensitive)
-    and return its **Approved Response:** text.
+    Find the scenario heading containing heading_fragment and return its Approved Response text.
+    Supports both markdown format (### heading / **Approved Response:**) and plain format.
     strip_cc=True (default): removes CC routing lines from the body.
     strip_cc=False: preserves the CC line so callers can extract it.
     Returns None if the scenario or response block is not found.
     """
     heading_match = re.search(
-        rf"### [^\n]*{re.escape(heading_fragment)}[^\n]*\n",
+        rf"^(?:#{1,3}\s+)?[^\n]*{re.escape(heading_fragment)}[^\n]*\n",
         talent_section,
-        re.IGNORECASE,
+        re.IGNORECASE | re.MULTILINE,
     )
     if not heading_match:
         return None
 
     rest = talent_section[heading_match.end():]
-    resp_match = re.search(r"\*\*Approved Response:\*\*\s*\n", rest)
+    resp_match = re.search(r"\*{0,2}Approved Response:\*{0,2}\s*\n", rest)
     if not resp_match:
         return None
 
     response_text = rest[resp_match.end():]
-    end_match = re.search(r"\n###\s", response_text)
+    # End at next scenario heading (markdown or plain)
+    end_match = re.search(r"\n(?:#{1,3}\s+)?Scenario\s", response_text)
     if end_match:
         response_text = response_text[: end_match.start()]
 
@@ -131,6 +133,17 @@ def _extract_approved_response(
         result = response_text.strip()
 
     return result or None
+
+
+def get_scenario_a_response(talent_name: str) -> str | None:
+    """Return Scenario A (default) response for a talent directly from SOP. Used by Regenerate."""
+    talent_section = _get_talent_section_raw(talent_name)
+    if not talent_section:
+        return None
+    return (
+        _extract_approved_response(talent_section, "⭐ DEFAULT")
+        or _extract_approved_response(talent_section, "Scenario A")
+    )
 
 
 def _extract_adequate_threshold(talent_section: str) -> float | None:
@@ -492,10 +505,20 @@ def draft_reply(
         lines.pop()
     text = "\n".join(lines).strip()
 
-    # Check if GPT decided to escalate
+    # Check if GPT decided to escalate — try Scenario A before giving up
     if text.upper().startswith(_ESCALATE_PREFIX.upper()):
         reason = text[len(_ESCALATE_PREFIX):].strip()
-        logger.info("GPT escalated for %s: %s", talent_key, reason)
+        logger.info("GPT escalated for %s (%s) — trying Scenario A fallback", talent_key, reason)
+        talent_section = _get_talent_section_raw(talent_name)
+        if talent_section:
+            fallback = (
+                _extract_approved_response(talent_section, "⭐ DEFAULT")
+                or _extract_approved_response(talent_section, "Scenario A")
+            )
+            if fallback:
+                logger.info("draft_reply: Scenario A fallback used for %s", talent_key)
+                cc, clean = _extract_cc_from_draft(fallback)
+                return {"draft_text": clean, "is_escalate": False, "escalate_reason": None, "cc_recipients": cc}
         return _escalate_result(reason)
 
     cc, text = _extract_cc_from_draft(text)
