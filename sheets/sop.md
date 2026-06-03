@@ -265,20 +265,22 @@ Use Scenario A when:
 
 If uncertain between Scenario A and another approved response, use Scenario A.
 14B. Scenario B — Bundle Rate Requested
-Scenario B applies only when the sender clearly asks for bundle, package, bulk, discounted, or multi-post pricing for multiple deliverables from the same talent.
+Scenario B applies only when the sender explicitly asks whether the talent offers bundle, package, bulk, volume, or discounted pricing.
 
-Use Scenario B when the email explicitly asks for:
+Use Scenario B only when the email includes a clear pricing question such as:
 
-- bundle rates
-- package pricing
-- bulk pricing
-- discounted pricing for multiple posts/videos
-- pricing for 3+ videos/posts
-- pricing for a set number of deliverables
+- “Do you offer bundle rates?”
+- “Do you have package pricing?”
+- “Is there a discount for multiple posts?”
+- “What would a bundle cost?”
+- “Can you send bulk pricing?”
+- “Can you do a discounted rate for multiple videos?”
 
-Do not use Scenario B just because the email mentions multiple platforms, multiple deliverable options, general rates, a media kit, usage rights, whitelisting, exclusivity, or cross-posting.
+Do not use Scenario B when the sender only lists multiple deliverables, even if the email includes several posts, platforms, videos, stories, usage rights, whitelisting, exclusivity, or cross-posting.
 
-If Scenario B does not clearly apply, use Scenario A by default.
+A brand offering or requesting multiple deliverables is still Scenario A unless they clearly ask for bundle/package/discounted pricing.
+
+If Scenario B does not clearly and explicitly apply, use Scenario A by default.
 14C. Scenario C — Personal Email
 Scenario C applies when the sender email matches any personal email listed under that talent’s Scenario C section.
 
