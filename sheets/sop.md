@@ -55,7 +55,7 @@ As an additional safeguard, the workflow should only process emails where:
 If Gmail thread message count is greater than 1:
 
 - Classification: Human Admin Required
-- Apply Option B under Rule 11
+- Apply Option B under Rule 12
 
 6. Default to Initial Approved Response
 
@@ -101,7 +101,20 @@ Each talent may include a Scenario C containing one or more personal email addre
 
 If the inbound sender email matches any email listed under Scenario C for the matched talent, classify the email as Ignore.
 
-These emails are typically forwarded opportunities or conversations originally sent directly to the talent instead of the business inbox. 10. Formatting, Hyperlinks, and Internal Instructions
+These emails are typically forwarded opportunities or conversations originally sent directly to the talent instead of the business inbox. 10. Repeat Client Handling
+
+Some repeat clients should be ignored by this workflow because they are handled manually by the team.
+
+If the inbound sender email domain matches any domain listed under Repeat Client Domains, classify the email as Ignore.
+
+Repeat Client Domains:
+
+- favored.live
+- nextwave-talent.com
+
+If this rule applies, classify the email as Ignore.
+
+Operational handling is controlled by Rule 12: Inbox Handling After Classification. 11. Formatting, Hyperlinks, and Internal Instructions
 
 Approved responses may contain formatting markup and internal routing instructions.
 
@@ -140,7 +153,7 @@ Formatting behavior:
 - Render hyperlinks correctly.
 - If formatting cannot be rendered, remove markup and render the plain text only.
 
-11. Inbox Handling After Classification
+12. Inbox Handling After Classification
 
 This workflow applies only to eligible initial inbound emails currently in the INBOX.
 
@@ -151,7 +164,7 @@ Every processed email must result in exactly ONE of the following outcomes:
 Option A — Draft Created
 Option B — No Draft / Human Review
 
-Operational actions are controlled only by Rule 11. Other rules and scenarios determine classification only.
+Operational actions are controlled only by Rule 12. Other rules and scenarios determine classification only.
 
 These actions are mutually exclusive. Only one option may be applied per email.
 
@@ -200,7 +213,7 @@ Important:
 - Do not apply any other label.
 - Leave the email untouched in the Inbox.
 
-12. Required Output Format
+13. Required Output Format
 
 The Required Output Format is automation metadata only and must never be used as the email draft body.
 
@@ -218,19 +231,17 @@ Apply Label at Draft Creation: None
 Apply Label After Successful Send: A Initial Response / None
 
 Email Body must be blank unless Classification = Approved Response.
+A Initial Response must only be applied after the draft is successfully sent.
 
 Part 2 — Approved Response Matching
 
-13. Response Matching Hierarchy
+14. Response Matching Hierarchy
 
 When selecting an approved response:
 
-1. Apply all Global Rules first.
-2. Check whether the email matches Scenario C: Personal Email.
-3. Check whether the email clearly matches Scenario B: Bundle Rate Requested.
-4. Use the most specific matching scenario.
-5. If no specific scenario matches, use Scenario A: Initial Inbound Default Response.
-6. Scenario A is the default fallback response for all eligible inbound inquiries.
+1. Apply all Global no-draft rules first, including Event Invite, Repeat Client, and Personal Email handling.
+2. If no no-draft rule applies, check whether the email clearly matches Scenario B: Bundle Rate Requested.
+3. If Scenario B does not clearly apply, use Scenario A by default.
 
 There should be no “no matching scenario” outcome after the correct talent has been identified.
 
@@ -241,7 +252,7 @@ Only return “no match” if:
 - the email matches a global no-draft rule
 
 If the talent is identified and no specific scenario applies, use Scenario A.
-13A. Scenario A — Initial Inbound Default Response
+14A. Scenario A — Initial Inbound Default Response
 Scenario A is the default approved response for all eligible initial inbound emails when the correct talent is identified and no more specific scenario applies.
 
 Use Scenario A when:
@@ -253,20 +264,22 @@ Use Scenario A when:
 - no global no-draft rule applies
 
 If uncertain between Scenario A and another approved response, use Scenario A.
-13B. Scenario B — Bundle Rate Requested
-Scenario B applies when the inbound email asks for:
+14B. Scenario B — Bundle Rate Requested
+Scenario B applies only when the sender clearly asks for bundle, package, bulk, discounted, or multi-post pricing for multiple deliverables from the same talent.
 
-- multiple videos
-- multiple posts
-- bundle pricing
+Use Scenario B when the email explicitly asks for:
+
+- bundle rates
 - package pricing
-- multi-post pricing
-- several deliverables from the same talent
+- bulk pricing
+- discounted pricing for multiple posts/videos
+- pricing for 3+ videos/posts
+- pricing for a set number of deliverables
 
-If Scenario B applies, use that talent’s Scenario B approved response.
+Do not use Scenario B just because the email mentions multiple platforms, multiple deliverable options, general rates, a media kit, usage rights, whitelisting, exclusivity, or cross-posting.
 
 If Scenario B does not clearly apply, use Scenario A by default.
-13C. Scenario C — Personal Email
+14C. Scenario C — Personal Email
 Scenario C applies when the sender email matches any personal email listed under that talent’s Scenario C section.
 
 If Scenario C applies:
@@ -274,7 +287,7 @@ If Scenario C applies:
 - classify the email as Ignore
 - do not use Scenario A or Scenario B
 
-Operational handling is controlled by Rule 11: Inbox Handling After Classification.
+Operational handling is controlled by Rule 12: Inbox Handling After Classification.
 
 Part 3 — Talent Approved Responses
 

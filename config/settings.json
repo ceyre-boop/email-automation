@@ -32,7 +32,9 @@
         "mail.google.com",
         "superordinary.com",
         "grail-talent.com",
-        "nextwave.com"
+        "nextwave.com",
+        "favored.live",
+        "nextwave-talent.com"
       ],
       "senders": [],
       "emails": [],
@@ -291,6 +293,7 @@
       "minimum_rate_usd": 300,
       "rate_unit": "per video",
       "tier": "low",
+      "personal_email": "crashingskydrummer@gmail.com",
       "max_drafts_per_day": 2000
     },
     {
