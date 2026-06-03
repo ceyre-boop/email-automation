@@ -3,7 +3,7 @@
   "ai_enabled": true,
   "_ai_enabled_comment": "HARD BLOCKER \u2014 set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
   "auto_send_enabled": true,
-  "auto_send_talents": ["Wesley", "Hana"],
+  "auto_send_talents": ["Wesley", "Hana", "Audur"],
   "auto_send_hold_minutes": 15,
   "spam_sweep_enabled": false,
   "_spam_sweep_enabled_comment": "Set to true to re-enable spam folder scanning. Drafts replies to score=3 emails caught by Gmail spam filter, leaving them untouched in Spam. Paused 2026-05-27 pending Marco review.",
