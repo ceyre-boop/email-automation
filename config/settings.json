@@ -5,6 +5,8 @@
   "auto_send_enabled": true,
   "auto_send_talents": ["Wesley", "Hana", "Audur"],
   "auto_send_hold_minutes": 15,
+  "auto_send_velocity_cap": 25,
+  "_auto_send_velocity_cap_comment": "Max auto-sends per talent per rolling hour. Raise if queue backs up on busy days.",
   "spam_sweep_enabled": false,
   "_spam_sweep_enabled_comment": "Set to true to re-enable spam folder scanning. Drafts replies to score=3 emails caught by Gmail spam filter, leaving them untouched in Spam. Paused 2026-05-27 pending Marco review.",
   "openai": {

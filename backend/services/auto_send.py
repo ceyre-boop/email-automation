@@ -59,6 +59,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
         return
 
     # Velocity guard: count auto-sends in last hour for this talent
+    velocity_cap: int = int(cfg.get("auto_send_velocity_cap", 25))
     one_hour_ago = datetime.utcnow() - timedelta(hours=1)
     sent_last_hour = (
         db.query(Draft)
@@ -69,10 +70,10 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
         )
         .count()
     )
-    if sent_last_hour >= 5:
+    if sent_last_hour >= velocity_cap:
         logger.warning(
-            "auto_send: velocity cap reached for %s (%d sent in last hour) — skipping cycle",
-            talent_key, sent_last_hour,
+            "auto_send: velocity cap reached for %s (%d sent in last hour, cap=%d) — skipping cycle",
+            talent_key, sent_last_hour, velocity_cap,
         )
         return
 
@@ -106,7 +107,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
 
     sent_this_cycle = 0
     for draft in drafts:
-        if sent_last_hour + sent_this_cycle >= 5:
+        if sent_last_hour + sent_this_cycle >= velocity_cap:
             logger.info("auto_send: velocity cap hit mid-cycle for %s — stopping", talent_key)
             break
 
