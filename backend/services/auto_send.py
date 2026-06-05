@@ -175,9 +175,12 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
                 sent_messages = [m for m in messages if "DRAFT" not in m.get("labelIds", [])]
                 if len(sent_messages) > 1:
                     logger.info(
-                        "auto_send: thread %s has %d sent messages — skipping draft %d",
+                        "auto_send: thread %s has %d sent messages — dismissing draft %d",
                         draft.thread_id, len(sent_messages), draft.id,
                     )
+                    draft.dismissed = True
+                    db.add(draft)
+                    db.commit()
                     continue
             except Exception as exc:  # noqa: BLE001
                 logger.warning("auto_send: thread check failed for draft %d: %s — skipping", draft.id, exc)
