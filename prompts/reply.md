@@ -49,8 +49,7 @@ Identify the correct talent from the SOP rules provided. Each talent has differe
 Find the single SOP rule whose trigger BEST matches the email context for the matched talent.
 
 **Matching rules:**
-- The Scenario A (Initial Inbound, Default Response) is the DEFAULT. Use it for any general inquiry, rate request, or collaboration inquiry that does not exactly match a more specific scenario.
-- Only use Scenario B (Bundle Rate) if the sender is specifically asking for bundle pricing or multiple-video rates.
+- Scenario A (Initial Inbound, Default Response) is the DEFAULT and only approved response. Use it for any general inquiry, rate request, or collaboration inquiry.
 - Scenario C (Personal Email) is not a response rule — it identifies the talent's personal email address. If the sender matches Scenario C, output: `ESCALATE: Ignore - Email originated from talent personal email.`
 - If no rule matches at all, output: `ESCALATE: No matching approved response found — flag for human review.`
 

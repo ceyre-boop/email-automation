@@ -178,7 +178,7 @@ def _deterministic_initial_or_counter_reply(
 ) -> str | None:
     """
     Return the verbatim SOP approved response for common scenarios — no GPT involved.
-    Covers: rates inquiry (default), bundle request, below-minimum counter.
+    Covers: rates inquiry (default), below-minimum counter.
     Returns None to fall through to GPT for anything else.
     """
     talent_section = _get_talent_section_raw(talent_name)
@@ -188,24 +188,14 @@ def _deterministic_initial_or_counter_reply(
     triage_lower = (triage_reason or "").lower()
     body_lower = (body_text or "")[:500].lower()
 
-    is_bundle = (
-        any(phrase in triage_lower for phrase in _BUNDLE_PRICING_PHRASES)
-        or any(phrase in body_lower for phrase in _BUNDLE_PRICING_PHRASES)
-    )
     is_inquiry = (
         not proposed_rate
         or any(sig in triage_lower for sig in _INQUIRY_SIGNALS)
         or any(sig in body_lower for sig in _INQUIRY_EMAIL_SIGNALS)
     )
 
-    # Bundle overrides default
-    if is_bundle:
-        response = _extract_approved_response(talent_section, "Bundle")
-        if response:
-            return response
-
     # Rates inquiry → default response
-    if is_inquiry and not is_bundle:
+    if is_inquiry:
         response = _extract_approved_response(talent_section, "⭐ DEFAULT")
         if response:
             return response
@@ -216,13 +206,13 @@ def _deterministic_initial_or_counter_reply(
 
     # Adequate offer → Scenario C (CC manager). Return WITH CC line so caller can wire it.
     adequate_threshold = _extract_adequate_threshold(talent_section)
-    if adequate_threshold and proposed_rate and float(proposed_rate) > adequate_threshold and not is_bundle:
+    if adequate_threshold and proposed_rate and float(proposed_rate) > adequate_threshold:
         response = _extract_approved_response(talent_section, "Adequate", strip_cc=False)
         if response:
             return response
 
     # Below-minimum counter offer
-    if proposed_rate and 0 < proposed_rate < minimum_rate and not is_bundle:
+    if proposed_rate and 0 < proposed_rate < minimum_rate:
         for marker in ("Counter", "Below", "below minimum", "lower"):
             response = _extract_approved_response(talent_section, marker)
             if response:
@@ -245,19 +235,6 @@ _INQUIRY_SIGNALS = (
 _INQUIRY_EMAIL_SIGNALS = (
     "what are your rates", "rate card", "media kit", "pricing", "share rates",
     "send rates", "quote", "budget range", "can you send your rates",
-)
-
-# Phrases that indicate the sender is explicitly asking about bundle/package pricing.
-# Must be specific pricing phrases — bare "bundle" (e.g. "product bundle") does NOT qualify.
-# Aligned with SOP Rule 14B: only fire Scenario B when sender asks "do you offer bundle pricing?"
-_BUNDLE_PRICING_PHRASES = (
-    "bundle rate", "bundle pricing", "bundle price", "bundle deal",
-    "bundle discount", "bundle package",
-    "package rate", "package pricing", "package price", "package deal",
-    "bulk rate", "bulk pricing", "bulk price", "bulk discount",
-    "volume pricing", "volume rate", "volume discount",
-    "discount for multiple", "discounted rate for multiple",
-    "multi-video rate", "multi video rate",
 )
 
 # Maximum characters of the original email body included in the reply prompt.

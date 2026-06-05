@@ -19,23 +19,9 @@
         "do_not_use_when": [
           "An exact match from scenario below"
         ],
-        "response": "Thank you so much for reaching out about a potential partnership with Sylvia!! I\u2019m happy to share her media kit HERE [https://taboost.my.canva.site/sylvia] + rates below:\n\u2022 1 TikTok [https://www.tiktok.com/@sylviavanhoevenbeauty] (beauty): $2,000\n\u2022 1 TikTok [https://www.tiktok.com/@sylviavanhoeven] (fashion): $1,000\n\u2022 1 IG Reel [https://www.instagram.com/sylviavanhoeven]: $850\n\u2022 1 UGC Video: $1,500 (usage to be negotiated)\n\nSylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers!\n\nPlease let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We\u2019d love to explore working together!",
+        "response": "Thank you so much for reaching out about a potential partnership with Sylvia!! I’m happy to share her media kit HERE [https://taboost.my.canva.site/sylvia] + rates below:\n• 1 TikTok [https://www.tiktok.com/@sylviavanhoevenbeauty] (beauty): $2,000\n• 1 TikTok [https://www.tiktok.com/@sylviavanhoeven] (fashion): $1,000\n• 1 IG Reel [https://www.instagram.com/sylviavanhoeven]: $850\n• 1 UGC Video: $1,500 (usage to be negotiated)\n\nSylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers!\n\nPlease let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We’d love to explore working together!",
         "cc": null,
         "is_default": true
-      },
-      {
-        "scenario": "B",
-        "label": "Initial Inbound (Bundle Rate Requested)",
-        "trigger": "Asking for bundle rates",
-        "use_when": [
-          "Asking for bundle rates"
-        ],
-        "do_not_use_when": [
-          "Multiple post rate is not asked for"
-        ],
-        "response": "Sylvia's standard rate is $2,000 per video! HERE [https://taboost.my.canva.site/sylvia] is her media kit. Below is her bundle pricing:\n\n3 videos (90%) \u2192 $5,400\n5 videos (85%) \u2192 $8,500\n10 videos (75%) \u2192 $15,000\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!",
-        "cc": null,
-        "is_default": false
       },
       {
         "scenario": "C",
@@ -71,23 +57,9 @@
         "do_not_use_when": [
           "An exact match from scenario below"
         ],
-        "response": "Thank you so much for reaching out about a potential partnership with Trinity!! I\u2019m happy to share her media kit HERE [https://taboost.my.canva.site/trinity] + rates below:\n\u2022 1 TikTok [https://www.tiktok.com/@trinity.blair]: $4,000\n\u2022 1 IG Reel [https://www.instagram.com/trinyxo]: $2,000\n\u2022 Podcast [https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf] Feature: $1,500\n\u2022 1 UGC Video: $1,500 (usage to be negotiated)\n\nTrinity's pricing reflects her 3.4M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!",
+        "response": "Thank you so much for reaching out about a potential partnership with Trinity!! I’m happy to share her media kit HERE [https://taboost.my.canva.site/trinity] + rates below:\n• 1 TikTok [https://www.tiktok.com/@trinity.blair]: $4,000\n• 1 IG Reel [https://www.instagram.com/trinyxo]: $2,000\n• Podcast [https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf] Feature: $1,500\n• 1 UGC Video: $1,500 (usage to be negotiated)\n\nTrinity's pricing reflects her 3.4M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!",
         "cc": null,
         "is_default": true
-      },
-      {
-        "scenario": "B",
-        "label": "Initial Inbound (Bundle Rate Requested)",
-        "trigger": "Asking for bundle rates",
-        "use_when": [
-          "Asking for bundle rates"
-        ],
-        "do_not_use_when": [
-          "Multiple post rate is not asked for"
-        ],
-        "response": "Trinity's standard rate is $4,000 per video! HERE [https://taboost.my.canva.site/trinity] is her media kit. Below is her bundle pricing:\n\n3 videos (85%) \u2192 $10,000\n5 videos (80%) \u2192 $16,000\n10 videos (70%) \u2192 $28,000\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!",
-        "cc": null,
-        "is_default": false
       },
       {
         "scenario": "C",
@@ -145,23 +117,9 @@
         "do_not_use_when": [
           "An exact match from scenario below"
         ],
-        "response": "Thank you so much for reaching out about a potential partnership with Katrina!! I\u2019m happy to share her rates below:\n\u2022 1 TikTok [https://www.tiktok.com/@katrinagmoore]: $500\n\u2022 Cross posting to IG Reels [https://www.instagram.com/katrinamoore621/reels/]: + $150\n\u2022 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We\u2019d love to explore working together!",
+        "response": "Thank you so much for reaching out about a potential partnership with Katrina!! I’m happy to share her rates below:\n• 1 TikTok [https://www.tiktok.com/@katrinagmoore]: $500\n• Cross posting to IG Reels [https://www.instagram.com/katrinamoore621/reels/]: + $150\n• 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!",
         "cc": null,
         "is_default": true
-      },
-      {
-        "scenario": "B",
-        "label": "Initial Inbound (Bundle Rate Requested)",
-        "trigger": "Asking for bundle rates",
-        "use_when": [
-          "Asking for bundle rates"
-        ],
-        "do_not_use_when": [
-          "Multiple post rate is not asked for"
-        ],
-        "response": "Katrina's [https://www.tiktok.com/@katrinagmoore] standard rate is $500 per video! Below is her bundle pricing:\n\n3 videos (90%) \u2192 $1,350\n5 videos (85%) \u2192 $2,100\n10 videos (75%) \u2192 $3,750\n\nWe\u2019ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!",
-        "cc": null,
-        "is_default": false
       },
       {
         "scenario": "C",
