@@ -188,7 +188,10 @@ def _deterministic_initial_or_counter_reply(
     triage_lower = (triage_reason or "").lower()
     body_lower = (body_text or "")[:500].lower()
 
-    is_bundle = "bundle" in triage_lower or "bundle" in body_lower
+    is_bundle = (
+        any(phrase in triage_lower for phrase in _BUNDLE_PRICING_PHRASES)
+        or any(phrase in body_lower for phrase in _BUNDLE_PRICING_PHRASES)
+    )
     is_inquiry = (
         not proposed_rate
         or any(sig in triage_lower for sig in _INQUIRY_SIGNALS)
@@ -242,6 +245,19 @@ _INQUIRY_SIGNALS = (
 _INQUIRY_EMAIL_SIGNALS = (
     "what are your rates", "rate card", "media kit", "pricing", "share rates",
     "send rates", "quote", "budget range", "can you send your rates",
+)
+
+# Phrases that indicate the sender is explicitly asking about bundle/package pricing.
+# Must be specific pricing phrases — bare "bundle" (e.g. "product bundle") does NOT qualify.
+# Aligned with SOP Rule 14B: only fire Scenario B when sender asks "do you offer bundle pricing?"
+_BUNDLE_PRICING_PHRASES = (
+    "bundle rate", "bundle pricing", "bundle price", "bundle deal",
+    "bundle discount", "bundle package",
+    "package rate", "package pricing", "package price", "package deal",
+    "bulk rate", "bulk pricing", "bulk price", "bulk discount",
+    "volume pricing", "volume rate", "volume discount",
+    "discount for multiple", "discounted rate for multiple",
+    "multi-video rate", "multi video rate",
 )
 
 # Maximum characters of the original email body included in the reply prompt.

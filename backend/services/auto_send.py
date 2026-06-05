@@ -59,7 +59,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
         return
 
     # Velocity guard: count auto-sends in last hour for this talent
-    velocity_cap: int = int(cfg.get("auto_send_velocity_cap", 25))
+    velocity_cap: int = int(get_settings().app_config.get("auto_send_velocity_cap", 25))
     one_hour_ago = datetime.utcnow() - timedelta(hours=1)
     sent_last_hour = (
         db.query(Draft)
