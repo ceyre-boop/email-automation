@@ -223,7 +223,7 @@ Classification: Approved Response / Ignore / Human Admin Required
 Draft Created: Yes / No
 Send Draft: Yes / No
 Talent: [talent name, if applicable]
-Matched Scenario: [A / B / C / Event Invite / None]
+Matched Scenario: [A / C / Event Invite / Repeat Client / None]
 Internal Reason: [internal only, never draft body]
 Email Body: [only include when Classification = Approved Response]
 Remove INBOX Label: Yes / No
@@ -240,8 +240,7 @@ Part 2 — Approved Response Matching
 When selecting an approved response:
 
 1. Apply all Global no-draft rules first, including Event Invite, Repeat Client, and Personal Email handling.
-2. If no no-draft rule applies, check whether the email clearly matches Scenario B: Bundle Rate Requested.
-3. If Scenario B does not clearly apply, use Scenario A by default.
+2. If no no-draft rule applies and the correct talent is identified, use Scenario A: Initial Inbound Default Response.
 
 There should be no “no matching scenario” outcome after the correct talent has been identified.
 
@@ -251,43 +250,25 @@ Only return “no match” if:
 - the email is outside workflow eligibility
 - the email matches a global no-draft rule
 
-If the talent is identified and no specific scenario applies, use Scenario A.
+If the talent is identified and no no-draft rule applies, use Scenario A.
 14A. Scenario A — Initial Inbound Default Response
-Scenario A is the default approved response for all eligible initial inbound emails when the correct talent is identified and no more specific scenario applies.
+Scenario A is the default and only approved response for eligible initial inbound emails when the correct talent is identified.
 
 Use Scenario A when:
 
 - the email is an eligible initial inbound inquiry
 - the correct talent is identified
-- Scenario B does not clearly apply
-- Scenario C does not apply
 - no global no-draft rule applies
+- Scenario C does not apply
 
-If uncertain between Scenario A and another approved response, use Scenario A.
-14B. Scenario B — Bundle Rate Requested
-Scenario B applies only when the sender explicitly asks whether the talent offers bundle, package, bulk, volume, or discounted pricing.
-
-Use Scenario B only when the email includes a clear pricing question such as:
-
-- “Do you offer bundle rates?”
-- “Do you have package pricing?”
-- “Is there a discount for multiple posts?”
-- “What would a bundle cost?”
-- “Can you send bulk pricing?”
-- “Can you do a discounted rate for multiple videos?”
-
-Do not use Scenario B when the sender only lists multiple deliverables, even if the email includes several posts, platforms, videos, stories, usage rights, whitelisting, exclusivity, or cross-posting.
-
-A brand offering or requesting multiple deliverables is still Scenario A unless they clearly ask for bundle/package/discounted pricing.
-
-If Scenario B does not clearly and explicitly apply, use Scenario A by default.
+If uncertain, use Scenario A.
 14C. Scenario C — Personal Email
 Scenario C applies when the sender email matches any personal email listed under that talent’s Scenario C section.
 
 If Scenario C applies:
 
 - classify the email as Ignore
-- do not use Scenario A or Scenario B
+- do not use Scenario A
 
 Operational handling is controlled by Rule 12: Inbox Handling After Classification.
 
@@ -298,23 +279,12 @@ Talent: Katrina Moore
 Manager: Chenni Li
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-Thank you so much for reaching out about a potential partnership with Katrina!! I’m happy to share her rates below:
-**1 TikTok** [katrinagmoore](https://www.tiktok.com/@katrinagmoore) - $500
-Cross-posting to **IG Reels** [katrinamoore621](https://www.instagram.com/katrinamoore621/reels/) - +$150
-**1 UGC Video** - $400 (usage to be negotiated)
+Thanks for reaching out about working with Katrina!
+[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.
 
-Katrina's pricing reflects her extremely high **conversion rate**. Her monthly GMV is **$450k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong **following** plus great engagement!
+Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
+Looking forward to hearing your thoughts!
 
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Katrina's](https://www.tiktok.com/@katrinagmoore) standard rate is $500 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $1,350
-    5 videos (85%) → $2,100
-    10 videos (75%) → $3,750
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: katrinamoore621@gmail.com
 
@@ -332,15 +302,6 @@ Thank you so much for reaching out about a potential partnership with Anastasiya
 Anastasiya's pricing reflects her high-quality, **polished** content with a bestie beauty vibe that feels authentic, relatable, and **brand-elevating**!! Plus she's a UGC expert so she knows how to make videos that convert!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Anastasiya's](https://www.tiktok.com/@anastasiya_ray) standard rate is $800 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $2,150
-    5 videos (85%) → $3,400
-    10 videos (75%) → $6,000
-
-We’ve found bundles usually perform better since multiple posts make the product feel like a real part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -360,15 +321,6 @@ Thank you so much for reaching out about a potential partnership with Wesley!! I
 Wesley's pricing reflects her strong following across both TikTok and Instagram. She specializes in **tall girl-friendly fashion**, beauty, and lifestyle content, creating relatable recommendations that make her content feel approachable and easy to trust!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Wesley’s](https://www.tiktok.com/@wesleyrbarker) standard rate is $750 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $2,000
-    5 videos (85%) → $3,100
-    10 videos (75%) → $5,600
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: wesleybarkerbookings@gmail.com
 
@@ -385,15 +337,6 @@ Thank you so much for reaching out about a potential partnership with Hana!! I�
 Hana's pricing reflects her ability to create content that feels **genuine** and **unfiltered**. Known for her silly personality and authentic approach, she isn't afraid to show her audience the **real** her while sharing products she genuinely loves and uses in her everyday life.
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Hana’s](https://www.tiktok.com/@hanaisfinechina) standard rate is $750 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $2,000
-    5 videos (85%) → $3,100
-    10 videos (75%) → $5,600
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: hanaisfinechina@gmail.com
 
@@ -409,15 +352,6 @@ Thank you so much for reaching out about a potential partnership with Jenn!! I�
 Jenn's pricing reflects her extremely high **conversion rate** (consistent **$400k+** monthly GMV). She's a TikTok Shop Star who shares relatable, authentic finds with her audience through engaging, trust-first content that drives attention and connection!!
 
 Please let us know **what type of collab you're looking for** + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Jenn’s](https://www.tiktok.com/@jenn_lyles) standard rate is $500 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $1,350
-    5 videos (85%) → $2,100
-    10 videos (75%) → $3,750
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: jenn@jennlyles.com
 
@@ -434,15 +368,6 @@ Thank you so much for reaching out about a potential partnership with Angela!! I
 Angela's pricing reflects her extremely high conversion rate (consistent **$450k+** monthly GMV). She's a TikTok Shop Star who specializes in real friend-to-friend recommendations for **fashion & beauty** based on her authenticity!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Angela’s](https://www.tiktok.com/@angelacallisto123) standard rate is $750 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $2,000
-    5 videos (85%) → $3,100
-    10 videos (75%) → $5,600
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: angelacallisto123@gmail.com
 
@@ -458,15 +383,6 @@ Thank you so much for reaching out about a potential partnership with Grayson!! 
 Grayson's pricing reflects her high quality **fashion** content & the effort she puts in to drive conversions (consistent **$60k+** monthly GMV)!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Grayson's](https://www.tiktok.com/@grayson.finks) standard rate is $750 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $2,000
-    5 videos (85%) → $3,150
-    10 videos (75%) → $5,600
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: graysonfinks@gmail.com
 
@@ -483,15 +399,6 @@ Thank you so much for reaching out about a potential partnership with Kylika!! I
 Kylika's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **fashion & beauty** recommendations on TikTok Shop!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Kylika's](https://www.tiktok.com/@kylikamiller44) standard rate is $750 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $2,000
-    5 videos (85%) → $3,100
-    10 videos (75%) → $5,600
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: kylikacollabs@gmail.com
 
@@ -509,15 +416,6 @@ Thank you so much for reaching out about a potential partnership with Audur!! I�
 Audur's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **beauty & personal care** recommendations on TikTok Shop!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Audur's](https://www.tiktok.com/@thatnordicblonde) standard rate is $800 per video! Below is her bundle pricing:
-
-    3 videos (90%) → $2,150
-    5 videos (85%) → $3,400
-    10 videos (75%) → $6,000
-
-We’ve found bundles usually perform **better** since multiple posts make the product feel like a **real** part of her routine instead of a one-off. Let me know your thoughts!
 Scenario C: Personal Email Forward
 Personal Email: thebanksedit@gmail.com
 
@@ -533,8 +431,5 @@ Thank you so much for reaching out about a potential partnership with Skyler!! I
 Skyler’s pricing reflects her high quality content + the access you'll get to the community of music fans on TikTok!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-Scenario B: Initial Inbound (Bundle Rate Requested)
-Approved Response:
-[Not provided - Use Scenario A]
 Scenario C: Personal Email Forward
 Personal Email: crashingskydrummer@gmail.com
