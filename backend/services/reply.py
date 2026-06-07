@@ -188,23 +188,17 @@ def _deterministic_initial_or_counter_reply(
     triage_lower = (triage_reason or "").lower()
     body_lower = (body_text or "")[:500].lower()
 
-    is_inquiry = (
-        not proposed_rate
-        or any(sig in triage_lower for sig in _INQUIRY_SIGNALS)
-        or any(sig in body_lower for sig in _INQUIRY_EMAIL_SIGNALS)
-    )
+    # Always try Scenario A first — it is the default and only approved path for all
+    # current SOPs. A non-zero proposed_rate must NOT gate this lookup; the rate value
+    # has been corrupting drafts by causing this block to be skipped entirely.
+    response = _extract_approved_response(talent_section, "⭐ DEFAULT")
+    if response:
+        return response
+    response = _extract_approved_response(talent_section, "Scenario A")
+    if response:
+        return response
 
-    # Rates inquiry → default response
-    if is_inquiry:
-        response = _extract_approved_response(talent_section, "⭐ DEFAULT")
-        if response:
-            return response
-        # Fallback for talents without the ⭐ DEFAULT marker
-        response = _extract_approved_response(talent_section, "Scenario A")
-        if response:
-            return response
-
-    # Adequate offer → Scenario C (CC manager). Return WITH CC line so caller can wire it.
+    # Rate-based paths — only reached if SOP has no Scenario A (e.g. future counter-offer SOPs).
     adequate_threshold = _extract_adequate_threshold(talent_section)
     if adequate_threshold and proposed_rate and float(proposed_rate) > adequate_threshold:
         response = _extract_approved_response(talent_section, "Adequate", strip_cc=False)
@@ -368,7 +362,6 @@ def _build_reply_messages(
         f"Subject: {subject}\n"
         f"Sender: {sender}\n"
         f"Brand: {brand_name}\n"
-        f"Proposed rate: ${int(proposed_rate) if proposed_rate else 0}\n"
         f"Triage notes: {triage_reason}\n\n"
         f"Email:\n---\n{body_snippet or '(not available)'}\n---\n\n"
         f"Return the matching Approved Response for {talent_name} exactly as written."

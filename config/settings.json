@@ -6,7 +6,7 @@
   "auto_send_talents": ["Wesley", "Hana", "Audur", "Katrina"],
   "auto_send_hold_minutes": 120,
   "auto_send_velocity_cap": 500,
-  "_auto_send_velocity_cap_comment": "Max auto-sends per talent per rolling hour. Raise if queue backs up on busy days.",
+  "_auto_send_velocity_cap_comment": "TEMPORARY: raised to 500 for Katrina backlog clear (2026-06-07). Reset to 100 once clear.",
   "auto_send_window_enabled": false,
   "auto_send_window_start": "07:00",
   "auto_send_window_end": "19:00",
