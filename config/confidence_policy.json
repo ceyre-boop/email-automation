@@ -93,43 +93,7 @@
   },
 
   "special_talent_routing": {
-    "_comment": "Per-talent logic that overrides global rules. These must be implemented in the Special Rules column of each talent's SOP tab AND in the reply prompt for the AI to handle correctly.",
-
-    "Katrina": {
-      "rule": "Dual manager escalation",
-      "condition_a": "If proposed_rate_usd > 650",
-      "action_a": "Route to ESCALATE with note: 'Offer above $650 threshold — CC Cara per Katrina's SOP'",
-      "condition_b": "If proposed_rate_usd <= 650 AND score == 3",
-      "action_b": "Route to ESCALATE with note: 'Standard offer — CC Chenni per Katrina's SOP'",
-      "make_implementation": "Set Auto-Respond Flag = ESCALATE for all Sponsored Post rows in Katrina's SOP tab. The escalation note in Special Rules will guide the human reviewer."
-    },
-
-    "Michaela": {
-      "rule": "Dual manager escalation + floor threshold",
-      "condition_a": "If proposed_rate_usd < 1000",
-      "action_a": "Route to Score 1 behavior (archive, no reply). The offer is below the minimum rate floor.",
-      "condition_b": "If proposed_rate_usd >= 1000 AND proposed_rate_usd <= 4000",
-      "action_b": "Route to ESCALATE with note: 'Offer at/below $4,000 — CC Chenni per Michaela's SOP'",
-      "condition_c": "If proposed_rate_usd > 4000",
-      "action_c": "Route to ESCALATE with note: 'High-value offer above $4,000 — CC Cara per Michaela's SOP'",
-      "make_implementation": "Set Auto-Respond Flag = ESCALATE for all rows in Michaela's SOP tab. Add a pre-check in Phase 1: if talent == Michaela AND proposed_rate_usd < 1000, route to Score 1 even if GPT returned Score 3. This check runs AFTER the GPT score is received.",
-      "_override_note": "The '$1,000 floor = Score 1' rule for Michaela overrides the standard GPT score. It is applied as a post-GPT routing step, not as a prompt instruction."
-    },
-
-    "KatrinaD": {
-      "rule": "Hourly rate interpretation",
-      "condition": "All offers for KatrinaD must be interpreted as hourly rates",
-      "action": "If a flat fee is quoted without hours: route to Score 2. If hourly rate can be calculated and is >= $150/hr: proceed with Score 3. If hourly rate < $150/hr: Score 1.",
-      "make_implementation": "In the Phase 1 scenario for KatrinaD, add a post-GPT module: if proposed_rate_usd > 0, calculate hourly_rate = proposed_rate_usd / estimated_hours (default estimate: 2 hours if not stated). Route based on hourly_rate vs minimum ($150).",
-      "_implementation_note": "Estimated hours parsing requires an additional GPT call or a regex to extract hours from the email body. Simpler alternative: set KatrinaD's triage minimum_rate to her hourly minimum ($150) and add a Special Rule note to the triage prompt: 'KatrinaD's rate is per hour. The minimum rate listed is per hour. Interpret all offers accordingly.'"
-    },
-
-    "Trin": {
-      "rule": "Commission-only offers are immediately Score 1",
-      "condition": "If offer_type == 'Affiliate' AND proposed_rate_usd == 0",
-      "action": "Override to Score 1 regardless of brand name. Archive. No reply.",
-      "make_implementation": "Post-GPT router for Trin's scenario: if offer_type contains 'Affiliate' and proposed_rate_usd == 0, route to Score 1 path."
-    }
+    "_comment": "Per-talent routing overrides. All talent-specific logic lives in sheets/sop.md — not here and not in code. This section is intentionally empty. Add entries only when a talent's SOP explicitly defines routing rules that cannot be expressed in the SOP template."
   },
 
   "global_hard_floor": {

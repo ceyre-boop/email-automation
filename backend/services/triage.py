@@ -82,13 +82,8 @@ def _build_triage_messages(
     sender: str,
     sender_domain: str,
     body: str,
-    rate_note: str = "",
 ) -> list[dict]:
-    """Parse the triage.md prompt and fill in template variables.
-
-    rate_note: Optional extra instruction appended to the user message for
-    talents whose rate unit differs from the default (e.g. per-hour vs per-video).
-    """
+    """Parse the triage.md prompt and fill in template variables."""
     system_text, user_template = _get_triage_sections()
 
     user_text = (
@@ -98,11 +93,8 @@ def _build_triage_messages(
         .replace("{{EMAIL_SUBJECT}}", subject)
         .replace("{{SENDER_EMAIL}}", sender)
         .replace("{{SENDER_DOMAIN}}", sender_domain)
-        .replace("{{EMAIL_BODY}}", body[:2000])  # 2 KB is ample for triage scoring
+        .replace("{{EMAIL_BODY}}", body[:2000])
     )
-
-    if rate_note:
-        user_text += f"\n\nSPECIAL RATE NOTE: {rate_note}"
 
     return [
         {"role": "system", "content": system_text},
@@ -120,86 +112,7 @@ def _apply_special_routing(
     policy: dict,
     brand_name: str = "",
 ) -> int:
-    """Apply per-talent overrides from confidence_policy.json special_talent_routing."""
-    key = talent_key.lower()
-
-    if key == "britt":
-        offer_lower = offer_type.lower()
-        # PR requests from any identifiable brand → always draft a reply (Score 3).
-        # Britt's SOP has a canned PR response; missing one is worse than sending it.
-        if "pr" in offer_lower or "pr request" in offer_lower:
-            if brand_name:
-                logger.info("Britt PR request from brand '%s' → Score 3", brand_name)
-                return 3
-        # Event / panel / TikTok invites → always flag for human review, never trash.
-        if "event" in offer_lower or "panel" in offer_lower or "appearance" in offer_lower:
-            if score == 1:
-                logger.info("Britt event/panel invite → upgrading Score 1 → Score 2")
-                return 2
-        # Commission-only (Affiliate, no flat fee) → flag for review, never trash.
-        # A real brand offering affiliate-only is worth a human look even if we can't auto-reply.
-        if "affiliate" in offer_lower and proposed_rate == 0:
-            if score == 1:
-                logger.info("Britt commission-only offer → upgrading Score 1 → Score 2")
-                return 2
-        # Any email from an identifiable brand should never be trashed outright.
-        # Bias toward drafting: a draft we don't send costs nothing; a missed deal costs revenue.
-        if score == 1 and brand_name:
-            logger.info(
-                "Britt real-brand safety net: brand='%s' offer_type='%s' → upgrading Score 1 → Score 2",
-                brand_name, offer_type,
-            )
-            return 2
-
-    if key == "trin":
-        if "affiliate" in offer_type.lower() and proposed_rate == 0:
-            logger.info("Trin commission-only override → Score 1")
-            return 1
-
-    if key == "katrina":
-        # Dual-manager escalation: all Score-3 offers are escalated at the reply stage.
-        # Threshold comes from confidence_policy.json special_talent_routing.Katrina.
-        # Rate > threshold → CC Cara; rate ≤ threshold (or unknown) → CC Chenni.
-        # No score change here — score-3 proceeds to the reply engine which applies
-        # the SOP escalation. Logged so the routing intent is visible in server logs.
-        katrina_cfg = policy.get("special_talent_routing", {}).get("Katrina", {})
-        # condition_a text is "If proposed_rate_usd > 650" — parse the threshold
-        # defensively, falling back to the canonical $650 if parsing fails.
-        _raw = katrina_cfg.get("condition_a", "")
-        try:
-            cara_threshold = float(re.search(r">\s*(\d+)", _raw).group(1))  # type: ignore[union-attr]
-        except (AttributeError, ValueError):
-            cara_threshold = 650.0
-        if score == 3:
-            if proposed_rate > cara_threshold:
-                logger.info(
-                    "Katrina dual-manager rule: rate $%s > $%s threshold → "
-                    "reply engine will escalate to Cara",
-                    proposed_rate, cara_threshold,
-                )
-            else:
-                logger.info(
-                    "Katrina dual-manager rule: rate $%s ≤ $%s (or unknown) → "
-                    "reply engine will escalate to Chenni",
-                    proposed_rate, cara_threshold,
-                )
-
-    if key == "katrinad":
-        # Hourly-rate interpretation: all KatrinaD offers are priced per hour.
-        # The minimum_rate in settings is already set to the hourly floor ($150/hr).
-        # GPT receives a SPECIAL RATE NOTE (injected by triage_email) instructing it
-        # to interpret rates as per-hour. If GPT cannot determine the hourly rate
-        # from the email (flat fee with no hours mentioned), it should return Score 2.
-        # No hard score override here — we trust the enriched prompt; log for visibility.
-        logger.debug(
-            "KatrinaD hourly-rate triage: proposed_rate=%s (per hour)", proposed_rate
-        )
-
-    if key == "michaela":
-        if proposed_rate > 0 and proposed_rate < 1000:
-            logger.info("Michaela floor override ($%s < $1000) → Score 1", proposed_rate)
-            return 1
-
+    """All talent-specific routing lives in the SOP (sheets/sop.md), not here."""
     return score
 
 
@@ -263,8 +176,6 @@ def triage_email(
     policy = settings.confidence_policy
     triage_cfg = settings.app_config.get("triage", {})
 
-    # Build a per-hour rate note for talents whose rate unit is not "per video".
-    # This is critical for KatrinaD (per hour) so GPT interprets offered amounts correctly.
     talent_cfg = next(
         (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),
         {},
@@ -289,16 +200,6 @@ def triage_email(
                 "Email originated from talent personal email — left in INBOX for human review.",
                 "Personal Email Forward",
             )
-    rate_unit = talent_cfg.get("rate_unit", "per video")
-    rate_note = (
-        f"This talent's rate is {rate_unit}. The minimum rate listed above is "
-        f"{rate_unit}. Interpret all offered amounts accordingly. "
-        "If an offer quotes a flat fee without specifying hours, respond with Score 2 "
-        "because the effective hourly rate cannot be determined."
-        if rate_unit != "per video"
-        else ""
-    )
-
     # ── Pre-filter: explicit never-reply rules → Score 1, no GPT call ───────────
     never_reply = triage_cfg.get("never_reply", {}) if isinstance(triage_cfg, dict) else {}
     blocked_domains = {str(d).strip().lower() for d in never_reply.get("domains", []) if str(d).strip()}
@@ -374,7 +275,6 @@ def triage_email(
         sender=sender,
         sender_domain=sender_domain,
         body=body,
-        rate_note=rate_note,
     )
 
     client = OpenAI(api_key=settings.openai_api_key)
