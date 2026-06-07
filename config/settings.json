@@ -3,9 +3,9 @@
   "ai_enabled": true,
   "_ai_enabled_comment": "HARD BLOCKER \u2014 set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
   "auto_send_enabled": true,
-  "auto_send_talents": ["Wesley", "Hana", "Audur", "Anastasiya", "Jenn", "Angela", "Grayson", "Kylika", "Katrina"],
+  "auto_send_talents": ["Wesley", "Hana", "Audur", "Katrina"],
   "auto_send_hold_minutes": 120,
-  "auto_send_velocity_cap": 50,
+  "auto_send_velocity_cap": 500,
   "_auto_send_velocity_cap_comment": "Max auto-sends per talent per rolling hour. Raise if queue backs up on busy days.",
   "auto_send_window_enabled": false,
   "auto_send_window_start": "07:00",
@@ -335,7 +335,9 @@
     "draft_email_ratio_kill": 5.0,
     "stuck_processing_threshold_minutes": 5,
     "alert_cooldown_minutes": 30,
-    "alert_email": "info@taboost.me",
+    "alert_email": "skyler@taboost.me",
+    "sender_talent_key": "Skyler",
+    "_sender_talent_key_comment": "Talent whose Gmail OAuth token is used to send Guardian alert emails. Must have an active token in the DB.",
     "recovery_wait_minutes": 30,
     "recovery_health_threshold": 0.7
   }

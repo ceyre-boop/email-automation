@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     # Google OAuth
     google_client_id: str = ""
     google_client_secret: str = ""
-    google_redirect_uri: str = "https://yourapp.com/auth/callback"
+    google_redirect_uri: str = ""
 
     # OpenAI
     openai_api_key: str = ""
@@ -43,7 +43,7 @@ class Settings(BaseSettings):
     google_sheets_service_account_file: str = ""
 
     # App
-    app_base_url: str = "https://yourapp.com"
+    app_base_url: str = ""
     agency_secret_key: str = "change_me"
     allowed_origins: str = "http://localhost:3000"
 

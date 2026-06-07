@@ -40,23 +40,23 @@ def test_triage_messages_contains_talent_name():
 
 
 def test_triage_messages_contains_minimum_rate():
-    msgs = _build_triage_messages("Sam", 700, "Subj", "a@b.com", "b.com", "body")
+    msgs = _build_triage_messages("Wesley", 700, "Subj", "a@b.com", "b.com", "body")
     assert "700" in msgs[1]["content"]
 
 
 def test_triage_messages_body_truncated_at_4000():
     long_body = "x" * 5000
-    msgs = _build_triage_messages("Sam", 700, "Subj", "a@b.com", "b.com", long_body)
+    msgs = _build_triage_messages("Wesley", 700, "Subj", "a@b.com", "b.com", long_body)
     assert "x" * 4001 not in msgs[1]["content"]
 
 
 def test_triage_system_prompt_is_non_empty():
-    msgs = _build_triage_messages("Sam", 700, "Subj", "a@b.com", "b.com", "body")
+    msgs = _build_triage_messages("Wesley", 700, "Subj", "a@b.com", "b.com", "body")
     assert len(msgs[0]["content"]) > 100
 
 
 def test_triage_returns_two_messages():
-    msgs = _build_triage_messages("Sam", 700, "Subj", "a@b.com", "b.com", "body")
+    msgs = _build_triage_messages("Wesley", 700, "Subj", "a@b.com", "b.com", "body")
     assert len(msgs) == 2
     assert msgs[0]["role"] == "system"
     assert msgs[1]["role"] == "user"
@@ -73,7 +73,7 @@ def test_triage_rate_note_injected_when_provided():
 
 def test_triage_no_rate_note_by_default():
     """No SPECIAL RATE NOTE section when rate_note is omitted."""
-    msgs = _build_triage_messages("Sam", 700, "Subj", "a@b.com", "b.com", "body")
+    msgs = _build_triage_messages("Wesley", 700, "Subj", "a@b.com", "b.com", "body")
     assert "SPECIAL RATE NOTE" not in msgs[1]["content"]
 
 
@@ -318,8 +318,8 @@ def test_triage_taboost_domain_blocked(mock_settings, mock_openai_cls):
     mock_settings.return_value = s
 
     result = triage_email(
-        "Lizz",
-        "Lizz Freixas",
+        "Wesley",
+        "Wesley Barker",
         600,
         "Re: collab with brand",
         "cara@taboost.me",

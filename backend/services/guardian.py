@@ -406,7 +406,15 @@ class GuardianWatchdog:
             )
 
             from backend.models.db import TalentToken
-            token_row = db.query(TalentToken).filter(TalentToken.active == True).first()  # noqa: E712
+            sender_key = cfg.get("sender_talent_key", "")
+            if sender_key:
+                token_row = (
+                    db.query(TalentToken)
+                    .filter(TalentToken.talent_key.ilike(sender_key), TalentToken.active == True)  # noqa: E712
+                    .first()
+                )
+            else:
+                token_row = db.query(TalentToken).filter(TalentToken.active == True).first()  # noqa: E712
             if token_row:
                 from backend.services.gmail import send_standalone_message
                 send_standalone_message(token_row, to=alert_email, subject=subject, body=body, db=db)

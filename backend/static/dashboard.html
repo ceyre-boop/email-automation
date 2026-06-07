@@ -189,7 +189,7 @@ body {
 }
 .t-dot.online    { background: var(--green);  box-shadow: 0 0 6px var(--green); }
 .t-dot.drafting  { background: #f4b400;       box-shadow: 0 0 6px #f4b400; }
-.t-dot.offline   { background: var(--text-3); }
+.t-dot.offline   { background: var(--red); box-shadow: 0 0 6px var(--red); }
 
 .t-badge {
   background: var(--red); color: #fff;
@@ -1479,7 +1479,7 @@ function renderSidebar() {
   ul.innerHTML = '';
   const pendingMap = {};
   state.report?.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_real_drafts ?? c.pending_drafts; });
-  state.talents.forEach(t => {
+  state.talents.filter(t => t.connected).forEach(t => {
     const pending = pendingMap[t.key] || 0;
     const health = state.tokenHealth[t.key.toLowerCase()];
     const needsReconnect = health && (!health.active || health.consecutive_failures >= 2);
