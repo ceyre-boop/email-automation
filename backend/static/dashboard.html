@@ -1466,11 +1466,11 @@ function closeSopModal() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
 
-// ── Dot state: green = auto-send, yellow = drafting, grey = disconnected/paused
+// ── Dot state: green = auto-send, yellow = draft-only, grey = disconnected/paused
 function dotClass(t) {
   if (!t.connected || t.paused) return 'offline';
-  if (t.draft_mode) return 'drafting';
-  return 'online';
+  if (t.auto_send) return 'online';
+  return 'drafting';
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────

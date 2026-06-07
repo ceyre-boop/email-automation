@@ -100,6 +100,7 @@ class TalentOut(BaseModel):
     connected_at: Optional[str] = None
     paused: bool = False
     draft_mode: bool = True
+    auto_send: bool = False
 
 
 class EmailOut(BaseModel):
@@ -452,6 +453,8 @@ def list_talents(db: Session = Depends(get_db)):
     }
 
     global_draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
+    auto_send_talents: set[str] = {k.lower() for k in settings.app_config.get("auto_send_talents", [])}
+    auto_send_enabled: bool = settings.app_config.get("auto_send_enabled", False)
 
     return [
         TalentOut(
@@ -466,6 +469,7 @@ def list_talents(db: Session = Depends(get_db)):
             connected_at=connected[t["key"].lower()].connected_at.isoformat() if t["key"].lower() in connected else None,
             paused=t.get("paused", False),
             draft_mode=global_draft_mode,
+            auto_send=auto_send_enabled and t["key"].lower() in auto_send_talents,
         )
         for t in talent_configs
     ]
