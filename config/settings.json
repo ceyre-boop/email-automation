@@ -3,7 +3,7 @@
   "ai_enabled": true,
   "_ai_enabled_comment": "HARD BLOCKER \u2014 set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
   "auto_send_enabled": true,
-  "auto_send_talents": ["Wesley", "Hana", "Audur", "Anastasiya", "Jenn", "Angela", "Grayson", "Kylika"],
+  "auto_send_talents": ["Wesley", "Hana", "Audur", "Anastasiya", "Jenn", "Angela", "Grayson", "Kylika", "Katrina"],
   "auto_send_hold_minutes": 120,
   "auto_send_velocity_cap": 50,
   "_auto_send_velocity_cap_comment": "Max auto-sends per talent per rolling hour. Raise if queue backs up on busy days.",
@@ -207,7 +207,6 @@
       "rate_unit": "per video",
       "personal_email": "katrinamoore621@gmail.com",
       "_note": "Dual manager escalation: offers above $650 go to Cara; at or below $650 go to Chenni.",
-      "paused": true,
       "max_drafts_per_day": 2000
     },
     {
