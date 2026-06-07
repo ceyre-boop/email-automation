@@ -251,7 +251,7 @@ def triage_email(
         "score": 1|2|3,
         "reason": str,
         "offer_type": str,
-        "proposed_rate_usd": float,
+        "proposed_rate_usd": 0.0,
         "brand_name": str,
     }
     Falls back to score=2 on any error (never silently drops emails).
@@ -415,7 +415,7 @@ def triage_email(
         return _fallback(talent_key, f"API error: {exc}")
 
     # Schema validation — required fields must all be present
-    _REQUIRED = {"score", "reason", "offer_type", "proposed_rate_usd", "brand_name"}
+    _REQUIRED = {"score", "reason", "offer_type", "brand_name"}
     missing = _REQUIRED - set(result.keys())
     if missing:
         logger.error(
@@ -430,7 +430,7 @@ def triage_email(
         logger.warning("Invalid score %r for %s — routing to Score 2", score, talent_key)
         return _fallback(talent_key, f"invalid score value: {score}")
 
-    proposed_rate = float(result.get("proposed_rate_usd", 0) or 0)
+    proposed_rate = 0.0
     offer_type = str(result.get("offer_type", "Unknown"))
     brand_name = str(result.get("brand_name", "") or "")
 
@@ -457,7 +457,7 @@ def triage_email(
         "score": score,
         "reason": result.get("reason", ""),
         "offer_type": offer_type,
-        "proposed_rate_usd": proposed_rate,
+        "proposed_rate_usd": 0.0,
         "brand_name": brand_name,
         "sentiment_score": _clamp_score(result.get("sentiment_score"), 5),
         "urgency_score": _clamp_score(result.get("urgency_score"), 0),

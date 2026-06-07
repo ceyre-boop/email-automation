@@ -69,27 +69,4 @@ def run_pre_send_checks(draft: Draft, db: Session) -> tuple[bool, str | None]:
                 f"but email was triaged for '{pe.talent_key}'"
             )
 
-    # Check 6 — SOP approved response match (skip for human-edited drafts)
-    if not draft.human_edited:
-        talent_name = _key_to_name(draft.talent_key)
-        if talent_name:
-            try:
-                from backend.services.reply import get_all_approved_responses
-                responses = get_all_approved_responses(talent_name)
-                if responses:
-                    normalized = body
-                    if draft.brand_name:
-                        normalized = re.sub(
-                            re.escape(draft.brand_name), "[Brand Name]", normalized, flags=re.IGNORECASE
-                        )
-                    normalized_lower = normalized.lower()
-                    matched = any(
-                        len(resp.strip()[:80]) >= 30 and resp.strip()[:80].lower() in normalized_lower
-                        for resp in responses
-                    )
-                    if not matched:
-                        return False, "Draft text does not match any approved SOP response for this talent"
-            except Exception as exc:  # noqa: BLE001
-                logger.warning("run_pre_send_checks: SOP match check failed (non-blocking): %s", exc)
-
     return True, None

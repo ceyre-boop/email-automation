@@ -54,14 +54,7 @@ Also score 1 for: emails where the sender name closely matches the talent name (
 Return ONLY a JSON object. No explanation, no extra text.
 
 Format:
-{"score": <1|2|3>, "reason": "<one sentence explaining the score>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|PR Request|Event Appearance|Gifting|Rate Inquiry|Other|Unknown>", "proposed_rate_usd": <number or 0 if not explicitly stated>, "brand_name": "<brand or company name, or empty string>", "sentiment_score": <0-10>, "urgency_score": <0-10>, "risk_score": <0-10>, "alternatives_considered": "<one sentence on what other score was considered and why rejected>"}
-
-proposed_rate_usd rules:
-- 0 if asking for rates or no specific dollar amount stated
-- 0 if the amount is described as "up to $X", "earn up to", "potential earnings", or affiliate/commission estimates
-- 0 if the email is an affiliate gifting program (free sample + commission) — these are NOT direct paid offers
-- 0 if the payment is conditional on performance, clicks, or sales (commission-based)
-- Non-zero ONLY if brand explicitly states a guaranteed flat payment: "we will pay you $X per video" or "our budget is $X"
+{"score": <1|2|3>, "reason": "<one sentence explaining the score>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|PR Request|Event Appearance|Gifting|Rate Inquiry|Other|Unknown>", "brand_name": "<brand or company name, or empty string>", "sentiment_score": <0-10>, "urgency_score": <0-10>, "risk_score": <0-10>, "alternatives_considered": "<one sentence on what other score was considered and why rejected>"}
 
 ---
 
