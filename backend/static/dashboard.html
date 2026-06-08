@@ -2092,7 +2092,7 @@ let _draftQueueExpanded = {};
 
 async function loadDraftQueue() {
   try {
-    const drafts = await api('GET', '/api/drafts?status=pending');
+    const drafts = await api('GET', '/api/drafts');
     const list = document.getElementById('draft-queue-list');
     const countEl = document.getElementById('draft-queue-count');
     countEl.textContent = drafts.length;
