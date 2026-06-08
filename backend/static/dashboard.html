@@ -1071,7 +1071,7 @@ async function api(method, path, body = null) {
     let msg;
     try { const j = await res.json(); msg = j.detail || j.message || res.statusText; }
     catch (_) { msg = res.statusText; }
-    if (res.status !== 503) showToast('Error ' + res.status + ': ' + String(msg).slice(0, 120), 'error');
+    showToast('Error ' + res.status + ': ' + String(msg).slice(0, 120), 'error');
     throw new Error(msg);
   }
   return res.json();
@@ -2599,12 +2599,11 @@ function checkFeedEmpty() {
 }
 
 async function dismissDraft(id, btn) {
-  const card = document.getElementById(`draft-card-${id}`);
   const orig = btn.innerHTML;
   btn.innerHTML = '…'; btn.disabled = true;
   try {
     await api('POST', `/api/drafts/${id}/dismiss`);
-    if (card) card.remove();
+    await loadDraftQueue();
     renderSidebar();
   } catch(e) {
     showToast('Dismiss failed: ' + e.message, 'error');
