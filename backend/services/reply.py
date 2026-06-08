@@ -42,9 +42,13 @@ def _get_talent_sop_section(talent_name: str) -> str:
     if not md:
         return ""
 
-    # Extract global rules (everything before the first Talent: heading)
+    # Extract global rules (everything before the first Talent: heading).
+    # Note: the generic "Talent: " regex fires on Rule 13's template line ("Talent: [talent name...]")
+    # rather than the real talent sections. That means global_rules ends mid-Rule 13, including
+    # "Draft Created: Yes / No" which GPT echoes into the reply body. Strip Rule 13 to prevent this.
     talent_heading_match = re.search(r"\n(?:## )?Talent: ", md)
     global_rules = md[:talent_heading_match.start()].strip() if talent_heading_match else md
+    global_rules = re.sub(r"\n+13\. Required Output Format.*", "", global_rules, flags=re.DOTALL)
 
     # Find this talent's section (try full name, then first name only)
     start = None
@@ -481,6 +485,7 @@ def draft_reply(
     # Strip any remaining SOP metadata lines from top AND bottom (Classification:, Talent:, etc.)
     _META_LINE_PREFIXES = (
         "classification:", "talent:", "matched scenario:",
+        "draft created:", "send draft:", "internal reason:", "email body:",
         "draft sent:", "remove inbox label:", "apply label:",
         "rule 11:", "scenario:",
     )
