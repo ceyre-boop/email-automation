@@ -183,8 +183,11 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
                     db.commit()
                     continue
             except Exception as exc:  # noqa: BLE001
-                logger.warning("auto_send: thread check failed for draft %d: %s — skipping", draft.id, exc)
-                continue
+                logger.warning(
+                    "auto_send: thread check failed for draft %d (%s): %s — proceeding without check",
+                    draft.id, draft.talent_key, exc,
+                )
+                # Fall through to _send_draft. reviewed_at guard above prevents double-send.
 
         _send_draft(db, draft, token, service)
         sent_this_cycle += 1
