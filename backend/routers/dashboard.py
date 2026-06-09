@@ -302,6 +302,7 @@ def daily_report(db: Session = Depends(get_db)):
     ).filter(
         Draft.status == DraftStatus.pending,
         Draft.is_escalate == False,  # noqa: E712
+        Draft.dismissed == False,  # noqa: E712
     ).group_by(Draft.talent_key).all()
     backlog_by_talent: dict[str, int] = {
         _safe_lkey(r.talent_key): r.cnt for r in backlog_count_rows if _safe_lkey(r.talent_key)
