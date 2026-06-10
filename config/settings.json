@@ -338,6 +338,21 @@
       "paused": true,
       "_note": "New talent — update manager, category, minimum_rate_usd, then remove paused flag.",
       "max_drafts_per_day": 2000
+    },
+    {
+      "key": "Mahogany",
+      "full_name": "Mahogany",
+      "inbox_email": "mahogany@taboost.me",
+      "gmail_connection_name": "Gmail - Mahogany",
+      "sop_tab_name": "Mahogany",
+      "manager": "TODO",
+      "category": "TODO",
+      "minimum_rate_usd": 500,
+      "rate_unit": "per video",
+      "tier": "low",
+      "paused": true,
+      "_note": "New talent — update manager, category, minimum_rate_usd, then remove paused flag.",
+      "max_drafts_per_day": 2000
     }
   ],
   "make": {
