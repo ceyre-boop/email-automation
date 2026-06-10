@@ -308,6 +308,36 @@
       "tier": "low",
       "personal_email": "wesleybarkerbookings@gmail.com",
       "max_drafts_per_day": 2000
+    },
+    {
+      "key": "Stephanie",
+      "full_name": "Stephanie",
+      "inbox_email": "stephanie@taboost.me",
+      "gmail_connection_name": "Gmail - Stephanie",
+      "sop_tab_name": "Stephanie",
+      "manager": "TODO",
+      "category": "TODO",
+      "minimum_rate_usd": 500,
+      "rate_unit": "per video",
+      "tier": "low",
+      "paused": true,
+      "_note": "New talent — update manager, category, minimum_rate_usd, then remove paused flag.",
+      "max_drafts_per_day": 2000
+    },
+    {
+      "key": "Jocelyn",
+      "full_name": "Jocelyn",
+      "inbox_email": "jocelyn@taboost.me",
+      "gmail_connection_name": "Gmail - Jocelyn",
+      "sop_tab_name": "Jocelyn",
+      "manager": "TODO",
+      "category": "TODO",
+      "minimum_rate_usd": 500,
+      "rate_unit": "per video",
+      "tier": "low",
+      "paused": true,
+      "_note": "New talent — update manager, category, minimum_rate_usd, then remove paused flag.",
+      "max_drafts_per_day": 2000
     }
   ],
   "make": {
