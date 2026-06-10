@@ -5,12 +5,7 @@
   "auto_send_enabled": true,
   "auto_send_talents": ["Wesley", "Hana", "Audur", "Katrina", "Anastasiya", "Jenn", "Angela", "Grayson", "Kylika", "Skyler"],
   "auto_send_hold_minutes": 60,
-  "auto_send_velocity_cap": 100,
-  "auto_send_window_enabled": false,
-  "auto_send_window_start": "07:00",
-  "auto_send_window_end": "19:00",
-  "auto_send_timezone": "America/Detroit",
-  "_auto_send_window_comment": "When enabled, auto-send only fires between window_start and window_end in the given timezone. Drafts are still created overnight; only the send is held.",
+  "auto_send_velocity_cap": 200,
   "spam_sweep_enabled": false,
   "_spam_sweep_enabled_comment": "Set to true to re-enable spam folder scanning. Drafts replies to score=3 emails caught by Gmail spam filter, leaving them untouched in Spam. Paused 2026-05-27 pending Marco review.",
   "openai": {

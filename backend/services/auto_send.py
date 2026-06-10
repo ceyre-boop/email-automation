@@ -4,7 +4,6 @@ Controlled entirely by config/settings.json:
   auto_send_enabled: false          → function returns immediately, nothing fires
   auto_send_talents: [...]          → pilot talent list
   auto_send_hold_minutes: 15        → drafts younger than this are never auto-sent
-  auto_send_window_enabled: true    → only send between window_start and window_end in the configured timezone
 
 Safeguards enforced per draft:
   - Velocity cap: no more than N auto-sends per talent per hour
@@ -15,8 +14,7 @@ Safeguards enforced per draft:
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta, timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime, timedelta
 
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -27,31 +25,6 @@ from backend.services import gmail as gmail_svc
 from backend.services.oauth import TokenRefreshError
 
 logger = logging.getLogger(__name__)
-
-
-def _is_within_send_window(now_utc: datetime, cfg: dict) -> bool:
-    """Return True if auto-send is allowed right now per the configured time window.
-
-    Isolated so per-talent or per-timezone logic can be added here later
-    without touching the send loop. When window is disabled, always returns True.
-    Fails open on any config/tz error so a bad timezone string never silently blocks sends.
-    """
-    if not cfg.get("auto_send_window_enabled", False):
-        return True
-    tz_name = cfg.get("auto_send_timezone", "America/Detroit")
-    start_str = cfg.get("auto_send_window_start", "07:00")
-    end_str = cfg.get("auto_send_window_end", "19:00")
-    try:
-        tz = ZoneInfo(tz_name)
-        now_local = now_utc.replace(tzinfo=timezone.utc).astimezone(tz)
-        sh, sm = map(int, start_str.split(":"))
-        eh, em = map(int, end_str.split(":"))
-        window_start = now_local.replace(hour=sh, minute=sm, second=0, microsecond=0)
-        window_end   = now_local.replace(hour=eh, minute=em, second=0, microsecond=0)
-        return window_start <= now_local < window_end
-    except Exception as exc:  # noqa: BLE001
-        logger.warning("auto_send: window check failed (%s) — allowing send", exc)
-        return True
 
 
 def run_auto_send(db: Session) -> None:
@@ -67,15 +40,6 @@ def run_auto_send(db: Session) -> None:
 
     hold_minutes: int = int(cfg.get("auto_send_hold_minutes", 15))
     cutoff = datetime.utcnow() - timedelta(minutes=hold_minutes)
-
-    if not _is_within_send_window(datetime.utcnow(), cfg):
-        logger.info(
-            "auto_send: outside send window [%s–%s %s] — skipping cycle",
-            cfg.get("auto_send_window_start", "07:00"),
-            cfg.get("auto_send_window_end", "19:00"),
-            cfg.get("auto_send_timezone", "America/Detroit"),
-        )
-        return
 
     for talent_key in talents:
         try:
