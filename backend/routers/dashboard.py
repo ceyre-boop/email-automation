@@ -296,12 +296,13 @@ def daily_report(db: Session = Depends(get_db)):
         _safe_lkey(r.talent_key): r.cnt for r in sent_count_rows if _safe_lkey(r.talent_key)
     }
 
-    # Draft backlog per talent (pending, non-escalate, any date)
+    # Draft backlog per talent (pending, any date) — must match GET /api/drafts default
+    # filter exactly (pending + not dismissed, escalations included) so the top
+    # summary number equals the visible Pending Drafts queue.
     backlog_count_rows = db.query(
         Draft.talent_key, func.count().label("cnt")
     ).filter(
         Draft.status == DraftStatus.pending,
-        Draft.is_escalate == False,  # noqa: E712
         Draft.dismissed == False,  # noqa: E712
     ).group_by(Draft.talent_key).all()
     backlog_by_talent: dict[str, int] = {
@@ -314,6 +315,7 @@ def daily_report(db: Session = Depends(get_db)):
     ).filter(
         Draft.status == DraftStatus.pending,
         Draft.is_escalate == False,  # noqa: E712
+        Draft.dismissed == False,  # noqa: E712
         Draft.created_at >= earliest,
     ).group_by(Draft.talent_key).all()
     new_today_by_talent: dict[str, int] = {
