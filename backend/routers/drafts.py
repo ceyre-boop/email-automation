@@ -437,6 +437,7 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
         )
         db.add(draft_row)
 
+        gmail_svc.remove_from_inbox(token, gmail_message_id, db=db)
         labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
         if not labeled:
             logger.warning("regenerate: mark_initial_response_sent returned False for %s", gmail_message_id)

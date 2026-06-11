@@ -1112,6 +1112,16 @@ function fmtDateIso(iso) {
     return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
+function fmtDraftTime(iso) {
+  if (!iso) return '';
+  const raw = iso.endsWith('Z') ? iso : iso + 'Z';
+  const d = new Date(raw);
+  const diffH = (Date.now() - d) / 3600000;
+  if (diffH < 1) return Math.round(diffH * 60) + ' min ago';
+  if (diffH < 24) return Math.round(diffH) + ' hrs ago';
+  return d.toLocaleDateString('en-US', {month:'short', day:'numeric'}) + ' · ' +
+         d.toLocaleTimeString('en-US', {hour:'numeric', minute:'2-digit'});
+}
 function shortSender(s) {
   if (!s) return 'Unknown';
   const nm = s.match(/^"?([^"<]+?)"?\s*<[^>]+>/);
@@ -2121,6 +2131,7 @@ async function loadDraftQueue() {
               ${humanEdited}
               ${invalidBadge}
               ${d.brand_name ? `<span style="font-size:11px; color:var(--green);">${esc(d.brand_name)}${rate}</span>` : ''}
+              ${d.created_at ? `<span style="margin-left:auto; font-size:11px; color:rgba(255,255,255,0.35); white-space:nowrap;">${fmtDraftTime(d.created_at)}</span>` : ''}
             </div>
             <div style="font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(senderName)} — ${esc(d.subject || '(no subject)')}</div>
             ${d.triage_reason ? `<div style="font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.45; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${esc(d.triage_reason)}</div>` : ''}
