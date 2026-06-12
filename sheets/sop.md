@@ -109,6 +109,7 @@ If the inbound sender email domain matches any domain listed under Repeat Client
 
 Repeat Client Domains:
 
+- taboost.me
 - favored.live
 - nextwave-talent.com
 
@@ -286,7 +287,9 @@ Please let me know if there are any additional creators you'd like to explore, a
 Looking forward to hearing your thoughts!
 
 Scenario C: Personal Email Forward
-Personal Email: katrinamoore621@gmail.com
+Personal Email:
+
+- katrinamoore621@gmail.com
 
 Talent: Anastasiya Ray
 
@@ -322,7 +325,9 @@ Wesley's pricing reflects her strong following across both TikTok and Instagram.
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: wesleybarkerbookings@gmail.com
+Personal Email:
+
+- wesleybarkerbookings@gmail.com
 
 Talent: Hana Tanaka
 
@@ -338,7 +343,9 @@ Hana's pricing reflects her ability to create content that feels **genuine** and
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: hanaisfinechina@gmail.com
+Personal Email:
+
+- hanaisfinechina@gmail.com
 
 Talent: Jenn Lyles
 
@@ -353,7 +360,9 @@ Jenn's pricing reflects her extremely high **conversion rate** (consistent **$40
 
 Please let us know **what type of collab you're looking for** + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: jenn@jennlyles.com
+Personal Email:
+
+- jenn@jennlyles.com
 
 Talent: Angela Callisto
 
@@ -369,7 +378,9 @@ Angela's pricing reflects her extremely high conversion rate (consistent **$450k
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: angelacallisto123@gmail.com
+Personal Email:
+
+- angelacallisto123@gmail.com
 
 Talent: Grayson Finks
 
@@ -384,7 +395,9 @@ Grayson's pricing reflects her high quality **fashion** content & the effort she
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: graysonfinks@gmail.com
+Personal Email:
+
+- graysonfinks@gmail.com
 
 Talent: Kylika Miller
 
@@ -400,7 +413,9 @@ Kylika's pricing reflects her high quality content + the access you'll get to th
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: kylikacollabs@gmail.com
+Personal Email:
+
+- kylikacollabs@gmail.com
 
 Talent: Audur Banks
 
@@ -417,7 +432,9 @@ Audur's pricing reflects her high quality content + the access you'll get to the
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: thebanksedit@gmail.com
+Personal Email:
+
+- thebanksedit@gmail.com
 
 Talent: Skyler Clark
 
@@ -432,4 +449,43 @@ Skyler’s pricing reflects her high quality content + the access you'll get to 
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
-Personal Email: crashingskydrummer@gmail.com
+Personal Email:
+
+- crashingskydrummer@gmail.com
+
+Talent: Stephanie Stimson
+
+Manager: Nicole Park
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Stephanie!! I’m happy to share her rates below:
+**1 TikTok** [stephanie_stimson](https://www.tiktok.com/@stephanie_stimson) - $750
+**1 Instagram** [Reel](https://www.instagram.com/stephaniestimson_) - $650
+**1 UGC Video** - $500 (usage to be negotiated)
+
+Stephanie's pricing reflects her authentic and relatable approach that allows her recommendations to feel natural, making her a trusted voice among her audience. She is known for her beauty content and practical everyday finds that make life a little easier!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- collaboratewithsteph@gmail.com
+- stephaniestimson9@gmail.com
+
+Talent: Jocelyn Chardon
+
+Manager: Cara Best
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Jocelyn!! I’m happy to share her rates below:
+**1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $900
+**1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $800
+**1 UGC Video** - $800 (usage to be negotiated)
+
+Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- jocelynsagec@gmail.com
