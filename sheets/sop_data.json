@@ -248,5 +248,47 @@
     "rate_unit": "per video",
     "sop_status": "approved",
     "rules": []
+  },
+  "Stephanie": {
+    "full_name": "Stephanie Stimson",
+    "manager": "Nicole Park",
+    "manager_email": "nicole@taboost.me",
+    "category": "Beauty",
+    "min_rate_usd": 500,
+    "rate_unit": "per video",
+    "sop_status": "approved",
+    "rules": [
+      {
+        "scenario": "A",
+        "label": "Initial Inbound (Default Response)",
+        "trigger": "Asking for rates or a potential to collab",
+        "use_when": ["Asking for rates or a potential to collab", "All other general inquiries"],
+        "do_not_use_when": ["An exact match from scenario below"],
+        "response": "Thank you so much for reaching out about a potential partnership with Stephanie!! I'm happy to share her rates below:\n• 1 TikTok @stephanie_stimson: $750\n• 1 Instagram Reel @stephaniestimson_: $650\n• 1 UGC Video: $500 (usage to be negotiated)\n\nStephanie's pricing reflects her authentic and relatable approach that allows her recommendations to feel natural, making her a trusted voice among her audience. She is known for her beauty content and practical everyday finds that make life a little easier!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!",
+        "cc": null,
+        "is_default": true
+      }
+    ]
+  },
+  "Jocelyn": {
+    "full_name": "Jocelyn Chardon",
+    "manager": "Cara Best",
+    "manager_email": "cara@taboost.me",
+    "category": "Fashion",
+    "min_rate_usd": 800,
+    "rate_unit": "per video",
+    "sop_status": "approved",
+    "rules": [
+      {
+        "scenario": "A",
+        "label": "Initial Inbound (Default Response)",
+        "trigger": "Asking for rates or a potential to collab",
+        "use_when": ["Asking for rates or a potential to collab", "All other general inquiries"],
+        "do_not_use_when": ["An exact match from scenario below"],
+        "response": "Thank you so much for reaching out about a potential partnership with Jocelyn!! I'm happy to share her rates below:\n• 1 TikTok @ohsoitsjocelyn: $900\n• 1 Instagram Reel @ohsoitsjocelyn: $800\n• 1 UGC Video: $800 (usage to be negotiated)\n\nJocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!",
+        "cc": null,
+        "is_default": true
+      }
+    ]
   }
 }
