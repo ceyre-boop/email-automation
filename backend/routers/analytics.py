@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, time as dt_time
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -42,7 +42,10 @@ logger = logging.getLogger(__name__)
 
 
 def _window_start(days: int = 7) -> datetime:
-    return datetime.utcnow() - timedelta(days=days)
+    # Snap to midnight UTC so daily_volume bars sum exactly to total_emails.
+    # Rolling timedelta would cut the first day mid-day, making sum(bars) < total.
+    today = datetime.utcnow().date()
+    return datetime.combine(today - timedelta(days=days), dt_time.min)
 
 
 # ── Triage Intelligence ───────────────────────────────────────────────────────

@@ -11,7 +11,7 @@ from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 
 from backend.core.config import get_settings
 from backend.models.db import create_tables
@@ -88,9 +88,9 @@ def api_talents():
     return JSONResponse({"status": "ok", "talents": talents})
 
 
-@app.get("/", response_class=HTMLResponse, include_in_schema=False)
+@app.get("/", include_in_schema=False)
 def landing_page():
-    return HTMLResponse(content=_home_html_path.read_text(encoding="utf-8"))
+    return RedirectResponse(url="/dashboard")
 
 
 @app.get("/privacy", response_class=HTMLResponse, include_in_schema=False)
