@@ -55,9 +55,9 @@ def run_pre_send_checks(draft: Draft, db: Session) -> tuple[bool, str | None]:
     if re.search(r'(?i)^cc\s*:', body, re.MULTILINE):
         return False, "Draft body contains a 'CC:' line — CC must be in cc_recipients field, not the body"
 
-    # Check 5 — talent match
-    known_keys = {t["key"].lower() for t in get_settings().app_config.get("talents", [])}
-    if draft.talent_key.lower() not in known_keys:
+    # Check 5 — talent match (source from sop.md profiles, not settings.json talents[])
+    known_keys = {k.lower() for k in get_settings().talent_profiles}
+    if known_keys and draft.talent_key.lower() not in known_keys:
         return False, f"talent_key '{draft.talent_key}' is not in the talent roster"
     if draft.gmail_message_id:
         pe = db.query(ProcessedEmail).filter(
