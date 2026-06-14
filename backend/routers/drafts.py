@@ -437,10 +437,8 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
         )
         db.add(draft_row)
 
+        # SOP Rule 11: remove from INBOX at draft creation; "A Initial Response" label applied post-send only
         gmail_svc.remove_from_inbox(token, gmail_message_id, db=db)
-        labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
-        if not labeled:
-            logger.warning("regenerate: mark_initial_response_sent returned False for %s", gmail_message_id)
 
         db.commit()
         return {"ok": True, "draft_id": draft_row.id, "gmail_draft_id": gmail_draft_id}

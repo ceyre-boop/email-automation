@@ -1522,10 +1522,8 @@ def force_draft_email(
         )
         db.add(draft_row)
 
-        # Apply "A Initial Response" label + remove INBOX on the original email
-        labeled = gmail_svc.mark_initial_response_sent(token, gmail_message_id, db=db)
-        if not labeled:
-            logger.warning("force-draft: mark_initial_response_sent returned False for %s", gmail_message_id)
+        # SOP Rule 11: remove from INBOX at draft creation; "A Initial Response" label applied post-send only
+        gmail_svc.remove_from_inbox(token, gmail_message_id, db=db)
 
         # Update ProcessedEmail score to 3 if it exists
         pe = db.query(ProcessedEmail).filter(
