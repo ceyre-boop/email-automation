@@ -27,10 +27,11 @@ _SOP_METADATA_MARKERS = [
 
 
 def _key_to_name(talent_key: str) -> str | None:
-    for t in get_settings().app_config.get("talents", []):
-        if t["key"].lower() == talent_key.lower():
-            return t.get("full_name", t["key"])
-    return None
+    profiles = get_settings().talent_profiles
+    profile = profiles.get(talent_key) or next(
+        (p for p in profiles.values() if p.key.lower() == talent_key.lower()), None
+    )
+    return profile.full_name if profile else None
 
 
 def run_pre_send_checks(draft: Draft, db: Session) -> tuple[bool, str | None]:

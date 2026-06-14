@@ -83,7 +83,7 @@ def api_talents():
     """Public endpoint — returns talent list for the onboarding page."""
     talents = [
         {"key": t["key"], "full_name": t.get("full_name", t["key"])}
-        for t in get_settings().app_config.get("talents", [])
+        for t in get_settings().talent_list
     ]
     return JSONResponse({"status": "ok", "talents": talents})
 
@@ -253,7 +253,7 @@ def onboarding_page(talent: str = Query(..., description="Talent key from settin
     Serve the one-time Gmail onboarding page for a talent.
     Returns 404 if the talent_key is not defined in settings.json.
     """
-    talent_map = {t["key"].lower(): t for t in get_settings().app_config.get("talents", [])}
+    talent_map = {t["key"].lower(): t for t in get_settings().talent_list}
     if talent.lower() not in talent_map:
         raise HTTPException(status_code=404, detail=f"Unknown talent: {talent}")
     return HTMLResponse(content=_connect_html_path.read_text(encoding="utf-8"))
@@ -300,7 +300,14 @@ def on_startup():
         for w in warnings:
             logger.warning("SOP validator: %s", w)
 
-        logger.info("SOP validator: %d talents loaded from sop.md, %d warnings", len(profiles), len(warnings))
+        if len(profiles) < 5:
+            logger.critical(
+                "STARTUP CRITICAL: only %d talent profiles loaded from sop.md — expected >= 5. "
+                "Validation will fail for most talents. Check sop.md format and file path.",
+                len(profiles),
+            )
+        else:
+            logger.info("SOP validator: %d talents loaded from sop.md, %d warnings", len(profiles), len(warnings))
 
         # Generate sop_data.json as a derived cache so the SOP gate in reply.py
         # works correctly without needing a hand-maintained file.

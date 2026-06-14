@@ -484,6 +484,31 @@ def _validate_talent(talent_key: str) -> None:
         raise HTTPException(status_code=404, detail=f"Unknown talent: {talent_key}")
 
 
+@router.post("/admin/revalidate-drafts")
+def revalidate_drafts(db: Session = Depends(get_db)):
+    """Re-run pre-send validation on all INVALID drafts and clear the flag if they now pass."""
+    from backend.services.validation import run_pre_send_checks
+    invalid_drafts = (
+        db.query(Draft)
+        .filter(Draft.validation_failed == True, Draft.status == DraftStatus.pending)  # noqa: E712
+        .all()
+    )
+    cleared = still_failed = 0
+    for draft in invalid_drafts:
+        ok, err = run_pre_send_checks(draft, db)
+        if ok:
+            draft.validation_failed = False
+            draft.validation_error = None
+            cleared += 1
+        else:
+            draft.validation_error = err
+            still_failed += 1
+        db.add(draft)
+    db.commit()
+    logger.info("Revalidate: cleared=%d still_failed=%d", cleared, still_failed)
+    return {"cleared": cleared, "still_failed": still_failed}
+
+
 @router.get("/talents/{talent_key}/emails", response_model=list[EmailOut])
 def talent_emails(talent_key: str, db: Session = Depends(get_db)):
     """Last 50 processed emails for a talent, newest first."""

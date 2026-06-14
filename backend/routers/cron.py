@@ -30,12 +30,21 @@ logger = logging.getLogger(__name__)
 _draft_queue_lock = threading.Lock()
 
 
+import hashlib
+from pathlib import Path as _Path
+
 from datetime import datetime as _dt
 _DEPLOY_TIME = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
+_SOP_PATH = _Path(__file__).parent.parent.parent / "sheets" / "sop.md"
+_SOP_HASH = (
+    hashlib.sha256(_SOP_PATH.read_bytes()).hexdigest()[:12]
+    if _SOP_PATH.exists() else "MISSING"
+)
+
 @router.get("/health")
 def health():
-    return {"status": "ok", "deployed_at": _DEPLOY_TIME}
+    return {"status": "ok", "deployed_at": _DEPLOY_TIME, "sop_hash": _SOP_HASH}
 
 
 def _run_poll():
@@ -85,7 +94,33 @@ def _run_draft_queue_inner(batch_size: int = 60):
         if not settings.app_config.get("ai_enabled", True):
             return
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
-        talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+
+        # Build talent_map from sop.md (single source of truth).
+        # settings.json no longer carries a talents[] array.
+        from backend.services.sop_parser import get_active_profiles as _get_active
+        talent_map = {
+            k.lower(): {
+                "key": p.key,
+                "full_name": p.full_name,
+                "minimum_rate_usd": p.minimum_rate_usd,
+                "manager": p.manager,
+                "paused": p.paused,
+            }
+            for k, p in _get_active(settings.talent_profiles).items()
+        }
+
+        # Burst guard: if more than 20 drafts were created in the last 60 seconds,
+        # skip this cycle to prevent runaway backlog blasts.
+        from datetime import timedelta as _td
+        recent_count = db.query(Draft).filter(
+            Draft.created_at >= _dt.utcnow() - _td(seconds=60)
+        ).count()
+        if recent_count > 20:
+            logger.warning(
+                "Draft queue: burst guard triggered (%d drafts in last 60s) — skipping cycle",
+                recent_count,
+            )
+            return
 
         # Subquery: find Score-3 ProcessedEmails that have no matching Draft row
         # Uses NOT EXISTS instead of loading all draft IDs into Python memory

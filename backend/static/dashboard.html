@@ -940,6 +940,7 @@ body {
         <button class="btn btn-ghost" onclick="loadEmailFeed()" style="font-size:11px;">↻ Refresh</button>
         <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
         <button class="btn btn-ghost" onclick="retriageBackfill()" style="font-size:11px; border-color:rgba(251,191,36,0.5); color:#f59e0b;">⟳ Re-triage Score 2</button>
+        <button class="btn btn-ghost" onclick="revalidateDrafts(this)" style="font-size:11px; border-color:rgba(239,68,68,0.5); color:#ef4444;" title="Clear INVALID flags on drafts that now pass validation">✓ Re-validate INVALID</button>
       </div>
     </div>
     <div id="email-feed-list" style="display:flex; flex-direction:column; gap:6px;"></div>
@@ -2662,6 +2663,22 @@ async function feedActionC(talentKey, gmailMessageId, btn) {
     showToast('Archived.');
     document.getElementById(`feed-row-${gmailMessageId}`)?.remove(); checkFeedEmpty();
   } catch(e) { btn.innerHTML = orig; btn.disabled = false; }
+}
+
+async function revalidateDrafts(btn) {
+  if (!confirm('Re-run validation on all INVALID drafts. Drafts that now pass will have their INVALID flag cleared and become eligible for auto-send.')) return;
+  if (btn) btn.disabled = true;
+  showOverlay('Re-validating INVALID drafts…');
+  try {
+    const r = await api('POST', '/api/dashboard/admin/revalidate-drafts');
+    showToast(`Re-validated: ${r.cleared} cleared, ${r.still_failed} still invalid.`);
+    await loadDrafts(state.currentTalent);
+  } catch(e) {
+    showToast('Re-validate failed: ' + e.message);
+  } finally {
+    hideOverlay();
+    if (btn) btn.disabled = false;
+  }
 }
 
 async function retriageBackfill() {
