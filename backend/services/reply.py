@@ -412,9 +412,10 @@ def draft_reply(
     sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
     sop_status = sop.get(sop_key, {}).get("sop_status", "pending") if sop_key else "pending"
     if sop_status != "approved":
-        # Fallback: if talent has a section in sop.md, treat as approved.
+        # Fallback: if talent has an Approved Response in sop.md, treat as approved.
         # Fires when talent was added to sop.md but sop_data.json wasn't updated.
-        if _get_talent_section_raw(talent_name):
+        _section = _get_talent_section_raw(talent_name)
+        if _section and "Approved Response:" in _section:
             logger.warning("SOP gate: %s absent from sop_data.json but found in sop.md — treating as approved", talent_key)
         else:
             logger.warning("SOP not approved for %s — routing to Human Admin Required", talent_key)
