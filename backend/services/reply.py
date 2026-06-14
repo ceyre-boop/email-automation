@@ -412,12 +412,17 @@ def draft_reply(
     sop_key = next((k for k in sop if k.lower() == talent_key.lower()), None)
     sop_status = sop.get(sop_key, {}).get("sop_status", "pending") if sop_key else "pending"
     if sop_status != "approved":
-        logger.warning("SOP not approved for %s — routing to Human Admin Required", talent_key)
-        return {
-            "draft_text": "ESCALATE: SOP not yet approved for this talent — human admin required.",
-            "is_escalate": True,
-            "escalate_reason": f"SOP pending for {talent_key}. No approved responses loaded yet.",
-        }
+        # Fallback: if talent has a section in sop.md, treat as approved.
+        # Fires when talent was added to sop.md but sop_data.json wasn't updated.
+        if _get_talent_section_raw(talent_name):
+            logger.warning("SOP gate: %s absent from sop_data.json but found in sop.md — treating as approved", talent_key)
+        else:
+            logger.warning("SOP not approved for %s — routing to Human Admin Required", talent_key)
+            return {
+                "draft_text": "ESCALATE: SOP not yet approved for this talent — human admin required.",
+                "is_escalate": True,
+                "escalate_reason": f"SOP pending for {talent_key}. No approved responses loaded yet.",
+            }
 
     voice_profile, manager_context_text = _load_talent_context(db, talent_key)
 

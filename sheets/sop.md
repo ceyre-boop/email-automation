@@ -478,9 +478,9 @@ Manager: Cara Best
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Jocelyn!! I’m happy to share her rates below:
-**1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $900
-**1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $800
-**1 UGC Video** - $800 (usage to be negotiated)
+**1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850
+**1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700
+**1 UGC Video** - $1,000 (usage to be negotiated)
 
 Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
 
