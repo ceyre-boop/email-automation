@@ -34,7 +34,9 @@ def run_auto_send(db: Session) -> None:
     if not cfg.get("auto_send_enabled", False):
         return
 
-    talents: list[str] = cfg.get("auto_send_talents", [])
+    talents: list[str] = [
+        key for key, p in settings.talent_profiles.items() if p.auto_send and not p.paused
+    ]
     if not talents:
         return
 

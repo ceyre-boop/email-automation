@@ -276,8 +276,13 @@ Operational handling is controlled by Rule 12: Inbox Handling After Classificati
 Part 3 — Talent Approved Responses
 
 Talent: Katrina Moore
+Key: Katrina
+Manager: Chenni Li <chenni@taboost.me>
+Gmail: Gmail - Katrina
+Min Rate: $300 per video
+Auto Send: yes
+Paused: no
 
-Manager: Chenni Li
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Katrina!
@@ -292,8 +297,13 @@ Personal Email:
 - katrinamoore621@gmail.com
 
 Talent: Anastasiya Ray
+Key: Anastasiya
+Manager: Cara Best <cara@taboost.me>
+Gmail: Gmail - Anastasiya
+Min Rate: $750 per video
+Auto Send: yes
+Paused: no
 
-Manager: Cara Best
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Anastasiya!! I’m happy to share her rates below:
@@ -312,8 +322,13 @@ Personal Emails:
 - anastasiyaraytts@gmail.com
 
 Talent: Wesley Barker
+Key: Wesley
+Manager: Chenni Li <chenni@taboost.me>
+Gmail: Gmail - Wesley
+Min Rate: $750 per video
+Auto Send: yes
+Paused: no
 
-Manager: Chenni Li
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Wesley!! I’m happy to share her rates below:
@@ -330,8 +345,13 @@ Personal Email:
 - wesleybarkerbookings@gmail.com
 
 Talent: Hana Tanaka
+Key: Hana
+Manager: Chenni Li <chenni@taboost.me>
+Gmail: Gmail - Hana
+Min Rate: $750 per video
+Auto Send: yes
+Paused: no
 
-Manager: Chenni Li
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Hana!! I’m happy to share her rates below:
@@ -348,8 +368,13 @@ Personal Email:
 - hanaisfinechina@gmail.com
 
 Talent: Jenn Lyles
+Key: Jenn
+Manager: Chenni Li <chenni@taboost.me>
+Gmail: Gmail - Jenn
+Min Rate: $500 per video
+Auto Send: yes
+Paused: no
 
-Manager: Chenni Li
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Jenn!! I’m happy to share her rates below:
@@ -365,8 +390,13 @@ Personal Email:
 - jenn@jennlyles.com
 
 Talent: Angela Callisto
+Key: Angela
+Manager: Chenni Li <chenni@taboost.me>
+Gmail: Gmail - Angela
+Min Rate: $750 per video
+Auto Send: yes
+Paused: no
 
-Manager: Chenni Li
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Angela!! I’m happy to share her rates below:
@@ -383,8 +413,13 @@ Personal Email:
 - angelacallisto123@gmail.com
 
 Talent: Grayson Finks
+Key: Grayson
+Manager: Nicole Park <nicole@taboost.me>
+Gmail: Gmail - Grayson
+Min Rate: $750 per video
+Auto Send: yes
+Paused: no
 
-Manager: Nicole Park
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Grayson!! I’m happy to share her rates below:
@@ -400,8 +435,13 @@ Personal Email:
 - graysonfinks@gmail.com
 
 Talent: Kylika Miller
+Key: Kylika
+Manager: Nicole Park <nicole@taboost.me>
+Gmail: Gmail - Kylika
+Min Rate: $750 per video
+Auto Send: yes
+Paused: no
 
-Manager: Nicole Park
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Kylika!! I’m happy to share her rates below:
@@ -418,8 +458,13 @@ Personal Email:
 - kylikacollabs@gmail.com
 
 Talent: Audur Banks
+Key: Audur
+Manager: Nicole Park <nicole@taboost.me>
+Gmail: Gmail - Audur
+Min Rate: $800 per video
+Auto Send: yes
+Paused: no
 
-Manager: Nicole Park
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Audur!! I’m happy to share her rates below:
@@ -437,8 +482,13 @@ Personal Email:
 - thebanksedit@gmail.com
 
 Talent: Skyler Clark
+Key: Skyler
+Manager: Marco Perez <marco@taboost.me>
+Gmail: Gmail - Skyler
+Min Rate: $300 per video
+Auto Send: yes
+Paused: no
 
-Manager: Marco Perez
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Skyler!! I’m happy to share her rates below:
@@ -454,8 +504,13 @@ Personal Email:
 - crashingskydrummer@gmail.com
 
 Talent: Stephanie Stimson
+Key: Stephanie
+Manager: Nicole Park <nicole@taboost.me>
+Gmail: Gmail - Stephanie
+Min Rate: $500 per video
+Auto Send: no
+Paused: no
 
-Manager: Nicole Park
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Stephanie!! I’m happy to share her rates below:
@@ -473,8 +528,13 @@ Personal Emails:
 - stephaniestimson9@gmail.com
 
 Talent: Jocelyn Chardon
+Key: Jocelyn
+Manager: Cara Best <cara@taboost.me>
+Gmail: Gmail - Jocelyn
+Min Rate: $800 per video
+Auto Send: no
+Paused: no
 
-Manager: Cara Best
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Jocelyn!! I’m happy to share her rates below:

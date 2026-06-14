@@ -4,6 +4,9 @@
 secrets/
 backend/secrets/
 
+# Generated files — do not commit, regenerated at startup
+sheets/sop_data.json
+
 # Python
 __pycache__/
 *.py[cod]

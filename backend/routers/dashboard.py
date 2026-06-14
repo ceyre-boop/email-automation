@@ -198,7 +198,7 @@ def _set_dashboard_reset_at(db: Session, when: datetime) -> None:
 def daily_report(db: Session = Depends(get_db)):
     """Report — counts since last manual reset. No automatic daily reset."""
     settings = get_settings()
-    talent_configs = settings.app_config.get("talents", [])
+    talent_configs = settings.talent_list
 
     today_utc = datetime.utcnow().date()
     # Fallback window: 30 days back if no reset has ever been set
@@ -448,7 +448,7 @@ def daily_report(db: Session = Depends(get_db)):
 def list_talents(db: Session = Depends(get_db)):
     """All configured talents with OAuth connection status."""
     settings = get_settings()
-    talent_configs = settings.app_config.get("talents", [])
+    talent_configs = settings.talent_list
 
     connected = {
         row.talent_key.lower(): row
@@ -456,7 +456,7 @@ def list_talents(db: Session = Depends(get_db)):
     }
 
     global_draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
-    auto_send_talents: set[str] = {k.lower() for k in settings.app_config.get("auto_send_talents", [])}
+    auto_send_talents: set[str] = {k.lower() for k, p in settings.talent_profiles.items() if p.auto_send and not p.paused}
     auto_send_enabled: bool = settings.app_config.get("auto_send_enabled", False)
 
     return [
@@ -479,7 +479,7 @@ def list_talents(db: Session = Depends(get_db)):
 
 
 def _validate_talent(talent_key: str) -> None:
-    talent_keys = {t["key"].lower() for t in get_settings().app_config.get("talents", [])}
+    talent_keys = {t["key"].lower() for t in get_settings().talent_list}
     if talent_key.lower() not in talent_keys:
         raise HTTPException(status_code=404, detail=f"Unknown talent: {talent_key}")
 
@@ -822,7 +822,7 @@ def talent_sent_emails(talent_key: str, limit: int = 50, db: Session = Depends(g
 def get_talent_settings(talent_key: str, db: Session = Depends(get_db)):
     """Talent voice profile and manager instructions."""
     settings = get_settings()
-    talent_cfg = next((t for t in settings.app_config.get("talents", []) if t["key"].lower() == talent_key.lower()), None)
+    talent_cfg = next((t for t in settings.talent_list if t["key"].lower() == talent_key.lower()), None)
     ctx = db.query(ManagerContext).filter(
         ManagerContext.talent_key == talent_key.lower(),
         ManagerContext.active == True,  # noqa: E712
@@ -900,7 +900,7 @@ def process_single_email(body: ProcessEmailIn, db: Session = Depends(get_db)):
         return {"ok": True, "status": "already_processed"}
 
     settings = _gs()
-    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_map = {t["key"].lower(): t for t in settings.talent_list}
     talent_cfg = talent_map.get(body.talent_key.lower(), {})
     draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
     summary: dict = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
@@ -1032,7 +1032,7 @@ def _run_force_blast(talent_key: str, msg_ids: list):
     from backend.core.config import get_settings as _gs
 
     settings = _gs()
-    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_map = {t["key"].lower(): t for t in settings.talent_list}
     talent_cfg = talent_map.get(talent_key.lower(), {})
     talent_name = talent_cfg.get("full_name", talent_key)
     minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
@@ -1110,7 +1110,7 @@ def _run_process_batch(talent_key: str, msg_ids: list):
             return
 
         settings = _gs()
-        talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+        talent_map = {t["key"].lower(): t for t in settings.talent_list}
         talent_cfg = talent_map.get(talent_key.lower(), {})
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 
@@ -1395,7 +1395,7 @@ def force_draft_email(
 
     # Load talent config
     settings = get_settings()
-    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_map = {t["key"].lower(): t for t in settings.talent_list}
     talent_cfg = talent_map.get(talent_key.lower(), {})
     talent_name = talent_cfg.get("full_name", talent_key)
     minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
@@ -1790,7 +1790,7 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
     from backend.services.poller import _already_processed, _process_one_message
 
     settings = _gs()
-    talent_map = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_map = {t["key"].lower(): t for t in settings.talent_list}
     talent_cfg = talent_map.get(talent_key.lower(), {})
     talent_name = talent_cfg.get("full_name", talent_key)
     minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
@@ -1962,7 +1962,7 @@ def triage_all_unscored(background_tasks: BackgroundTasks, db: Session = Depends
 
 @router.get("/sop-html")
 def get_sop_html():
-    """Build SOP HTML from sop_data.json — no file-parsing dependencies needed."""
+    """Build SOP HTML from sop.md talent profiles."""
     import html as html_lib
 
     def esc(s: str) -> str:
@@ -1993,10 +1993,10 @@ def get_sop_html():
     for title, body in global_rules:
         parts.append(f"<p><strong>{esc(title)}</strong><br>{esc(body)}</p>")
 
-    # ── SOP Status index ──────────────────────────────────────────────────────
-    sop = get_settings().sop_data
-    approved_names = [v.get("full_name", k) for k, v in sop.items() if v.get("sop_status") == "approved"]
-    pending_names  = [v.get("full_name", k) for k, v in sop.items() if v.get("sop_status") != "approved"]
+    # ── SOP Status index — derived from sop.md profiles ──────────────────────
+    _profiles = get_settings().talent_profiles
+    approved_names = [p.full_name for p in _profiles.values() if p.has_approved_response]
+    pending_names  = [p.full_name for p in _profiles.values() if not p.has_approved_response]
 
     parts.append("<h2>SOP Status</h2>")
     parts.append(f"<p><strong>✅ AI will draft ({len(approved_names)}):</strong> {esc(', '.join(approved_names))}</p>")
@@ -2081,7 +2081,7 @@ def _retry_one_fallback(processed_email_id: int) -> None:
 
         settings = get_settings()
         talent_cfg = next(
-            (t for t in settings.app_config.get("talents", [])
+            (t for t in settings.talent_list
              if t.get("key", "").lower() == (row.talent_key or "").lower()),
             None,
         )

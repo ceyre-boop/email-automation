@@ -28,6 +28,7 @@ from backend.services import sheets as sheets_svc
 from backend.services import triage as triage_svc
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
 from backend.services.oauth import TokenRefreshError
+from backend.services.sop_parser import TalentProfile, get_active_profiles
 
 logger = logging.getLogger(__name__)
 
@@ -61,12 +62,9 @@ def _get_session_factory():
     return _session_factory
 
 
-def _talent_config_map(settings) -> dict[str, dict]:
-    """Return a dict of talent_key → talent config dict from settings.json.
-
-    Keys are normalised to lowercase so DB keys ('katrina') match config keys ('Katrina').
-    """
-    return {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+def _talent_profile_map(settings) -> dict[str, TalentProfile]:
+    """Return a dict of lowercase talent_key → TalentProfile, excluding paused talents."""
+    return {k.lower(): p for k, p in get_active_profiles(settings.talent_profiles).items()}
 
 
 def _already_processed(db: Session, message_id: str) -> bool:
@@ -108,7 +106,7 @@ def poll_all_inboxes(db: Session) -> dict:
     Returns a summary dict for logging/monitoring.
     """
     settings = get_settings()
-    talent_map = _talent_config_map(settings)
+    talent_map = _talent_profile_map(settings)
     draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 
     active_tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
@@ -119,17 +117,14 @@ def poll_all_inboxes(db: Session) -> dict:
         logger.info("No active tokens — nothing to poll")
         return summary
 
-    # Build per-talent job list, skipping talents with no config
-    jobs: list[tuple[int, dict, bool]] = []
+    # Build per-talent job list, skipping talents with no sop.md profile
+    jobs: list[tuple[int, TalentProfile, bool]] = []
     for token_row in active_tokens:
-        talent_cfg = talent_map.get(token_row.talent_key.lower())
-        if not talent_cfg:
-            logger.warning("No config for talent_key=%s — skipping", token_row.talent_key)
+        profile = talent_map.get(token_row.talent_key.lower())
+        if not profile:
+            logger.warning("No sop.md profile for talent_key=%s — skipping", token_row.talent_key)
             continue
-        if talent_cfg.get("paused"):
-            logger.info("Skipping %s — paused in settings.json", token_row.talent_key)
-            continue
-        jobs.append((token_row.id, talent_cfg, draft_mode))
+        jobs.append((token_row.id, profile, draft_mode))
 
     if not jobs:
         return summary
@@ -139,8 +134,8 @@ def poll_all_inboxes(db: Session) -> dict:
     # Process all talents concurrently — each gets its own DB session via _poll_one_talent
     with ThreadPoolExecutor(max_workers=min(len(jobs), MAX_TALENT_WORKERS)) as executor:
         future_to_key = {
-            executor.submit(_poll_one_talent, tid, cfg, dm): cfg["key"]
-            for tid, cfg, dm in jobs
+            executor.submit(_poll_one_talent, tid, profile, dm): profile.key
+            for tid, profile, dm in jobs
         }
         for future in as_completed(future_to_key):
             talent_key = future_to_key[future]
@@ -160,9 +155,9 @@ def poll_all_inboxes(db: Session) -> dict:
     return summary
 
 
-def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> dict:
+def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool) -> dict:
     """Process one talent's inbox in its own DB session. Returns per-talent summary."""
-    talent_key = talent_cfg["key"]
+    talent_key = profile.key
 
     if _poll_locks.get(talent_key):
         logger.info("Poll still running for %s — skipping cycle", talent_key)
@@ -194,9 +189,9 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
             logger.warning("Ghost cleanup failed for %s: %s", talent_key, _e)
             db.rollback()
 
-        talent_name = talent_cfg.get("full_name", talent_key)
-        minimum_rate = talent_cfg.get("minimum_rate_usd", 0)
-        max_drafts = talent_cfg.get("max_drafts_per_day")
+        talent_name = profile.full_name or talent_key
+        minimum_rate = profile.minimum_rate_usd
+        max_drafts = get_settings().app_config.get("guardian", {}).get("default_max_drafts_per_day")
 
         # Enforce per-talent draft cap if configured
         if max_drafts is not None:
@@ -257,7 +252,7 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
                 talent_key, emails_found, len(pending_ids), MAX_CONCURRENT_EMAILS,
             )
 
-            manager_name = talent_cfg.get("manager", "")
+            manager_name = profile.manager or ""
             futures: dict[Future, str] = {}
             with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
                 for message_id in pending_ids:
@@ -313,14 +308,14 @@ def _poll_one_talent(token_row_id: int, talent_cfg: dict, draft_mode: bool) -> d
         db.close()
 
 
-def _spam_sweep_for_talent(token_row, talent_cfg: dict, db: Session) -> int:
+def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> int:
     """
     Scan the talent's SPAM folder and draft replies for score=3 emails.
     Score=1/2: write ProcessedEmail row to skip on next cycle.
     Score=3: triage + reply + Gmail draft, no label changes.
     Returns count of drafts created.
     """
-    talent_key = talent_cfg["key"]
+    talent_key = profile.key
     messages = gmail_svc.list_spam_messages(token_row, db=db)
     if not messages:
         return 0
@@ -331,8 +326,8 @@ def _spam_sweep_for_talent(token_row, talent_cfg: dict, db: Session) -> int:
     if not pending:
         return 0
 
-    talent_name = talent_cfg.get("full_name", talent_key)
-    minimum_rate = float(talent_cfg.get("minimum_rate_usd", 0))
+    talent_name = profile.full_name or talent_key
+    minimum_rate = float(profile.minimum_rate_usd)
     service = gmail_svc._gmail_service(token_row, db)
     drafted = 0
 

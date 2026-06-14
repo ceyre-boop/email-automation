@@ -115,7 +115,40 @@ class Settings(BaseSettings):
     def sop_data(self) -> dict:
         """Return the parsed sheets/sop_data.json from the repo root."""
         sop_path = Path(__file__).parent.parent.parent / "sheets" / "sop_data.json"
+        if not sop_path.exists():
+            return {}
         return json.loads(sop_path.read_text())
+
+    @property
+    def talent_profiles(self) -> "dict[str, object]":
+        """Return parsed talent profiles from sheets/sop.md — single source of truth."""
+        from backend.services.sop_parser import parse_sop_md
+        from backend.services.reply import _load_sop_md
+        return parse_sop_md(_load_sop_md())
+
+    @property
+    def talent_list(self) -> "list[dict]":
+        """Talent roster as list of dicts sourced from sop.md profiles.
+
+        Provides the same shape as the legacy settings.json talents[] array so
+        existing dashboard code can migrate without interface changes.
+        """
+        return [
+            {
+                "key": p.key,
+                "full_name": p.full_name,
+                "manager": p.manager,
+                "manager_email": p.manager_email,
+                "gmail_connection_name": p.gmail_connection_name,
+                "minimum_rate_usd": p.minimum_rate_usd,
+                "rate_unit": p.rate_unit,
+                "auto_send": p.auto_send,
+                "paused": p.paused,
+                "category": None,
+                "inbox_email": None,
+            }
+            for p in self.talent_profiles.values()
+        ]
 
     @property
     def confidence_policy(self) -> dict:

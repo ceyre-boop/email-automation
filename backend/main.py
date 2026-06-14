@@ -285,6 +285,39 @@ def on_startup():
     except Exception:
         logger.warning("Cache clear on startup failed (non-fatal).")
 
+    # Parse sop.md, validate all talent profiles, and regenerate sop_data.json.
+    try:
+        import json
+        from datetime import datetime
+        from pathlib import Path
+        from backend.services.reply import _load_sop_md
+        from backend.services.sop_parser import parse_sop_md, validate_profiles
+
+        sop_text = _load_sop_md()
+        profiles = parse_sop_md(sop_text)
+        warnings = validate_profiles(profiles)
+
+        for w in warnings:
+            logger.warning("SOP validator: %s", w)
+
+        logger.info("SOP validator: %d talents loaded from sop.md, %d warnings", len(profiles), len(warnings))
+
+        # Generate sop_data.json as a derived cache so the SOP gate in reply.py
+        # works correctly without needing a hand-maintained file.
+        sop_data = {
+            key: {
+                "full_name": p.full_name,
+                "sop_status": "approved" if p.has_approved_response else "pending",
+            }
+            for key, p in profiles.items()
+        }
+        sop_data["_generated"] = datetime.utcnow().isoformat()
+        sop_path = Path(__file__).parent.parent / "sheets" / "sop_data.json"
+        sop_path.write_text(json.dumps(sop_data, indent=2))
+        logger.info("SOP validator: sop_data.json regenerated (%d entries)", len(profiles))
+    except Exception:
+        logger.exception("SOP startup validator failed (non-fatal — poll cycle will continue).")
+
     if settings.database_url:
         if os.getenv("SKIP_MIGRATIONS"):
             logger.warning("SKIP_MIGRATIONS=true — skipping create_tables(). DB schema must already be current.")

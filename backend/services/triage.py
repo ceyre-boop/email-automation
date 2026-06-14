@@ -177,25 +177,17 @@ def triage_email(
     policy = settings.confidence_policy
     triage_cfg = settings.app_config.get("triage", {})
 
-    talent_cfg = next(
-        (t for t in settings.app_config.get("talents", []) if t.get("key", "").lower() == talent_key.lower()),
-        {},
-    )
-
     # ── Pre-filter: personal email forward (Rule 8) ───────────────────────────
     # If the inbound sender matches any of the talent's personal emails, leave in INBOX.
-    # personal_email may be a string (single address), comma-separated string, or a JSON array.
     sender_lower = sender.lower()
     # Gmail From: headers arrive as "Display Name <addr@domain.com>" — extract just the address.
     _, _sender_addr = parseaddr(sender)
     sender_addr_lower = _sender_addr.strip().lower() or sender_lower
-    personal_email = talent_cfg.get("personal_email", "")
-    if personal_email:
-        if isinstance(personal_email, list):
-            personal_emails = [e.strip().lower() for e in personal_email if e.strip()]
-        else:
-            personal_emails = [e.strip().lower() for e in personal_email.split(",") if e.strip()]
-        if sender_addr_lower in personal_emails:
+
+    _profiles_by_key = {k.lower(): p for k, p in settings.talent_profiles.items()}
+    _profile = _profiles_by_key.get(talent_key.lower())
+    personal_emails = [e.strip().lower() for e in (_profile.personal_emails if _profile else [])]
+    if personal_emails and sender_addr_lower in personal_emails:
             logger.info(
                 "Pre-filter: personal email match for %s (%s) → ignore, leave in INBOX",
                 talent_key, sender,
