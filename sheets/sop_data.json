@@ -117,23 +117,9 @@
         "do_not_use_when": [
           "An exact match from scenario below"
         ],
-        "response": "Thank you so much for reaching out about a potential partnership with Katrina!! I’m happy to share her rates below:\n• 1 TikTok [https://www.tiktok.com/@katrinagmoore]: $500\n• Cross posting to IG Reels [https://www.instagram.com/katrinamoore621/reels/]: + $150\n• 1 UGC Video: $400 (usage to be negotiated)\n\nKatrina's pricing reflects her extremely high conversion rate. Her monthly GMV is $450k+ and she is an expert at directing her loyal followers/buyers to the right fashion products. Katrina has a strong following plus great engagement!!!.\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!",
+        "response": "Thanks for reaching out about working with Katrina!\n[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.\n\nPlease let me know if there are any additional creators you’d like to explore, and I’d be happy to provide their specific rates.\nLooking forward to hearing your thoughts!",
         "cc": null,
         "is_default": true
-      },
-      {
-        "scenario": "C",
-        "label": "Initial Inbound (Adequate Offer)",
-        "trigger": "Initially offered a rate that is OVER $600 for one post",
-        "use_when": [
-          "Initially offered a rate that is OVER $600 for one post"
-        ],
-        "do_not_use_when": [
-          "An explicit offer of the above rate is not specified"
-        ],
-        "response": "Email Draft: CC chenni@taboost.me\nHi,\n\nThank you for the offer! I think this collab could be a good fit for Katrina [https://www.tiktok.com/@katrinagmoore]. Looping in her management team who can move forward with this convo!",
-        "cc": "chenni@taboost.me",
-        "is_default": false
       }
     ]
   },
@@ -271,7 +257,7 @@
     ]
   },
   "Jocelyn": {
-    "_updated": "2026-06-13",
+    "_updated": "2026-06-14",
     "full_name": "Jocelyn Chardon",
     "manager": "Cara Best",
     "manager_email": "cara@taboost.me",
@@ -286,7 +272,7 @@
         "trigger": "Asking for rates or a potential to collab",
         "use_when": ["Asking for rates or a potential to collab", "All other general inquiries"],
         "do_not_use_when": ["An exact match from scenario below"],
-        "response": "Thank you so much for reaching out about a potential partnership with Jocelyn!! I'm happy to share her rates below:\n• 1 TikTok @ohsoitsjocelyn: $900\n• 1 Instagram Reel @ohsoitsjocelyn: $800\n• 1 UGC Video: $800 (usage to be negotiated)\n\nJocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!",
+        "response": "Thank you so much for reaching out about a potential partnership with Jocelyn!! I'm happy to share her rates below:\n**1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850\n**1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700\n**1 UGC Video** - $1,000 (usage to be negotiated)\n\nJocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!\n\nPlease let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We'd love to explore working together!",
         "cc": null,
         "is_default": true
       }
