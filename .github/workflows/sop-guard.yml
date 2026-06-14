@@ -1,0 +1,67 @@
+name: SOP Guard
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  sop-guard:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Parse sop.md and validate profiles
+        run: |
+          python - <<'EOF'
+          import sys
+          sys.path.insert(0, '.')
+          from backend.services.sop_parser import parse_sop_md, validate_profiles
+          text = open('sheets/sop.md').read()
+          profiles = parse_sop_md(text)
+          if len(profiles) < 5:
+              print(f"FAIL: only {len(profiles)} talent profiles found in sop.md (expected >= 5)")
+              sys.exit(1)
+          warnings = validate_profiles(profiles)
+          for w in warnings:
+              print(f"WARNING: {w}")
+          print(f"PASS: {len(profiles)} talent profiles loaded, {len(warnings)} warnings")
+          EOF
+
+      - name: No legacy settings.json talent array reads
+        run: |
+          FOUND=$(grep -rn 'app_config.get("talents"' backend/ --include="*.py" || true)
+          if [ -n "$FOUND" ]; then
+            echo "FAIL: legacy settings.json talents[] reads found:"
+            echo "$FOUND"
+            exit 1
+          fi
+          echo "PASS: no legacy talent array reads found"
+
+      - name: No banned patterns
+        run: |
+          FAIL=0
+
+          if grep -rn "send_window\|ZoneInfo\|_is_within_send_window" backend/ --include="*.py" -q; then
+            echo "FAIL: send_window/ZoneInfo found (operating hours logic must stay removed)"
+            FAIL=1
+          fi
+
+          if grep -rn "proposed_rate" prompts/ --include="*.md" -q; then
+            echo "FAIL: proposed_rate found in prompt files"
+            FAIL=1
+          fi
+
+          if grep -rn 'lizz@\|britt@\|sylvia@\|trinity@\|michaela@' backend/ --include="*.py" -q; then
+            echo "FAIL: hard-coded talent-specific emails found in Python"
+            FAIL=1
+          fi
+
+          if [ $FAIL -eq 1 ]; then exit 1; fi
+          echo "PASS: no banned patterns found"

@@ -110,7 +110,7 @@ def triage_intelligence(days: int = 1, db: Session = Depends(get_db)):
 def talent_health(days: int = 7, db: Session = Depends(get_db)):
     """Per-talent volume, response load, escalation rate, spam rate, risk flags."""
     settings = get_settings()
-    talent_configs = {t["key"].lower(): t for t in settings.app_config.get("talents", [])}
+    talent_configs = {t["key"].lower(): t for t in settings.talent_list}
     since = _window_start(days)
 
     agg_rows = db.query(

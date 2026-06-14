@@ -37,14 +37,32 @@ from datetime import datetime as _dt
 _DEPLOY_TIME = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 _SOP_PATH = _Path(__file__).parent.parent.parent / "sheets" / "sop.md"
-_SOP_HASH = (
-    hashlib.sha256(_SOP_PATH.read_bytes()).hexdigest()[:12]
-    if _SOP_PATH.exists() else "MISSING"
-)
+
+def _compute_startup_sop_stats():
+    from backend.services.sop_parser import parse_sop_md, validate_profiles
+    if not _SOP_PATH.exists():
+        return "MISSING", 0, ["sop.md file not found"], _dt.utcnow().isoformat()
+    text = _SOP_PATH.read_bytes()
+    sop_hash = hashlib.sha256(text).hexdigest()[:12]
+    profiles = parse_sop_md(text.decode())
+    warnings = validate_profiles(profiles)
+    parse_ts = _dt.utcnow().isoformat()
+    return sop_hash, len(profiles), warnings, parse_ts
+
+_SOP_HASH, _TALENT_COUNT, _PROFILE_WARNINGS, _PARSE_TIMESTAMP = _compute_startup_sop_stats()
+_ANY_WARNINGS = len(_PROFILE_WARNINGS) > 0
 
 @router.get("/health")
 def health():
-    return {"status": "ok", "deployed_at": _DEPLOY_TIME, "sop_hash": _SOP_HASH}
+    return {
+        "status": "ok",
+        "deployed_at": _DEPLOY_TIME,
+        "sop_hash": _SOP_HASH,
+        "talent_count": _TALENT_COUNT,
+        "talent_warnings": len(_PROFILE_WARNINGS),
+        "any_warnings": _ANY_WARNINGS,
+        "last_parse_timestamp": _PARSE_TIMESTAMP,
+    }
 
 
 def _run_poll():
@@ -155,6 +173,18 @@ def _run_draft_queue_inner(batch_size: int = 60):
         def _draft_one(row):
             _tk = row.talent_key.lower()
             talent_cfg = talent_map.get(_tk, {})
+            if not talent_cfg:
+                logger.error(
+                    "Draft queue: talent '%s' not found in sop.md — skipping email %s",
+                    _tk, row.gmail_message_id,
+                )
+                return
+            if talent_cfg.get("minimum_rate_usd", 0) == 0:
+                logger.error(
+                    "Draft queue: talent '%s' has minimum_rate=0 (incomplete profile) — skipping email %s",
+                    _tk, row.gmail_message_id,
+                )
+                return
             if talent_cfg.get("paused"):
                 return
             if _tk not in token_cache:
@@ -504,7 +534,7 @@ def get_status(db: Session = Depends(get_db)):
     Used by the agency dashboard to show who is connected.
     """
     settings = get_settings()
-    talents = settings.app_config.get("talents", [])
+    talents = settings.talent_list
     connected = {
         row.talent_key.lower(): {
             "email": row.email,
@@ -514,6 +544,10 @@ def get_status(db: Session = Depends(get_db)):
         for row in db.query(TalentToken).all()
     }
     pending_count = db.query(Draft).filter(Draft.status == DraftStatus.pending).count()
+    invalid_count = db.query(Draft).filter(
+        Draft.status == DraftStatus.pending,
+        Draft.validation_failed == True,  # noqa: E712
+    ).count()
 
     return {
         "talents": [
@@ -527,6 +561,7 @@ def get_status(db: Session = Depends(get_db)):
             for t in talents
         ],
         "pending_drafts": pending_count,
+        "invalid_draft_count": invalid_count,
     }
 
 

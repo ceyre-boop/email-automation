@@ -325,6 +325,28 @@ def on_startup():
     except Exception:
         logger.exception("SOP startup validator failed (non-fatal — poll cycle will continue).")
 
+    # Cross-check: every active Gmail token must have a matching sop.md profile.
+    try:
+        from backend.models.db import get_session_factory, TalentToken as _TT
+        from backend.services.reply import _load_sop_md
+        from backend.services.sop_parser import parse_sop_md
+        _profiles = parse_sop_md(_load_sop_md())
+        _profile_keys = {k.lower() for k in _profiles}
+        _db = get_session_factory()()
+        try:
+            _active = _db.query(_TT).filter(_TT.active == True).all()  # noqa: E712
+            for _tok in _active:
+                if _tok.talent_key.lower() not in _profile_keys:
+                    logger.error(
+                        "Startup: active Gmail token for '%s' has NO matching sop.md profile — "
+                        "emails will be processed but drafts may fail validation",
+                        _tok.talent_key,
+                    )
+        finally:
+            _db.close()
+    except Exception:
+        logger.warning("Startup cross-check (token vs sop.md) failed (non-fatal).", exc_info=True)
+
     if settings.database_url:
         if os.getenv("SKIP_MIGRATIONS"):
             logger.warning("SKIP_MIGRATIONS=true — skipping create_tables(). DB schema must already be current.")

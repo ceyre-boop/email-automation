@@ -9,7 +9,7 @@ from backend.core.config import get_settings
 def get_talent_config(talent_key: str) -> dict | None:
     """Return the talent config row for a key, case-insensitive."""
     key = talent_key.lower()
-    for talent in get_settings().app_config.get("talents", []):
+    for talent in get_settings().talent_list:
         if talent.get("key", "").lower() == key:
             return talent
     return None

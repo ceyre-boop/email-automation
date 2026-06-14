@@ -307,7 +307,7 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
 
     settings = get_settings()
     talent_cfg = next(
-        (t for t in settings.app_config.get("talents", []) if t["key"].lower() == pe.talent_key.lower()),
+        (t for t in settings.talent_list if t["key"].lower() == pe.talent_key.lower()),
         None,
     )
     talent_name = talent_cfg.get("full_name", pe.talent_key) if talent_cfg else pe.talent_key

@@ -752,6 +752,13 @@ body {
 <!-- Main -->
 <main id="main">
 
+<!-- INVALID draft banner — shown when validation_failed drafts exist -->
+<div id="invalid-banner" style="display:none; background:rgba(239,68,68,0.12); border-bottom:1px solid rgba(239,68,68,0.3); padding:10px 24px; display:none; align-items:center; gap:12px; font-size:13px; color:#ef4444; position:sticky; top:0; z-index:50;">
+  <span style="font-size:16px;">⚠️</span>
+  <span id="invalid-banner-msg"></span>
+  <button onclick="revalidateDrafts(this)" style="margin-left:auto; background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.4); color:#ef4444; border-radius:6px; padding:4px 12px; font-size:12px; cursor:pointer;">Re-validate INVALID</button>
+</div>
+
   <!-- ── Overview ─────────────────────────────────────────────────────── -->
   <div id="view-overview" style="display:none;">
     <div class="ov-header fade-up">
@@ -2101,12 +2108,24 @@ async function saveSettings() {
 // ── Draft Review Queue ────────────────────────────────────────────────────
 let _draftQueueExpanded = {};
 
+function updateInvalidBanner(invalidCount) {
+  const banner = document.getElementById('invalid-banner');
+  const msg = document.getElementById('invalid-banner-msg');
+  if (invalidCount > 0) {
+    msg.textContent = `${invalidCount} draft${invalidCount > 1 ? 's' : ''} marked INVALID — these won't auto-send until re-validated.`;
+    banner.style.display = 'flex';
+  } else {
+    banner.style.display = 'none';
+  }
+}
+
 async function loadDraftQueue() {
   try {
     const drafts = await api('GET', '/api/drafts');
     const list = document.getElementById('draft-queue-list');
     const countEl = document.getElementById('draft-queue-count');
     countEl.textContent = drafts.length;
+    updateInvalidBanner(drafts.filter(d => d.validation_failed).length);
 
     if (!drafts.length) {
       list.innerHTML = `<div style="text-align:center; padding:28px; color:var(--text-3); font-size:12px;">No pending drafts — inbox is clear ✓</div>`;

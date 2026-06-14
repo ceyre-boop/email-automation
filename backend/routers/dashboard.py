@@ -747,6 +747,10 @@ def health_summary(db: Session = Depends(get_db)):
     escalations_today = db.query(Draft).filter(Draft.created_at >= today, Draft.is_escalate == True).count()  # noqa: E712
     errors_today = db.query(PollHealth).filter(PollHealth.polled_at >= today, PollHealth.error_message != None).count()  # noqa: E711
     pending_drafts = db.query(Draft).filter(Draft.status == DraftStatus.pending).count()
+    invalid_draft_count = db.query(Draft).filter(
+        Draft.status == DraftStatus.pending,
+        Draft.validation_failed == True,  # noqa: E712
+    ).count()
     # Fallback count: real GPT failures only — excludes manual admin resets (SOP-pending re-queue)
     fallbacks_today = db.query(ProcessedEmail).filter(
         ProcessedEmail.processed_at >= today,
@@ -763,6 +767,7 @@ def health_summary(db: Session = Depends(get_db)):
         "escalations_today": escalations_today,
         "errors_today": errors_today,
         "pending_drafts": pending_drafts,
+        "invalid_draft_count": invalid_draft_count,
         "triage_fallbacks_today": fallbacks_today,
         "score2_today": score2_today,
         "fallback_rate": round(fallbacks_today / max(emails_today, 1), 3),

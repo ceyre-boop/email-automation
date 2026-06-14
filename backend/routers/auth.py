@@ -47,7 +47,7 @@ def _generate_talent_key(name: str, email: str, db: Session) -> str:
 def connect_gmail(talent_key: str | None = Query(None), db: Session = Depends(get_db)):
     """Redirect any user to the Google consent screen. Pin to a talent_key if provided."""
     if talent_key is not None:
-        valid_keys = {t["key"].lower() for t in get_settings().app_config.get("talents", [])}
+        valid_keys = {t["key"].lower() for t in get_settings().talent_list}
         if talent_key.lower() not in valid_keys:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail=f"Unknown talent: {talent_key}")

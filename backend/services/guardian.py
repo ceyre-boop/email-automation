@@ -12,6 +12,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import time
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -23,6 +24,7 @@ from sqlalchemy.orm import Session
 logger = logging.getLogger(__name__)
 
 _CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "settings.json"
+_SOP_PATH = Path(__file__).resolve().parents[2] / "sheets" / "sop.md"
 
 # AppState keys used by guardian
 _KEY_DISABLED_AT = "guardian_ai_disabled_at"
@@ -140,7 +142,7 @@ class GuardianWatchdog:
         from backend.models.db import Draft
         triggers = []
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        talent_map = {t["key"].lower(): t for t in get_settings().app_config.get("talents", [])}
+        talent_map = {t["key"].lower(): t for t in get_settings().talent_list}
         rows = (
             db.query(Draft.talent_key, func.count(Draft.id))
             .filter(Draft.created_at >= today_start)
@@ -358,14 +360,22 @@ class GuardianWatchdog:
 
     def _pause_talent(self, talent_key: str, reason: str) -> None:
         try:
-            data = json.loads(_CONFIG_PATH.read_text())
-            for t in data.get("talents", []):
-                if t.get("key", "").lower() == talent_key.lower():
-                    t["paused"] = True
-                    t["_guardian_paused_reason"] = reason
-                    t["_guardian_paused_at"] = datetime.utcnow().isoformat()
-            _CONFIG_PATH.write_text(json.dumps(data, indent=2))
-            logger.warning("Guardian: paused talent %s", talent_key)
+            from backend.core.config import get_settings
+            sop_text = _SOP_PATH.read_text()
+            # Replace "Paused: no" in the talent's section (Key: <key> ... Paused: no)
+            pattern = re.compile(
+                r"(Key:\s+" + re.escape(talent_key) + r".*?Paused:\s*)no",
+                re.IGNORECASE | re.DOTALL,
+            )
+            new_text, count = pattern.subn(r"\1yes", sop_text, count=1)
+            if count == 0:
+                logger.error(
+                    "Guardian: could not find 'Paused: no' for talent '%s' in sop.md", talent_key
+                )
+                return
+            _SOP_PATH.write_text(new_text)
+            get_settings.cache_clear()
+            logger.warning("Guardian: paused talent %s in sop.md — reason: %s", talent_key, reason)
         except Exception as exc:
             logger.error("Guardian: failed to pause talent %s: %s", talent_key, exc)
 
