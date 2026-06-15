@@ -16,7 +16,7 @@ from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from backend.core.config import get_settings
 from backend.models.db import create_tables
 try:
-    from backend.routers import auth, cron, drafts, dashboard, analytics, guardian
+    from backend.routers import auth, cron, drafts, dashboard, analytics, guardian, sop_admin
 except Exception as _import_exc:
     print(f"FATAL: router import failed — {_import_exc}", file=sys.stderr, flush=True)
     import traceback; traceback.print_exc(file=sys.stderr)
@@ -59,16 +59,24 @@ app.include_router(cron.router)
 app.include_router(dashboard.router)
 app.include_router(analytics.router)
 app.include_router(guardian.router)
+app.include_router(sop_admin.router)
 
 
 # ── Manager Dashboard ─────────────────────────────────────────────────────────
 _dashboard_html_path = Path(__file__).parent / "static" / "dashboard.html"
+_sop_admin_html_path = Path(__file__).parent / "static" / "sop_admin.html"
 
 
 @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
 def dashboard_page():
     """Serve the manager dashboard SPA."""
     return HTMLResponse(content=_dashboard_html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/admin/sop", response_class=HTMLResponse, include_in_schema=False)
+def sop_admin_page():
+    """Serve the SOP Admin SPA."""
+    return HTMLResponse(content=_sop_admin_html_path.read_text(encoding="utf-8"))
 
 
 # ── Onboarding page at /connect?talent=<key> ─────────────────────────────────

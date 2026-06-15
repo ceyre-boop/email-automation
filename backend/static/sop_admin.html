@@ -1,0 +1,401 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>SOP Admin — TABOOST</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #080809;
+      --surface:   #101013;
+      --surface-2: #17171c;
+      --surface-3: #1e1e25;
+      --border:    rgba(255,255,255,0.07);
+      --border-2:  rgba(255,255,255,0.12);
+      --red:       #e31c25;
+      --red-dim:   rgba(227,28,37,0.18);
+      --green:     #22c55e;
+      --yellow:    #eab308;
+      --text:      #f2f2f3;
+      --text-2:    #c0c0cc;
+      --text-3:    #888896;
+      --sans:      -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", sans-serif;
+    }
+
+    html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--sans); font-size: 14px; }
+
+    /* ── Layout ── */
+    #app { display: flex; height: 100vh; }
+
+    /* ── Sidebar ── */
+    #sidebar {
+      width: 240px; flex-shrink: 0;
+      background: var(--surface);
+      border-right: 1px solid var(--border);
+      display: flex; flex-direction: column;
+      overflow: hidden;
+    }
+    #sidebar-header {
+      padding: 20px 16px 12px;
+      border-bottom: 1px solid var(--border);
+    }
+    #sidebar-header h1 {
+      font-size: 15px; font-weight: 700; color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    #sidebar-header .subtitle { font-size: 11px; color: var(--text-3); margin-top: 2px; }
+    #talent-list { flex: 1; overflow-y: auto; padding: 8px 0; }
+    .talent-item {
+      display: flex; align-items: center; gap: 10px;
+      padding: 8px 16px; cursor: pointer;
+      transition: background 0.1s;
+      border-radius: 0;
+    }
+    .talent-item:hover { background: var(--surface-2); }
+    .talent-item.active { background: var(--surface-3); }
+    .talent-dot {
+      width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0;
+    }
+    .talent-dot.complete { background: var(--green); }
+    .talent-dot.warning  { background: var(--yellow); }
+    .talent-name { font-size: 13px; color: var(--text-2); flex: 1; }
+    .talent-item.active .talent-name { color: var(--text); font-weight: 500; }
+    .auto-badge {
+      font-size: 10px; padding: 2px 5px; border-radius: 3px;
+      background: var(--red-dim); color: var(--red);
+      font-weight: 600; letter-spacing: 0.04em;
+    }
+
+    /* ── Main panel ── */
+    #panel {
+      flex: 1; overflow-y: auto; padding: 32px 40px;
+      max-width: 760px;
+    }
+    #panel-empty {
+      color: var(--text-3); font-size: 14px; margin-top: 80px; text-align: center;
+    }
+    #form-area { display: none; }
+    #form-area.visible { display: block; }
+
+    #talent-title {
+      font-size: 22px; font-weight: 700; letter-spacing: -0.02em; margin-bottom: 4px;
+    }
+    #talent-key-label { font-size: 12px; color: var(--text-3); margin-bottom: 28px; }
+
+    .section-heading {
+      font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+      color: var(--text-3); margin-bottom: 12px; margin-top: 28px;
+      padding-bottom: 8px; border-bottom: 1px solid var(--border);
+    }
+    .section-heading:first-of-type { margin-top: 0; }
+
+    .field-row { display: flex; gap: 16px; margin-bottom: 14px; }
+    .field-group { flex: 1; display: flex; flex-direction: column; gap: 6px; }
+    .field-group label { font-size: 11px; color: var(--text-3); font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; }
+
+    input[type="text"], input[type="number"], textarea {
+      background: var(--surface-2);
+      border: 1px solid var(--border-2);
+      border-radius: 6px;
+      color: var(--text);
+      font-family: var(--sans);
+      font-size: 13px;
+      padding: 8px 10px;
+      width: 100%;
+      transition: border-color 0.15s;
+      resize: vertical;
+    }
+    input:focus, textarea:focus {
+      outline: none; border-color: var(--red);
+    }
+    textarea { min-height: 120px; }
+    #approved-response-ta { min-height: 180px; font-size: 12.5px; line-height: 1.5; }
+
+    /* ── Checkboxes ── */
+    .toggle-row { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+    .toggle-label { font-size: 13px; color: var(--text-2); }
+    .toggle-switch {
+      position: relative; width: 36px; height: 20px; flex-shrink: 0;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-track {
+      position: absolute; inset: 0; background: var(--surface-3);
+      border-radius: 20px; cursor: pointer; transition: background 0.2s;
+    }
+    .toggle-track::after {
+      content: ""; position: absolute; width: 14px; height: 14px;
+      background: var(--text-3); border-radius: 50%;
+      top: 3px; left: 3px; transition: left 0.2s, background 0.2s;
+    }
+    .toggle-switch input:checked + .toggle-track { background: var(--red); }
+    .toggle-switch input:checked + .toggle-track::after { left: 19px; background: #fff; }
+
+    /* ── Save button ── */
+    #save-bar {
+      margin-top: 28px; display: flex; align-items: center; gap: 14px;
+    }
+    #btn-save {
+      background: var(--red); color: #fff;
+      border: none; border-radius: 6px;
+      padding: 9px 22px; font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: opacity 0.15s;
+    }
+    #btn-save:hover { opacity: 0.85; }
+    #btn-save:disabled { opacity: 0.4; cursor: default; }
+    #save-status { font-size: 13px; color: var(--text-3); }
+    #save-status.ok { color: var(--green); }
+    #save-status.err { color: var(--red); }
+
+    /* ── Error list ── */
+    #error-list {
+      margin-top: 10px; padding: 10px 14px;
+      background: var(--red-dim); border: 1px solid rgba(227,28,37,0.3);
+      border-radius: 6px; display: none;
+    }
+    #error-list.visible { display: block; }
+    #error-list li { font-size: 12px; color: var(--red); margin-left: 14px; margin-top: 4px; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 5px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
+  </style>
+</head>
+<body>
+<div id="app">
+  <!-- Sidebar -->
+  <nav id="sidebar">
+    <div id="sidebar-header">
+      <h1>SOP Admin</h1>
+      <div class="subtitle">TABOOST Talent Roster</div>
+    </div>
+    <div id="talent-list"></div>
+  </nav>
+
+  <!-- Main panel -->
+  <main id="panel">
+    <div id="panel-empty">Select a talent to edit their profile.</div>
+
+    <div id="form-area">
+      <div id="talent-title"></div>
+      <div id="talent-key-label"></div>
+
+      <div class="section-heading">Core Info</div>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label>Manager</label>
+          <input type="text" id="f-manager" placeholder="Name &lt;email@taboost.me&gt;"/>
+        </div>
+        <div class="field-group">
+          <label>Gmail Connection</label>
+          <input type="text" id="f-gmail" placeholder="read-only" disabled/>
+        </div>
+      </div>
+
+      <div class="field-row">
+        <div class="field-group" style="max-width:140px">
+          <label>Min Rate (USD)</label>
+          <input type="number" id="f-rate-usd" min="0" step="50"/>
+        </div>
+        <div class="field-group" style="max-width:160px">
+          <label>Rate Unit</label>
+          <input type="text" id="f-rate-unit" placeholder="per video"/>
+        </div>
+      </div>
+
+      <div class="toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="f-auto-send"/>
+          <span class="toggle-track"></span>
+        </label>
+        <span class="toggle-label">Auto Send</span>
+      </div>
+      <div class="toggle-row">
+        <label class="toggle-switch">
+          <input type="checkbox" id="f-paused"/>
+          <span class="toggle-track"></span>
+        </label>
+        <span class="toggle-label">Paused</span>
+      </div>
+
+      <div class="section-heading">Personal Emails</div>
+      <div class="field-group">
+        <label>One email per line</label>
+        <textarea id="f-personal-emails" placeholder="email@gmail.com&#10;email2@gmail.com"></textarea>
+      </div>
+
+      <div class="section-heading">Approved Response</div>
+      <div class="field-group">
+        <label>Sent verbatim — no modifications</label>
+        <textarea id="approved-response-ta" id="f-approved-response"></textarea>
+      </div>
+
+      <div id="save-bar">
+        <button id="btn-save" onclick="saveProfile()">Save Changes</button>
+        <span id="save-status"></span>
+      </div>
+      <ul id="error-list"></ul>
+    </div>
+  </main>
+</div>
+
+<script>
+  const API_KEY_STORAGE = 'sop_admin_api_key';
+  let apiKey = localStorage.getItem(API_KEY_STORAGE);
+  let currentKey = null;
+  let currentProfile = null;
+
+  function getApiKey() {
+    if (!apiKey) {
+      apiKey = prompt('Enter API key:');
+      if (apiKey) localStorage.setItem(API_KEY_STORAGE, apiKey);
+    }
+    return apiKey;
+  }
+
+  function headers() {
+    return { 'Content-Type': 'application/json', 'x-api-key': getApiKey() };
+  }
+
+  async function apiFetch(url, opts = {}) {
+    const res = await fetch(url, { headers: headers(), ...opts });
+    if (res.status === 403) {
+      apiKey = null;
+      localStorage.removeItem(API_KEY_STORAGE);
+      alert('Invalid API key. Please reload and try again.');
+      throw new Error('Unauthorized');
+    }
+    return res;
+  }
+
+  // ── Sidebar ───────────────────────────────────────────────────────────────
+
+  async function loadSidebar() {
+    const res = await apiFetch('/admin/api/talents');
+    if (!res.ok) return;
+    const data = await res.json();
+    const list = document.getElementById('talent-list');
+    list.innerHTML = '';
+    for (const t of data.talents) {
+      const complete = t.has_approved_response && t.personal_emails.length > 0;
+      const item = document.createElement('div');
+      item.className = 'talent-item';
+      item.dataset.key = t.key;
+      item.innerHTML = `
+        <span class="talent-dot ${complete ? 'complete' : 'warning'}"></span>
+        <span class="talent-name">${t.full_name}</span>
+        ${t.auto_send ? '<span class="auto-badge">AUTO</span>' : ''}
+      `;
+      item.addEventListener('click', () => selectTalent(t.key));
+      list.appendChild(item);
+    }
+  }
+
+  // ── Detail panel ──────────────────────────────────────────────────────────
+
+  async function selectTalent(key) {
+    document.querySelectorAll('.talent-item').forEach(el => {
+      el.classList.toggle('active', el.dataset.key === key);
+    });
+
+    const res = await apiFetch(`/admin/api/talents/${key}`);
+    if (!res.ok) { alert('Failed to load talent'); return; }
+    const p = await res.json();
+    currentKey = key;
+    currentProfile = p;
+
+    document.getElementById('panel-empty').style.display = 'none';
+    const form = document.getElementById('form-area');
+    form.classList.add('visible');
+
+    document.getElementById('talent-title').textContent = p.full_name;
+    document.getElementById('talent-key-label').textContent = `Key: ${p.key}`;
+    document.getElementById('f-manager').value = p.manager_email
+      ? `${p.manager} <${p.manager_email}>`
+      : p.manager;
+    document.getElementById('f-gmail').value = p.gmail_connection_name || '';
+    document.getElementById('f-rate-usd').value = p.minimum_rate_usd;
+    document.getElementById('f-rate-unit').value = p.rate_unit || '';
+    document.getElementById('f-auto-send').checked = p.auto_send;
+    document.getElementById('f-paused').checked = p.paused;
+    document.getElementById('f-personal-emails').value = p.personal_emails.join('\n');
+    document.getElementById('approved-response-ta').value = p.approved_response || '';
+
+    clearStatus();
+  }
+
+  // ── Save ──────────────────────────────────────────────────────────────────
+
+  async function saveProfile() {
+    if (!currentKey) return;
+    const btn = document.getElementById('btn-save');
+    btn.disabled = true;
+    clearStatus();
+
+    const emailsRaw = document.getElementById('f-personal-emails').value;
+    const emails = emailsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+
+    const payload = {
+      manager: document.getElementById('f-manager').value.trim() || null,
+      minimum_rate_usd: parseInt(document.getElementById('f-rate-usd').value) || null,
+      rate_unit: document.getElementById('f-rate-unit').value.trim() || null,
+      auto_send: document.getElementById('f-auto-send').checked,
+      paused: document.getElementById('f-paused').checked,
+      personal_emails: emails,
+      approved_response: document.getElementById('approved-response-ta').value,
+    };
+
+    try {
+      const res = await apiFetch(`/admin/api/talents/${currentKey}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setStatus('Saved!', 'ok');
+        await loadSidebar();
+        // Re-select to refresh sidebar dot state
+        document.querySelectorAll('.talent-item').forEach(el => {
+          if (el.dataset.key === currentKey) el.classList.add('active');
+        });
+      } else {
+        const err = await res.json();
+        const msgs = err.detail?.errors || [err.detail || 'Save failed'];
+        showErrors(msgs);
+        setStatus('', '');
+      }
+    } catch (e) {
+      if (e.message !== 'Unauthorized') setStatus('Network error', 'err');
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  function setStatus(msg, cls) {
+    const el = document.getElementById('save-status');
+    el.textContent = msg;
+    el.className = cls;
+  }
+
+  function showErrors(msgs) {
+    const list = document.getElementById('error-list');
+    list.innerHTML = msgs.map(m => `<li>${m}</li>`).join('');
+    list.classList.add('visible');
+  }
+
+  function clearStatus() {
+    setStatus('', '');
+    const list = document.getElementById('error-list');
+    list.innerHTML = '';
+    list.classList.remove('visible');
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  getApiKey();
+  loadSidebar();
+</script>
+</body>
+</html>
