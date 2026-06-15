@@ -549,3 +549,67 @@ Scenario C: Personal Email Forward
 Personal Emails:
 
 - jocelynsagec@gmail.com
+
+Talent: Allee LastName
+Key: Allee
+Manager: Colin Eyre <colineyre222@gmail.com>
+Gmail: Gmail - Allee
+Min Rate: $750 per video
+Auto Send: no
+Paused: yes
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+[PLACEHOLDER — edit via /admin/sop before unpausing]
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- allee@personalemail.com
+
+Talent: Lizz LastName
+Key: Lizz
+Manager: Colin Eyre <colineyre222@gmail.com>
+Gmail: Gmail - Lizz
+Min Rate: $750 per video
+Auto Send: no
+Paused: yes
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+[PLACEHOLDER — edit via /admin/sop before unpausing]
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- lizz@personalemail.com
+
+Talent: Alana LastName
+Key: Alana
+Manager: Colin Eyre <colineyre222@gmail.com>
+Gmail: Gmail - Alana
+Min Rate: $750 per video
+Auto Send: no
+Paused: yes
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+[PLACEHOLDER — edit via /admin/sop before unpausing]
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- alana@personalemail.com
+
+Talent: Brittanie LastName
+Key: Brittanie
+Manager: Colin Eyre <colineyre222@gmail.com>
+Gmail: Gmail - Brittanie
+Min Rate: $750 per video
+Auto Send: no
+Paused: yes
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+[PLACEHOLDER — edit via /admin/sop before unpausing]
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- brittanie@personalemail.com
