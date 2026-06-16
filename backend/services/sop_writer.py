@@ -91,7 +91,9 @@ def update_personal_emails(sop_text: str, talent_key: str, emails: list[str]) ->
 
 
 def write_sop_md(new_text: str) -> None:
-    """Write updated text to sheets/sop.md and invalidate all in-memory caches."""
+    """Write updated text to sheets/sop.md, invalidate all in-memory caches, and commit+push."""
+    import logging
+    import subprocess
     _SOP_PATH.write_text(new_text, encoding="utf-8")
     from backend.core.config import get_settings
     get_settings.cache_clear()
@@ -100,6 +102,22 @@ def write_sop_md(new_text: str) -> None:
         clear_sop_cache()
     except Exception:
         pass
+    # Commit and push so changes survive redeploys
+    _logger = logging.getLogger(__name__)
+    try:
+        repo_root = str(_SOP_PATH.parents[1])
+        subprocess.run(["git", "add", str(_SOP_PATH)], cwd=repo_root, check=True, capture_output=True)
+        result = subprocess.run(
+            ["git", "commit", "-m", "admin: update sop.md via SOP Admin UI"],
+            cwd=repo_root, capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            subprocess.run(["git", "push"], cwd=repo_root, check=False, capture_output=True)
+            _logger.info("sop_writer: committed and pushed sop.md changes")
+        else:
+            _logger.debug("sop_writer: git commit skipped (nothing to commit or no changes)")
+    except Exception as exc:
+        _logger.warning("sop_writer: git auto-commit failed (changes saved in-memory only): %s", exc)
 
 
 def validate_before_write(
