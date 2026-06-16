@@ -519,7 +519,7 @@ def _get_or_create_custom_label(service, label_name: str, *, background_color: s
     try:
         existing = service.users().labels().list(userId="me").execute()
         for lbl in existing.get("labels", []):
-            if lbl.get("name") == label_name:
+            if lbl.get("name", "").lower() == label_name.lower():
                 return lbl["id"]
         created = service.users().labels().create(
             userId="me",
