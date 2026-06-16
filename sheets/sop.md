@@ -550,25 +550,31 @@ Personal Emails:
 
 - jocelynsagec@gmail.com
 
-Talent: Allee LastName
-Key: Allee
-Manager: Colin Eyre <colineyre222@gmail.com>
-Gmail: Gmail - Allee
-Min Rate: $750 per video
+Talent: Brittanie Hammer
+Key: Brittanie
+Manager: Chenni Li <chenni@taboost.me>
+Gmail: Gmail - Brittanie
+Min Rate: $1000 per video
 Auto Send: no
 Paused: yes
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-[PLACEHOLDER — edit via /admin/sop before unpausing]
+Thank you so much for reaching out about a potential partnership with Britt!! I’m happy to share her rates below:
+**1 TikTok** [bestiebriitt](https://www.tiktok.com/@bestiebriitt) - $1,250
+**1 UGC Video** - $1,000 (usage to be negotiated)
+
+Britt's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$669k** & she was TikTok’s 2025 Home Creator of the Year!!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
-- allee@personalemail.com
+- hammer.brittanie@gmail.com
 
-Talent: Lizz LastName
+Talent: Lizz Freixas
 Key: Lizz
-Manager: Colin Eyre <colineyre222@gmail.com>
+Manager: Chenni Li <chenni@taboost.me>
 Gmail: Gmail - Lizz
 Min Rate: $750 per video
 Auto Send: no
@@ -576,40 +582,61 @@ Paused: yes
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-[PLACEHOLDER — edit via /admin/sop before unpausing]
+Thank you so much for reaching out about a potential partnership with Lizz!! I’m happy to share her rates below:
+**1 TikTok** [lizzmi45](https://www.tiktok.com/@lizzmi45) - $750
+**1 UGC Video** - $900 (usage to be negotiated)
+
+Lizz's pricing reflects her extremely high **conversion rate** from content that truly sells. Her monthly GMV is **$550k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super **high** for a shop creator which is ideal for brand collabs.
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
-- lizz@personalemail.com
+- lizzmilenafg45@gmail.com
 
-Talent: Alana LastName
+Talent: Allee Baray
+Key: Allee
+Manager: Chenni Li <chenni@taboost.me>
+Gmail: Gmail - Allee
+Min Rate: $500 per video
+Auto Send: no
+Paused: yes
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Allee!! I’m happy to share her rates below:
+**1 TikTok** [ababyandabulldog](https://www.tiktok.com/@ababyandabulldog) - $850
+**1 TikTok** [shopaholicallee](https://www.tiktok.com/@shopaholicallee) - $700
+**1 TikTok** [shopaholicallee2](https://www.tiktok.com/@shopaholicallee2) - $500
+**1 UGC Video** - $800 (usage to be negotiated)
+
+Allee's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$490k+** & that was just her main account. She is a TikTok Shop Star and has a great pulse on what her viewers are wanting to buy!!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- alleebaray@gmail.com
+
+Talent: Alana Calviello
 Key: Alana
-Manager: Colin Eyre <colineyre222@gmail.com>
+Manager: Nicole Park <nicole@taboost.me>
 Gmail: Gmail - Alana
-Min Rate: $750 per video
+Min Rate: $500 per video
 Auto Send: no
 Paused: yes
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-[PLACEHOLDER — edit via /admin/sop before unpausing]
+Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
+**1 TikTok** [\_alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
+**1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
+**1 UGC Video** - $500 (usage to be negotiated)
+
+Alana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
-- alana@personalemail.com
-
-Talent: Brittanie LastName
-Key: Brittanie
-Manager: Colin Eyre <colineyre222@gmail.com>
-Gmail: Gmail - Brittanie
-Min Rate: $750 per video
-Auto Send: no
-Paused: yes
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-[PLACEHOLDER — edit via /admin/sop before unpausing]
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- brittanie@personalemail.com
+- arcalviello@gmail.com
