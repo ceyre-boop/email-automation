@@ -1,0 +1,21 @@
+name: Keep Render Alive
+
+on:
+  schedule:
+    - cron: "*/10 * * * *"   # every 10 min — Render sleeps at 15 min inactivity
+  workflow_dispatch:
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Ping health endpoint
+        run: |
+          curl -sf https://manager-email-automation.onrender.com/health \
+            --max-time 30 \
+            --retry 2 \
+            --retry-delay 5 \
+            -o /dev/null \
+            && echo "OK" \
+            || echo "Ping failed (non-fatal — Render may be cold-starting)"
