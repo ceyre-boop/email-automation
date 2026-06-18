@@ -555,7 +555,7 @@ Key: Brittanie
 Manager: Chenni Li <chenni@taboost.me>
 Gmail: Gmail - Brittanie
 Min Rate: $1000 per video
-Auto Send: no
+Auto Send: yes
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
@@ -577,7 +577,7 @@ Key: Lizz
 Manager: Chenni Li <chenni@taboost.me>
 Gmail: Gmail - Lizz
 Min Rate: $750 per video
-Auto Send: no
+Auto Send: yes
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
@@ -599,7 +599,7 @@ Key: Allee
 Manager: Chenni Li <chenni@taboost.me>
 Gmail: Gmail - Allee
 Min Rate: $500 per video
-Auto Send: no
+Auto Send: yes
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
@@ -623,7 +623,7 @@ Key: Alana
 Manager: Nicole Park <nicole@taboost.me>
 Gmail: Gmail - Alana
 Min Rate: $500 per video
-Auto Send: no
+Auto Send: yes
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
