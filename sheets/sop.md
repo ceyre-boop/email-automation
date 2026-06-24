@@ -626,6 +626,22 @@ Min Rate: $500 per video
 Auto Send: yes
 Paused: no
 
+Talent: Mahogany
+Key: Mahogany
+Manager: TBD
+Gmail: Gmail - Mahogany
+Min Rate: $500 per video
+Auto Send: no
+Paused: yes
+
+Talent: BKuhl
+Key: BKuhl
+Manager: TBD
+Gmail: Gmail - BKuhl
+Min Rate: $500 per video
+Auto Send: no
+Paused: yes
+
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
