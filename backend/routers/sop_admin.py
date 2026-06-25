@@ -211,10 +211,53 @@ async def import_sop_docx(file: UploadFile = File(...)):
 
 @router.post("/api/sop/import-docx/confirm", dependencies=[Depends(verify_api_key)])
 async def confirm_sop_import(payload: dict):
-    """Write the sop_text returned by import-docx to sop.md and commit."""
+    """Write the sop_text returned by import-docx to sop.md and commit.
+
+    Merge rules applied before writing (single commit):
+    - Existing talent: preserve their current Paused + Auto Send values so a docx
+      upload can't accidentally reset a green/yellow talent.
+    - New talent: automatically set Paused=no, Auto Send=no (yellow mode) so managers
+      don't need a manual unpause step after adding a talent.
+    """
     sop_text = payload.get("sop_text", "")
-    profiles = parse_sop_md(sop_text)
-    if len(profiles) < 5:
+    incoming_profiles = parse_sop_md(sop_text)
+    if len(incoming_profiles) < 5:
         raise HTTPException(status_code=400, detail="Re-validation failed — aborting write")
-    _writer.write_sop_md(sop_text)
-    return {"status": "ok", "talent_count": len(profiles)}
+
+    try:
+        existing_profiles = parse_sop_md(_read_sop())
+    except Exception:
+        existing_profiles = {}
+
+    merged_text = sop_text
+    new_talent_keys: list[str] = []
+
+    for key, incoming in incoming_profiles.items():
+        existing = existing_profiles.get(key) or next(
+            (p for k, p in existing_profiles.items() if k.lower() == key.lower()), None
+        )
+        try:
+            if existing:
+                if incoming.paused != existing.paused:
+                    merged_text = _writer.update_talent_field(
+                        merged_text, key, "Paused", "yes" if existing.paused else "no"
+                    )
+                if incoming.auto_send != existing.auto_send:
+                    merged_text = _writer.update_talent_field(
+                        merged_text, key, "Auto Send", "yes" if existing.auto_send else "no"
+                    )
+            else:
+                new_talent_keys.append(key)
+                if incoming.paused:
+                    merged_text = _writer.update_talent_field(merged_text, key, "Paused", "no")
+                if incoming.auto_send:
+                    merged_text = _writer.update_talent_field(merged_text, key, "Auto Send", "no")
+        except ValueError:
+            pass
+
+    _writer.write_sop_md(merged_text)
+    return {
+        "status": "ok",
+        "talent_count": len(incoming_profiles),
+        "new_talents": new_talent_keys,
+    }
