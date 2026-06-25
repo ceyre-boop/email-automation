@@ -165,6 +165,12 @@ Every processed email must result in exactly ONE of the following outcomes:
 Option A — Draft Created
 Option B — No Draft / Human Review
 
+Classification-to-action mapping:
+
+- Classification = Approved Response → Option A — Draft Created
+- Classification = Ignore → Option B — No Draft / Human Review
+- Classification = Human Admin Required → Option B — No Draft / Human Review
+
 Operational actions are controlled only by Rule 12. Other rules and scenarios determine classification only.
 
 These actions are mutually exclusive. Only one option may be applied per email.
@@ -515,8 +521,8 @@ Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Stephanie!! I’m happy to share her rates below:
 **1 TikTok** [stephanie_stimson](https://www.tiktok.com/@stephanie_stimson) - $750
-**1 Instagram** [Reel](https://www.instagram.com/stephaniestimson_) - $650
-**1 UGC Video** - $500 (usage to be negotiated)
+**1 Instagram** [Reel](https://www.instagram.com/stephaniestimson_) - $550
+**1 UGC Video** - $600 (usage to be negotiated)
 
 Stephanie's pricing reflects her authentic and relatable approach that allows her recommendations to feel natural, making her a trusted voice among her audience. She is known for her beauty content and practical everyday finds that make life a little easier!
 
@@ -543,8 +549,6 @@ Thank you so much for reaching out about a potential partnership with Jocelyn!! 
 **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -561,7 +565,7 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Britt!! I’m happy to share her rates below:
-**1 TikTok** [bestiebriitt](https://www.tiktok.com/@bestiebriitt) - $1,250
+**1 TikTok** [bestiebriitt](https://www.tiktok.com/@bestiebriitt) - $1,500
 **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Britt's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$669k** & she was TikTok’s 2025 Home Creator of the Year!!
@@ -626,22 +630,6 @@ Min Rate: $500 per video
 Auto Send: yes
 Paused: no
 
-Talent: Mahogany
-Key: Mahogany
-Manager: TBD
-Gmail: Gmail - Mahogany
-Min Rate: $500 per video
-Auto Send: no
-Paused: yes
-
-Talent: BKuhl
-Key: BKuhl
-Manager: TBD
-Gmail: Gmail - BKuhl
-Min Rate: $500 per video
-Auto Send: no
-Paused: yes
-
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
@@ -649,10 +637,58 @@ Thank you so much for reaching out about a potential partnership with Alana!! I�
 **1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
 **1 UGC Video** - $500 (usage to be negotiated)
 
-Alana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
+Alana’s pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
 
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let us know **what type of collab you’re looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
 - arcalviello@gmail.com
+
+Talent: Mahogany Lox
+Key: Mahogany
+Manager: Cara Best <cara@taboost.me>
+Gmail: Gmail - Mahogany
+Min Rate: $1000 per video
+Auto Send: no
+Paused: yes
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Mahogany!! I’m happy to share her rates below:
+**1 TikTok** [mahoganylox](https://www.tiktok.com/@mahoganylox) - $1,000
+**1 Instagram** [Reel](https://www.instagram.com/mahoganylox) - $2,500
+**1 UGC Video** - $1,500 (usage to be negotiated)
+
+Mahogany’s pricing reflects her impressive social presence, with **7.5M** TikTok and **1.2M** Instagram followers. She creates beauty, fashion, and lifestyle content with a strong focus on personality and **self-expression**, allowing her to seamlessly connect with her audience across platforms.
+
+Please let us know **what type of collab you’re looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- bookmahoganylox@gmail.com
+- booking@494ent.com
+- booking@four9four.com
+
+Talent: Brittany Kuhl
+Key: BKuhl
+Manager: Nicole Park <nicole@taboost.me>
+Gmail: Gmail - BKuhl
+Min Rate: $750 per video
+Auto Send: no
+Paused: yes
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Brittany!! I’m happy to share her rates below:
+**1 TikTok** [bkewwwl1507](https://www.tiktok.com/@bkewwwl1507) - $750
+**1 UGC Video** - $600 (usage to be negotiated)
+
+Brittany’s pricing reflects her proven ability to consistently generate **$150K+ GMV** in monthly sales. As a mom, she shares home, beauty, and everyday lifestyle content through visually compelling, high-converting content.
+
+Please let us know **what type of collab you’re looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- brittanykuhl.tiktok@gmail.com
