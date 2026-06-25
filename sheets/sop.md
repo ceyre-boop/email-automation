@@ -549,6 +549,8 @@ Thank you so much for reaching out about a potential partnership with Jocelyn!! 
 **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -633,13 +635,13 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
-**1 TikTok** [_alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
+**1 TikTok** [\_alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
 **1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
 **1 UGC Video** - $500 (usage to be negotiated)
 
-Alana’s pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
+Alana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
 
-Please let us know **what type of collab you’re looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -660,9 +662,9 @@ Thank you so much for reaching out about a potential partnership with Mahogany!!
 **1 Instagram** [Reel](https://www.instagram.com/mahoganylox) - $2,500
 **1 UGC Video** - $1,500 (usage to be negotiated)
 
-Mahogany’s pricing reflects her impressive social presence, with **7.5M** TikTok and **1.2M** Instagram followers. She creates beauty, fashion, and lifestyle content with a strong focus on personality and **self-expression**, allowing her to seamlessly connect with her audience across platforms.
+Mahogany's pricing reflects her impressive social presence, with **7.5M** TikTok and **1.2M** Instagram followers. She creates beauty, fashion, and lifestyle content with a strong focus on personality and **self-expression**, allowing her to seamlessly connect with her audience across platforms.
 
-Please let us know **what type of collab you’re looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 
 Scenario C: Personal Email Forward
 Personal Emails:
@@ -685,9 +687,9 @@ Thank you so much for reaching out about a potential partnership with Brittany!!
 **1 TikTok** [bkewwwl1507](https://www.tiktok.com/@bkewwwl1507) - $750
 **1 UGC Video** - $600 (usage to be negotiated)
 
-Brittany’s pricing reflects her proven ability to consistently generate **$150K+ GMV** in monthly sales. As a mom, she shares home, beauty, and everyday lifestyle content through visually compelling, high-converting content.
+Brittany's pricing reflects her proven ability to consistently generate **$150K+ GMV** in monthly sales. As a mom, she shares home, beauty, and everyday lifestyle content through visually compelling, high-converting content.
 
-Please let us know **what type of collab you’re looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 
