@@ -651,7 +651,7 @@ Manager: Cara Best <cara@taboost.me>
 Gmail: Gmail - Mahogany
 Min Rate: $1000 per video
 Auto Send: no
-Paused: yes
+Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
@@ -677,7 +677,7 @@ Manager: Nicole Park <nicole@taboost.me>
 Gmail: Gmail - BKuhl
 Min Rate: $750 per video
 Auto Send: no
-Paused: yes
+Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
