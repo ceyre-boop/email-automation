@@ -2,14 +2,16 @@
 from __future__ import annotations
 
 import re
+from io import BytesIO
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Response
+from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 
 from backend.core.config import get_settings
 from backend.routers.deps import verify_api_key
 from backend.services import sop_writer as _writer
+from backend.services.sop_parser import parse_sop_md, validate_profiles
 
 _SOP_PATH = Path(__file__).resolve().parents[2] / "sheets" / "sop.md"
 
@@ -173,3 +175,46 @@ def toggle_auto_send(talent_key: str):
 @router.get("/api/sop/raw", dependencies=[Depends(verify_api_key)])
 def sop_raw():
     return Response(content=_read_sop(), media_type="text/plain")
+
+
+@router.post("/api/sop/import-docx", dependencies=[Depends(verify_api_key)])
+async def import_sop_docx(file: UploadFile = File(...)):
+    """Parse a .docx file and return a preview — does not write anything."""
+    try:
+        from docx import Document  # python-docx
+    except ImportError:
+        raise HTTPException(status_code=500, detail="python-docx not installed on server")
+
+    content = await file.read()
+    try:
+        doc = Document(BytesIO(content))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not parse docx: {exc}")
+
+    sop_text = "\n".join(p.text for p in doc.paragraphs)
+    profiles = parse_sop_md(sop_text)
+
+    if len(profiles) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {len(profiles)} talent profile(s) parsed — check that the docx uses the same format as sop.md (Talent:, Key:, Manager:, etc.)",
+        )
+
+    warnings = validate_profiles(profiles)
+    return {
+        "talent_count": len(profiles),
+        "talent_names": [p.full_name for p in profiles.values()],
+        "warnings": warnings,
+        "sop_text": sop_text,
+    }
+
+
+@router.post("/api/sop/import-docx/confirm", dependencies=[Depends(verify_api_key)])
+async def confirm_sop_import(payload: dict):
+    """Write the sop_text returned by import-docx to sop.md and commit."""
+    sop_text = payload.get("sop_text", "")
+    profiles = parse_sop_md(sop_text)
+    if len(profiles) < 5:
+        raise HTTPException(status_code=400, detail="Re-validation failed — aborting write")
+    _writer.write_sop_md(sop_text)
+    return {"status": "ok", "talent_count": len(profiles)}

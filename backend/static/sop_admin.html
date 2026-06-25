@@ -157,6 +157,44 @@
     #error-list.visible { display: block; }
     #error-list li { font-size: 12px; color: var(--red); margin-left: 14px; margin-top: 4px; }
 
+    /* ── Import DOCX ── */
+    #import-zone {
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    #btn-import {
+      width: 100%; background: var(--surface-2);
+      border: 1px solid var(--border-2); border-radius: 6px;
+      color: var(--text-2); font-size: 12px; font-weight: 600;
+      padding: 7px 10px; cursor: pointer; transition: background 0.15s;
+      text-align: left;
+    }
+    #btn-import:hover { background: var(--surface-3); }
+    #import-preview {
+      margin-top: 10px; padding: 10px 12px;
+      background: var(--surface-2); border: 1px solid var(--border-2);
+      border-radius: 6px; font-size: 12px; display: none;
+    }
+    #import-preview.visible { display: block; }
+    #import-preview .preview-count { font-weight: 700; color: var(--text); margin-bottom: 6px; }
+    #import-preview .preview-warn { color: #f59e0b; margin-bottom: 6px; }
+    #import-preview .preview-names {
+      color: var(--text-3); font-size: 11px; line-height: 1.6;
+      max-height: 80px; overflow-y: auto; margin-bottom: 8px;
+    }
+    #import-btn-row { display: flex; gap: 8px; margin-top: 8px; }
+    #btn-import-confirm {
+      flex: 1; background: var(--red); color: #fff;
+      border: none; border-radius: 5px;
+      padding: 6px 10px; font-size: 12px; font-weight: 600;
+      cursor: pointer;
+    }
+    #btn-import-cancel {
+      background: var(--surface-3); color: var(--text-2);
+      border: none; border-radius: 5px;
+      padding: 6px 10px; font-size: 12px; cursor: pointer;
+    }
+
     /* ── Scrollbar ── */
     ::-webkit-scrollbar { width: 5px; }
     ::-webkit-scrollbar-track { background: transparent; }
@@ -171,6 +209,24 @@
       <h1>SOP Admin</h1>
       <div class="subtitle">TABOOST Talent Roster</div>
     </div>
+
+    <!-- DOCX bulk import -->
+    <div id="import-zone">
+      <input type="file" id="docx-file-input" accept=".docx" style="display:none" onchange="handleDocxFile(this)"/>
+      <button id="btn-import" onclick="document.getElementById('docx-file-input').click()">
+        ⬆ Import from DOCX
+      </button>
+      <div id="import-preview">
+        <div class="preview-count" id="import-count"></div>
+        <div class="preview-warn" id="import-warn"></div>
+        <div class="preview-names" id="import-names"></div>
+        <div id="import-btn-row">
+          <button id="btn-import-confirm" onclick="confirmDocxImport()">Apply & Push</button>
+          <button id="btn-import-cancel" onclick="cancelImport()">Cancel</button>
+        </div>
+      </div>
+    </div>
+
     <div id="talent-list"></div>
   </nav>
 
@@ -391,6 +447,77 @@
     const list = document.getElementById('error-list');
     list.innerHTML = '';
     list.classList.remove('visible');
+  }
+
+  // ── DOCX Import ───────────────────────────────────────────────────────────
+  let _pendingSopText = null;
+
+  async function handleDocxFile(input) {
+    const file = input.files[0];
+    if (!file) return;
+    input.value = '';
+    const btn = document.getElementById('btn-import');
+    btn.textContent = '⏳ Parsing…';
+    btn.disabled = true;
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const res = await fetch('/admin/api/sop/import-docx', {
+        method: 'POST',
+        headers: { 'x-api-key': getApiKey() },
+        body: fd,
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert('Import failed: ' + (data.detail || JSON.stringify(data)));
+        return;
+      }
+      _pendingSopText = data.sop_text;
+      document.getElementById('import-count').textContent =
+        `Found ${data.talent_count} talent profiles`;
+      const warnEl = document.getElementById('import-warn');
+      warnEl.textContent = data.warnings && data.warnings.length
+        ? `⚠ ${data.warnings.length} warning(s): ${data.warnings.join('; ')}`
+        : '';
+      document.getElementById('import-names').textContent = data.talent_names.join(', ');
+      document.getElementById('import-preview').classList.add('visible');
+    } catch (e) {
+      alert('Upload error: ' + e.message);
+    } finally {
+      btn.textContent = '⬆ Import from DOCX';
+      btn.disabled = false;
+    }
+  }
+
+  async function confirmDocxImport() {
+    if (!_pendingSopText) return;
+    const btn = document.getElementById('btn-import-confirm');
+    btn.textContent = 'Applying…';
+    btn.disabled = true;
+    try {
+      const res = await apiFetch('/admin/api/sop/import-docx/confirm', {
+        method: 'POST',
+        body: JSON.stringify({ sop_text: _pendingSopText }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        alert('Confirm failed: ' + (data.detail || JSON.stringify(data)));
+        return;
+      }
+      cancelImport();
+      alert(`✅ SOP updated — ${data.talent_count} profiles written. Render will redeploy in ~2 min.`);
+      loadSidebar();
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      btn.textContent = 'Apply & Push';
+      btn.disabled = false;
+    }
+  }
+
+  function cancelImport() {
+    _pendingSopText = null;
+    document.getElementById('import-preview').classList.remove('visible');
   }
 
   // ── Init ──────────────────────────────────────────────────────────────────
