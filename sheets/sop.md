@@ -450,14 +450,11 @@ Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-Thank you so much for reaching out about a potential partnership with Kylika!! I’m happy to share her rates below:
-**1 TikTok** [kylikamiller44](https://www.tiktok.com/@kylikamiller44) - $750
-**1 Instagram** [Reel](https://www.instagram.com/kylikamiller/) - $500
-**1 UGC Video** - $600 (usage to be negotiated)
+Thanks for reaching out about working with Kylika!
+[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.
 
-Kylika's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **fashion & beauty** recommendations on TikTok Shop!!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
+Looking forward to hearing your thoughts!
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -492,7 +489,7 @@ Key: Skyler
 Manager: Marco Perez <marco@taboost.me>
 Gmail: Gmail - Skyler
 Min Rate: $300 per video
-Auto Send: yes
+Auto Send: no
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
@@ -514,7 +511,7 @@ Key: Stephanie
 Manager: Nicole Park <nicole@taboost.me>
 Gmail: Gmail - Stephanie
 Min Rate: $500 per video
-Auto Send: no
+Auto Send: yes
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
@@ -678,7 +675,7 @@ Key: BKuhl
 Manager: Nicole Park <nicole@taboost.me>
 Gmail: Gmail - BKuhl
 Min Rate: $750 per video
-Auto Send: no
+Auto Send: yes
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
