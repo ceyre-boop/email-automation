@@ -6,6 +6,11 @@ from pathlib import Path
 
 _SOP_PATH = Path(__file__).resolve().parents[2] / "sheets" / "sop.md"
 
+# Stray Markdown backslash-escapes (\_ \* \[ …) must never survive into sop.md — a DOCX
+# import/merge reintroducing `\_alanacalvs` is what caused the leaked-backslash regression.
+# Mirror of gmail._MD_ESCAPE_RE; normalized at every write (all writes flow through here).
+_MD_ESCAPE_RE = re.compile(r"\\([\\`*_{}\[\]()#+.!~>-])")
+
 _TALENT_HEADING_RE = re.compile(
     r"^[ \t]*(?:#+[ \t]*)?Talent:[ \t]*(?P<name>[^\r\n]*)[ \t]*$",
     re.MULTILINE,
@@ -94,6 +99,9 @@ def write_sop_md(new_text: str) -> None:
     """Write updated text to sheets/sop.md, invalidate all in-memory caches, and commit+push."""
     import logging
     import subprocess
+    # Normalize stray Markdown escapes so imports/merges can't reintroduce artifacts
+    # like `\_alanacalvs` that leak into sent emails (see module note above).
+    new_text = _MD_ESCAPE_RE.sub(r"\1", new_text)
     _SOP_PATH.write_text(new_text, encoding="utf-8")
     from backend.core.config import get_settings
     get_settings.cache_clear()

@@ -632,7 +632,7 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
-**1 TikTok** [\_alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
+**1 TikTok** [_alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
 **1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
 **1 UGC Video** - $500 (usage to be negotiated)
 

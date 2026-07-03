@@ -54,6 +54,17 @@ def _escape_and_autolink(segment: str) -> str:
     return _RAW_URL_RE.sub(r'<a href="\1">\1</a>', escaped)
 
 
+# Markdown backslash-escapes: `\_` `\*` `\[` etc. A SOP response occasionally carries
+# a stray escape (e.g. `\_alanacalvs`, from a markdown previewer) that must NEVER reach
+# a sent email. This is the render-side guarantee against that whole class of artifact.
+_MD_ESCAPE_RE = re.compile(r'\\([\\`*_{}\[\]()#+.!~>-])')
+
+
+def _unescape_markdown(text: str) -> str:
+    """Strip Markdown backslash-escapes, leaving the literal char (\\_ → _, \\* → *)."""
+    return _MD_ESCAPE_RE.sub(r'\1', text or "")
+
+
 def _iter_internal_link_spans(text: str):
     """
     Yield (start, end, anchor, url) spans for SOP Markdown link format:
@@ -179,8 +190,10 @@ def _render_email_body(body: str) -> tuple[str, str]:
     plain_chunks.append(_strip_inline_formatting(tail))
     html_chunks.append(_apply_inline_formatting(_escape_and_autolink(tail)))
 
-    plain = "".join(plain_chunks)
-    html_body = "".join(html_chunks)
+    # Final pass: inline-formatting markers are already converted to tags, so any
+    # remaining backslash-escapes (\_ \* …) are literal — strip so they never ship.
+    plain = _unescape_markdown("".join(plain_chunks))
+    html_body = _unescape_markdown("".join(html_chunks))
     return plain, f"<div>{html_body.replace('\n', '<br>')}</div>"
 
 
