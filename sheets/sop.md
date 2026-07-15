@@ -470,15 +470,11 @@ Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-Thank you so much for reaching out about a potential partnership with Audur!! I’m happy to share her rates below:
-**1 TikTok** [thatnordicblonde](https://www.tiktok.com/@thatnordicblonde) - $800
-**1 TikTok (2nd)** [everydayaudur](https://www.tiktok.com/@everydayaudur) - $500
-**1 Instagram** [Reel](https://www.instagram.com/thatnordicblonde/) - $500
-**1 UGC Video** - $1,000 (usage to be negotiated)
+Thanks for reaching out about working with Audur!
+[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.
 
-Audur's pricing reflects her high quality content + the access you'll get to the community of buyers she's built from her **beauty & personal care** recommendations on TikTok Shop!!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
+Looking forward to hearing your thoughts!
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -632,7 +628,7 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
-**1 TikTok** [_alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
+**1 TikTok** [alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
 **1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
 **1 UGC Video** - $500 (usage to be negotiated)
 
