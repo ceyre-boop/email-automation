@@ -21,11 +21,12 @@ from sqlalchemy.orm import Session
 import time
 
 from backend.core.config import get_settings
-from backend.models.db import Draft, DraftStatus, EmailStatus, PollHealth, ProcessedEmail, TalentToken
+from backend.models.db import Draft, DraftStatus, EmailStatus, ExternalChannelReview, PollHealth, ProcessedEmail, TalentToken
 from backend.services import gmail as gmail_svc
 from backend.services import reply as reply_svc
 from backend.services import sheets as sheets_svc
 from backend.services import triage as triage_svc
+from backend.services.external_channel import detect_external_channel
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
 from backend.services.oauth import TokenRefreshError
 from backend.services.sop_parser import TalentProfile, get_active_profiles
@@ -360,6 +361,9 @@ def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> in
             offer_type = triage_result.get("offer_type")
             reason = triage_result.get("reason", "")
 
+            # External Channel Review — informational only, independent of score.
+            _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date)
+
             if score != 3:
                 _record_processed(
                     db, talent_key, message_id, thread_id, sender, subject,
@@ -638,6 +642,9 @@ def _process_one_message(
     risk_score = triage_result.get("risk_score")
     alternatives_considered = triage_result.get("alternatives_considered", "")
 
+    # External Channel Review — informational only, independent of score routing.
+    _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date)
+
     _extra = dict(
         sender_domain=sender_domain,
         email_length=email_length,
@@ -855,6 +862,44 @@ def _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rat
         sheets_svc.log_email(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, status_label, reason)
     except Exception as exc:
         logger.warning("Sheets log failed for %s / %s (non-fatal): %s", talent_key, subject, exc)
+
+
+def _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date):
+    """Upsert an ExternalChannelReview row when the sender asks to move to WhatsApp/Discord.
+
+    Informational only — separate from _record_processed and the score routing. Fully
+    isolated: writes to its own table, never touches ProcessedEmail/drafts/labels/send.
+    Own try/except so a failure here can never disrupt triage or draft handling.
+    """
+    try:
+        channel = detect_external_channel(subject, sender, body)
+        if not channel:
+            return
+        exists = (
+            db.query(ExternalChannelReview)
+            .filter(ExternalChannelReview.gmail_message_id == message_id)
+            .first()
+        )
+        if exists:
+            return
+        db.add(ExternalChannelReview(
+            gmail_message_id=message_id,
+            thread_id=thread_id,
+            talent_key=talent_key,
+            sender=sender,
+            subject=subject,
+            body_text=body or None,
+            channel_requested=channel,
+            received_at=email_date,
+        ))
+        db.commit()
+        logger.info("External Channel Review flagged (%s) for %s / %s", channel, talent_key, message_id)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("External channel flag failed for %s / %s (non-fatal): %s", talent_key, message_id, exc)
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
 
 
 def _record_processed(

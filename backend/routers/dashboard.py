@@ -27,6 +27,7 @@ from backend.models.db import (
     Draft,
     DraftStatus,
     EmailStatus,
+    ExternalChannelReview,
     InboxEmail,
     ManagerContext,
     PollHealth,
@@ -532,6 +533,64 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
         .order_by(Draft.created_at.desc())
         .all()
     )
+
+# ── External Channel Review ────────────────────────────────────────────────────
+# Informational-only surface: inbound emails whose sender asked to continue via
+# WhatsApp / Discord. Stored in its own table (external_channel_reviews), fully
+# isolated from processed_emails — these endpoints never affect drafts, labels,
+# send, or any other read path. The list query fails soft to [] so a missing table
+# or any error can never 500 the dashboard.
+
+@router.get("/external-channel-review")
+def external_channel_review_items(limit: int = 100, db: Session = Depends(get_db)):
+    """Undismissed External Channel Review items, newest first.
+
+    Returns the ORIGINAL inbound email body so managers can read the request in place.
+    Fails soft to an empty list — never raises — so this section can never break the dashboard.
+    """
+    try:
+        rows = (
+            db.query(ExternalChannelReview)
+            .filter(ExternalChannelReview.dismissed == False)  # noqa: E712
+            .order_by(ExternalChannelReview.created_at.desc())
+            .limit(limit)
+            .all()
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("external-channel-review list failed (returning []): %s", exc)
+        return []
+    return [
+        {
+            "review_type": "External Channel Review",
+            "status": "Needs Review",
+            "gmail_message_id": r.gmail_message_id,
+            "thread_id": r.thread_id,
+            "talent_key": r.talent_key,
+            "sender": r.sender,
+            "subject": r.subject,
+            "body_text": r.body_text,
+            "channel_requested": r.channel_requested,
+            "received_at": r.received_at.isoformat() if r.received_at else None,
+            "created_at": r.created_at.isoformat() if r.created_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/external-channel-review/{gmail_message_id}/dismiss")
+def dismiss_external_channel_review(gmail_message_id: str, db: Session = Depends(get_db)):
+    """Remove an External Channel Review item from the dashboard (informational only)."""
+    row = (
+        db.query(ExternalChannelReview)
+        .filter(ExternalChannelReview.gmail_message_id == gmail_message_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Review item not found.")
+    row.dismissed = True
+    db.commit()
+    return {"ok": True}
+
 
 @router.post("/reset-badges")
 def reset_all_badges(db: Session = Depends(get_db)):

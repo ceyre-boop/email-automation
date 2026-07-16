@@ -112,6 +112,28 @@ class ProcessedEmail(Base):
     scenario_needs_improvement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
 
+class ExternalChannelReview(Base):
+    """Informational-only flag: inbound emails whose sender asked to continue via an
+    outside channel (WhatsApp / Discord). Stored in its own table so it never touches
+    the hot `processed_emails` schema — surfacing this flag cannot affect triage,
+    drafts, labels, send, or any existing dashboard read path. Self-contained: the
+    dashboard section reads only this table (sender/subject/body are denormalized here)."""
+
+    __tablename__ = "external_channel_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    gmail_message_id: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
+    thread_id: Mapped[str | None] = mapped_column(String(128))
+    talent_key: Mapped[str | None] = mapped_column(String(64), index=True)
+    sender: Mapped[str | None] = mapped_column(String(256))
+    subject: Mapped[str | None] = mapped_column(String(512))
+    body_text: Mapped[str | None] = mapped_column(Text)                 # ORIGINAL inbound body
+    channel_requested: Mapped[str | None] = mapped_column(String(16))   # WhatsApp | Discord | Both
+    received_at: Mapped[datetime | None] = mapped_column(DateTime)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class OAuthState(Base):
     """Short-lived CSRF state tokens for the OAuth flow. DB-backed so restarts don't break reconnects."""
 
