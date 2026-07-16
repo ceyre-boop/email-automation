@@ -26,6 +26,7 @@ from backend.services import gmail as gmail_svc
 from backend.services import reply as reply_svc
 from backend.services import sheets as sheets_svc
 from backend.services import triage as triage_svc
+from backend.services.external_channel import detect_external_channel
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
 from backend.services.oauth import TokenRefreshError
 from backend.services.sop_parser import TalentProfile, get_active_profiles
@@ -360,12 +361,17 @@ def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> in
             offer_type = triage_result.get("offer_type")
             reason = triage_result.get("reason", "")
 
+            # External Channel Review — informational only, independent of score.
+            ext_channel = detect_external_channel(subject, sender, body)
+
             if score != 3:
                 _record_processed(
                     db, talent_key, message_id, thread_id, sender, subject,
                     score, brand_name, proposed_rate, offer_type, reason,
                     EmailStatus.archived if score == 1 else EmailStatus.flagged,
                     body_text=body, email_date=email_date, sender_domain=sender_domain,
+                    external_channel_review=ext_channel is not None,
+                    external_channel_requested=ext_channel,
                 )
                 db.commit()
                 continue
@@ -389,6 +395,8 @@ def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> in
                     score, brand_name, proposed_rate, offer_type, reason,
                     EmailStatus.flagged,
                     body_text=body, email_date=email_date, sender_domain=sender_domain,
+                    external_channel_review=ext_channel is not None,
+                    external_channel_requested=ext_channel,
                 )
                 db.commit()
                 continue
@@ -437,6 +445,8 @@ def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> in
                 score, brand_name, proposed_rate, offer_type, reason,
                 EmailStatus.draft_saved,
                 body_text=body, email_date=email_date, sender_domain=sender_domain,
+                external_channel_review=ext_channel is not None,
+                external_channel_requested=ext_channel,
             )
             db.commit()
             drafted += 1
@@ -638,6 +648,10 @@ def _process_one_message(
     risk_score = triage_result.get("risk_score")
     alternatives_considered = triage_result.get("alternatives_considered", "")
 
+    # External Channel Review — informational only, independent of triage score.
+    # Runs on every email regardless of score routing (never touches drafts/labels/send).
+    external_channel_requested = detect_external_channel(subject, sender, body)
+
     _extra = dict(
         sender_domain=sender_domain,
         email_length=email_length,
@@ -649,6 +663,8 @@ def _process_one_message(
         has_links=has_links,
         alternatives_considered=alternatives_considered,
         time_to_classify_ms=time_to_classify_ms,
+        external_channel_review=external_channel_requested is not None,
+        external_channel_requested=external_channel_requested,
     )
 
     # ── Score 1 → Spam (Option C) ───────────────────────────────────────────
@@ -706,7 +722,7 @@ def _process_one_message(
                 db, talent_key, message_id, thread_id, sender, subject,
                 2, brand_name, proposed_rate, "Human Admin Required",
                 "Ongoing thread — prior reply detected. Human review required.",
-                EmailStatus.flagged, body_text=body, email_date=email_date,
+                EmailStatus.flagged, body_text=body, email_date=email_date, **_extra,
             )
             db.commit()
             summary["flagged"] += 1
@@ -729,7 +745,7 @@ def _process_one_message(
                 _record_processed(
                     db, talent_key, message_id, thread_id, sender, subject,
                     score, brand_name, proposed_rate, offer_type, reason,
-                    EmailStatus.draft_saved, body_text=body, email_date=email_date,
+                    EmailStatus.draft_saved, body_text=body, email_date=email_date, **_extra,
                 )
                 db.commit()
             summary["processed"] += 1
@@ -884,6 +900,8 @@ def _record_processed(
     time_to_classify_ms: int | None = None,
     time_to_draft_ms: int | None = None,
     human_override_occurred: bool = False,
+    external_channel_review: bool = False,
+    external_channel_requested: str | None = None,
 ):
     # The claim row was pre-inserted at the start of _process_one_message.
     # Update it in-place rather than inserting a duplicate.
@@ -914,6 +932,8 @@ def _record_processed(
         existing.time_to_classify_ms = time_to_classify_ms
         existing.time_to_draft_ms = time_to_draft_ms
         existing.human_override_occurred = human_override_occurred
+        existing.external_channel_review = external_channel_review
+        existing.external_channel_requested = external_channel_requested
     else:
         row = ProcessedEmail(
             talent_key=talent_key,
@@ -942,5 +962,7 @@ def _record_processed(
             time_to_classify_ms=time_to_classify_ms,
             time_to_draft_ms=time_to_draft_ms,
             human_override_occurred=human_override_occurred,
+            external_channel_review=external_channel_review,
+            external_channel_requested=external_channel_requested,
         )
         db.add(row)

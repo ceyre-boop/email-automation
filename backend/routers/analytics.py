@@ -535,6 +535,8 @@ def email_feed(hours: int | None = None, limit: int = 500, db: Session = Depends
             "processed_at": r.processed_at.isoformat() if r.processed_at else None,
             "draft_id": draft_map.get(r.gmail_message_id),
             "is_lost": is_lost,
+            "external_channel_review": bool(getattr(r, "external_channel_review", False)),
+            "external_channel_requested": getattr(r, "external_channel_requested", None),
         }
 
     merged = [_serialize(r, False) for r in base_rows] + [_serialize(r, True) for r in lost_rows]

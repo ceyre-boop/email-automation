@@ -117,6 +117,8 @@ class EmailOut(BaseModel):
     email_date: Optional[datetime] = None
     processed_at: datetime
     status: str
+    external_channel_review: bool = False
+    external_channel_requested: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -532,6 +534,59 @@ def talent_drafts(talent_key: str, db: Session = Depends(get_db)):
         .order_by(Draft.created_at.desc())
         .all()
     )
+
+# ── External Channel Review ────────────────────────────────────────────────────
+# Informational-only surface: inbound emails whose sender asked to continue via
+# WhatsApp / Discord. Listing + per-item dismiss (removes from dashboard only —
+# never touches Gmail, drafts, labels, or send).
+
+@router.get("/external-channel-review")
+def external_channel_review_items(limit: int = 100, db: Session = Depends(get_db)):
+    """Undismissed External Channel Review items, newest first.
+
+    Returns the ORIGINAL inbound email body (body_text) so managers can read the
+    request in place.
+    """
+    rows = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.external_channel_review == True,  # noqa: E712
+            ProcessedEmail.external_channel_dismissed == False,  # noqa: E712
+        )
+        .order_by(ProcessedEmail.processed_at.desc())
+        .limit(limit)
+        .all()
+    )
+    return [
+        {
+            "gmail_message_id": r.gmail_message_id,
+            "thread_id": r.thread_id,
+            "talent_key": r.talent_key,
+            "sender": r.sender,
+            "subject": r.subject,
+            "body_text": r.body_text,
+            "channel_requested": r.external_channel_requested,
+            "email_date": r.email_date.isoformat() if r.email_date else None,
+            "processed_at": r.processed_at.isoformat() if r.processed_at else None,
+        }
+        for r in rows
+    ]
+
+
+@router.post("/external-channel-review/{gmail_message_id}/dismiss")
+def dismiss_external_channel_review(gmail_message_id: str, db: Session = Depends(get_db)):
+    """Remove an External Channel Review item from the dashboard (informational only)."""
+    row = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.gmail_message_id == gmail_message_id)
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="Email not found.")
+    row.external_channel_dismissed = True
+    db.commit()
+    return {"ok": True}
+
 
 @router.post("/reset-badges")
 def reset_all_badges(db: Session = Depends(get_db)):
@@ -1257,6 +1312,8 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
                 "status": r.triage_status or "unprocessed",
                 "is_unread": r.is_unread,
                 "last_synced_at": r.last_synced_at.isoformat() if r.last_synced_at else None,
+                "external_channel_review": bool(getattr(r, "external_channel_review", False)),
+                "external_channel_requested": getattr(r, "external_channel_requested", None),
             }
             for r in cached
         ]
@@ -1327,6 +1384,8 @@ def live_inbox(talent_key: str, db: Session = Depends(get_db)):
             "status": db_row.status if db_row else "unprocessed",
             "is_unread": "UNREAD" in headers.get("label_ids", []),
             "last_synced_at": None,
+            "external_channel_review": bool(db_row.external_channel_review) if db_row else False,
+            "external_channel_requested": db_row.external_channel_requested if db_row else None,
         })
 
     return results
