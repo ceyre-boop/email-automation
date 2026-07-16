@@ -383,7 +383,15 @@ def get_session_factory():
 def create_tables():
     """Create all tables and run additive column migrations (idempotent)."""
     engine = _make_engine()
-    Base.metadata.create_all(engine)
+    # create_all is wrapped so a failure here can never abort the function and
+    # silently block _MIGRATION_STMTS below — that abort-before-migrations flaw
+    # left new tables/columns missing in prod while the deployed ORM referenced
+    # them. New tables must ALSO ship a CREATE TABLE IF NOT EXISTS migration
+    # statement (see guardian_audit_log / external_channel_reviews).
+    try:
+        Base.metadata.create_all(engine)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("create_all failed (continuing to migrations): %s", exc)
     # Additive column migrations — AUTOCOMMIT so each statement is its own transaction.
     # Previously used a single shared connection where one failure aborted all subsequent
     # statements silently. AUTOCOMMIT isolates failures: a DDL error on one statement
@@ -432,6 +440,23 @@ def create_tables():
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_draft_ms INTEGER",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
+        # External Channel Review — new isolated table. Created here (proven mechanism)
+        # rather than trusting create_all; must match the ExternalChannelReview model 1:1.
+        """CREATE TABLE IF NOT EXISTS external_channel_reviews (
+            id SERIAL PRIMARY KEY,
+            gmail_message_id VARCHAR(128) NOT NULL,
+            thread_id VARCHAR(128),
+            talent_key VARCHAR(64),
+            sender VARCHAR(256),
+            subject VARCHAR(512),
+            body_text TEXT,
+            channel_requested VARCHAR(16),
+            received_at TIMESTAMP,
+            dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""",
+        "CREATE UNIQUE INDEX IF NOT EXISTS uq_extreview_gmail_message_id ON external_channel_reviews (gmail_message_id)",
+        "CREATE INDEX IF NOT EXISTS ix_extreview_talent_key ON external_channel_reviews (talent_key)",
         "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'",
         # NOTE: score=0 ghost-row cleanup removed from startup — it can lock processed_emails
         # on a large table and delay port binding, causing Render R10 boot timeouts.

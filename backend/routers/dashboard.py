@@ -577,6 +577,26 @@ def external_channel_review_items(limit: int = 100, db: Session = Depends(get_db
     ]
 
 
+@router.get("/external-channel-review/health")
+def external_channel_review_health(db: Session = Depends(get_db)):
+    """Diagnostic: distinguishes 'no items yet' from 'table missing/broken'.
+
+    The list endpoint fails soft to [] by design, which makes those two states
+    look identical — this endpoint exists so they never are again.
+    """
+    try:
+        total = db.query(ExternalChannelReview).count()
+        undismissed = (
+            db.query(ExternalChannelReview)
+            .filter(ExternalChannelReview.dismissed == False)  # noqa: E712
+            .count()
+        )
+        return {"table_ok": True, "rows": total, "undismissed": undismissed}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("external-channel-review health check failed: %s", exc)
+        return {"table_ok": False, "rows": 0, "undismissed": 0}
+
+
 @router.post("/external-channel-review/{gmail_message_id}/dismiss")
 def dismiss_external_channel_review(gmail_message_id: str, db: Session = Depends(get_db)):
     """Remove an External Channel Review item from the dashboard (informational only)."""

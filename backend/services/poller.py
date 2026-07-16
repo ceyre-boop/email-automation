@@ -581,6 +581,11 @@ def _process_one_message(
     has_links = bool(body and ("http://" in body or "https://" in body))
     has_attachments = bool(detail.get("has_attachments", False))
 
+    # External Channel Review — informational only, independent of score routing.
+    # Runs BEFORE the ongoing-thread guardrail so thread replies (where brands most
+    # often ask to move to WhatsApp/Discord) are scanned too. Own try/except inside.
+    _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date)
+
     # ── Guardrail: ongoing thread with existing draft/sent work → manual only ──
     if thread_id:
         existing_thread_activity = (
@@ -641,9 +646,6 @@ def _process_one_message(
     urgency_score = triage_result.get("urgency_score")
     risk_score = triage_result.get("risk_score")
     alternatives_considered = triage_result.get("alternatives_considered", "")
-
-    # External Channel Review — informational only, independent of score routing.
-    _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date)
 
     _extra = dict(
         sender_domain=sender_domain,

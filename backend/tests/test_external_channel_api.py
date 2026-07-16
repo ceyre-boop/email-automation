@@ -76,3 +76,15 @@ def test_dismiss_removes_from_list(client, db_session):
 def test_dismiss_unknown_message_404(client, db_session):
     resp = client.post("/api/dashboard/external-channel-review/does-not-exist/dismiss")
     assert resp.status_code == 404
+
+
+def test_health_reports_table_ok_and_counts(client, db_session):
+    _make_review(db_session, "ext-h1", "WhatsApp")
+    _make_review(db_session, "ext-h2", "Discord", dismissed=True)
+
+    resp = client.get("/api/dashboard/external-channel-review/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["table_ok"] is True
+    assert data["rows"] == 2
+    assert data["undismissed"] == 1
