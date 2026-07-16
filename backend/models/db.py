@@ -110,10 +110,6 @@ class ProcessedEmail(Base):
     time_to_draft_ms: Mapped[int | None] = mapped_column(Integer)
     human_override_occurred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     scenario_needs_improvement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
-    # ── External Channel Review (informational only — never affects routing) ──────
-    external_channel_review: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
-    external_channel_requested: Mapped[str | None] = mapped_column(String(16))  # WhatsApp|Discord|Both
-    external_channel_dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
 
 class OAuthState(Base):
@@ -414,9 +410,6 @@ def create_tables():
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_draft_ms INTEGER",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS external_channel_review BOOLEAN DEFAULT FALSE",
-        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS external_channel_requested VARCHAR(16)",
-        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS external_channel_dismissed BOOLEAN DEFAULT FALSE",
         "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'",
         # NOTE: score=0 ghost-row cleanup removed from startup — it can lock processed_emails
         # on a large table and delay port binding, causing Render R10 boot timeouts.
