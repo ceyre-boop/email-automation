@@ -577,6 +577,53 @@ def external_channel_review_items(limit: int = 100, db: Session = Depends(get_db
     ]
 
 
+@router.post("/external-channel-review/cleanup-threads")
+def cleanup_external_channel_threads(limit: int = 200, db: Session = Depends(get_db)):
+    """One-time cleanup: dismiss review items whose Gmail thread is already past the
+    initial inbound / first response stage (message count > 2) — i.e. deals already
+    moving forward. Read-only on Gmail; only flips the `dismissed` flag. Idempotent.
+    """
+    from backend.services import gmail as gmail_svc
+
+    rows = (
+        db.query(ExternalChannelReview)
+        .filter(ExternalChannelReview.dismissed == False)  # noqa: E712
+        .order_by(ExternalChannelReview.created_at.desc())
+        .limit(limit)
+        .all()
+    )
+    # One Gmail service per talent (reused across that talent's rows).
+    svc_by_talent: dict[str, object] = {}
+    dismissed = 0
+    checked = 0
+    errors = 0
+    for r in rows:
+        if not r.thread_id or not r.talent_key:
+            continue
+        svc = svc_by_talent.get(r.talent_key)
+        if svc is None:
+            token = (
+                db.query(TalentToken)
+                .filter(TalentToken.talent_key.ilike(r.talent_key), TalentToken.active == True)  # noqa: E712
+                .first()
+            )
+            if not token:
+                continue
+            try:
+                svc = gmail_svc.build_service(token, db)
+                svc_by_talent[r.talent_key] = svc
+            except Exception:  # noqa: BLE001
+                errors += 1
+                continue
+        count = gmail_svc.get_thread_message_count(svc, r.thread_id)
+        checked += 1
+        if count is not None and count > 2:
+            r.dismissed = True
+            dismissed += 1
+    db.commit()
+    return {"ok": True, "checked": checked, "dismissed": dismissed, "errors": errors, "scanned": len(rows)}
+
+
 @router.get("/external-channel-review/health")
 def external_channel_review_health(db: Session = Depends(get_db)):
     """Diagnostic: distinguishes 'no items yet' from 'table missing/broken'.

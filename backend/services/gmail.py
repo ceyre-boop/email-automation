@@ -466,6 +466,22 @@ def _extract_body(payload: dict) -> str:
 # ── Thread guard ─────────────────────────────────────────────────────────────
 
 
+def get_thread_message_count(service, thread_id: str) -> int | None:
+    """Return the number of messages in a Gmail thread, or None on error.
+
+    Cheap (format='minimal'). Used to distinguish initial inbound / first response
+    (1-2 messages) from deals already several replies deep.
+    """
+    try:
+        thread = service.users().threads().get(
+            userId="me", id=thread_id, format="minimal"
+        ).execute()
+        return len(thread.get("messages", []))
+    except HttpError as exc:
+        logger.warning("get_thread_message_count failed for %s (non-fatal): %s", thread_id, exc)
+        return None
+
+
 def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
     """
     Return True if this Gmail thread already has a SENT message in it.

@@ -362,7 +362,7 @@ def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> in
             reason = triage_result.get("reason", "")
 
             # External Channel Review — informational only, independent of score.
-            _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date)
+            _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date, service=service)
 
             if score != 3:
                 _record_processed(
@@ -584,7 +584,8 @@ def _process_one_message(
     # External Channel Review — informational only, independent of score routing.
     # Runs BEFORE the ongoing-thread guardrail so thread replies (where brands most
     # often ask to move to WhatsApp/Discord) are scanned too. Own try/except inside.
-    _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date)
+    # Filtered to initial inbound / first response (thread size <= 2).
+    _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date, service=service)
 
     # ── Guardrail: ongoing thread with existing draft/sent work → manual only ──
     if thread_id:
@@ -866,17 +867,28 @@ def _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rat
         logger.warning("Sheets log failed for %s / %s (non-fatal): %s", talent_key, subject, exc)
 
 
-def _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date):
+def _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date, service=None):
     """Upsert an ExternalChannelReview row when the sender asks to move to WhatsApp/Discord.
 
     Informational only — separate from _record_processed and the score routing. Fully
     isolated: writes to its own table, never touches ProcessedEmail/drafts/labels/send.
     Own try/except so a failure here can never disrupt triage or draft handling.
+
+    Only flags EARLY conversation — thread message count 1 (initial inbound) or 2
+    (first response). Deals already several replies deep are skipped, so the review
+    queue surfaces new handoff requests, not conversations already moving forward.
     """
     try:
         channel = detect_external_channel(subject, sender, body)
         if not channel:
             return
+        # Initial inbound / first response only. Count is fetched lazily (only after a
+        # channel match) to avoid an extra Gmail call on every email. On error (None)
+        # we default to flagging — better to over-surface than silently drop.
+        if service is not None and thread_id:
+            count = gmail_svc.get_thread_message_count(service, thread_id)
+            if count is not None and count > 2:
+                return
         exists = (
             db.query(ExternalChannelReview)
             .filter(ExternalChannelReview.gmail_message_id == message_id)
