@@ -2319,9 +2319,33 @@ function toggleDraftExpand(id) {
 }
 
 // ── External Channel Review ──────────────────────────────────────────────────
+// Extract the actual contact detail the sender provided (phone for WhatsApp,
+// invite link for Discord) so the compact card can show it without expanding.
+function extReviewContact(r) {
+  const blob = `${r.sender || ''}\n${r.subject || ''}\n${r.body_text || ''}`;
+  const chan = r.channel_requested || '';
+  if (chan === 'Discord' || chan === 'Both') {
+    const inv = blob.match(/discord\.(?:gg|com\/invite)\/[A-Za-z0-9]+/i);
+    if (inv) return { icon: '💬', val: inv[0] };
+  }
+  const PHONE = /\+?\d[\d\s().\-]{5,}\d/g; let m;
+  while ((m = PHONE.exec(blob))) {
+    const digits = (m[0].match(/\d/g) || []).length;
+    if (digits >= 7 && digits <= 15) return { icon: '📞', val: m[0].trim() };
+  }
+  return null;
+}
+
+function extReviewSenderName(r) {
+  const s = r.sender || '';
+  const name = s.replace(/<.*>/, '').trim().replace(/^"|"$/g, '');
+  const email = (s.match(/<([^>]+)>/) || [])[1] || '';
+  return name || email || '(unknown sender)';
+}
+
 async function loadExtReview() {
   try {
-    const rows = await api('GET', '/api/dashboard/external-channel-review?limit=100');
+    const rows = await api('GET', '/api/dashboard/external-channel-review?limit=200');
     const list = document.getElementById('extreview-list');
     const countEl = document.getElementById('extreview-count');
     countEl.textContent = rows.length;
@@ -2330,26 +2354,42 @@ async function loadExtReview() {
       return;
     }
     list.innerHTML = rows.map(r => {
+      const id = esc(r.gmail_message_id);
       const chan = r.channel_requested || 'Unknown';
+      const contact = extReviewContact(r);
+      const contactHtml = contact
+        ? `<span style="font-size:12px;font-weight:700;color:#a855f7;white-space:nowrap;">${contact.icon} ${esc(contact.val)}</span>`
+        : `<span style="font-size:11px;color:var(--text-3);">${esc(chan)} requested</span>`;
       return `
-      <div id="extreview-row-${esc(r.gmail_message_id)}" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:flex-start;gap:12px;">
-        <div style="flex:1;min-width:0;">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:4px;flex-wrap:wrap;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">${esc(r.talent_key || '')}</span>
-            <span style="background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:6px;font-size:10px;font-weight:800;padding:2px 7px;">${esc(chan)}</span>
-            <span style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc((r.sender || '').replace(/<.*>/, '').trim())}</span>
+      <div id="extreview-row-${id}" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
+        <div style="display:flex;align-items:center;gap:10px;">
+          <div onclick="toggleExtReview('${id}')" style="flex:1;min-width:0;cursor:pointer;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+            <span id="extreview-caret-${id}" style="color:var(--text-3);font-size:10px;width:9px;flex-shrink:0;">▸</span>
+            <span style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;">${esc(r.talent_key || '')}</span>
+            <span style="background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:6px;font-size:10px;font-weight:800;padding:1px 6px;white-space:nowrap;">${esc(chan)}</span>
+            <span style="font-size:12px;color:var(--text);font-weight:600;white-space:nowrap;">${esc(extReviewSenderName(r))}</span>
+            <span style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;">${esc(r.subject || '(no subject)')}</span>
           </div>
-          <div style="font-size:12px;font-weight:600;color:var(--text-2);margin-bottom:6px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.subject || '(no subject)')}</div>
-          <div style="font-size:12px;color:var(--text-2);line-height:1.5;white-space:pre-wrap;max-height:220px;overflow-y:auto;background:var(--surface-3,#1a1a1a);border-radius:8px;padding:10px 12px;">${esc(r.body_text || '(no body)')}</div>
+          ${contactHtml}
+          <button onclick="dismissExtReview('${id}', this)"
+            style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:7px;padding:4px 9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);flex-shrink:0;line-height:1;"
+            title="Remove from dashboard">&times;</button>
         </div>
-        <button onclick="dismissExtReview('${esc(r.gmail_message_id)}', this)"
-          style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:7px;padding:5px 10px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);flex-shrink:0;line-height:1;"
-          title="Remove from dashboard">&times;</button>
+        <div id="extreview-body-${id}" style="display:none;margin-top:10px;font-size:12px;color:var(--text-2);line-height:1.5;white-space:pre-wrap;max-height:320px;overflow-y:auto;background:var(--surface-3,#1a1a1a);border-radius:8px;padding:10px 12px;">${esc(r.body_text || '(no body)')}</div>
       </div>`;
     }).join('');
   } catch(e) {
     document.getElementById('extreview-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load: ${esc(e.message)}</div>`;
   }
+}
+
+function toggleExtReview(id) {
+  const body = document.getElementById(`extreview-body-${id}`);
+  const caret = document.getElementById(`extreview-caret-${id}`);
+  if (!body) return;
+  const open = body.style.display !== 'none';
+  body.style.display = open ? 'none' : 'block';
+  if (caret) caret.textContent = open ? '▸' : '▾';
 }
 
 async function dismissExtReview(msgId, btn) {
