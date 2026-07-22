@@ -531,7 +531,7 @@ Key: Jocelyn
 Manager: Cara Best <cara@taboost.me>
 Gmail: Gmail - Jocelyn
 Min Rate: $800 per video
-Auto Send: no
+Auto Send: yes
 Paused: no
 
 Scenario A: Initial Inbound (Default Response)
