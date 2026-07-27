@@ -309,6 +309,36 @@ class GuardianAuditLog(Base):
     )
 
 
+class ExternalChannelReview(Base):
+    """
+    Flags inbound emails where the sender asks to continue on WhatsApp, Discord, etc.
+
+    Informational-only: never blocks triage or draft generation. Managers review these
+    and dismiss when handled. Only initial inbound / first-response threads are flagged
+    (message count <= 2 at detection time) — deep conversations are skipped.
+    """
+
+    __tablename__ = "external_channel_reviews"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    gmail_message_id: Mapped[str] = mapped_column(String(256), nullable=False, unique=True)
+    thread_id: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    talent_key: Mapped[str] = mapped_column(String(64), nullable=False)
+    sender: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    subject: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    body_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+    channel_requested: Mapped[str] = mapped_column(String(64), nullable=False)  # "WhatsApp", "Discord", "Both"
+    received_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    dismissed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime,
+        default=datetime.utcnow,
+        nullable=False,
+        server_default=text("CURRENT_TIMESTAMP"),
+    )
+
+
 class SopVersion(Base):
     """
     Persisted snapshot of sheets/sop.md after each successful docx upload.
@@ -343,19 +373,24 @@ def _make_engine():
     if _engine is None:
         settings = get_settings()
         db_url = settings.database_url.replace("postgres://", "postgresql://", 1)
-        # Peak connection demand: 1 + (5 talent workers × 4 sessions each) = ~21 for poll,
-        # + 6 for draft queue + 5 for other jobs/HTTP = ~32 peak. pool_size=10 + overflow=15
-        # gives 25 hard cap, which fits with the reduced MAX_TALENT_WORKERS=5 and
-        # MAX_CONCURRENT_EMAILS=3 in poller.py. Increasing these limits further would
-        # require Supabase connection limit audit first (free tier: ~60 concurrent).
-        _engine = create_engine(
-            db_url,
-            pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
-            max_overflow=15,    # was 10 — total cap: 25
-            pool_timeout=15,    # was 10 — extra breathing room under load
-            pool_recycle=300,
-            pool_pre_ping=True,
-        )
+        if db_url.startswith("sqlite"):
+            # SQLite (used in tests) does not support QueuePool connection-pool kwargs.
+            # Use a bare engine — StaticPool or SingletonThreadPool is fine for test isolation.
+            _engine = create_engine(db_url)
+        else:
+            # Peak connection demand: 1 + (5 talent workers × 4 sessions each) = ~21 for poll,
+            # + 6 for draft queue + 5 for other jobs/HTTP = ~32 peak. pool_size=10 + overflow=15
+            # gives 25 hard cap, which fits with the reduced MAX_TALENT_WORKERS=5 and
+            # MAX_CONCURRENT_EMAILS=3 in poller.py. Increasing these limits further would
+            # require Supabase connection limit audit first (free tier: ~60 concurrent).
+            _engine = create_engine(
+                db_url,
+                pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
+                max_overflow=15,    # was 10 — total cap: 25
+                pool_timeout=15,    # was 10 — extra breathing room under load
+                pool_recycle=300,
+                pool_pre_ping=True,
+            )
     return _engine
 
 
@@ -440,16 +475,38 @@ def create_tables():
             uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
             is_active BOOLEAN NOT NULL DEFAULT FALSE
         )""",
+        """CREATE TABLE IF NOT EXISTS external_channel_reviews (
+            id SERIAL PRIMARY KEY,
+            gmail_message_id VARCHAR(256) NOT NULL UNIQUE,
+            thread_id VARCHAR(256),
+            talent_key VARCHAR(64) NOT NULL,
+            sender VARCHAR(512),
+            subject VARCHAR(512),
+            body_text TEXT,
+            channel_requested VARCHAR(64) NOT NULL,
+            received_at TIMESTAMP,
+            dismissed BOOLEAN NOT NULL DEFAULT FALSE,
+            dismissed_at TIMESTAMP,
+            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )""",
         # NOTE: score=0 ghost-row cleanup removed from startup — it can lock processed_emails
         # on a large table and delay port binding, causing Render R10 boot timeouts.
         # This cleanup now runs inside _run_guardian() (cron.py) at +35s after startup.
     ]
+    settings = get_settings()
+    mig_url = settings.database_url.replace("postgres://", "postgresql://", 1)
+
+    if mig_url.startswith("sqlite"):
+        # SQLite (tests): Base.metadata.create_all already created the schema above.
+        # The PostgreSQL-specific DDL statements (SERIAL, IF NOT EXISTS ALTER TABLE,
+        # ALTER TYPE, NullPool connect_args) cannot run on SQLite — skip them.
+        logger.debug("SQLite detected — skipping additive migration statements.")
+        return
+
     # Dedicated NullPool migration engine — does NOT draw from the application QueuePool.
     # Each migration statement gets its own connection that is closed immediately after.
     # statement_timeout=25000ms hard-caps any single DDL so a blocked ALTER TABLE or
     # ALTER TYPE cannot hang the startup indefinitely and trigger a Render restart.
-    settings = get_settings()
-    mig_url = settings.database_url.replace("postgres://", "postgresql://", 1)
     _mig_engine = create_engine(
         mig_url,
         poolclass=NullPool,

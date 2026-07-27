@@ -7,13 +7,15 @@ import pytest
 
 
 def test_connect_page_loads(client):
-    resp = client.get("/connect?talent=Sylvia")
+    # "Jocelyn" is present in sheets/sop.md — use a real roster entry so the
+    # route's talent-key validation passes.
+    resp = client.get("/connect?talent=Jocelyn")
     assert resp.status_code == 200
     assert "text/html" in resp.headers.get("content-type", "")
 
 
 def test_connect_page_has_connect_button(client):
-    resp = client.get("/connect?talent=Sylvia")
+    resp = client.get("/connect?talent=Jocelyn")
     assert "Connect Gmail" in resp.text or "connect" in resp.text.lower()
 
 

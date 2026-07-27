@@ -166,17 +166,24 @@ def _strip_inline_formatting(text: str) -> str:
     return text
 
 
+_WORD_BRACKET_URL_RE = re.compile(r"(\w+)\s+\[(https?://[^\]]+)\]")
+
+
 def _render_email_body(body: str) -> tuple[str, str]:
     """
     Render body into (plain_text, html_text).
 
     Supports:
       [Anchor Text] (https://example.com)  → clickable link
+      WORD [https://example.com]            → same (SOP "word before bracketed URL" format)
       **bold text**                          → <strong>
       __underlined text__                    → <u>
       [b]bold[/b]  /  [ul]underline[/ul]    → same (SOP hard-coded tags)
     """
     source = body or ""
+    # Normalise "WORD [https://url]" → "[WORD](https://url)" so the main
+    # rendering loop can handle it as a standard Markdown-style link.
+    source = _WORD_BRACKET_URL_RE.sub(r"[\1](\2)", source)
     spans = list(_iter_internal_link_spans(source))
 
     plain_chunks: list[str] = []
@@ -212,7 +219,8 @@ def _render_email_body(body: str) -> tuple[str, str]:
     # remaining backslash-escapes (\_ \* …) are literal — strip so they never ship.
     plain = _unescape_markdown("".join(plain_chunks))
     html_body = _unescape_markdown("".join(html_chunks))
-    return plain, f"<div>{html_body.replace('\n', '<br>')}</div>"
+    html_body_br = html_body.replace("\n", "<br>")
+    return plain, f"<div>{html_body_br}</div>"
 
 
 def _plain_to_html(body: str) -> str:

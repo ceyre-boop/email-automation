@@ -661,12 +661,50 @@ def dismiss_external_channel_review(gmail_message_id: str, db: Session = Depends
 
 @router.post("/reset-badges")
 def reset_all_badges(db: Session = Depends(get_db)):
-    """Zero out all badge counts from now — no drafts touched, no data deleted."""
+    """
+    Hard reset: discard all pending drafts, clear inbox badge data, set a new
+    reset timestamp so post-reset counts start from zero.
+    """
     now = datetime.utcnow()
+
+    # 1. Discard all pending (non-sent) drafts.
+    pending_drafts = (
+        db.query(Draft)
+        .filter(Draft.status == DraftStatus.pending)
+        .all()
+    )
+    for draft in pending_drafts:
+        draft.status = DraftStatus.discarded
+        draft.reviewed_by = "dashboard-reset"
+        draft.reviewed_at = now
+        db.add(draft)
+    discarded_count = len(pending_drafts)
+
+    # 2. Clear triage badge data from inbox emails (score, brand, rate, etc.).
+    inbox_rows = db.query(InboxEmail).filter(InboxEmail.score.isnot(None)).all()
+    for row in inbox_rows:
+        row.score = None
+        row.brand_name = None
+        row.proposed_rate = None
+        row.offer_type = None
+        row.triage_reason = None
+        row.triage_status = None
+        db.add(row)
+    cleared_count = len(inbox_rows)
+
+    # 3. Persist the new reset timestamp.
     _set_reset_at(db, now)
     db.commit()
-    logger.info("Global badge reset at %s", now.isoformat())
-    return {"ok": True, "reset_at": now.isoformat()}
+    logger.info(
+        "Global badge reset at %s — discarded %d drafts, cleared %d inbox badges",
+        now.isoformat(), discarded_count, cleared_count,
+    )
+    return {
+        "ok": True,
+        "reset_at": now.isoformat(),
+        "discarded_drafts": discarded_count,
+        "cleared_inbox_badges": cleared_count,
+    }
 
 
 @router.post("/talents/{talent_key}/reset-badges")

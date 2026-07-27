@@ -8,10 +8,11 @@ from backend.tests.conftest import make_draft, make_token
 
 
 def test_reset_badges_clears_dashboard_counts(client, db_session):
-    make_token(db_session, talent_key="Sylvia")
-    draft = make_draft(db_session, talent_key="Sylvia")
+    # Use "Jocelyn" — a real SOP talent so dashboard report includes their row.
+    make_token(db_session, talent_key="Jocelyn")
+    draft = make_draft(db_session, talent_key="Jocelyn")
     processed = ProcessedEmail(
-        talent_key="Sylvia",
+        talent_key="Jocelyn",
         gmail_message_id="processed-msg-001",
         sender="brand@nike.com",
         subject="Partnership",
@@ -23,7 +24,7 @@ def test_reset_badges_clears_dashboard_counts(client, db_session):
         processed_at=datetime.utcnow() - timedelta(hours=1),
     )
     inbox = InboxEmail(
-        talent_key="Sylvia",
+        talent_key="Jocelyn",
         gmail_message_id="inbox-msg-001",
         sender="brand@nike.com",
         subject="Partnership",
@@ -62,26 +63,27 @@ def test_reset_badges_clears_dashboard_counts(client, db_session):
 
     report = client.get("/api/dashboard/report")
     assert report.status_code == 200
-    sylvia = next(t for t in report.json()["talents"] if t["talent_key"] == "Sylvia")
+    jocelyn = next(t for t in report.json()["talents"] if t["talent_key"] == "Jocelyn")
     assert report.json()["total_emails"] == 0
-    assert sylvia["count_good"] == 0
-    assert sylvia["pending_drafts"] == 0
-    assert sylvia["pending_real_drafts"] == 0
+    assert jocelyn["count_good"] == 0
+    assert jocelyn["pending_drafts"] == 0
+    assert jocelyn["pending_real_drafts"] == 0
 
-    drafts = client.get("/api/dashboard/talents/Sylvia/drafts")
+    drafts = client.get("/api/dashboard/talents/Jocelyn/drafts")
     assert drafts.status_code == 200
     assert drafts.json() == []
 
 
 def test_report_counts_new_activity_after_reset(client, db_session):
-    make_token(db_session, talent_key="Sylvia")
+    # Use "Jocelyn" — a real SOP talent so dashboard report includes their row.
+    make_token(db_session, talent_key="Jocelyn")
 
     reset_resp = client.post("/api/dashboard/reset-badges")
     assert reset_resp.status_code == 200
     reset_at = datetime.fromisoformat(reset_resp.json()["reset_at"])
 
     processed = ProcessedEmail(
-        talent_key="Sylvia",
+        talent_key="Jocelyn",
         gmail_message_id="processed-msg-after-reset",
         sender="brand@adidas.com",
         subject="Fresh deal",
@@ -93,7 +95,7 @@ def test_report_counts_new_activity_after_reset(client, db_session):
         processed_at=reset_at + timedelta(seconds=1),
     )
     draft = Draft(
-        talent_key="Sylvia",
+        talent_key="Jocelyn",
         gmail_message_id="draft-msg-after-reset",
         sender="brand@adidas.com",
         subject="Fresh deal",
@@ -111,11 +113,11 @@ def test_report_counts_new_activity_after_reset(client, db_session):
     report = client.get("/api/dashboard/report")
     assert report.status_code == 200
     data = report.json()
-    sylvia = next(t for t in data["talents"] if t["talent_key"] == "Sylvia")
+    jocelyn = next(t for t in data["talents"] if t["talent_key"] == "Jocelyn")
     assert data["total_good"] == 1
     assert data["total_uncertain"] == 0
     assert data["total_trash"] == 0
     assert data["total_emails"] == 1
-    assert sylvia["count_good"] == 1
-    assert sylvia["pending_drafts"] == 1
-    assert sylvia["pending_real_drafts"] == 1
+    assert jocelyn["count_good"] == 1
+    assert jocelyn["pending_drafts"] == 1
+    assert jocelyn["pending_real_drafts"] == 1

@@ -11,20 +11,27 @@ from backend.core.config import get_settings
 
 def test_settings_loads():
     s = get_settings()
-    assert s.google_client_id == "test-client-id"
-    assert s.openai_api_key == "test-openai-key"
+    # Env vars are loaded (non-empty) — exact values depend on CI vs local env.
+    assert isinstance(s.google_client_id, str) and len(s.google_client_id) > 0
+    assert isinstance(s.openai_api_key, str) and len(s.openai_api_key) > 0
 
 
-def test_app_config_has_talents():
+def test_talent_profiles_loads():
+    """Talent roster is sourced from sop.md (not settings.json since SOP Manager v2)."""
     s = get_settings()
-    cfg = s.app_config
-    assert "talents" in cfg
-    assert len(cfg["talents"]) > 0
+    profiles = s.talent_profiles
+    assert isinstance(profiles, dict)
+    assert len(profiles) >= 5, f"Expected at least 5 talent profiles, got {len(profiles)}"
+    # All keys should be non-empty strings
+    for key, profile in profiles.items():
+        assert isinstance(key, str) and len(key) > 0, f"Bad profile key: {key!r}"
+        assert profile.full_name, f"Profile {key!r} has no full_name"
 
 
-def test_talent_keys_are_strings():
+def test_talent_list_has_correct_shape():
+    """talent_list bridges sop.md profiles → legacy dict shape for dashboard code."""
     s = get_settings()
-    for talent in s.app_config["talents"]:
+    for talent in s.talent_list:
         assert isinstance(talent["key"], str)
         assert len(talent["key"]) > 0
 
@@ -33,9 +40,9 @@ def test_sop_data_loads():
     s = get_settings()
     sop = s.sop_data
     assert isinstance(sop, dict)
-    # At least one talent should have rules
-    all_rules = [t for t in sop.values() if t.get("rules")]
-    assert len(all_rules) > 0
+    # sop_data.json entries are dicts; _generated is a metadata string — skip it.
+    talent_entries = {k: v for k, v in sop.items() if isinstance(v, dict)}
+    assert len(talent_entries) > 0, "sop_data.json should have at least one talent entry"
 
 
 def test_confidence_policy_loads():

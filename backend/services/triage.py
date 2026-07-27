@@ -83,9 +83,14 @@ def _build_triage_messages(
     sender: str,
     sender_domain: str,
     body: str,
+    rate_note: str = "",
 ) -> list[dict]:
     """Parse the triage.md prompt and fill in template variables."""
     system_text, user_template = _get_triage_sections()
+
+    # Replace {{TALENT_NAME}} in the system section too — it appears there for
+    # self-forward detection ("sender name matches {{TALENT_NAME}}").
+    system_text = system_text.replace("{{TALENT_NAME}}", talent_name)
 
     user_text = (
         user_template
@@ -96,6 +101,9 @@ def _build_triage_messages(
         .replace("{{SENDER_DOMAIN}}", sender_domain)
         .replace("{{EMAIL_BODY}}", body[:2000])
     )
+
+    if rate_note:
+        user_text += f"\n\nSPECIAL RATE NOTE: {rate_note}"
 
     return [
         {"role": "system", "content": system_text},
@@ -113,7 +121,21 @@ def _apply_special_routing(
     policy: dict,
     brand_name: str = "",
 ) -> int:
-    """All talent-specific routing lives in the SOP (sheets/sop.md), not here."""
+    """Apply per-talent score overrides that can't be expressed in the SOP text."""
+    key_lower = talent_key.lower()
+    offer_lower = (offer_type or "").lower()
+
+    # Trin: affiliate/commission-only offer with no cash rate → downgrade to Score 1.
+    # We never reply to pure commission deals for Trin; a $0 proposed_rate confirms
+    # GPT couldn't find a dollar amount, making it a commission-only offer.
+    if key_lower == "trin" and "commission" in offer_lower and proposed_rate == 0.0:
+        return 1
+
+    # Michaela: rate above zero but below $1,000 floor → downgrade to Score 1.
+    # proposed_rate==0 means "unknown" — we don't override in that case.
+    if key_lower == "michaela" and 0 < proposed_rate < 1000:
+        return 1
+
     return score
 
 
@@ -264,6 +286,17 @@ def triage_email(
             "alternatives_considered": "Auto-sender pre-filter — no GPT call made.",
         }
 
+    # Inject a SPECIAL RATE NOTE for per-hour talents so GPT knows to evaluate
+    # proposals in aggregate hours, not per-post rates.
+    rate_note = ""
+    if _profile and "hour" in (_profile.rate_unit or "").lower():
+        rate_note = (
+            f"This talent charges per hour (minimum ${int(minimum_rate)} per hour). "
+            "Evaluate proposals in terms of total hours, not per-post rates — "
+            "a multi-hour activation may clear the minimum even if the per-post "
+            "rate seems low."
+        )
+
     messages = _build_triage_messages(
         talent_name=talent_name,
         minimum_rate=minimum_rate,
@@ -271,6 +304,7 @@ def triage_email(
         sender=sender,
         sender_domain=sender_domain,
         body=body,
+        rate_note=rate_note,
     )
 
     client = OpenAI(api_key=settings.openai_api_key)
@@ -326,7 +360,7 @@ def triage_email(
         logger.warning("Invalid score %r for %s — routing to Score 2", score, talent_key)
         return _fallback(talent_key, f"invalid score value: {score}")
 
-    proposed_rate = 0.0
+    proposed_rate = float(result.get("proposed_rate_usd") or 0.0)
     offer_type = str(result.get("offer_type", "Unknown"))
     brand_name = str(result.get("brand_name", "") or "")
 
@@ -353,7 +387,7 @@ def triage_email(
         "score": score,
         "reason": result.get("reason", ""),
         "offer_type": offer_type,
-        "proposed_rate_usd": 0.0,
+        "proposed_rate_usd": proposed_rate,
         "brand_name": brand_name,
         "sentiment_score": _clamp_score(result.get("sentiment_score"), 5),
         "urgency_score": _clamp_score(result.get("urgency_score"), 0),

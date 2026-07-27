@@ -40,13 +40,15 @@ def test_status_shows_not_connected_by_default(client):
 
 
 def test_status_shows_connected_talent(client, db_session):
-    make_token(db_session, talent_key="Sylvia")
+    # "Jocelyn" is in sheets/sop.md; /api/status builds its list from sop.md
+    # so only real SOP talent keys can appear as connected.
+    make_token(db_session, talent_key="Jocelyn", email="jocelyn@example.com")
     resp = client.get("/api/status")
     data = resp.json()
-    sylvia = next((t for t in data["talents"] if t["key"] == "Sylvia"), None)
-    assert sylvia is not None
-    assert sylvia["connected"] is True
-    assert sylvia["email"] == "sylvia@gmail.com"
+    jocelyn = next((t for t in data["talents"] if t["key"] == "Jocelyn"), None)
+    assert jocelyn is not None
+    assert jocelyn["connected"] is True
+    assert jocelyn["email"] == "jocelyn@example.com"
 
 
 def test_status_pending_drafts_count(client, db_session):

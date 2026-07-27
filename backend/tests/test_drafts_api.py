@@ -161,8 +161,12 @@ def test_discard_already_sent_rejected(client, db_session):
 
 # ── POST /api/drafts/{id}/approve ─────────────────────────────────────────────
 
-@patch("backend.routers.drafts.gmail_svc.send_reply", return_value=True)
-def test_approve_draft_success(mock_send, client, db_session):
+@patch("backend.services.validation.run_pre_send_checks", return_value=(True, None))
+@patch("backend.routers.drafts.gmail_svc.send_reply", return_value=(True, ""))
+def test_approve_draft_success(mock_send, mock_checks, client, db_session):
+    # run_pre_send_checks is patched: test focuses on the approve flow,
+    # not on validation (which uses the real SOP talent roster and would
+    # reject the synthetic "Sylvia" test talent).
     make_token(db_session)
     draft = make_draft(db_session)
 
@@ -176,8 +180,9 @@ def test_approve_draft_success(mock_send, client, db_session):
     mock_send.assert_called_once()
 
 
-@patch("backend.routers.drafts.gmail_svc.send_reply", return_value=False)
-def test_approve_draft_gmail_failure(mock_send, client, db_session):
+@patch("backend.services.validation.run_pre_send_checks", return_value=(True, None))
+@patch("backend.routers.drafts.gmail_svc.send_reply", return_value=(False, "Gmail API error"))
+def test_approve_draft_gmail_failure(mock_send, mock_checks, client, db_session):
     make_token(db_session)
     draft = make_draft(db_session)
 
@@ -208,9 +213,10 @@ def test_approve_no_active_token(client, db_session):
     assert resp.status_code == 404
 
 
-@patch("backend.routers.drafts.gmail_svc.send_reply", return_value=True)
+@patch("backend.services.validation.run_pre_send_checks", return_value=(True, None))
+@patch("backend.routers.drafts.gmail_svc.send_reply", return_value=(True, ""))
 @patch("backend.routers.drafts.gmail_svc.delete_gmail_draft")
-def test_approve_deletes_gmail_draft_copy(mock_delete, mock_send, client, db_session):
+def test_approve_deletes_gmail_draft_copy(mock_delete, mock_send, mock_checks, client, db_session):
     make_token(db_session)
     draft = make_draft(db_session, gmail_draft_id="gmail-draft-abc")
 

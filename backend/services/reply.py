@@ -221,40 +221,51 @@ def _deterministic_initial_or_counter_reply(
 ) -> str | None:
     """
     Return the verbatim SOP approved response for common scenarios — no GPT involved.
-    Covers: rates inquiry (default), below-minimum counter.
-    Returns None to fall through to GPT for anything else.
+    Covers: rates inquiries / no-offer → Scenario A; below-minimum genuine offers → Counter.
+    Returns None for adequate offers (rate >= minimum) so GPT handles them.
+
+    Decision tree:
+    1. Inquiry signals in triage_reason/body OR proposed_rate == 0 → Scenario A (initial rates)
+    2. 0 < proposed_rate < minimum_rate AND not an inquiry → Counter scenario, then Scenario A
+    3. proposed_rate >= minimum_rate → None (fall through to GPT)
     """
     talent_section = _get_talent_section_raw(talent_name)
     if not talent_section:
         return None
 
     triage_lower = (triage_reason or "").lower()
+    subject_lower = (subject or "").lower()
     body_lower = (body_text or "")[:500].lower()
 
-    # Always try Scenario A first — it is the default and only approved path for all
-    # current SOPs. A non-zero proposed_rate must NOT gate this lookup; the rate value
-    # has been corrupting drafts by causing this block to be skipped entirely.
-    response = _extract_approved_response(talent_section, "⭐ DEFAULT")
-    if response:
-        return response
-    response = _extract_approved_response(talent_section, "Scenario A")
-    if response:
-        return response
+    # Step 1 — detect rate inquiries.
+    # A zero proposed_rate means triage found no dollar amount → treat as inquiry.
+    is_inquiry = (
+        proposed_rate == 0.0
+        or any(sig in triage_lower for sig in _INQUIRY_SIGNALS)
+        or any(sig in subject_lower for sig in _INQUIRY_EMAIL_SIGNALS)
+        or any(sig in body_lower for sig in _INQUIRY_EMAIL_SIGNALS)
+    )
 
-    # Rate-based paths — only reached if SOP has no Scenario A (e.g. future counter-offer SOPs).
-    adequate_threshold = _extract_adequate_threshold(talent_section)
-    if adequate_threshold and proposed_rate and float(proposed_rate) > adequate_threshold:
-        response = _extract_approved_response(talent_section, "Adequate", strip_cc=False)
+    if is_inquiry:
+        # Rate inquiry or no-offer → send initial response
+        response = _extract_approved_response(talent_section, "⭐ DEFAULT")
         if response:
             return response
+        return _extract_approved_response(talent_section, "Scenario A")
 
-    # Below-minimum counter offer
-    if proposed_rate and 0 < proposed_rate < minimum_rate:
+    # Step 2 — genuine below-minimum offer (not an inquiry)
+    if 0 < proposed_rate < minimum_rate:
         for marker in ("Counter", "Below", "below minimum", "lower"):
             response = _extract_approved_response(talent_section, marker)
             if response:
                 return response
+        # No counter scenario defined — fall back to initial rates response
+        response = _extract_approved_response(talent_section, "⭐ DEFAULT")
+        if response:
+            return response
+        return _extract_approved_response(talent_section, "Scenario A")
 
+    # Step 3 — adequate offer (rate >= minimum) → GPT handles it
     return None
 
 # Keywords in the triage reason that indicate the brand is *asking* for rates,
@@ -541,20 +552,10 @@ def draft_reply(
         lines.pop()
     text = "\n".join(lines).strip()
 
-    # Check if GPT decided to escalate — try Scenario A before giving up
+    # Check if GPT decided to escalate
     if text.upper().startswith(_ESCALATE_PREFIX.upper()):
         reason = text[len(_ESCALATE_PREFIX):].strip()
-        logger.info("GPT escalated for %s (%s) — trying Scenario A fallback", talent_key, reason)
-        talent_section = _get_talent_section_raw(talent_name)
-        if talent_section:
-            fallback = (
-                _extract_approved_response(talent_section, "⭐ DEFAULT")
-                or _extract_approved_response(talent_section, "Scenario A")
-            )
-            if fallback:
-                logger.info("draft_reply: Scenario A fallback used for %s", talent_key)
-                cc, clean = _extract_cc_from_draft(fallback)
-                return {"draft_text": clean, "is_escalate": False, "escalate_reason": None, "cc_recipients": cc}
+        logger.info("GPT escalated for %s: %s", talent_key, reason)
         return _escalate_result(reason)
 
     cc, text = _extract_cc_from_draft(text)

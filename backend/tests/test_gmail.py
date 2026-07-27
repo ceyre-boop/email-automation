@@ -89,7 +89,9 @@ def test_render_email_body_converts_internal_link_format():
     plain, html = _render_email_body("See media kit HERE [https://taboost.my.canva.site/sylvia].")
     assert plain == "See media kit HERE."
     assert "[https://taboost.my.canva.site/sylvia]" not in plain
-    assert "See media kit HERE" in html
+    # HTML splits surrounding text and anchor across the <a> tag, so check both separately.
+    assert "See media kit" in html
+    assert ">HERE<" in html
     assert 'href="https://taboost.my.canva.site/sylvia"' in html
     assert "[https://taboost.my.canva.site/sylvia]" not in html
 
@@ -150,7 +152,9 @@ def test_create_draft_renders_internal_links_as_anchor_text(mock_build, mock_cre
     assert "[https://taboost.my.canva.site/sylvia]" not in parts["text/plain"]
     assert parts["text/plain"].strip() == "Media kit HERE"
     assert 'href="https://taboost.my.canva.site/sylvia"' in parts["text/html"]
-    assert "Media kit HERE" in parts["text/html"]
+    # HTML renders as "Media kit <a href=...>HERE</a>" — text and anchor are not contiguous.
+    assert "Media kit" in parts["text/html"]
+    assert ">HERE<" in parts["text/html"]
 
 
 @patch("backend.services.gmail.refresh_if_needed")
@@ -267,9 +271,9 @@ def test_create_draft_threads_correctly(mock_build, mock_creds, mock_refresh):
 @patch("backend.services.gmail.refresh_if_needed")
 @patch("backend.services.gmail.credentials_from_token_row")
 @patch("backend.services.gmail.build")
-def test_create_draft_returns_none_on_http_error(mock_build, mock_creds, mock_refresh):
+def test_create_draft_raises_on_http_error(mock_build, mock_creds, mock_refresh):
     from googleapiclient.errors import HttpError
-    from backend.services.gmail import create_gmail_draft
+    from backend.services.gmail import GmailDraftError, create_gmail_draft
 
     fake_svc = _mock_service()
     mock_build.return_value = fake_svc
@@ -280,15 +284,14 @@ def test_create_draft_returns_none_on_http_error(mock_build, mock_creds, mock_re
     resp_mock.status = 403
     fake_svc.users().drafts().create().execute.side_effect = HttpError(resp_mock, b"Forbidden")
 
-    result = create_gmail_draft(
-        token_row=_make_token(),
-        thread_id="t1",
-        reply_to="x@brand.com",
-        subject="Test",
-        body="Body",
-    )
-
-    assert result is None
+    with pytest.raises(GmailDraftError):
+        create_gmail_draft(
+            token_row=_make_token(),
+            thread_id="t1",
+            reply_to="x@brand.com",
+            subject="Test",
+            body="Body",
+        )
 
 
 # ── list_gmail_drafts ─────────────────────────────────────────────────────────
@@ -480,7 +483,7 @@ def test_send_reply_builds_correct_mime(mock_build, mock_creds, mock_refresh):
         body="Thanks for reaching out!",
     )
 
-    assert result is True
+    assert result == (True, "")
     send_call = fake_svc.users().messages().send
     body_arg = send_call.call_args[1]["body"]
     assert body_arg["threadId"] == "thread-999"

@@ -15,7 +15,7 @@ from backend.tests.conftest import make_token
 _TEST_STATE = "test-csrf-state-token"
 
 
-def _insert_state(db_session, talent_key: str = "Sylvia") -> str:
+def _insert_state(db_session, talent_key: str = "Jocelyn") -> str:
     """Pre-insert an OAuthState row so the callback CSRF check passes."""
     db_session.add(OAuthState(state=_TEST_STATE, pinned_talent_key=talent_key))
     db_session.commit()
@@ -25,17 +25,20 @@ def _insert_state(db_session, talent_key: str = "Sylvia") -> str:
 # ── GET /auth/connect ─────────────────────────────────────────────────────────
 
 def test_connect_redirects_to_google(client):
-    """Should 307-redirect to accounts.google.com."""
-    resp = client.get("/auth/connect?talent_key=Sylvia", follow_redirects=False)
+    """Should 307-redirect to accounts.google.com.
+    Uses "Jocelyn" — a talent that exists in sheets/sop.md so the route's
+    talent-key validation passes.
+    """
+    resp = client.get("/auth/connect?talent_key=Jocelyn", follow_redirects=False)
     assert resp.status_code in (307, 302)
     location = resp.headers.get("location", "")
     assert "accounts.google.com" in location or "google.com" in location
 
 
 def test_connect_encodes_talent_key_in_state(client):
-    resp = client.get("/auth/connect?talent_key=Sylvia", follow_redirects=False)
+    resp = client.get("/auth/connect?talent_key=Jocelyn", follow_redirects=False)
     location = resp.headers.get("location", "")
-    assert "Sylvia" in location or "state=" in location
+    assert "Jocelyn" in location or "state=" in location
 
 
 def test_connect_unknown_talent_returns_404(client):
@@ -60,12 +63,14 @@ def _mock_exchange_code_result():
 
 
 def _mock_userinfo_response():
+    # "Jocelyn" maps to a real talent in sop.md; state is pinned to "Jocelyn"
+    # so the callback uses the pinned key rather than deriving one from the name.
     mock_resp = MagicMock()
     mock_resp.raise_for_status.return_value = None
     mock_resp.json.return_value = {
-        "email": "sylvia@gmail.com",
+        "email": "jocelyn@example.com",
         "sub": "google-uid-123",
-        "name": "Sylvia",
+        "name": "Jocelyn Chardon",
     }
     return mock_resp
 
@@ -73,7 +78,7 @@ def _mock_userinfo_response():
 @patch("backend.routers.auth.requests.get")
 @patch("backend.routers.auth.exchange_code")
 def test_callback_stores_new_token(mock_exchange, mock_get, client, db_session):
-    _insert_state(db_session)
+    _insert_state(db_session)  # pinned to "Jocelyn"
     mock_exchange.return_value = _mock_exchange_code_result()
     mock_get.return_value = _mock_userinfo_response()
 
@@ -81,9 +86,9 @@ def test_callback_stores_new_token(mock_exchange, mock_get, client, db_session):
     assert resp.status_code == 200
     assert "connected" in resp.text.lower() or "✅" in resp.text
 
-    row = db_session.query(TalentToken).filter(TalentToken.talent_key == "Sylvia").first()
+    row = db_session.query(TalentToken).filter(TalentToken.talent_key == "Jocelyn").first()
     assert row is not None
-    assert row.email == "sylvia@gmail.com"
+    assert row.email == "jocelyn@example.com"
     assert row.access_token == "ya29.test-access-token"
     assert row.active is True
 
@@ -91,8 +96,8 @@ def test_callback_stores_new_token(mock_exchange, mock_get, client, db_session):
 @patch("backend.routers.auth.requests.get")
 @patch("backend.routers.auth.exchange_code")
 def test_callback_updates_existing_token(mock_exchange, mock_get, client, db_session):
-    make_token(db_session, talent_key="Sylvia")
-    _insert_state(db_session)
+    make_token(db_session, talent_key="Jocelyn")
+    _insert_state(db_session)  # pinned to "Jocelyn"
 
     mock_exchange.return_value = {
         "access_token": "ya29.new-token",
@@ -105,7 +110,7 @@ def test_callback_updates_existing_token(mock_exchange, mock_get, client, db_ses
     assert resp.status_code == 200
 
     db_session.expire_all()
-    row = db_session.query(TalentToken).filter(TalentToken.talent_key == "Sylvia").first()
+    row = db_session.query(TalentToken).filter(TalentToken.talent_key == "Jocelyn").first()
     assert row.access_token == "ya29.new-token"
 
 
@@ -136,7 +141,7 @@ def test_callback_success_page_shows_talent_name(mock_exchange, mock_get, client
     resp = client.get(f"/auth/callback?code=test-code&state={_TEST_STATE}")
     assert resp.status_code == 200
     # Talent full_name from settings.json should appear in the HTML
-    assert "<strong>" in resp.text or "Sylvia" in resp.text
+    assert "<strong>" in resp.text or "Jocelyn" in resp.text
 
 
 @patch("backend.routers.auth.requests.get")

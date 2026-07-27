@@ -26,7 +26,7 @@ os.environ.setdefault("AGENCY_SECRET_KEY", "test-secret")
 
 from backend.core.config import get_settings
 from backend.models.db import Base, Draft, DraftStatus, EmailStatus, ProcessedEmail, TalentToken
-from backend.routers.deps import get_db
+from backend.routers.deps import get_db, verify_api_key
 
 
 # ── SQLite in-memory DB fixture ───────────────────────────────────────────────
@@ -53,10 +53,16 @@ def db_session(db_engine):
 
 @pytest.fixture(scope="function")
 def client(db_session):
-    """FastAPI TestClient with DB overridden to use in-memory SQLite."""
+    """FastAPI TestClient with DB overridden to use in-memory SQLite.
+
+    Also bypasses verify_api_key — tests focus on business logic, not auth.
+    Individual tests that need to test auth can override this via autouse fixtures
+    (see test_external_channel_api.py for an example).
+    """
     from backend.main import app
 
     app.dependency_overrides[get_db] = lambda: db_session
+    app.dependency_overrides[verify_api_key] = lambda: None
     with TestClient(app, raise_server_exceptions=True) as c:
         yield c
     app.dependency_overrides.clear()
@@ -64,10 +70,10 @@ def client(db_session):
 
 # ── Helper factories ───────────────────────────────────────────────────────────
 
-def make_token(db_session, talent_key: str = "Sylvia", active: bool = True) -> TalentToken:
+def make_token(db_session, talent_key: str = "Sylvia", active: bool = True, email: str | None = None) -> TalentToken:
     token = TalentToken(
         talent_key=talent_key,
-        email=f"{talent_key.lower()}@gmail.com",
+        email=email or f"{talent_key.lower()}@gmail.com",
         access_token="fake-access-token",
         refresh_token="fake-refresh-token",
         token_expiry=datetime.utcnow() + timedelta(hours=1),
