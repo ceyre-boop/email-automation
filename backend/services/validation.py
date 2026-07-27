@@ -56,6 +56,18 @@ def run_pre_send_checks(draft: Draft, db: Session) -> tuple[bool, str | None]:
     if re.search(r'(?i)^cc\s*:', body, re.MULTILINE):
         return False, "Draft body contains a 'CC:' line — CC must be in cc_recipients field, not the body"
 
+    # Check 3 — verbatim SOP gate at send time (skipped for human-edited drafts)
+    # A human-edited draft intentionally deviates from the SOP template (e.g. manager
+    # added context) — the edit action itself is the approval signal, so we skip this gate.
+    # For AI-generated drafts we enforce word-for-word SOP compliance right up until send.
+    if not getattr(draft, "human_edited", False):
+        talent_name = _key_to_name(draft.talent_key)
+        if talent_name:
+            from backend.services.reply import enforce_verbatim_response
+            verbatim_err = enforce_verbatim_response(talent_name, body)
+            if verbatim_err:
+                return False, f"Verbatim SOP check failed at send time: {verbatim_err}"
+
     # Check 5 — talent match (source from sop.md profiles, not settings.json talents[])
     known_keys = {k.lower() for k in get_settings().talent_profiles}
     if known_keys and draft.talent_key.lower() not in known_keys:
