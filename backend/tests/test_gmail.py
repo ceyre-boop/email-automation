@@ -584,3 +584,63 @@ def test_thread_has_prior_sent_reply_returns_false_on_api_error():
     fake_svc.users().threads().get().execute.side_effect = Exception("Connection refused")
 
     assert thread_has_prior_sent_reply(fake_svc, "thread-err") is False
+
+
+# ── Reply-To routing (SOP v15 Rule 12) ───────────────────────────────────────
+
+
+@patch("backend.services.gmail.refresh_if_needed")
+@patch("backend.services.gmail.credentials_from_token_row")
+@patch("backend.services.gmail.build")
+def test_create_draft_sets_reply_to_for_routed_inbox(mock_build, mock_creds, mock_refresh):
+    from backend.services.gmail import create_gmail_draft
+
+    token = _make_token()
+    token.email = "allee@taboost.me"
+    svc = _mock_service()
+    svc.users().drafts().create().execute.return_value = {"id": "d1"}
+    mock_build.return_value = svc
+
+    create_gmail_draft(token, "t1", "brand@example.com", "Collab", "Hi!")
+
+    raw = svc.users().drafts().create.call_args.kwargs["body"]["message"]["raw"]
+    msg = _decode_raw(raw)
+    assert msg["Reply-To"] == "talent-mgmt@taboost.me"
+
+
+@patch("backend.services.gmail.refresh_if_needed")
+@patch("backend.services.gmail.credentials_from_token_row")
+@patch("backend.services.gmail.build")
+def test_create_draft_no_reply_to_for_unrouted_inbox(mock_build, mock_creds, mock_refresh):
+    from backend.services.gmail import create_gmail_draft
+
+    token = _make_token()
+    token.email = "katrina@taboost.me"  # not on the routing list
+    svc = _mock_service()
+    svc.users().drafts().create().execute.return_value = {"id": "d1"}
+    mock_build.return_value = svc
+
+    create_gmail_draft(token, "t1", "brand@example.com", "Collab", "Hi!")
+
+    raw = svc.users().drafts().create.call_args.kwargs["body"]["message"]["raw"]
+    msg = _decode_raw(raw)
+    assert msg["Reply-To"] is None
+
+
+@patch("backend.services.gmail.refresh_if_needed")
+@patch("backend.services.gmail.credentials_from_token_row")
+@patch("backend.services.gmail.build")
+def test_send_reply_sets_reply_to_for_routed_inbox(mock_build, mock_creds, mock_refresh):
+    from backend.services.gmail import send_reply
+
+    token = _make_token()
+    token.email = "Joceyln@Taboost.me"  # case-insensitive match
+    svc = _mock_service()
+    svc.users().messages().send().execute.return_value = {}
+    mock_build.return_value = svc
+
+    send_reply(token, "t1", "brand@example.com", "Collab", "Hi!")
+
+    raw = svc.users().messages().send.call_args.kwargs["body"]["raw"]
+    msg = _decode_raw(raw)
+    assert msg["Reply-To"] == "talent-mgmt@taboost.me"

@@ -46,6 +46,24 @@ def _safe_address(addr_str: str) -> str:
     return formataddr((name, addr)) if name else addr
 
 
+def _reply_to_header(token_row) -> str | None:
+    """SOP v15 Rule 12: return the consolidated Reply-To address if this talent's
+    inbox is on the approved routing list (config/settings.json reply_to_routing),
+    else None. Header-only routing — never referenced in email bodies."""
+    try:
+        from backend.core.config import get_settings
+
+        routing = get_settings().app_config.get("reply_to_routing") or {}
+        inboxes = [str(a).lower().strip() for a in routing.get("inboxes", [])]
+        inbox_email = (getattr(token_row, "email", "") or "").lower().strip()
+        if inbox_email and inbox_email in inboxes:
+            return routing.get("reply_to_address") or None
+    except Exception as exc:  # routing must never break drafting
+        logger.warning("Reply-To routing lookup failed for %s: %s",
+                       getattr(token_row, "talent_key", "?"), exc)
+    return None
+
+
 _RAW_URL_RE = re.compile(r"(https?://[^\s<>\"]+[^\s<>\".,;!?)])")
 
 
@@ -709,6 +727,9 @@ def create_gmail_draft(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
+    _rt = _reply_to_header(token_row)
+    if _rt:
+        mime_msg["Reply-To"] = _rt
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
         mime_msg["References"] = in_reply_to
@@ -764,6 +785,9 @@ def send_reply(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
+    _rt = _reply_to_header(token_row)
+    if _rt:
+        mime_msg["Reply-To"] = _rt
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
         mime_msg["References"] = in_reply_to

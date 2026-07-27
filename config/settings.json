@@ -108,5 +108,17 @@
     "_sender_talent_key_comment": "Talent whose Gmail OAuth token is used to send Guardian alert emails. Must have an active token in the DB.",
     "recovery_wait_minutes": 30,
     "recovery_health_threshold": 0.7
+  },
+  "reply_to_routing": {
+    "_comment": "SOP v15 Rule 12 — set the Reply-To HEADER on drafts/replies for these talent inboxes ONLY. Routing instruction only: never added to the email body, never mentioned in the draft, From address unchanged. Inboxes not listed get no Reply-To.",
+    "reply_to_address": "talent-mgmt@taboost.me",
+    "inboxes": [
+      "allee@taboost.me",
+      "lizz@taboost.me",
+      "angela@taboost.me",
+      "alana@taboost.me",
+      "stephanie@taboost.me",
+      "joceyln@taboost.me"
+    ]
   }
 }
