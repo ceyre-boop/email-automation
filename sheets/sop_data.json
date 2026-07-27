@@ -1,282 +1,79 @@
 {
-  "Sylvia": {
-    "full_name": "Sylvia Van Hoeven",
-    "manager": "Cara Best",
-    "manager_email": "cara@taboost.me",
-    "category": "Beauty/Fashion",
-    "min_rate_usd": 1000,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": [
-      {
-        "scenario": "A",
-        "label": "Initial Inbound (Default Response)",
-        "trigger": "Asking for rates or a potential to collab\nAll other general inquiries",
-        "use_when": [
-          "Asking for rates or a potential to collab",
-          "All other general inquiries"
-        ],
-        "do_not_use_when": [
-          "An exact match from scenario below"
-        ],
-        "response": "Thank you so much for reaching out about a potential partnership with Sylvia!! I’m happy to share her media kit HERE [https://taboost.my.canva.site/sylvia] + rates below:\n• 1 TikTok [https://www.tiktok.com/@sylviavanhoevenbeauty] (beauty): $2,000\n• 1 TikTok [https://www.tiktok.com/@sylviavanhoeven] (fashion): $1,000\n• 1 IG Reel [https://www.instagram.com/sylviavanhoeven]: $850\n• 1 UGC Video: $1,500 (usage to be negotiated)\n\nSylvia's pricing reflects her high quality content that performs super well organically + with spark ads/boosting!! Consistently her TikTok beauty account drives 300k GMV monthly & her fashion tiktok account has a cult following of over 690k followers!\n\nPlease let us know what account you'd like her to post on in your offer + if you have any questions moving forward. We’d love to explore working together!",
-        "cc": null,
-        "is_default": true
-      },
-      {
-        "scenario": "C",
-        "label": "Initial Inbound (Adequate Offer)",
-        "trigger": "Initially offered a rate that is OVER $1,500 for one post",
-        "use_when": [
-          "Initially offered a rate that is OVER $1,500 for one post"
-        ],
-        "do_not_use_when": [
-          "An explicit offer of the above rate is not specified"
-        ],
-        "response": "Email Draft: CC cara@taboost.me\nHi,\n\nThank you for the offer! I think this collab could be a good fit for Sylvia [https://www.tiktok.com/@sylviavanhoevenbeauty]. Looping in her management team who can move forward with this convo!",
-        "cc": "cara@taboost.me",
-        "is_default": false
-      }
-    ]
-  },
-  "Trin": {
-    "full_name": "Trinity Blair",
-    "manager": "Chenni Li",
-    "category": "Lifestyle",
-    "min_rate_usd": 2000,
-    "rate_unit": "per video",
-    "rules": [
-      {
-        "scenario": "A",
-        "label": "Initial Inbound (Default Response)",
-        "trigger": "Asking for rates or a potential to collab\nAll other general inquiries",
-        "use_when": [
-          "Asking for rates or a potential to collab",
-          "All other general inquiries"
-        ],
-        "do_not_use_when": [
-          "An exact match from scenario below"
-        ],
-        "response": "Thank you so much for reaching out about a potential partnership with Trinity!! I’m happy to share her media kit HERE [https://taboost.my.canva.site/trinity] + rates below:\n• 1 TikTok [https://www.tiktok.com/@trinity.blair]: $4,000\n• 1 IG Reel [https://www.instagram.com/trinyxo]: $2,000\n• Podcast [https://open.spotify.com/show/5j2Sagld5jGiJibHlXUohQ?si=330cd6a1acc54cbf] Feature: $1,500\n• 1 UGC Video: $1,500 (usage to be negotiated)\n\nTrinity's pricing reflects her 3.4M followers + high engagement rate. She has a cult following always asking her for suggestions, recommendations, and advice via TikTok, her Podcast, Snapchat, and IG!!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We’d love to explore working together!",
-        "cc": null,
-        "is_default": true
-      },
-      {
-        "scenario": "C",
-        "label": "Initial Inbound (Adequate Offer)",
-        "trigger": "Initially offered a rate that is OVER $600 for one post",
-        "use_when": [
-          "Initially offered a rate that is OVER $600 for one post"
-        ],
-        "do_not_use_when": [
-          "An explicit offer of the above rate is not specified"
-        ],
-        "response": "Email Draft: CC chenni@taboost.me\nHi,\n\nThank you for the offer! I think this collab could be a good fit for Trinity [https://www.tiktok.com/@trinity.blair]. Looping in her management team who can move forward with this convo!",
-        "cc": "chenni@taboost.me",
-        "is_default": false
-      }
-    ],
-    "sop_status": "approved",
-    "manager_email": "chenni@taboost.me"
-  },
-  "Britt": {
-    "full_name": "Brittanie Hammer",
-    "manager": "Chenni",
-    "category": "Home/Living",
-    "min_rate_usd": 900,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "pending"
-  },
-  "Allee": {
-    "full_name": "Allee Baray",
-    "manager": "Chenni",
-    "category": "Fashion",
-    "min_rate_usd": 650,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "pending"
-  },
   "Katrina": {
     "full_name": "Katrina Moore",
-    "manager": "Chenni Li",
-    "manager_email": "chenni@taboost.me",
-    "category": "Fashion",
-    "min_rate_usd": 300,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": [
-      {
-        "scenario": "A",
-        "label": "Initial Inbound (Default Response)",
-        "trigger": "Asking for rates or a potential to collab\nAll other general inquiries",
-        "use_when": [
-          "Asking for rates or a potential to collab",
-          "All other general inquiries"
-        ],
-        "do_not_use_when": [
-          "An exact match from scenario below"
-        ],
-        "response": "Thanks for reaching out about working with Katrina!\n[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.\n\nPlease let me know if there are any additional creators you’d like to explore, and I’d be happy to provide their specific rates.\nLooking forward to hearing your thoughts!",
-        "cc": null,
-        "is_default": true
-      }
-    ]
-  },
-  "Jenn": {
-    "full_name": "Jenn Lyles",
-    "manager": "Chenni",
-    "category": "Fashion",
-    "min_rate_usd": 500,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "approved"
-  },
-  "Angela": {
-    "full_name": "Angela Callisto",
-    "manager": "Chenni",
-    "category": "Fashion",
-    "min_rate_usd": 750,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "approved"
-  },
-  "Colleen": {
-    "full_name": "Colleen Fusco",
-    "manager": "Cara",
-    "category": "Beauty",
-    "min_rate_usd": 800,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "pending"
-  },
-  "Alana": {
-    "full_name": "Alana Calviello",
-    "manager": "Nicole",
-    "category": "Fashion",
-    "min_rate_usd": 400,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "pending"
-  },
-  "Grayson": {
-    "full_name": "Grayson Finks",
-    "manager": "Nicole",
-    "category": "Fashion",
-    "min_rate_usd": 750,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "approved"
-  },
-  "Kylika": {
-    "full_name": "Kylika Miller",
-    "manager": "Nicole",
-    "category": "Beauty",
-    "min_rate_usd": 750,
-    "rate_unit": "per video",
-    "rules": [],
     "sop_status": "approved"
   },
   "Anastasiya": {
     "full_name": "Anastasiya Ray",
-    "manager": "Cara Best",
-    "manager_email": "cara@taboost.me",
-    "category": "Beauty/Fashion",
-    "min_rate_usd": 750,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": []
-  },
-  "Michaela": {
-    "full_name": "Michaela",
-    "manager": "Cara",
-    "category": "Fashion/Beauty",
-    "min_rate_usd": 3500,
-    "rate_unit": "per video",
-    "rules": [],
-    "sop_status": "pending"
-  },
-  "Skyler": {
-    "full_name": "Skyler Clark",
-    "manager": "",
-    "category": "TBD",
-    "min_rate_usd": 0,
-    "rate_unit": "per video",
-    "rules": [],
     "sop_status": "approved"
   },
   "Wesley": {
     "full_name": "Wesley Barker",
-    "manager": "Chenni Li",
-    "manager_email": "chenni@taboost.me",
-    "category": "Fashion/Beauty",
-    "min_rate_usd": 750,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": []
+    "sop_status": "approved"
   },
   "Hana": {
     "full_name": "Hana Tanaka",
-    "manager": "Chenni Li",
-    "manager_email": "chenni@taboost.me",
-    "category": "Fashion/Beauty",
-    "min_rate_usd": 750,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": []
+    "sop_status": "approved"
+  },
+  "Jenn": {
+    "full_name": "Jenn Lyles",
+    "sop_status": "approved"
+  },
+  "Angela": {
+    "full_name": "Angela Callisto",
+    "sop_status": "approved"
+  },
+  "Grayson": {
+    "full_name": "Grayson Finks",
+    "sop_status": "approved"
+  },
+  "Kylika": {
+    "full_name": "Kylika Miller",
+    "sop_status": "approved"
   },
   "Audur": {
     "full_name": "Audur Banks",
-    "manager": "Nicole Park",
-    "manager_email": "nicole@taboost.me",
-    "category": "Beauty",
-    "min_rate_usd": 800,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": []
+    "sop_status": "approved"
+  },
+  "Skyler": {
+    "full_name": "Skyler Clark",
+    "sop_status": "approved"
   },
   "Stephanie": {
-    "_updated": "2026-06-14",
     "full_name": "Stephanie Stimson",
-    "manager": "Nicole Park",
-    "manager_email": "nicole@taboost.me",
-    "category": "Beauty",
-    "min_rate_usd": 500,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": [
-      {
-        "scenario": "A",
-        "label": "Initial Inbound (Default Response)",
-        "trigger": "Asking for rates or a potential to collab",
-        "use_when": ["Asking for rates or a potential to collab", "All other general inquiries"],
-        "do_not_use_when": ["An exact match from scenario below"],
-        "response": "Thank you so much for reaching out about a potential partnership with Stephanie!! I'm happy to share her rates below:\n• 1 TikTok @stephanie_stimson: $750\n• 1 Instagram Reel @stephaniestimson_: $650\n• 1 UGC Video: $500 (usage to be negotiated)\n\nStephanie's pricing reflects her authentic and relatable approach that allows her recommendations to feel natural, making her a trusted voice among her audience. She is known for her beauty content and practical everyday finds that make life a little easier!\n\nPlease let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!",
-        "cc": null,
-        "is_default": true
-      }
-    ]
+    "sop_status": "approved"
   },
   "Jocelyn": {
-    "_updated": "2026-06-14",
     "full_name": "Jocelyn Chardon",
-    "manager": "Cara Best",
-    "manager_email": "cara@taboost.me",
-    "category": "Fashion",
-    "min_rate_usd": 800,
-    "rate_unit": "per video",
-    "sop_status": "approved",
-    "rules": [
-      {
-        "scenario": "A",
-        "label": "Initial Inbound (Default Response)",
-        "trigger": "Asking for rates or a potential to collab",
-        "use_when": ["Asking for rates or a potential to collab", "All other general inquiries"],
-        "do_not_use_when": ["An exact match from scenario below"],
-        "response": "Thank you so much for reaching out about a potential partnership with Jocelyn!! I'm happy to share her rates below:\n**1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850\n**1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700\n**1 UGC Video** - $1,000 (usage to be negotiated)\n\nJocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!\n\nPlease let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We'd love to explore working together!",
-        "cc": null,
-        "is_default": true
-      }
-    ]
-  }
+    "sop_status": "approved"
+  },
+  "Brittanie": {
+    "full_name": "Brittanie Hammer",
+    "sop_status": "approved"
+  },
+  "Lizz": {
+    "full_name": "Lizz Freixas",
+    "sop_status": "approved"
+  },
+  "Allee": {
+    "full_name": "Allee Baray",
+    "sop_status": "approved"
+  },
+  "Alana": {
+    "full_name": "Alana Calviello",
+    "sop_status": "approved"
+  },
+  "Mahogany": {
+    "full_name": "Mahogany Lox",
+    "sop_status": "approved"
+  },
+  "BKuhl": {
+    "full_name": "Brittany Kuhl",
+    "sop_status": "approved"
+  },
+  "Trin": {
+    "full_name": "Trinity Blair",
+    "sop_status": "approved"
+  },
+  "_generated": "2026-07-27T16:40:39.902929"
 }

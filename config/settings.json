@@ -110,7 +110,7 @@
     "recovery_health_threshold": 0.7
   },
   "reply_to_routing": {
-    "_comment": "SOP v15 Rule 12 — set the Reply-To HEADER on drafts/replies for these talent inboxes ONLY. Routing instruction only: never added to the email body, never mentioned in the draft, From address unchanged. Inboxes not listed get no Reply-To.",
+    "_comment": "SOP v15b Rule 12 + Part 3 Reply-To Routing List — set the Reply-To HEADER on drafts/replies for these talent inboxes ONLY. Routing instruction only: never added to the email body, never mentioned in the draft, From address unchanged. Inboxes not listed get no Reply-To. Source of truth: sheets/sop.md Part 3 — keep this list in sync with it.",
     "reply_to_address": "talent-mgmt@taboost.me",
     "inboxes": [
       "allee@taboost.me",
@@ -118,7 +118,12 @@
       "angela@taboost.me",
       "alana@taboost.me",
       "stephanie@taboost.me",
-      "joceyln@taboost.me"
+      "joceyln@taboost.me",
+      "katrina@taboost.me",
+      "kylika@taboost.me",
+      "audur@taboost.me",
+      "mahogany@taboost.me",
+      "trinity@taboost.me"
     ]
   }
 }

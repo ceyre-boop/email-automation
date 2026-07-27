@@ -2,8 +2,7 @@ Talent Email AI Guidelines
 Part 1 — Global Workflow Rules
 
 1. Workflow Eligibility
-
-This workflow should only initiate for emails currently in the INBOX.
+   This workflow should only initiate for emails currently in the INBOX.
 
 - Only process emails that have the INBOX label at the time the automation runs.
 - Do not process emails that are already archived, trashed, marked spam, sent, drafted, or visible only in All Mail.
@@ -11,8 +10,7 @@ This workflow should only initiate for emails currently in the INBOX.
 - Do not create a draft, send a reply, classify, relabel, archive, or modify non-INBOX emails.
 
 2. SOP Compliance
-
-The SOP document must be followed explicitly.
+   The SOP document must be followed explicitly.
 
 - Do not deviate from approved responses.
 - Do not rewrite, improve, shorten, expand, or personalize approved responses unless specifically instructed by an admin.
@@ -21,8 +19,7 @@ The SOP document must be followed explicitly.
 - Do not add extra commentary inside the email draft.
 
 3. Draft Creation Restriction
-
-A draft may be created ONLY when Classification = Approved Response.
+   A draft may be created ONLY when Classification = Approved Response.
 
 If Classification = Ignore or Human Admin Required:
 
@@ -35,7 +32,6 @@ If Classification = Ignore or Human Admin Required:
 
 Reasons, classifications, and internal notes are automation metadata only.
 They must never be used as customer-facing email content. 4. Talent Matching
-
 Talent matching is mandatory.
 
 - Each talent has different rates, terms, and response language.
@@ -43,8 +39,7 @@ Talent matching is mandatory.
 - Never use one talent’s response for another talent.
 
 5. Initial Inbound Emails Only
-
-This workflow is for initial inbound emails only.
+   This workflow is for initial inbound emails only.
 
 Eligible initial inbound emails are determined by the automation trigger conditions before this workflow runs.
 
@@ -55,19 +50,17 @@ As an additional safeguard, the workflow should only process emails where:
 If Gmail thread message count is greater than 1:
 
 - Classification: Human Admin Required
-- Apply Option B under Rule 13
+- Apply Option B under Rule 12
 
 6. Default to Initial Approved Response
-
-Each talent has an Initial Approved Response.
+   Each talent has an Initial Approved Response.
 
 - Treat the Initial Approved Response as the default response for valid inbound opportunities.
 - Only choose another approved response if the email clearly matches a more specific scenario.
 - Only avoid the Initial Approved Response if the email matches a no-draft rule, such as Event Invite, Personal Email, Human Admin Required, or workflow ineligibility.
 
 7. Spam Handling
-
-Spam handling is managed by Google/Gmail, not by this automation.
+   Spam handling is managed by Google/Gmail, not by this automation.
 
 - Do not classify emails as Spam.
 - Do not move emails to Spam.
@@ -76,8 +69,7 @@ Spam handling is managed by Google/Gmail, not by this automation.
 - If an email reaches this workflow, process it according to the normal workflow rules.
 
 8. Event / Appearance / Speaking Invite Emails
-
-Only classify an email as an event invite when the primary request is for the talent to attend, appear at, travel to, or speak at an event.
+   Only classify an email as an event invite when the primary request is for the talent to attend, appear at, travel to, or speak at an event.
 
 Use when the email clearly asks the talent to:
 
@@ -96,13 +88,11 @@ If uncertain, do NOT classify as Event Invite.
 Continue to response matching and use Scenario A by default.
 
 If this rule applies, classify the email as Ignore. 9. Talent Personal Email Handling
-
 Each talent may include a Scenario C containing one or more personal email addresses.
 
 If the inbound sender email matches any email listed under Scenario C for the matched talent, classify the email as Ignore.
 
 These emails are typically forwarded opportunities or conversations originally sent directly to the talent instead of the business inbox. 10. Repeat Client Handling
-
 Some repeat clients should be ignored by this workflow because they are handled manually by the team.
 
 If the inbound sender email domain matches any domain listed under Repeat Client Domains, classify the email as Ignore.
@@ -115,8 +105,7 @@ Repeat Client Domains:
 
 If this rule applies, classify the email as Ignore.
 
-Operational handling is controlled by Rule 13: Inbox Handling After Classification. 11. Formatting, Hyperlinks, and Internal Instructions
-
+Operational handling is controlled by Rule 12: Inbox Handling After Classification. 11. Formatting, Hyperlinks, and Internal Instructions
 Approved responses may contain formatting markup and internal routing instructions.
 
 Approved SOP formatting:
@@ -159,6 +148,7 @@ Formatting behavior:
 Some talent inboxes may use TABOOST’s consolidated talent management email as the Reply-To address.
 
 For designated inboxes only, set:
+
 Reply-To: talent-mgmt@taboost.me
 
 This is an email header/routing instruction only.
@@ -171,10 +161,7 @@ Do not:
 - change the sender/from address unless separately instructed
 - apply this to all talent inboxes automatically
 
-The Reply-To field should only be set when the matched talent or inbox is included in the approved Reply-To Routing List.
-
-13. Inbox Handling After Classification
-
+The Reply-To field should only be set when the matched talent or inbox is included in the approved Reply-To Routing List. 13. Inbox Handling After Classification
 This workflow applies only to eligible initial inbound emails currently in the INBOX.
 
 Eligible emails are determined by the automation trigger conditions before this workflow runs.
@@ -190,7 +177,7 @@ Classification-to-action mapping:
 - Classification = Ignore → Option B — No Draft / Human Review
 - Classification = Human Admin Required → Option B — No Draft / Human Review
 
-Operational actions are controlled only by Rule 13. Other rules and scenarios determine classification only.
+Operational actions are controlled only by Rule 12. Other rules and scenarios determine classification only.
 
 These actions are mutually exclusive. Only one option may be applied per email.
 
@@ -240,8 +227,7 @@ Important:
 - Leave the email untouched in the Inbox.
 
 14. Required Output Format
-
-The Required Output Format is automation metadata only and must never be used as the email draft body.
+    The Required Output Format is automation metadata only and must never be used as the email draft body.
 
 Every processed email must clearly state:
 
@@ -260,10 +246,7 @@ Reply-To Email: talent-mgmt@taboost.me / None
 Email Body must be blank unless Classification = Approved Response.
 A Initial Response must only be applied after the draft is successfully sent.
 
-Part 2 — Approved Response Matching
-
-15. Response Matching Hierarchy
-
+Part 2 — Approved Response Matching 15. Response Matching Hierarchy
 When selecting an approved response:
 
 1. Apply all Global no-draft rules first, including Event Invite, Repeat Client, and Personal Email handling.
@@ -297,7 +280,7 @@ If Scenario C applies:
 - classify the email as Ignore
 - do not use Scenario A
 
-Operational handling is controlled by Rule 13: Inbox Handling After Classification.
+Operational handling is controlled by Rule 12: Inbox Handling After Classification.
 
 Part 3 — Reply-To Routing List
 
@@ -318,15 +301,230 @@ Use Reply-To: talent-mgmt@taboost.me for the following talent inboxes:
 If a talent or inbox is not listed here, leave Reply-To blank/default.
 
 Part 4 — Talent Approved Responses
+Talent: Stephanie Stimson
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Stephanie!! I’m happy to share her rates below:
+**1 TikTok** [stephanie_stimson](https://www.tiktok.com/@stephanie_stimson) - $750
+**1 Instagram** [Reel](https://www.instagram.com/stephaniestimson_) - $550
+**1 UGC Video** - $600 (usage to be negotiated)
+
+Stephanie's pricing reflects her authentic and relatable approach that allows her recommendations to feel natural, making her a trusted voice among her audience. She is known for her beauty content and practical everyday finds that make life a little easier!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+collaboratewithsteph@gmail.com
+stephaniestimson9@gmail.com
+
+Talent: Jocelyn Chardon
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Jocelyn!! I’m happy to share her rates below:
+**1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850
+**1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700
+**1 UGC Video** - $1,000 (usage to be negotiated)
+
+Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+jocelynsagec@gmail.com
+
+Talent: Brittanie Hammer
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Britt!! I’m happy to share her rates below:
+**1 TikTok** [bestiebriitt](https://www.tiktok.com/@bestiebriitt) - $1,500
+**1 UGC Video** - $1,000 (usage to be negotiated)
+
+Britt's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$669k** & she was TikTok’s 2025 Home Creator of the Year!!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+hammer.brittanie@gmail.com
+
+Talent: Lizz Freixas
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Lizz!! I’m happy to share her rates below:
+**1 TikTok** [lizzmi45](https://www.tiktok.com/@lizzmi45) - $750
+**1 UGC Video** - $900 (usage to be negotiated)
+
+Lizz's pricing reflects her extremely high **conversion rate** from content that truly sells. Her monthly GMV is **$550k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super **high** for a shop creator which is ideal for brand collabs.
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+lizzmilenafg45@gmail.com
+
+Talent: Allee Baray
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Allee!! I’m happy to share her rates below:
+**1 TikTok** [ababyandabulldog](https://www.tiktok.com/@ababyandabulldog) - $850
+**1 TikTok** [shopaholicallee](https://www.tiktok.com/@shopaholicallee) - $700
+**1 TikTok** [shopaholicallee2](https://www.tiktok.com/@shopaholicallee2) - $500
+**1 UGC Video** - $800 (usage to be negotiated)
+
+Allee's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$490k+** & that was just her main account. She is a TikTok Shop Star and has a great pulse on what her viewers are wanting to buy!!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+alleebaray@gmail.com
+
+Talent: Angela Callisto
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Angela!! I’m happy to share her rates below:
+**1 TikTok** [angelacallisto123](https://www.tiktok.com/@angelacallisto123) - $750
+**1 Instagram** [Reel](https://www.instagram.com/angelacallisto/) - $500
+**1 UGC Video** - $1,000 (usage to be negotiated)
+
+Angela's pricing reflects her extremely high conversion rate (consistent **$450k+** monthly GMV). She's a TikTok Shop Star who specializes in real friend-to-friend recommendations for **fashion & beauty** based on her authenticity!!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Email:
+angelacallisto123@gmail.com
+
+Talent: Alana Calviello
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
+**1 TikTok** [alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
+**1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
+**1 UGC Video** - $500 (usage to be negotiated)
+
+Alana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+arcalviello@gmail.com
+
+Talent: Wesley Barker
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Wesley!! I’m happy to share her rates below:
+**1 TikTok** [wesleyrbarker](https://www.tiktok.com/@wesleyrbarker) - $750
+**1 Instagram** [Reel](https://www.instagram.com/wesleyrbarker/) - $600
+**1 UGC Video** - $900 (usage to be negotiated)
+
+Wesley's pricing reflects her strong following across both TikTok and Instagram. She specializes in **tall girl-friendly fashion**, beauty, and lifestyle content, creating relatable recommendations that make her content feel approachable and easy to trust!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Email:
+wesleybarkerbookings@gmail.com
+
+Talent: Hana Tanaka
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Hana!! I’m happy to share her rates below:
+**1 TikTok** [hanaisfinechina](https://www.tiktok.com/@hanaisfinechina) - $750
+**1 Instagram** [Reel](https://www.instagram.com/hanaisfinechina/) - $500
+**1 UGC Video** - $900 (usage to be negotiated)
+
+Hana's pricing reflects her ability to create content that feels **genuine** and **unfiltered**. Known for her silly personality and authentic approach, she isn't afraid to show her audience the **real** her while sharing products she genuinely loves and uses in her everyday life.
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Email:
+hanaisfinechina@gmail.com
+
+Talent: Anastasiya Ray
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Anastasiya!! I’m happy to share her rates below:
+**1 TikTok** [anastasiya_ray](https://www.tiktok.com/@anastasiya_ray) - $800
+**1 TikTok (2nd)** [theraysfinds](https://www.tiktok.com/@theraysfinds) - $800
+**1 Instagram** [Reel](https://www.instagram.com/ugcbyanastasiya/) - $750
+**1 UGC Video** [Portfolio](https://ugcbyanastasiya.com/) - $1,000 (usage to be negotiated)
+
+Anastasiya's pricing reflects her high-quality, **polished** content with a bestie beauty vibe that feels authentic, relatable, and **brand-elevating**!! Plus she's a UGC expert so she knows how to make videos that convert!!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+ugcbyanastasiya@gmail.com
+anastasiyaraytts@gmail.com
+
+Talent: Jenn Lyles
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Jenn!! I’m happy to share her rates below:
+**1 TikTok** [jenn_lyles](https://www.tiktok.com/@jenn_lyles) - $500
+**1 UGC Video** - $400 (usage to be negotiated)
+
+Jenn's pricing reflects her extremely high **conversion rate** (consistent **$400k+** monthly GMV). She's a TikTok Shop Star who shares relatable, authentic finds with her audience through engaging, trust-first content that drives attention and connection!!
+
+Please let us know **what type of collab you're looking for** + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Email:
+jenn@jennlyles.com
+
+Talent: Grayson Finks
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Grayson!! I’m happy to share her rates below:
+**1 TikTok** [grayson.finks](https://www.tiktok.com/@grayson.finks) - $750
+**1 UGC Video** - $400 (usage to be negotiated)
+
+Grayson's pricing reflects her high quality **fashion** content & the effort she puts in to drive conversions (consistent **$60k+** monthly GMV)!!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Email:
+graysonfinks@gmail.com
+
+Talent: Skyler Clark
+Manager: Marco Perez
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Skyler!! I’m happy to share her rates below:
+**1 TikTok** [skylerclarkk](https://www.tiktok.com/@skylerclarkk) - $500
+**1 Instagram** [Reel](https://www.instagram.com/crashingskymusic/) - $300
+
+Skyler’s pricing reflects her high quality content + the access you'll get to the community of music fans on TikTok!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Email:
+crashingskydrummer@gmail.com
+
+Talent: Brittany Kuhl
+Manager:
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Brittany!! I’m happy to share her rates below:
+**1 TikTok** [bkewwwl1507](https://www.tiktok.com/@bkewwwl1507) - $750
+**1 UGC Video** - $600 (usage to be negotiated)
+
+Brittany's pricing reflects her proven ability to consistently generate **$150K+ GMV** in monthly sales. As a mom, she shares home, beauty, and everyday lifestyle content through visually compelling, high-converting content.
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+brittanykuhl.tiktok@gmail.com
 
 Talent: Katrina Moore
-Key: Katrina
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Katrina
-Min Rate: $300 per video
-Auto Send: yes
-Paused: no
-
+Manager: N/A
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Katrina!
@@ -338,161 +536,10 @@ Looking forward to hearing your thoughts!
 
 Scenario C: Personal Email Forward
 Personal Email:
-
-- katrinamoore621@gmail.com
-
-Talent: Anastasiya Ray
-Key: Anastasiya
-Manager: Cara Best <cara@taboost.me>
-Gmail: Gmail - Anastasiya
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Anastasiya!! I’m happy to share her rates below:
-     **1 TikTok** [anastasiya_ray](https://www.tiktok.com/@anastasiya_ray) - $800
-     **1 TikTok (2nd)** [theraysfinds](https://www.tiktok.com/@theraysfinds) - $800
-     **1 Instagram** [Reel](https://www.instagram.com/ugcbyanastasiya/) - $750
-     **1 UGC Video** [Portfolio](https://ugcbyanastasiya.com/) - $1,000 (usage to be negotiated)
-
-Anastasiya's pricing reflects her high-quality, **polished** content with a bestie beauty vibe that feels authentic, relatable, and **brand-elevating**!! Plus she's a UGC expert so she knows how to make videos that convert!!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- ugcbyanastasiya@gmail.com
-- anastasiyaraytts@gmail.com
-
-Talent: Wesley Barker
-Key: Wesley
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Wesley
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Wesley!! I’m happy to share her rates below:
-     **1 TikTok** [wesleyrbarker](https://www.tiktok.com/@wesleyrbarker) - $750
-     **1 Instagram** [Reel](https://www.instagram.com/wesleyrbarker/) - $600
-     **1 UGC Video** - $900 (usage to be negotiated)
-
-Wesley's pricing reflects her strong following across both TikTok and Instagram. She specializes in **tall girl-friendly fashion**, beauty, and lifestyle content, creating relatable recommendations that make her content feel approachable and easy to trust!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Email:
-
-- wesleybarkerbookings@gmail.com
-
-Talent: Hana Tanaka
-Key: Hana
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Hana
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Hana!! I’m happy to share her rates below:
-     **1 TikTok** [hanaisfinechina](https://www.tiktok.com/@hanaisfinechina) - $750
-     **1 Instagram** [Reel](https://www.instagram.com/hanaisfinechina/) - $500
-     **1 UGC Video** - $900 (usage to be negotiated)
-
-Hana's pricing reflects her ability to create content that feels **genuine** and **unfiltered**. Known for her silly personality and authentic approach, she isn't afraid to show her audience the **real** her while sharing products she genuinely loves and uses in her everyday life.
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Email:
-
-- hanaisfinechina@gmail.com
-
-Talent: Jenn Lyles
-Key: Jenn
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Jenn
-Min Rate: $500 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Jenn!! I’m happy to share her rates below:
-     **1 TikTok** [jenn_lyles](https://www.tiktok.com/@jenn_lyles) - $500
-     **1 UGC Video** - $400 (usage to be negotiated)
-
-Jenn's pricing reflects her extremely high **conversion rate** (consistent **$400k+** monthly GMV). She's a TikTok Shop Star who shares relatable, authentic finds with her audience through engaging, trust-first content that drives attention and connection!!
-
-Please let us know **what type of collab you're looking for** + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Email:
-
-- jenn@jennlyles.com
-
-Talent: Angela Callisto
-Key: Angela
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Angela
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Angela!! I’m happy to share her rates below:
-     **1 TikTok** [angelacallisto123](https://www.tiktok.com/@angelacallisto123) - $750
-     **1 Instagram** [Reel](https://www.instagram.com/angelacallisto/) - $500
-     **1 UGC Video** - $1,000 (usage to be negotiated)
-
-Angela's pricing reflects her extremely high conversion rate (consistent **$450k+** monthly GMV). She's a TikTok Shop Star who specializes in real friend-to-friend recommendations for **fashion & beauty** based on her authenticity!!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Email:
-
-- angelacallisto123@gmail.com
-
-Talent: Grayson Finks
-Key: Grayson
-Manager: Nicole Park <nicole@taboost.me>
-Gmail: Gmail - Grayson
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Grayson!! I’m happy to share her rates below:
-     **1 TikTok** [grayson.finks](https://www.tiktok.com/@grayson.finks) - $750
-     **1 UGC Video** - $400 (usage to be negotiated)
-
-Grayson's pricing reflects her high quality **fashion** content & the effort she puts in to drive conversions (consistent **$60k+** monthly GMV)!!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Email:
-
-- graysonfinks@gmail.com
+katrinamoore621@gmail.com
 
 Talent: Kylika Miller
-Key: Kylika
-Manager: Nicole Park <nicole@taboost.me>
-Gmail: Gmail - Kylika
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
+Manager: N/A
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Kylika!
@@ -501,20 +548,12 @@ You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to exp
 
 Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
 Looking forward to hearing your thoughts!
-
 Scenario C: Personal Email Forward
 Personal Email:
-
-- kylikacollabs@gmail.com
+kylikacollabs@gmail.com
 
 Talent: Audur Banks
-Key: Audur
-Manager: Nicole Park <nicole@taboost.me>
-Gmail: Gmail - Audur
-Min Rate: $800 per video
-Auto Send: yes
-Paused: no
-
+Manager: N/A
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Audur!
@@ -523,187 +562,12 @@ You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to exp
 
 Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
 Looking forward to hearing your thoughts!
-
 Scenario C: Personal Email Forward
 Personal Email:
-
-- thebanksedit@gmail.com
-
-Talent: Skyler Clark
-Key: Skyler
-Manager: Marco Perez <marco@taboost.me>
-Gmail: Gmail - Skyler
-Min Rate: $300 per video
-Auto Send: no
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Skyler!! I’m happy to share her rates below:
-     **1 TikTok** [skylerclarkk](https://www.tiktok.com/@skylerclarkk) - $500
-     **1 Instagram** [Reel](https://www.instagram.com/crashingskymusic/) - $300
-
-Skyler’s pricing reflects her high quality content + the access you'll get to the community of music fans on TikTok!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Email:
-
-- crashingskydrummer@gmail.com
-
-Talent: Stephanie Stimson
-Key: Stephanie
-Manager: Nicole Park <nicole@taboost.me>
-Gmail: Gmail - Stephanie
-Min Rate: $500 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Stephanie!! I’m happy to share her rates below:
-     **1 TikTok** [stephanie_stimson](https://www.tiktok.com/@stephanie_stimson) - $750
-     **1 Instagram** [Reel](https://www.instagram.com/stephaniestimson_) - $550
-     **1 UGC Video** - $600 (usage to be negotiated)
-
-Stephanie's pricing reflects her authentic and relatable approach that allows her recommendations to feel natural, making her a trusted voice among her audience. She is known for her beauty content and practical everyday finds that make life a little easier!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- collaboratewithsteph@gmail.com
-- stephaniestimson9@gmail.com
-
-Talent: Jocelyn Chardon
-Key: Jocelyn
-Manager: Cara Best <cara@taboost.me>
-Gmail: Gmail - Jocelyn
-Min Rate: $800 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Jocelyn!! I’m happy to share her rates below:
-     **1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850
-     **1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700
-     **1 UGC Video** - $1,000 (usage to be negotiated)
-
-Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- jocelynsagec@gmail.com
-
-Talent: Brittanie Hammer
-Key: Brittanie
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Brittanie
-Min Rate: $1000 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Britt!! I’m happy to share her rates below:
-     **1 TikTok** [bestiebriitt](https://www.tiktok.com/@bestiebriitt) - $1,500
-     **1 UGC Video** - $1,000 (usage to be negotiated)
-
-Britt's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$669k** & she was TikTok’s 2025 Home Creator of the Year!!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- hammer.brittanie@gmail.com
-
-Talent: Lizz Freixas
-Key: Lizz
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Lizz
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Lizz!! I’m happy to share her rates below:
-     **1 TikTok** [lizzmi45](https://www.tiktok.com/@lizzmi45) - $750
-     **1 UGC Video** - $900 (usage to be negotiated)
-
-Lizz's pricing reflects her extremely high **conversion rate** from content that truly sells. Her monthly GMV is **$550k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super **high** for a shop creator which is ideal for brand collabs.
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- lizzmilenafg45@gmail.com
-
-Talent: Allee Baray
-Key: Allee
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Allee
-Min Rate: $500 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Allee!! I’m happy to share her rates below:
-     **1 TikTok** [ababyandabulldog](https://www.tiktok.com/@ababyandabulldog) - $850
-     **1 TikTok** [shopaholicallee](https://www.tiktok.com/@shopaholicallee) - $700
-     **1 TikTok** [shopaholicallee2](https://www.tiktok.com/@shopaholicallee2) - $500
-     **1 UGC Video** - $800 (usage to be negotiated)
-
-Allee's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$490k+** & that was just her main account. She is a TikTok Shop Star and has a great pulse on what her viewers are wanting to buy!!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- alleebaray@gmail.com
-
-Talent: Alana Calviello
-Key: Alana
-Manager: Nicole Park <nicole@taboost.me>
-Gmail: Gmail - Alana
-Min Rate: $500 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
-     **1 TikTok** [alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
-     **1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
-     **1 UGC Video** - $500 (usage to be negotiated)
-
-Alana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- arcalviello@gmail.com
+thebanksedit@gmail.com
 
 Talent: Mahogany Lox
-Key: Mahogany
-Manager: Cara Best <cara@taboost.me>
-Gmail: Gmail - Mahogany
-Min Rate: $1000 per video
-Auto Send: no
-Paused: no
-
+Manager: N/A
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Mahogany!
@@ -712,45 +576,14 @@ You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to exp
 
 Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
 Looking forward to hearing your thoughts!
-
 Scenario C: Personal Email Forward
 Personal Emails:
-
-- bookmahoganylox@gmail.com
-- booking@494ent.com
-- booking@four9four.com
-
-Talent: Brittany Kuhl
-Key: BKuhl
-Manager: Nicole Park <nicole@taboost.me>
-Gmail: Gmail - BKuhl
-Min Rate: $750 per video
-Auto Send: yes
-Paused: no
-
-Scenario A: Initial Inbound (Default Response)
-Approved Response:
-Thank you so much for reaching out about a potential partnership with Brittany!! I’m happy to share her rates below:
-     **1 TikTok** [bkewwwl1507](https://www.tiktok.com/@bkewwwl1507) - $750
-     **1 UGC Video** - $600 (usage to be negotiated)
-
-Brittany's pricing reflects her proven ability to consistently generate **$150K+ GMV** in monthly sales. As a mom, she shares home, beauty, and everyday lifestyle content through visually compelling, high-converting content.
-
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
-
-Scenario C: Personal Email Forward
-Personal Emails:
-
-- brittanykuhl.tiktok@gmail.com
+bookmahoganylox@gmail.com
+booking@494ent.com
+booking@four9four.com
 
 Talent: Trinity Blair
-Key: Trin
-Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Trin
-Min Rate: $2000 per video
-Auto Send: no
-Paused: yes
-
+Manager: N/A
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Trinity!
@@ -759,7 +592,5 @@ You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to exp
 
 Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
 Looking forward to hearing your thoughts!
-
 Scenario C: Personal Email Forward
 Personal Emails:
-
