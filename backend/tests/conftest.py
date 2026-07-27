@@ -3,6 +3,7 @@ from __future__ import annotations
 import itertools
 import os
 import json
+import pathlib
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
@@ -27,6 +28,41 @@ os.environ.setdefault("AGENCY_SECRET_KEY", "test-secret")
 from backend.core.config import get_settings
 from backend.models.db import Base, Draft, DraftStatus, EmailStatus, ProcessedEmail, TalentToken
 from backend.routers.deps import get_db, verify_api_key
+
+# ── Test-only SOP fixture ─────────────────────────────────────────────────────
+# The real sheets/sop.md contains only live talent profiles.  Test-only
+# "talents" (Sylvia, KatrinaD) live in tests/fixtures/test_talents_sop.md.
+# We redirect _SOP_MD_PATH for every test so the merged file (real + fixtures)
+# is used.  We can't just seed the module-level cache because code under test
+# calls clear_sop_cache(), which silently falls back to the real file.
+
+_FIXTURE_SOPmd = pathlib.Path(__file__).parent / "fixtures" / "test_talents_sop.md"
+
+
+@pytest.fixture(autouse=True)
+def _patch_sop_md_path(tmp_path):
+    """Redirect _SOP_MD_PATH to a merged file (real sop.md + test fixtures).
+
+    Cannot seed _sop_md_cache because clear_sop_cache() is called by code
+    under test, silently falling back to the real file.  Instead we write a
+    merged temp file and point the module-level path at it; any
+    clear_sop_cache() call will re-read from the merged file.
+    """
+    from backend.services import reply
+
+    real_content = reply._SOP_MD_PATH.read_text(encoding="utf-8") if reply._SOP_MD_PATH.exists() else ""
+    fixture_content = _FIXTURE_SOPmd.read_text(encoding="utf-8")
+    merged = tmp_path / "sop_merged.md"
+    merged.write_text(real_content + "\n\n" + fixture_content, encoding="utf-8")
+
+    original_path = reply._SOP_MD_PATH
+    reply._SOP_MD_PATH = merged
+    reply.clear_sop_cache()
+
+    yield
+
+    reply._SOP_MD_PATH = original_path
+    reply.clear_sop_cache()
 
 
 # ── SQLite in-memory DB fixture ───────────────────────────────────────────────
