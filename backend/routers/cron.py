@@ -426,6 +426,36 @@ def _run_full_reconcile():
     _run_inbox_reconcile()
 
 
+def _run_poll_health_retention(retain_days: int = 30) -> None:
+    """
+    Delete poll_health rows older than `retain_days` days.
+
+    The poll_health table writes one row per talent per cycle (~45s × 19 talents ≈ 24 k/day).
+    Without pruning it exceeds 1.5 M rows in ~60 days and bloats the DB.
+    Runs hourly; each call is a single indexed DELETE so it's fast.
+    """
+    from backend.models.db import get_session_factory
+    from sqlalchemy import text as _text
+
+    cutoff = datetime.utcnow() - timedelta(days=retain_days)
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        result = db.execute(
+            _text("DELETE FROM poll_health WHERE polled_at < :cutoff"),
+            {"cutoff": cutoff},
+        )
+        deleted = result.rowcount
+        db.commit()
+        if deleted:
+            logger.info("poll_health retention: deleted %d rows older than %d days", deleted, retain_days)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("poll_health retention failed: %s", exc)
+        db.rollback()
+    finally:
+        db.close()
+
+
 def _run_auto_send():
     """Auto-send qualifying pending drafts after the configured hold period."""
     from backend.models.db import get_session_factory
