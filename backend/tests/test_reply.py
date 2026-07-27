@@ -112,9 +112,11 @@ def test_draft_reply_normal(mock_openai_cls):
         offer_type="Sponsored Post", brand_name="Nike",
         proposed_rate=3500.0, triage_reason="Score 3",
     )
-    assert result["is_escalate"] is False
-    assert result["escalate_reason"] is None
-    assert "Nike" in result["draft_text"]
+    # SOP v15 Rule 2 hard gate: free-form GPT text that is not a character-for-character
+    # approved response must NEVER become a draft — it escalates to human review.
+    # (For this fixture talent, escalation triggers even earlier at the SOP-approval check.)
+    assert result["is_escalate"] is True
+    assert result["escalate_reason"]
 
 
 @patch("backend.services.reply.OpenAI")
@@ -248,3 +250,39 @@ def test_draft_reply_escalate_case_insensitive(mock_openai_cls):
         proposed_rate=1500.0, triage_reason="reason",
     )
     assert result["is_escalate"] is True
+
+
+# ── SOP v15 Rule 2: verbatim enforcement ─────────────────────────────────────
+
+
+def test_enforce_verbatim_accepts_exact_approved_response():
+    from backend.services.reply import enforce_verbatim_response, get_scenario_a_response
+
+    approved = get_scenario_a_response("Stephanie Stimson")
+    assert approved, "Stephanie's Scenario A must exist in sop.md"
+    assert enforce_verbatim_response("Stephanie Stimson", approved) is None
+
+
+def test_enforce_verbatim_rejects_any_rewording():
+    from backend.services.reply import enforce_verbatim_response, get_scenario_a_response
+
+    approved = get_scenario_a_response("Stephanie Stimson")
+    reworded = approved.replace("Thank you so much", "Thanks so much")
+    err = enforce_verbatim_response("Stephanie Stimson", reworded)
+    assert err is not None
+
+
+def test_enforce_verbatim_rejects_single_character_change():
+    from backend.services.reply import enforce_verbatim_response, get_scenario_a_response
+
+    approved = get_scenario_a_response("Stephanie Stimson")
+    off_by_one = approved[:-1] if approved.endswith("!") else approved + "!"
+    err = enforce_verbatim_response("Stephanie Stimson", off_by_one)
+    assert err is not None
+
+
+def test_enforce_verbatim_rejects_unknown_talent():
+    from backend.services.reply import enforce_verbatim_response
+
+    err = enforce_verbatim_response("Nonexistent Person", "any text")
+    assert err is not None

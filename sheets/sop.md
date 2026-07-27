@@ -292,7 +292,8 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Katrina!
-[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.
+
+You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to explore additional talent.
 
 Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
 Looking forward to hearing your thoughts!
@@ -313,14 +314,15 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Anastasiya!! I’m happy to share her rates below:
-**1 TikTok** [anastasiya_ray](https://www.tiktok.com/@anastasiya_ray) - $800
-**1 TikTok (2nd)** [theraysfinds](https://www.tiktok.com/@theraysfinds) - $800
-**1 Instagram** [Reel](https://www.instagram.com/ugcbyanastasiya/) - $750
-**1 UGC Video** [Portfolio](https://ugcbyanastasiya.com/) - $1,000 (usage to be negotiated)
+     **1 TikTok** [anastasiya_ray](https://www.tiktok.com/@anastasiya_ray) - $800
+     **1 TikTok (2nd)** [theraysfinds](https://www.tiktok.com/@theraysfinds) - $800
+     **1 Instagram** [Reel](https://www.instagram.com/ugcbyanastasiya/) - $750
+     **1 UGC Video** [Portfolio](https://ugcbyanastasiya.com/) - $1,000 (usage to be negotiated)
 
 Anastasiya's pricing reflects her high-quality, **polished** content with a bestie beauty vibe that feels authentic, relatable, and **brand-elevating**!! Plus she's a UGC expert so she knows how to make videos that convert!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -338,13 +340,14 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Wesley!! I’m happy to share her rates below:
-**1 TikTok** [wesleyrbarker](https://www.tiktok.com/@wesleyrbarker) - $750
-**1 Instagram** [Reel](https://www.instagram.com/wesleyrbarker/) - $600
-**1 UGC Video** - $900 (usage to be negotiated)
+     **1 TikTok** [wesleyrbarker](https://www.tiktok.com/@wesleyrbarker) - $750
+     **1 Instagram** [Reel](https://www.instagram.com/wesleyrbarker/) - $600
+     **1 UGC Video** - $900 (usage to be negotiated)
 
 Wesley's pricing reflects her strong following across both TikTok and Instagram. She specializes in **tall girl-friendly fashion**, beauty, and lifestyle content, creating relatable recommendations that make her content feel approachable and easy to trust!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -361,13 +364,14 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Hana!! I’m happy to share her rates below:
-**1 TikTok** [hanaisfinechina](https://www.tiktok.com/@hanaisfinechina) - $750
-**1 Instagram** [Reel](https://www.instagram.com/hanaisfinechina/) - $500
-**1 UGC Video** - $900 (usage to be negotiated)
+     **1 TikTok** [hanaisfinechina](https://www.tiktok.com/@hanaisfinechina) - $750
+     **1 Instagram** [Reel](https://www.instagram.com/hanaisfinechina/) - $500
+     **1 UGC Video** - $900 (usage to be negotiated)
 
 Hana's pricing reflects her ability to create content that feels **genuine** and **unfiltered**. Known for her silly personality and authentic approach, she isn't afraid to show her audience the **real** her while sharing products she genuinely loves and uses in her everyday life.
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -384,12 +388,13 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Jenn!! I’m happy to share her rates below:
-**1 TikTok** [jenn_lyles](https://www.tiktok.com/@jenn_lyles) - $500
-**1 UGC Video** - $400 (usage to be negotiated)
+     **1 TikTok** [jenn_lyles](https://www.tiktok.com/@jenn_lyles) - $500
+     **1 UGC Video** - $400 (usage to be negotiated)
 
 Jenn's pricing reflects her extremely high **conversion rate** (consistent **$400k+** monthly GMV). She's a TikTok Shop Star who shares relatable, authentic finds with her audience through engaging, trust-first content that drives attention and connection!!
 
 Please let us know **what type of collab you're looking for** + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -406,13 +411,14 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Angela!! I’m happy to share her rates below:
-**1 TikTok** [angelacallisto123](https://www.tiktok.com/@angelacallisto123) - $750
-**1 Instagram** [Reel](https://www.instagram.com/angelacallisto/) - $500
-**1 UGC Video** - $1,000 (usage to be negotiated)
+     **1 TikTok** [angelacallisto123](https://www.tiktok.com/@angelacallisto123) - $750
+     **1 Instagram** [Reel](https://www.instagram.com/angelacallisto/) - $500
+     **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Angela's pricing reflects her extremely high conversion rate (consistent **$450k+** monthly GMV). She's a TikTok Shop Star who specializes in real friend-to-friend recommendations for **fashion & beauty** based on her authenticity!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -429,12 +435,13 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Grayson!! I’m happy to share her rates below:
-**1 TikTok** [grayson.finks](https://www.tiktok.com/@grayson.finks) - $750
-**1 UGC Video** - $400 (usage to be negotiated)
+     **1 TikTok** [grayson.finks](https://www.tiktok.com/@grayson.finks) - $750
+     **1 UGC Video** - $400 (usage to be negotiated)
 
 Grayson's pricing reflects her high quality **fashion** content & the effort she puts in to drive conversions (consistent **$60k+** monthly GMV)!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -451,10 +458,12 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Kylika!
-[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.
+
+You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to explore additional talent.
 
 Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
 Looking forward to hearing your thoughts!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -471,10 +480,12 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thanks for reaching out about working with Audur!
-[HERE](https://docs.google.com/spreadsheets/d/1tTl9RfJKWbPmSj0BSK-SxAEYxOv9GTXM7a9DlqFRhSk/) is our full TABOOST Talent roster below for your review.
+
+You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to explore additional talent.
 
 Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
 Looking forward to hearing your thoughts!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -491,12 +502,13 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Skyler!! I’m happy to share her rates below:
-**1 TikTok** [skylerclarkk](https://www.tiktok.com/@skylerclarkk) - $500
-**1 Instagram** [Reel](https://www.instagram.com/crashingskymusic/) - $300
+     **1 TikTok** [skylerclarkk](https://www.tiktok.com/@skylerclarkk) - $500
+     **1 Instagram** [Reel](https://www.instagram.com/crashingskymusic/) - $300
 
 Skyler’s pricing reflects her high quality content + the access you'll get to the community of music fans on TikTok!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Email:
 
@@ -513,13 +525,14 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Stephanie!! I’m happy to share her rates below:
-**1 TikTok** [stephanie_stimson](https://www.tiktok.com/@stephanie_stimson) - $750
-**1 Instagram** [Reel](https://www.instagram.com/stephaniestimson_) - $550
-**1 UGC Video** - $600 (usage to be negotiated)
+     **1 TikTok** [stephanie_stimson](https://www.tiktok.com/@stephanie_stimson) - $750
+     **1 Instagram** [Reel](https://www.instagram.com/stephaniestimson_) - $550
+     **1 UGC Video** - $600 (usage to be negotiated)
 
 Stephanie's pricing reflects her authentic and relatable approach that allows her recommendations to feel natural, making her a trusted voice among her audience. She is known for her beauty content and practical everyday finds that make life a little easier!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -537,13 +550,14 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Jocelyn!! I’m happy to share her rates below:
-**1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850
-**1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700
-**1 UGC Video** - $1,000 (usage to be negotiated)
+     **1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850
+     **1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700
+     **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -560,12 +574,13 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Britt!! I’m happy to share her rates below:
-**1 TikTok** [bestiebriitt](https://www.tiktok.com/@bestiebriitt) - $1,500
-**1 UGC Video** - $1,000 (usage to be negotiated)
+     **1 TikTok** [bestiebriitt](https://www.tiktok.com/@bestiebriitt) - $1,500
+     **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Britt's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$669k** & she was TikTok’s 2025 Home Creator of the Year!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -582,12 +597,13 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Lizz!! I’m happy to share her rates below:
-**1 TikTok** [lizzmi45](https://www.tiktok.com/@lizzmi45) - $750
-**1 UGC Video** - $900 (usage to be negotiated)
+     **1 TikTok** [lizzmi45](https://www.tiktok.com/@lizzmi45) - $750
+     **1 UGC Video** - $900 (usage to be negotiated)
 
 Lizz's pricing reflects her extremely high **conversion rate** from content that truly sells. Her monthly GMV is **$550k+** and she is an expert at directing her loyal followers/buyers to the right fashion products. Lizz's engagement rate is also super **high** for a shop creator which is ideal for brand collabs.
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -604,14 +620,15 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Allee!! I’m happy to share her rates below:
-**1 TikTok** [ababyandabulldog](https://www.tiktok.com/@ababyandabulldog) - $850
-**1 TikTok** [shopaholicallee](https://www.tiktok.com/@shopaholicallee) - $700
-**1 TikTok** [shopaholicallee2](https://www.tiktok.com/@shopaholicallee2) - $500
-**1 UGC Video** - $800 (usage to be negotiated)
+     **1 TikTok** [ababyandabulldog](https://www.tiktok.com/@ababyandabulldog) - $850
+     **1 TikTok** [shopaholicallee](https://www.tiktok.com/@shopaholicallee) - $700
+     **1 TikTok** [shopaholicallee2](https://www.tiktok.com/@shopaholicallee2) - $500
+     **1 UGC Video** - $800 (usage to be negotiated)
 
 Allee's pricing reflects her extremely high **conversion rate** from content that truly sells. Her last month GMV was **$490k+** & that was just her main account. She is a TikTok Shop Star and has a great pulse on what her viewers are wanting to buy!!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -628,13 +645,14 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Alana!! I’m happy to share her rates below:
-**1 TikTok** [alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
-**1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
-**1 UGC Video** - $500 (usage to be negotiated)
+     **1 TikTok** [alanacalvs](https://www.tiktok.com/@_alanacalvs) - $750
+     **1 Instagram** [Reel](https://www.instagram.com/alanacalviello/) - $500
+     **1 UGC Video** - $500 (usage to be negotiated)
 
 Alana's pricing reflects her high quality content & the effort she puts in to drive conversions (consistent **$250k+** monthly GMV). She is strong in the **fashion** category but has sales across beauty & health/wellness too!
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -650,14 +668,12 @@ Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-Thank you so much for reaching out about a potential partnership with Mahogany!! I’m happy to share her rates below:
-**1 TikTok** [mahoganylox](https://www.tiktok.com/@mahoganylox) - $1,000
-**1 Instagram** [Reel](https://www.instagram.com/mahoganylox) - $2,500
-**1 UGC Video** - $1,500 (usage to be negotiated)
+Thanks for reaching out about working with Mahogany!
 
-Mahogany's pricing reflects her impressive social presence, with **7.5M** TikTok and **1.2M** Instagram followers. She creates beauty, fashion, and lifestyle content with a strong focus on personality and **self-expression**, allowing her to seamlessly connect with her audience across platforms.
+You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to explore additional talent.
 
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
+Looking forward to hearing your thoughts!
 
 Scenario C: Personal Email Forward
 Personal Emails:
@@ -677,12 +693,13 @@ Paused: no
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Brittany!! I’m happy to share her rates below:
-**1 TikTok** [bkewwwl1507](https://www.tiktok.com/@bkewwwl1507) - $750
-**1 UGC Video** - $600 (usage to be negotiated)
+     **1 TikTok** [bkewwwl1507](https://www.tiktok.com/@bkewwwl1507) - $750
+     **1 UGC Video** - $600 (usage to be negotiated)
 
 Brittany's pricing reflects her proven ability to consistently generate **$150K+ GMV** in monthly sales. As a mom, she shares home, beauty, and everyday lifestyle content through visually compelling, high-converting content.
 
 Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+
 Scenario C: Personal Email Forward
 Personal Emails:
 

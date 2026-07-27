@@ -139,6 +139,45 @@ def _extract_approved_response(
     return result or None
 
 
+def _all_approved_responses(talent_section: str) -> list[str]:
+    """Return every Approved Response block in a talent section, CC lines stripped —
+    the complete set of texts a draft is allowed to be (SOP: word-for-word only)."""
+    responses: list[str] = []
+    for m in re.finditer(r"\*{0,2}Approved Response:\*{0,2}\s*\n", talent_section):
+        rest = talent_section[m.end():]
+        end = re.search(r"\n(?:#{1,3}\s+)?(?:Scenario\s|Talent:|Personal Emails)", rest)
+        block = rest[: end.start()] if end else rest
+        lines = [
+            line for line in block.strip().splitlines()
+            if not line.strip().upper().startswith("CC:")
+        ]
+        cleaned = "\n".join(lines).strip()
+        if cleaned:
+            responses.append(cleaned)
+    return responses
+
+
+def enforce_verbatim_response(talent_name: str, draft_text: str) -> str | None:
+    """SOP Rule 2 enforcement: a draft may ONLY be an exact approved response.
+
+    Returns None if draft_text matches one of the talent's approved responses
+    character-for-character (after trimming outer whitespace), else an error
+    reason for escalation. If the talent section can't be loaded, returns an
+    error so off-script text can never slip through unchecked.
+    """
+    section = _get_talent_section_raw(talent_name)
+    if not section:
+        return "SOP section not found — cannot verify approved response verbatim"
+    approved = _all_approved_responses(section)
+    if not approved:
+        return "No approved responses found in SOP — cannot verify draft"
+    candidate = (draft_text or "").strip()
+    for resp in approved:
+        if candidate == resp:
+            return None
+    return "Draft is not a character-for-character approved response"
+
+
 def get_scenario_a_response(talent_name: str) -> str | None:
     """Return Scenario A (default) response for a talent directly from SOP. Used by Regenerate."""
     talent_section = _get_talent_section_raw(talent_name)
@@ -526,6 +565,14 @@ def draft_reply(
     if validation_error:
         logger.warning("Reply validation failed for %s: %s", talent_key, validation_error)
         return _escalate_result(f"Draft failed quality check: {validation_error}")
+
+    # SOP Rule 2 hard gate: GPT output must equal an approved response
+    # character-for-character. Anything off-script escalates to human review —
+    # the automation never sends reworded copy.
+    verbatim_error = enforce_verbatim_response(talent_name, text)
+    if verbatim_error:
+        logger.warning("Verbatim gate rejected GPT draft for %s: %s", talent_key, verbatim_error)
+        return _escalate_result(f"Verbatim check failed: {verbatim_error}")
 
     return {
         "draft_text": text,
