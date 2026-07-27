@@ -313,6 +313,11 @@ def on_startup():
     if settings.database_url:
         try:
             from backend.models.db import SopVersion, get_session_factory as _gsf
+            # SKIP_MIGRATIONS=true means create_tables() never ran, so this
+            # table may not exist. Provision it here (additive, idempotent)
+            # instead of throwing UndefinedTable on every boot.
+            from backend.routers.sop_admin import _ensure_sop_versions_table
+            _ensure_sop_versions_table()
             _db = _gsf()()
             try:
                 active_ver = (
