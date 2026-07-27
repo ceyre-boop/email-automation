@@ -306,12 +306,14 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
         raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
 
     settings = get_settings()
-    talent_cfg = next(
-        (t for t in settings.talent_list if t["key"].lower() == pe.talent_key.lower()),
+    # Look up from sop.md profiles (single source of truth — settings.json no longer
+    # carries the full talent roster after the SOP Manager v2 migration).
+    talent_profile = settings.talent_profiles.get(pe.talent_key) or next(
+        (p for k, p in settings.talent_profiles.items() if k.lower() == pe.talent_key.lower()),
         None,
     )
-    talent_name = talent_cfg.get("full_name", pe.talent_key) if talent_cfg else pe.talent_key
-    minimum_rate = float(talent_cfg.get("minimum_rate_usd", 0)) if talent_cfg else 0.0
+    talent_name = talent_profile.full_name if talent_profile else pe.talent_key
+    minimum_rate = float(talent_profile.minimum_rate_usd) if talent_profile else 0.0
 
     inbox_row = db.query(InboxEmail).filter(
         InboxEmail.gmail_message_id == gmail_message_id

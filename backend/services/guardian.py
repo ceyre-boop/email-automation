@@ -142,7 +142,9 @@ class GuardianWatchdog:
         from backend.models.db import Draft
         triggers = []
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        talent_map = {t["key"].lower(): t for t in get_settings().talent_list}
+        # Use sop.md profiles as the talent roster (not settings.json talent_list which
+        # may be missing talents added after the last settings.json update).
+        talent_profiles = get_settings().talent_profiles
         rows = (
             db.query(Draft.talent_key, func.count(Draft.id))
             .filter(Draft.created_at >= today_start)
@@ -150,8 +152,11 @@ class GuardianWatchdog:
             .all()
         )
         for talent_key, count in rows:
-            talent_cfg = talent_map.get(talent_key.lower(), {})
-            cap = talent_cfg.get("max_drafts_per_day", cfg.get("default_max_drafts_per_day", 2000))
+            talent_cfg = talent_profiles.get(talent_key.lower()) or next(
+                (p for k, p in talent_profiles.items() if k.lower() == talent_key.lower()), None
+            )
+            # TalentProfile objects don't have max_drafts_per_day — use guardian config default
+            cap = cfg.get("default_max_drafts_per_day", 2000)
             if count >= cap:
                 triggers.append({
                     "type": "talent_pause",
@@ -293,17 +298,17 @@ class GuardianWatchdog:
             self._send_guardian_alert(db, f"ALERT: Global AI kill triggered — {reason}", None, detail, cfg)
 
         elif t == "talent_pause":
-            # Idempotency: if talent is already paused, skip entirely.
+            # Idempotency: if talent is already paused in sop.md, skip entirely.
             # Without this, the guardian fires _log_marco every 60s indefinitely
             # because the velocity window still shows the breach after pause.
             try:
-                cfg_data = json.loads(_CONFIG_PATH.read_text())
-                already_paused = next(
-                    (bool(t_cfg.get("paused")) for t_cfg in cfg_data.get("talents", [])
-                     if t_cfg.get("key", "").lower() == (talent_key or "").lower()),
-                    False,
+                from backend.core.config import get_settings as _gs
+                profiles = _gs().talent_profiles
+                profile = profiles.get(talent_key or "") or next(
+                    (p for k, p in profiles.items() if k.lower() == (talent_key or "").lower()),
+                    None,
                 )
-                if already_paused:
+                if profile and profile.paused:
                     logger.info("Guardian: %s already paused — skipping re-dispatch", talent_key)
                     return
             except Exception as exc:
@@ -325,7 +330,7 @@ class GuardianWatchdog:
             # (settings write error), the cooldown still prevents 60s re-fire loops.
             _set_state(db, pause_key, datetime.utcnow().isoformat())
 
-            self._pause_talent(talent_key, reason)
+            self._pause_talent(talent_key, reason, db=db)
             _log_audit(db, "pause_talent", reason=reason, talent_key=talent_key,
                        detail=json.dumps(detail))
             _log_marco(db, f"GUARDIAN: {reason}", talent_key=talent_key, severity="critical")
@@ -354,11 +359,14 @@ class GuardianWatchdog:
             data = json.loads(_CONFIG_PATH.read_text())
             data["ai_enabled"] = enabled
             _CONFIG_PATH.write_text(json.dumps(data, indent=2))
+            # Clear the LRU cache so the new ai_enabled value takes effect immediately.
+            from backend.core.config import get_settings
+            get_settings.cache_clear()
             logger.warning("Guardian: ai_enabled set to %s", enabled)
         except Exception as exc:
             logger.error("Guardian: failed to set ai_enabled=%s: %s", enabled, exc)
 
-    def _pause_talent(self, talent_key: str, reason: str) -> None:
+    def _pause_talent(self, talent_key: str, reason: str, db: "Session | None" = None) -> None:
         try:
             from backend.core.config import get_settings
             sop_text = _SOP_PATH.read_text()
@@ -376,6 +384,35 @@ class GuardianWatchdog:
             _SOP_PATH.write_text(new_text)
             get_settings.cache_clear()
             logger.warning("Guardian: paused talent %s in sop.md — reason: %s", talent_key, reason)
+            # Persist to sop_versions DB so the pause survives a Render restart
+            # (on_startup restores from the active DB version, so sop.md-only writes
+            # are wiped every redeploy without this DB save).
+            try:
+                from backend.models.db import SopVersion, get_session_factory
+                from backend.services.sop_parser import parse_sop_md
+                _db = db or get_session_factory()()
+                _close = db is None  # only close if we opened it
+                try:
+                    _db.query(SopVersion).filter(SopVersion.is_active == True).update(  # noqa: E712
+                        {"is_active": False}
+                    )
+                    profiles = parse_sop_md(new_text)
+                    ver = SopVersion(
+                        version_label=f"guardian: paused {talent_key}",
+                        raw_content=new_text,
+                        talent_count=len(profiles),
+                        is_active=True,
+                    )
+                    _db.add(ver)
+                    _db.commit()
+                finally:
+                    if _close:
+                        _db.close()
+            except Exception as db_exc:
+                logger.warning(
+                    "Guardian: sop.md pause saved to disk but DB version save failed — "
+                    "change may be lost on restart: %s", db_exc
+                )
         except Exception as exc:
             logger.error("Guardian: failed to pause talent %s: %s", talent_key, exc)
 

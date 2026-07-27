@@ -482,7 +482,7 @@ def _blast_all_until_empty():
 
 
 @router.post("/cron/reconcile-drafts", dependencies=[Depends(verify_api_key)])
-def trigger_reconcile(background_tasks: BackgroundTasks):
+def reconcile_drafts_manually(background_tasks: BackgroundTasks):
     """Manually trigger draft reconciliation (detects drafts sent directly from Gmail)."""
     background_tasks.add_task(_run_reconcile)
     return {"ok": True, "queued": True}

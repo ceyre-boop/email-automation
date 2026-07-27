@@ -294,27 +294,35 @@ def list_inbox_messages(token_row, max_results: int = 50, db=None) -> list[dict]
     return result.get("messages", [])
 
 
-def list_unread_inbox_messages(token_row, db=None, max_results: int = 100) -> list[dict]:
+def list_unread_inbox_messages(token_row, db=None, max_results: int = 500) -> list[dict]:
     """
-    Return a list of unread INBOX messages for the talent.
+    Return a list of unread INBOX messages for the talent, paginating through all pages.
     Each item: {"id": <gmail_message_id>, "threadId": <thread_id>}
+
+    max_results caps the TOTAL returned (default 500 — well above any real inbox backlog).
+    Gmail API returns at most 500 per page; we paginate until done or the cap is hit.
     """
     service = _gmail_service(token_row, db)
+    messages: list[dict] = []
+    page_token = None
     try:
-        result = (
-            service.users()
-            .messages()
-            .list(
-                userId="me",
-                labelIds=["INBOX", "UNREAD"],
-                maxResults=max_results,
-            )
-            .execute()
-        )
+        while len(messages) < max_results:
+            kwargs: dict = {
+                "userId": "me",
+                "labelIds": ["INBOX", "UNREAD"],
+                "maxResults": min(500, max_results - len(messages)),
+            }
+            if page_token:
+                kwargs["pageToken"] = page_token
+            result = service.users().messages().list(**kwargs).execute()
+            messages.extend(result.get("messages", []))
+            page_token = result.get("nextPageToken")
+            if not page_token:
+                break
     except HttpError as exc:
         logger.error("Gmail list error for %s: %s", token_row.talent_key, exc)
-        return []
-    return result.get("messages", [])
+        return messages  # return whatever we have so far, don't wipe on partial failure
+    return messages
 
 
 def list_spam_messages(token_row, db=None, max_results: int = 50) -> list[dict]:
@@ -498,28 +506,6 @@ def get_thread_message_count(service, thread_id: str) -> int | None:
     except HttpError as exc:
         logger.warning("get_thread_message_count failed for %s (non-fatal): %s", thread_id, exc)
         return None
-
-
-def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
-    """
-    Return True if this Gmail thread already has a SENT message in it.
-
-    Catches threads where a human already replied (no DB record exists because
-    the conversation predates this system). Uses format='minimal' to keep the
-    API call cheap — we only need labels, not full message content.
-    Returns False on any API error so a failure never silently blocks a draft.
-    """
-    try:
-        thread = service.users().threads().get(
-            userId="me", id=thread_id, format="minimal"
-        ).execute()
-        for msg in thread.get("messages", []):
-            if "SENT" in msg.get("labelIds", []):
-                return True
-        return False
-    except HttpError as exc:
-        logger.warning("thread_has_prior_sent_reply failed for %s (non-fatal): %s", thread_id, exc)
-        return False
 
 
 # ── Labelling / archiving ─────────────────────────────────────────────────────
@@ -808,7 +794,8 @@ def send_standalone_message(token_row, to: str, subject: str, body: str, db=None
     """Send a fresh (non-reply) email from the talent's Gmail account."""
     service = _gmail_service(token_row, db)
     mime_msg = MIMEText(body, "plain")
-    mime_msg["From"] = "Colin <colineyre222@gmail.com>"
+    # Do NOT set From explicitly — Gmail API sets it from the authenticated credentials.
+    # A hardcoded From header would send guardian alerts as the wrong sender.
     mime_msg["To"] = _safe_address(to)
     mime_msg["Subject"] = subject
     raw = base64.urlsafe_b64encode(mime_msg.as_bytes()).decode()
