@@ -615,7 +615,9 @@ def test_create_draft_no_reply_to_for_unrouted_inbox(mock_build, mock_creds, moc
     from backend.services.gmail import create_gmail_draft
 
     token = _make_token()
-    token.email = "katrina@taboost.me"  # not on the routing list
+    # Must be an inbox absent from config/settings.json reply_to_routing.inboxes.
+    # Do NOT use katrina@ — SOP v15b added Katrina to the routing list.
+    token.email = "wesley@taboost.me"
     svc = _mock_service()
     svc.users().drafts().create().execute.return_value = {"id": "d1"}
     mock_build.return_value = svc

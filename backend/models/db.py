@@ -349,14 +349,19 @@ def _make_engine():
         # gives 25 hard cap, which fits with the reduced MAX_TALENT_WORKERS=5 and
         # MAX_CONCURRENT_EMAILS=3 in poller.py. Increasing these limits further would
         # require Supabase connection limit audit first (free tier: ~60 concurrent).
-        _engine = create_engine(
-            db_url,
-            pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
-            max_overflow=15,    # was 10 — total cap: 25
-            pool_timeout=15,    # was 10 — extra breathing room under load
-            pool_recycle=300,
-            pool_pre_ping=True,
-        )
+        # SQLite (tests) uses SingletonThreadPool, which rejects the queue-pool
+        # kwargs below with a TypeError. Only pass them for real Postgres.
+        if db_url.startswith("sqlite"):
+            _engine = create_engine(db_url)
+        else:
+            _engine = create_engine(
+                db_url,
+                pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
+                max_overflow=15,    # was 10 — total cap: 25
+                pool_timeout=15,    # was 10 — extra breathing room under load
+                pool_recycle=300,
+                pool_pre_ping=True,
+            )
     return _engine
 
 
