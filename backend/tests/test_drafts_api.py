@@ -223,3 +223,52 @@ def test_approve_deletes_gmail_draft_copy(mock_delete, mock_send, mock_checks, c
     resp = client.post(f"/api/drafts/{draft.id}/approve")
     assert resp.status_code == 200
     mock_delete.assert_called_once()
+
+
+def test_approve_blocked_by_verbatim_gate(client, db_session):
+    """Send-time verbatim check: off-script AI draft must be blocked with 422."""
+    from backend.services.reply import get_scenario_a_response
+
+    # Use a real SOP talent (Sylvia lives in test fixtures and is merged via _patch_sop_md_path)
+    approved = get_scenario_a_response("Sylvia")
+    assert approved, "Sylvia's Scenario A must be available via the test fixture"
+
+    make_token(db_session, talent_key="Sylvia")
+    # Insert a draft whose text is NOT the verbatim approved response
+    off_script = approved.replace("Thank you", "Thanks") if "Thank you" in approved else approved + " Extra sentence."
+    draft = make_draft(db_session, talent_key="Sylvia")
+    draft.draft_text = off_script
+    db_session.add(draft)
+    db_session.commit()
+
+    with patch("backend.routers.drafts.gmail_svc.send_reply", return_value=(True, "")):
+        resp = client.post(f"/api/drafts/{draft.id}/approve")
+
+    assert resp.status_code == 422
+    assert "Verbatim" in resp.json()["detail"] or "verbatim" in resp.json()["detail"].lower()
+
+
+@patch("backend.routers.drafts.gmail_svc.send_reply", return_value=(True, ""))
+def test_approve_human_edited_bypasses_verbatim_gate(mock_send, client, db_session):
+    """Human-edited drafts bypass the verbatim check — the edit IS the approval."""
+    from backend.services.reply import get_scenario_a_response
+    from datetime import datetime
+
+    approved = get_scenario_a_response("Sylvia")
+    assert approved, "Sylvia's Scenario A must be available via the test fixture"
+
+    make_token(db_session, talent_key="Sylvia")
+    # Off-script text — but human_edited=True means verbatim gate is skipped
+    off_script = approved + " (manager added context here)"
+    draft = make_draft(db_session, talent_key="Sylvia")
+    draft.draft_text = off_script
+    draft.human_edited = True
+    draft.human_edited_at = datetime.utcnow()
+    draft.human_edited_by = "colin"
+    db_session.add(draft)
+    db_session.commit()
+
+    resp = client.post(f"/api/drafts/{draft.id}/approve")
+    # Should NOT be 422 — human-edited drafts skip verbatim check
+    # May be 404 (token check) or 200 — just must not be blocked by verbatim
+    assert resp.status_code != 422, "Human-edited draft must not be blocked by verbatim gate"
