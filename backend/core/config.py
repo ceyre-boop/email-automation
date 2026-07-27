@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     # Polling
     poll_interval_minutes: int = 5
 
+    # Render deploy hook (POST to this URL to trigger a redeploy)
+    # Set RENDER_DEPLOY_HOOK_URL in Render → Environment Variables
+    render_deploy_hook_url: str = ""
+
     # ── Derived helpers ─────────────────────────────────────────────────────
 
     @property

@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import re
+import urllib.request
+from datetime import datetime
 from io import BytesIO
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Response, UploadFile
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Response, UploadFile
 from pydantic import BaseModel
 
 from backend.core.config import get_settings
@@ -261,3 +263,220 @@ async def confirm_sop_import(payload: dict):
         "talent_count": len(incoming_profiles),
         "new_talents": new_talent_keys,
     }
+
+
+# ── V2 SOP upload (rich-text aware) ──────────────────────────────────────────
+
+
+@router.post("/api/sop/upload-v2", dependencies=[Depends(verify_api_key)])
+async def upload_sop_v2(
+    file: UploadFile = File(...),
+    label: str = Form(""),
+):
+    """
+    Accept a .docx SOP file, extract rich text (preserving **bold** and
+    [hyperlinks](url)), merge the approved responses + personal emails into
+    the existing sop.md (keeping all metadata: Key, Gmail, Min Rate, etc.),
+    write the result to disk, persist it in the sop_versions table, and
+    clear all in-memory caches so the new SOP is live immediately.
+
+    Does NOT trigger a Render redeploy — that's a separate button.
+    The startup handler restores the active DB version on the next deploy.
+    """
+    try:
+        from backend.services.docx_parser import extract_talent_sections
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=f"docx_parser not available: {exc}")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    try:
+        docx_talents = extract_talent_sections(content)
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not parse docx: {exc}")
+
+    if not docx_talents:
+        raise HTTPException(
+            status_code=400,
+            detail="No 'Talent: Name' sections found in the docx — check the file format",
+        )
+
+    # Read current sop.md and parse existing profiles
+    sop_text = _read_sop()
+    existing_profiles = parse_sop_md(sop_text)
+
+    matched: list[str] = []
+    unmatched_sop: list[str] = []
+    unmatched_docx: list[str] = []
+    warnings: list[str] = []
+
+    for key, profile in existing_profiles.items():
+        name_lower = profile.full_name.lower()
+        docx_entry = docx_talents.get(name_lower)
+
+        # Fallback: match by first word of name (catches "Brittany" matching "Brittany Kuhl")
+        if docx_entry is None:
+            first_word = name_lower.split()[0] if name_lower.split() else ""
+            docx_entry = next(
+                (v for k, v in docx_talents.items() if k.startswith(first_word + " ") or k == first_word),
+                None,
+            )
+
+        if docx_entry is None:
+            unmatched_sop.append(profile.key)
+            continue
+
+        matched.append(profile.key)
+
+        if docx_entry.get("approved_response"):
+            try:
+                sop_text = _writer.update_approved_response(
+                    sop_text, profile.key, docx_entry["approved_response"]
+                )
+            except ValueError as exc:
+                warnings.append(f"{profile.key}: approved response not updated — {exc}")
+
+        if docx_entry.get("personal_emails"):
+            try:
+                sop_text = _writer.update_personal_emails(
+                    sop_text, profile.key, docx_entry["personal_emails"]
+                )
+            except ValueError as exc:
+                warnings.append(f"{profile.key}: personal emails not updated — {exc}")
+
+    # Find docx talents that had no match in sop.md
+    matched_name_lowers = {existing_profiles[k].full_name.lower() for k in matched}
+    for docx_name, docx_entry in docx_talents.items():
+        if docx_name not in matched_name_lowers:
+            unmatched_docx.append(docx_entry["full_name"])
+
+    # Write updated sop.md to disk + clear caches
+    _writer.write_sop_md(sop_text)
+
+    # Persist merged sop.md to sop_versions table as new active version
+    version_id: int | None = None
+    try:
+        from backend.models.db import SopVersion, get_session_factory
+        db = get_session_factory()()
+        try:
+            db.query(SopVersion).filter(SopVersion.is_active == True).update(  # noqa: E712
+                {"is_active": False}
+            )
+            version_label = label.strip() or f"Upload {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+            new_ver = SopVersion(
+                version_label=version_label,
+                raw_content=sop_text,
+                talent_count=len(existing_profiles),
+                is_active=True,
+            )
+            db.add(new_ver)
+            db.commit()
+            db.refresh(new_ver)
+            version_id = new_ver.id
+        finally:
+            db.close()
+    except Exception as exc:
+        warnings.append(f"DB version save failed (non-fatal — SOP is still live on disk): {exc}")
+
+    return {
+        "status": "ok",
+        "matched": matched,
+        "unmatched_sop": unmatched_sop,   # sop.md talents with no docx match (response unchanged)
+        "unmatched_docx": unmatched_docx,  # docx talents with no sop.md match (ignored)
+        "warnings": warnings,
+        "version_id": version_id,
+        "talent_count": len(existing_profiles),
+    }
+
+
+# ── Version history ───────────────────────────────────────────────────────────
+
+
+@router.get("/api/sop/versions", dependencies=[Depends(verify_api_key)])
+def list_sop_versions():
+    """Return the 20 most recent SOP versions from the DB."""
+    try:
+        from backend.models.db import SopVersion, get_session_factory
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    db = get_session_factory()()
+    try:
+        versions = (
+            db.query(SopVersion)
+            .order_by(SopVersion.uploaded_at.desc())
+            .limit(20)
+            .all()
+        )
+        return {
+            "versions": [
+                {
+                    "id": v.id,
+                    "label": v.version_label,
+                    "talent_count": v.talent_count,
+                    "uploaded_at": v.uploaded_at.isoformat() if v.uploaded_at else None,
+                    "is_active": v.is_active,
+                }
+                for v in versions
+            ]
+        }
+    finally:
+        db.close()
+
+
+@router.post("/api/sop/versions/{version_id}/restore", dependencies=[Depends(verify_api_key)])
+def restore_sop_version(version_id: int):
+    """Restore a past SOP version: write it to sop.md, mark it active in DB."""
+    try:
+        from backend.models.db import SopVersion, get_session_factory
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+    db = get_session_factory()()
+    try:
+        version = db.query(SopVersion).filter(SopVersion.id == version_id).first()
+        if version is None:
+            raise HTTPException(status_code=404, detail=f"Version {version_id} not found")
+
+        # Write to disk + clear caches
+        _writer.write_sop_md(version.raw_content)
+
+        # Mark this version active
+        db.query(SopVersion).filter(SopVersion.is_active == True).update(  # noqa: E712
+            {"is_active": False}
+        )
+        version.is_active = True
+        db.commit()
+
+        return {"status": "ok", "version_id": version_id, "label": version.version_label}
+    finally:
+        db.close()
+
+
+# ── Render deploy hook ────────────────────────────────────────────────────────
+
+
+@router.post("/api/sop/deploy-render", dependencies=[Depends(verify_api_key)])
+def deploy_to_render():
+    """
+    Trigger a Render redeploy via the deploy hook URL stored in
+    RENDER_DEPLOY_HOOK_URL env var.  The SOP itself is already live on disk
+    (write_sop_md is instant); this deploy is only needed so the next startup
+    also restores from DB correctly after any code changes.
+    """
+    hook = get_settings().render_deploy_hook_url
+    if not hook:
+        raise HTTPException(
+            status_code=400,
+            detail="RENDER_DEPLOY_HOOK_URL not set — add it in Render → Environment Variables",
+        )
+    try:
+        req = urllib.request.Request(hook, method="POST")
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            return {"status": "ok", "http_status": resp.status}
+    except urllib.error.HTTPError as exc:
+        raise HTTPException(status_code=502, detail=f"Render hook returned {exc.code}: {exc.reason}")
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=f"Render deploy hook failed: {exc}")

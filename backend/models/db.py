@@ -112,28 +112,6 @@ class ProcessedEmail(Base):
     scenario_needs_improvement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
 
 
-class ExternalChannelReview(Base):
-    """Informational-only flag: inbound emails whose sender asked to continue via an
-    outside channel (WhatsApp / Discord). Stored in its own table so it never touches
-    the hot `processed_emails` schema — surfacing this flag cannot affect triage,
-    drafts, labels, send, or any existing dashboard read path. Self-contained: the
-    dashboard section reads only this table (sender/subject/body are denormalized here)."""
-
-    __tablename__ = "external_channel_reviews"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    gmail_message_id: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False)
-    thread_id: Mapped[str | None] = mapped_column(String(128))
-    talent_key: Mapped[str | None] = mapped_column(String(64), index=True)
-    sender: Mapped[str | None] = mapped_column(String(256))
-    subject: Mapped[str | None] = mapped_column(String(512))
-    body_text: Mapped[str | None] = mapped_column(Text)                 # ORIGINAL inbound body
-    channel_requested: Mapped[str | None] = mapped_column(String(16))   # WhatsApp | Discord | Both
-    received_at: Mapped[datetime | None] = mapped_column(DateTime)
-    dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-
-
 class OAuthState(Base):
     """Short-lived CSRF state tokens for the OAuth flow. DB-backed so restarts don't break reconnects."""
 
@@ -331,6 +309,27 @@ class GuardianAuditLog(Base):
     )
 
 
+class SopVersion(Base):
+    """
+    Persisted snapshot of sheets/sop.md after each successful docx upload.
+
+    The startup event handler reads the active version from this table and
+    writes it to sheets/sop.md so the SOP survives Render redeploys even if
+    git commit/push fails from the running container.
+    """
+
+    __tablename__ = "sop_versions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    version_label: Mapped[str] = mapped_column(String(256), nullable=False, default="")
+    raw_content: Mapped[str] = mapped_column(Text, nullable=False)
+    talent_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uploaded_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, nullable=False
+    )
+    is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+
 # ── Engine / session factory ─────────────────────────────────────────────────
 # These are created lazily so tests can override DATABASE_URL before import.
 
@@ -349,19 +348,14 @@ def _make_engine():
         # gives 25 hard cap, which fits with the reduced MAX_TALENT_WORKERS=5 and
         # MAX_CONCURRENT_EMAILS=3 in poller.py. Increasing these limits further would
         # require Supabase connection limit audit first (free tier: ~60 concurrent).
-        # SQLite (tests) uses SingletonThreadPool, which rejects the queue-pool
-        # kwargs below with a TypeError. Only pass them for real Postgres.
-        if db_url.startswith("sqlite"):
-            _engine = create_engine(db_url)
-        else:
-            _engine = create_engine(
-                db_url,
-                pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
-                max_overflow=15,    # was 10 — total cap: 25
-                pool_timeout=15,    # was 10 — extra breathing room under load
-                pool_recycle=300,
-                pool_pre_ping=True,
-            )
+        _engine = create_engine(
+            db_url,
+            pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
+            max_overflow=15,    # was 10 — total cap: 25
+            pool_timeout=15,    # was 10 — extra breathing room under load
+            pool_recycle=300,
+            pool_pre_ping=True,
+        )
     return _engine
 
 
@@ -388,15 +382,7 @@ def get_session_factory():
 def create_tables():
     """Create all tables and run additive column migrations (idempotent)."""
     engine = _make_engine()
-    # create_all is wrapped so a failure here can never abort the function and
-    # silently block _MIGRATION_STMTS below — that abort-before-migrations flaw
-    # left new tables/columns missing in prod while the deployed ORM referenced
-    # them. New tables must ALSO ship a CREATE TABLE IF NOT EXISTS migration
-    # statement (see guardian_audit_log / external_channel_reviews).
-    try:
-        Base.metadata.create_all(engine)
-    except Exception as exc:  # noqa: BLE001
-        logger.error("create_all failed (continuing to migrations): %s", exc)
+    Base.metadata.create_all(engine)
     # Additive column migrations — AUTOCOMMIT so each statement is its own transaction.
     # Previously used a single shared connection where one failure aborted all subsequent
     # statements silently. AUTOCOMMIT isolates failures: a DDL error on one statement
@@ -445,24 +431,15 @@ def create_tables():
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS time_to_draft_ms INTEGER",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
-        # External Channel Review — new isolated table. Created here (proven mechanism)
-        # rather than trusting create_all; must match the ExternalChannelReview model 1:1.
-        """CREATE TABLE IF NOT EXISTS external_channel_reviews (
-            id SERIAL PRIMARY KEY,
-            gmail_message_id VARCHAR(128) NOT NULL,
-            thread_id VARCHAR(128),
-            talent_key VARCHAR(64),
-            sender VARCHAR(256),
-            subject VARCHAR(512),
-            body_text TEXT,
-            channel_requested VARCHAR(16),
-            received_at TIMESTAMP,
-            dismissed BOOLEAN NOT NULL DEFAULT FALSE,
-            created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
-        )""",
-        "CREATE UNIQUE INDEX IF NOT EXISTS uq_extreview_gmail_message_id ON external_channel_reviews (gmail_message_id)",
-        "CREATE INDEX IF NOT EXISTS ix_extreview_talent_key ON external_channel_reviews (talent_key)",
         "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'",
+        """CREATE TABLE IF NOT EXISTS sop_versions (
+            id SERIAL PRIMARY KEY,
+            version_label VARCHAR(256) NOT NULL DEFAULT '',
+            raw_content TEXT NOT NULL,
+            talent_count INTEGER,
+            uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            is_active BOOLEAN NOT NULL DEFAULT FALSE
+        )""",
         # NOTE: score=0 ghost-row cleanup removed from startup — it can lock processed_emails
         # on a large table and delay port binding, causing Render R10 boot timeouts.
         # This cleanup now runs inside _run_guardian() (cron.py) at +35s after startup.

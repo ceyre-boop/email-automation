@@ -1,0 +1,498 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>SOP Manager — TABOOST</title>
+<style>
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#080b14;--surface:#0d1120;--border:rgba(255,255,255,.08);
+    --pink:#e91e8c;--pink-dim:rgba(233,30,140,.15);--pink-border:rgba(233,30,140,.35);
+    --green:#22c55e;--green-dim:rgba(34,197,94,.12);
+    --yellow:#f59e0b;--yellow-dim:rgba(245,158,11,.12);
+    --red:#ef4444;--red-dim:rgba(239,68,68,.12);
+    --text:#e2e8f0;--muted:rgba(255,255,255,.45);--subtle:rgba(255,255,255,.12);
+    --radius:10px;--transition:.18s ease;
+  }
+  html{background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"SF Pro Display","Segoe UI",sans-serif;font-size:14px;line-height:1.6}
+  body{min-height:100vh;padding:0 0 80px}
+
+  /* ── Header ── */
+  .header{background:var(--surface);border-bottom:1px solid var(--border);padding:16px 24px;display:flex;align-items:center;gap:12px;position:sticky;top:0;z-index:100}
+  .header-logo{color:var(--pink);font-size:18px;font-weight:800;letter-spacing:-.03em}
+  .header-title{color:var(--muted);font-size:14px}
+  .header-sep{color:var(--subtle);margin:0 4px}
+
+  /* ── Layout ── */
+  .container{max-width:860px;margin:0 auto;padding:32px 24px;display:flex;flex-direction:column;gap:28px}
+
+  /* ── Cards ── */
+  .card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden}
+  .card-header{padding:16px 20px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+  .card-title{font-size:14px;font-weight:600;color:var(--text)}
+  .card-body{padding:20px}
+
+  /* ── API Key bar ── */
+  .key-bar{display:flex;gap:8px;align-items:center}
+  .key-bar input{flex:1;background:#0a0e1c;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:13px;padding:8px 12px;outline:none;transition:border var(--transition)}
+  .key-bar input:focus{border-color:var(--pink-border)}
+  .key-bar input::placeholder{color:var(--muted)}
+  .key-saved{color:var(--green);font-size:12px;opacity:0;transition:opacity .3s}
+  .key-saved.show{opacity:1}
+
+  /* ── Buttons ── */
+  .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:6px;border:none;cursor:pointer;font-size:13px;font-weight:600;transition:all var(--transition);white-space:nowrap}
+  .btn-primary{background:var(--pink);color:#fff}
+  .btn-primary:hover{background:#d01a7e}
+  .btn-primary:disabled{background:rgba(233,30,140,.3);cursor:not-allowed}
+  .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+  .btn-ghost:hover{border-color:var(--pink-border);color:var(--text)}
+  .btn-danger{background:transparent;border:1px solid rgba(239,68,68,.4);color:var(--red)}
+  .btn-danger:hover{background:var(--red-dim)}
+  .btn-sm{padding:5px 10px;font-size:12px}
+
+  /* ── Drop zone ── */
+  .drop-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px 24px;text-align:center;cursor:pointer;transition:all var(--transition);position:relative}
+  .drop-zone:hover,.drop-zone.drag-over{border-color:var(--pink-border);background:var(--pink-dim)}
+  .drop-zone input[type=file]{position:absolute;inset:0;opacity:0;cursor:pointer}
+  .drop-icon{font-size:32px;margin-bottom:12px}
+  .drop-title{font-weight:600;color:var(--text);margin-bottom:4px}
+  .drop-sub{font-size:12px;color:var(--muted)}
+
+  /* ── File selected state ── */
+  .file-selected{display:none;margin-top:16px;padding:14px 16px;background:#0a0e1c;border:1px solid var(--border);border-radius:8px}
+  .file-selected.show{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .file-name-badge{background:var(--pink-dim);border:1px solid var(--pink-border);border-radius:4px;padding:3px 10px;font-size:12px;color:var(--pink);font-weight:600}
+  .label-input{flex:1;min-width:180px;background:transparent;border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:12px;padding:6px 10px;outline:none}
+  .label-input:focus{border-color:var(--pink-border)}
+  .label-input::placeholder{color:var(--muted)}
+
+  /* ── Upload result ── */
+  .result-box{display:none;margin-top:16px;padding:16px;border-radius:8px}
+  .result-box.show{display:block}
+  .result-box.success{background:var(--green-dim);border:1px solid rgba(34,197,94,.25)}
+  .result-box.error{background:var(--red-dim);border:1px solid rgba(239,68,68,.25)}
+  .result-title{font-weight:700;font-size:14px;margin-bottom:10px}
+  .result-box.success .result-title{color:var(--green)}
+  .result-box.error .result-title{color:var(--red)}
+  .result-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:12px}
+  .result-stat{background:rgba(0,0,0,.25);border-radius:6px;padding:10px 12px}
+  .result-stat-num{font-size:22px;font-weight:800;line-height:1}
+  .result-stat-label{font-size:11px;color:var(--muted);margin-top:2px}
+  .tag-list{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+  .tag{font-size:11px;padding:2px 8px;border-radius:4px;font-weight:600}
+  .tag-green{background:var(--green-dim);color:var(--green)}
+  .tag-yellow{background:var(--yellow-dim);color:var(--yellow)}
+  .tag-red{background:var(--red-dim);color:var(--red)}
+  .warnings-list{margin-top:10px}
+  .warn-item{font-size:12px;color:var(--yellow);padding:3px 0;border-bottom:1px solid rgba(245,158,11,.1)}
+  .warn-item:last-child{border-bottom:none}
+
+  /* ── Version history ── */
+  .versions-table{width:100%;border-collapse:collapse}
+  .versions-table th{text-align:left;font-size:11px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:8px 12px;border-bottom:1px solid var(--border)}
+  .versions-table td{padding:10px 12px;border-bottom:1px solid rgba(255,255,255,.04);font-size:13px;vertical-align:middle}
+  .versions-table tr:last-child td{border-bottom:none}
+  .versions-table tr:hover td{background:rgba(255,255,255,.02)}
+  .active-badge{display:inline-block;background:var(--green-dim);border:1px solid rgba(34,197,94,.3);color:var(--green);font-size:10px;font-weight:700;padding:2px 7px;border-radius:4px;text-transform:uppercase;letter-spacing:.04em}
+  .empty-state{text-align:center;color:var(--muted);padding:32px 0;font-size:13px}
+
+  /* ── Deploy section ── */
+  .deploy-info{font-size:13px;color:var(--muted);margin-bottom:14px;line-height:1.7}
+  .deploy-status{margin-top:12px;font-size:13px;display:none}
+  .deploy-status.show{display:block}
+  .deploy-status.ok{color:var(--green)}
+  .deploy-status.err{color:var(--red)}
+
+  /* ── Spinner ── */
+  .spinner{display:inline-block;width:14px;height:14px;border:2px solid rgba(255,255,255,.2);border-top-color:currentColor;border-radius:50%;animation:spin .6s linear infinite;vertical-align:middle}
+  @keyframes spin{to{transform:rotate(360deg)}}
+
+  /* ── Toasts ── */
+  #toast{position:fixed;bottom:24px;right:24px;background:#1a2035;border:1px solid var(--border);border-radius:8px;padding:12px 18px;font-size:13px;color:var(--text);transform:translateY(120%);transition:transform .25s ease;z-index:9999;max-width:340px}
+  #toast.show{transform:translateY(0)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-logo">TABOOST</span>
+  <span class="header-sep">›</span>
+  <span class="header-title">SOP Manager</span>
+</div>
+
+<div class="container">
+
+  <!-- API Key -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🔑 API Key</span>
+      <span class="key-saved" id="key-saved">Saved ✓</span>
+    </div>
+    <div class="card-body">
+      <div class="key-bar">
+        <input type="password" id="api-key-input" placeholder="Paste your x-api-key here…" autocomplete="off"/>
+        <button class="btn btn-ghost" onclick="saveKey()">Save</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Upload -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">📄 Upload New SOP</span>
+    </div>
+    <div class="card-body">
+
+      <div class="drop-zone" id="drop-zone" onclick="document.getElementById('file-input').click()">
+        <input type="file" id="file-input" accept=".docx" onchange="onFileSelect(event)"/>
+        <div class="drop-icon">⬆️</div>
+        <div class="drop-title">Drop .docx here or click to browse</div>
+        <div class="drop-sub">CEO's SOP document · Preserves bold formatting &amp; hyperlinks</div>
+      </div>
+
+      <div class="file-selected" id="file-selected">
+        <span class="file-name-badge" id="file-name-badge"></span>
+        <input class="label-input" id="version-label" type="text" placeholder="Version label (optional, e.g. v15b)"/>
+        <button class="btn btn-primary" id="upload-btn" onclick="uploadSop()">
+          Upload &amp; Activate
+        </button>
+        <button class="btn btn-ghost" onclick="clearFile()">✕ Clear</button>
+      </div>
+
+      <div class="result-box" id="result-box">
+        <div class="result-title" id="result-title"></div>
+        <div class="result-grid" id="result-grid"></div>
+        <div id="result-tags"></div>
+        <div id="result-warnings" class="warnings-list"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Version History -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🕐 Version History</span>
+      <button class="btn btn-ghost btn-sm" onclick="loadVersions()">Refresh</button>
+    </div>
+    <div class="card-body" style="padding:0">
+      <div id="versions-wrap">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Deploy to Render -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">🚀 Deploy Code to Render</span>
+    </div>
+    <div class="card-body">
+      <p class="deploy-info">
+        SOP content updates are <strong>immediate</strong> — no deploy needed.
+        Use this button only when you've pushed code changes that also need to
+        go live.  The deploy takes ~2–3 minutes.
+      </p>
+      <button class="btn btn-danger" id="deploy-btn" onclick="deployToRender()">
+        Trigger Render Deploy
+      </button>
+      <div class="deploy-status" id="deploy-status"></div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<div id="toast"></div>
+
+<script>
+'use strict';
+
+// ── State ──────────────────────────────────────────────────────────────────
+
+let selectedFile = null;
+
+// ── Persistence ────────────────────────────────────────────────────────────
+
+function getKey() {
+  return localStorage.getItem('sop_api_key') || '';
+}
+
+function saveKey() {
+  const val = document.getElementById('api-key-input').value.trim();
+  if (!val) { toast('Enter an API key first'); return; }
+  localStorage.setItem('sop_api_key', val);
+  const el = document.getElementById('key-saved');
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ── File selection ─────────────────────────────────────────────────────────
+
+function onFileSelect(evt) {
+  const f = evt.target.files[0];
+  if (!f) return;
+  selectedFile = f;
+  document.getElementById('file-name-badge').textContent = f.name;
+  document.getElementById('file-selected').classList.add('show');
+  document.getElementById('result-box').classList.remove('show');
+}
+
+function clearFile() {
+  selectedFile = null;
+  document.getElementById('file-input').value = '';
+  document.getElementById('file-selected').classList.remove('show');
+  document.getElementById('result-box').classList.remove('show');
+}
+
+// Drag-and-drop
+const dz = document.getElementById('drop-zone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault();
+  dz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.docx')) {
+    selectedFile = f;
+    document.getElementById('file-name-badge').textContent = f.name;
+    document.getElementById('file-selected').classList.add('show');
+    document.getElementById('result-box').classList.remove('show');
+  } else {
+    toast('Please drop a .docx file');
+  }
+});
+
+// ── Upload ─────────────────────────────────────────────────────────────────
+
+async function uploadSop() {
+  const key = getKey();
+  if (!key) { toast('Set your API key first'); return; }
+  if (!selectedFile) { toast('Select a .docx file first'); return; }
+
+  const btn = document.getElementById('upload-btn');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Uploading…';
+
+  const label = document.getElementById('version-label').value.trim();
+  const fd = new FormData();
+  fd.append('file', selectedFile);
+  if (label) fd.append('label', label);
+
+  try {
+    const resp = await fetch('/admin/api/sop/upload-v2', {
+      method: 'POST',
+      headers: { 'x-api-key': key },
+      body: fd,
+    });
+    const data = await resp.json();
+
+    if (!resp.ok) {
+      showError(data.detail || JSON.stringify(data));
+    } else {
+      showSuccess(data);
+      loadVersions();
+    }
+  } catch (err) {
+    showError(String(err));
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Upload &amp; Activate';
+  }
+}
+
+function showSuccess(data) {
+  const box = document.getElementById('result-box');
+  box.className = 'result-box show success';
+
+  document.getElementById('result-title').textContent =
+    `✅ SOP activated — ${data.matched.length} talents updated`;
+
+  document.getElementById('result-grid').innerHTML = `
+    <div class="result-stat">
+      <div class="result-stat-num" style="color:var(--green)">${data.matched.length}</div>
+      <div class="result-stat-label">Matched &amp; updated</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-num" style="color:var(--muted)">${data.unmatched_sop.length}</div>
+      <div class="result-stat-label">In SOP but not in docx (unchanged)</div>
+    </div>
+    <div class="result-stat">
+      <div class="result-stat-num" style="color:var(--yellow)">${data.unmatched_docx.length}</div>
+      <div class="result-stat-label">In docx but not in SOP (ignored)</div>
+    </div>
+    ${data.version_id ? `<div class="result-stat">
+      <div class="result-stat-num" style="color:var(--pink)">#${data.version_id}</div>
+      <div class="result-stat-label">Version saved to DB</div>
+    </div>` : ''}
+  `;
+
+  // Tag lists
+  let tagsHtml = '';
+  if (data.matched.length) {
+    tagsHtml += `<div style="margin-top:12px;font-size:12px;color:var(--muted);margin-bottom:6px">Updated:</div>
+      <div class="tag-list">${data.matched.map(k => `<span class="tag tag-green">${k}</span>`).join('')}</div>`;
+  }
+  if (data.unmatched_docx.length) {
+    tagsHtml += `<div style="margin-top:10px;font-size:12px;color:var(--muted);margin-bottom:6px">In docx only (new talent — add to sop.md manually to activate):</div>
+      <div class="tag-list">${data.unmatched_docx.map(n => `<span class="tag tag-yellow">${n}</span>`).join('')}</div>`;
+  }
+  if (data.unmatched_sop.length) {
+    tagsHtml += `<div style="margin-top:10px;font-size:12px;color:var(--muted);margin-bottom:6px">In SOP only (response unchanged):</div>
+      <div class="tag-list">${data.unmatched_sop.map(k => `<span class="tag tag-red">${k}</span>`).join('')}</div>`;
+  }
+  document.getElementById('result-tags').innerHTML = tagsHtml;
+
+  // Warnings
+  const warnHtml = (data.warnings || []).map(w =>
+    `<div class="warn-item">⚠️ ${escHtml(w)}</div>`
+  ).join('');
+  document.getElementById('result-warnings').innerHTML = warnHtml;
+}
+
+function showError(detail) {
+  const box = document.getElementById('result-box');
+  box.className = 'result-box show error';
+  document.getElementById('result-title').textContent = '❌ Upload failed';
+  document.getElementById('result-grid').innerHTML = '';
+  document.getElementById('result-tags').innerHTML = `<p style="color:var(--red);font-size:13px;margin-top:4px">${escHtml(String(detail))}</p>`;
+  document.getElementById('result-warnings').innerHTML = '';
+}
+
+// ── Version History ────────────────────────────────────────────────────────
+
+async function loadVersions() {
+  const key = getKey();
+  const wrap = document.getElementById('versions-wrap');
+
+  if (!key) {
+    wrap.innerHTML = '<div class="empty-state">Set your API key to view version history</div>';
+    return;
+  }
+
+  wrap.innerHTML = '<div class="empty-state"><span class="spinner"></span> Loading…</div>';
+
+  try {
+    const resp = await fetch('/admin/api/sop/versions', { headers: { 'x-api-key': key } });
+    if (!resp.ok) {
+      wrap.innerHTML = `<div class="empty-state" style="color:var(--red)">Error ${resp.status}</div>`;
+      return;
+    }
+    const data = await resp.json();
+    renderVersions(data.versions || []);
+  } catch (err) {
+    wrap.innerHTML = `<div class="empty-state" style="color:var(--red)">${escHtml(String(err))}</div>`;
+  }
+}
+
+function renderVersions(versions) {
+  const wrap = document.getElementById('versions-wrap');
+  if (!versions.length) {
+    wrap.innerHTML = '<div class="empty-state">No versions saved yet — upload a docx to create one</div>';
+    return;
+  }
+
+  const rows = versions.map(v => {
+    const dt = v.uploaded_at ? new Date(v.uploaded_at + 'Z').toLocaleString() : '—';
+    const activeBadge = v.is_active ? '<span class="active-badge">Active</span>' : '';
+    return `<tr>
+      <td>${activeBadge || '<span style="color:var(--subtle)">—</span>'}</td>
+      <td style="font-weight:600">${escHtml(v.label || '—')}</td>
+      <td style="color:var(--muted)">${v.talent_count ?? '—'} talents</td>
+      <td style="color:var(--muted);font-size:12px">${escHtml(dt)}</td>
+      <td>
+        ${!v.is_active ? `<button class="btn btn-ghost btn-sm" onclick="restoreVersion(${v.id}, '${escHtml(v.label || '')}')">Restore</button>` : ''}
+      </td>
+    </tr>`;
+  }).join('');
+
+  wrap.innerHTML = `<table class="versions-table">
+    <thead><tr>
+      <th>Status</th><th>Label</th><th>Talents</th><th>Uploaded</th><th></th>
+    </tr></thead>
+    <tbody>${rows}</tbody>
+  </table>`;
+}
+
+async function restoreVersion(id, label) {
+  const key = getKey();
+  if (!key) { toast('Set your API key first'); return; }
+  if (!confirm(`Restore version "${label}"?\n\nThis will immediately overwrite the live SOP with this version.`)) return;
+
+  try {
+    const resp = await fetch(`/admin/api/sop/versions/${id}/restore`, {
+      method: 'POST',
+      headers: { 'x-api-key': key },
+    });
+    const data = await resp.json();
+    if (!resp.ok) { toast('❌ Restore failed: ' + (data.detail || resp.status)); return; }
+    toast(`✅ Restored version #${id} — SOP is now live`);
+    loadVersions();
+  } catch (err) {
+    toast('❌ ' + String(err));
+  }
+}
+
+// ── Deploy ─────────────────────────────────────────────────────────────────
+
+async function deployToRender() {
+  const key = getKey();
+  if (!key) { toast('Set your API key first'); return; }
+  if (!confirm('Trigger a Render redeploy?\n\nThis will restart the server (takes ~2–3 min). The SOP is already live without a deploy.')) return;
+
+  const btn = document.getElementById('deploy-btn');
+  const statusEl = document.getElementById('deploy-status');
+  btn.disabled = true;
+  btn.innerHTML = '<span class="spinner"></span> Deploying…';
+  statusEl.className = 'deploy-status';
+
+  try {
+    const resp = await fetch('/admin/api/sop/deploy-render', {
+      method: 'POST',
+      headers: { 'x-api-key': key },
+    });
+    const data = await resp.json();
+    if (!resp.ok) {
+      statusEl.className = 'deploy-status show err';
+      statusEl.textContent = '❌ ' + (data.detail || 'Deploy hook failed');
+    } else {
+      statusEl.className = 'deploy-status show ok';
+      statusEl.textContent = '🚀 Deploy triggered — server restarts in ~2–3 minutes';
+    }
+  } catch (err) {
+    statusEl.className = 'deploy-status show err';
+    statusEl.textContent = '❌ ' + String(err);
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = 'Trigger Render Deploy';
+  }
+}
+
+// ── Utilities ──────────────────────────────────────────────────────────────
+
+function escHtml(s) {
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+let _toastTimer = null;
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer = setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ── Init ───────────────────────────────────────────────────────────────────
+
+(function init() {
+  const saved = getKey();
+  if (saved) {
+    document.getElementById('api-key-input').value = saved;
+    loadVersions();
+  }
+})();
+</script>
+</body>
+</html>

@@ -65,6 +65,7 @@ app.include_router(sop_admin.router)
 # ── Manager Dashboard ─────────────────────────────────────────────────────────
 _dashboard_html_path = Path(__file__).parent / "static" / "dashboard.html"
 _sop_admin_html_path = Path(__file__).parent / "static" / "sop_admin.html"
+_sop_manager_html_path = Path(__file__).parent / "static" / "sop_manager.html"
 
 
 @app.get("/dashboard", response_class=HTMLResponse, include_in_schema=False)
@@ -77,6 +78,12 @@ def dashboard_page():
 def sop_admin_page():
     """Serve the SOP Admin SPA."""
     return HTMLResponse(content=_sop_admin_html_path.read_text(encoding="utf-8"))
+
+
+@app.get("/admin/sop-manager", response_class=HTMLResponse, include_in_schema=False)
+def sop_manager_page():
+    """Serve the new SOP Manager — docx drag-and-drop, version history, deploy."""
+    return HTMLResponse(content=_sop_manager_html_path.read_text(encoding="utf-8"))
 
 
 # ── Onboarding page at /connect?talent=<key> ─────────────────────────────────
@@ -282,8 +289,60 @@ def on_startup():
     if missing:
         logger.warning("Missing required env vars: %s — set these in Render dashboard → Environment", missing)
 
-    # Always clear SOP and triage prompt caches on startup so any file updates
-    # take effect immediately after deploy without needing a manual cache clear.
+    # ── Step 1: Create DB tables ──────────────────────────────────────────────
+    # Moved BEFORE SOP validation so the sop_versions table exists when we try
+    # to load the active version from DB below.
+    if settings.database_url:
+        if os.getenv("SKIP_MIGRATIONS"):
+            logger.warning("SKIP_MIGRATIONS=true — skipping create_tables(). DB schema must already be current.")
+        else:
+            logger.info("Creating database tables if they don't exist…")
+            try:
+                create_tables()
+                logger.info("DB tables ready.")
+            except Exception:
+                logger.exception("Could not create/verify database tables — check DATABASE_URL")
+    else:
+        logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
+
+    # ── Step 2: Restore active SOP from DB → sheets/sop.md ───────────────────
+    # Each Render deploy starts with a fresh filesystem (only repo files).
+    # If an admin uploaded a new SOP docx since the last git push, the DB has
+    # the authoritative version.  Write it to disk NOW so all subsequent code
+    # (validation, triage, reply) sees the correct SOP.
+    if settings.database_url:
+        try:
+            from backend.models.db import SopVersion, get_session_factory as _gsf
+            _db = _gsf()()
+            try:
+                active_ver = (
+                    _db.query(SopVersion)
+                    .filter(SopVersion.is_active == True)  # noqa: E712
+                    .order_by(SopVersion.uploaded_at.desc())
+                    .first()
+                )
+                if active_ver:
+                    _sop_path = Path(__file__).parent.parent / "sheets" / "sop.md"
+                    _sop_path.write_text(active_ver.raw_content, encoding="utf-8")
+                    logger.info(
+                        "Startup: restored SOP version #%d ('%s', %d chars) from DB → sheets/sop.md",
+                        active_ver.id,
+                        active_ver.version_label,
+                        len(active_ver.raw_content),
+                    )
+                else:
+                    logger.info("Startup: no active SOP version in DB — using repo's sheets/sop.md")
+            finally:
+                _db.close()
+        except Exception:
+            logger.warning(
+                "Startup: SOP DB restore failed (non-fatal) — using repo's sheets/sop.md",
+                exc_info=True,
+            )
+
+    # ── Step 3: Clear SOP / triage caches ────────────────────────────────────
+    # sop.md is now correct on disk.  Clear caches so any prior in-memory state
+    # (from import time) is replaced with the freshly written file.
     try:
         from backend.services.reply import clear_sop_cache
         from backend.services.triage import clear_triage_cache
@@ -293,11 +352,10 @@ def on_startup():
     except Exception:
         logger.warning("Cache clear on startup failed (non-fatal).")
 
-    # Parse sop.md, validate all talent profiles, and regenerate sop_data.json.
+    # ── Step 4: Parse and validate sop.md ────────────────────────────────────
     try:
         import json
         from datetime import datetime
-        from pathlib import Path
         from backend.services.reply import _load_sop_md
         from backend.services.sop_parser import parse_sop_md, validate_profiles
 
@@ -333,7 +391,7 @@ def on_startup():
     except Exception:
         logger.exception("SOP startup validator failed (non-fatal — poll cycle will continue).")
 
-    # Cross-check: every active Gmail token must have a matching sop.md profile.
+    # ── Step 5: Cross-check active Gmail tokens vs sop.md profiles ───────────
     try:
         from backend.models.db import get_session_factory, TalentToken as _TT
         from backend.services.reply import _load_sop_md
@@ -355,20 +413,8 @@ def on_startup():
     except Exception:
         logger.warning("Startup cross-check (token vs sop.md) failed (non-fatal).", exc_info=True)
 
-    if settings.database_url:
-        if os.getenv("SKIP_MIGRATIONS"):
-            logger.warning("SKIP_MIGRATIONS=true — skipping create_tables(). DB schema must already be current.")
-        else:
-            logger.info("Creating database tables if they don't exist…")
-            try:
-                create_tables()
-                logger.info("Startup complete.")
-            except Exception:
-                logger.exception("Could not create/verify database tables — check DATABASE_URL")
-    else:
-        logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
-
-    # One-time data fix: reset drafts blocked by the now-removed markdown link check.
+    # ── Step 6: One-time data fix ─────────────────────────────────────────────
+    # Reset drafts blocked by the now-removed markdown link check.
     try:
         from sqlalchemy import text as _text
         from backend.models.db import get_engine
