@@ -320,23 +320,36 @@ def on_startup():
             _ensure_sop_versions_table()
             _db = _gsf()()
             try:
-                active_ver = (
-                    _db.query(SopVersion)
-                    .filter(SopVersion.is_active == True)  # noqa: E712
-                    .order_by(SopVersion.uploaded_at.desc())
-                    .first()
-                )
-                if active_ver:
-                    _sop_path = Path(__file__).parent.parent / "sheets" / "sop.md"
-                    _sop_path.write_text(active_ver.raw_content, encoding="utf-8")
-                    logger.info(
-                        "Startup: restored SOP version #%d ('%s', %d chars) from DB → sheets/sop.md",
-                        active_ver.id,
-                        active_ver.version_label,
-                        len(active_ver.raw_content),
+                from backend.services import sop_writer as _sw
+
+                # MUST filter on doc_type. sop_versions holds BOTH sheets/sop.md
+                # and sheets/Automated Send Workflow.md, each with its own active
+                # row. Without this filter the most recently uploaded document
+                # wins regardless of type, so uploading the workflow doc would
+                # write it over sop.md on the next boot and wipe every talent's
+                # approved response. Reproduced by test_sop_merge.py.
+                for doc_type, target in (("sop", _sw._SOP_PATH), ("workflow", _sw._WORKFLOW_PATH)):
+                    active_ver = (
+                        _db.query(SopVersion)
+                        .filter(
+                            SopVersion.is_active == True,  # noqa: E712
+                            SopVersion.doc_type == doc_type,
+                        )
+                        .order_by(SopVersion.uploaded_at.desc())
+                        .first()
                     )
-                else:
-                    logger.info("Startup: no active SOP version in DB — using repo's sheets/sop.md")
+                    if active_ver:
+                        target.write_text(active_ver.raw_content, encoding="utf-8")
+                        logger.info(
+                            "Startup: restored %s version #%d ('%s', %d chars) from DB → %s",
+                            doc_type, active_ver.id, active_ver.version_label,
+                            len(active_ver.raw_content), target.name,
+                        )
+                    else:
+                        logger.info(
+                            "Startup: no active %s version in DB — using the repo's %s",
+                            doc_type, target.name,
+                        )
             finally:
                 _db.close()
         except Exception:

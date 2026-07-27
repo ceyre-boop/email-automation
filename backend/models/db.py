@@ -18,7 +18,7 @@ from sqlalchemy import (
     text,
 )
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
-from sqlalchemy.pool import NullPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from backend.core.config import get_settings
 
@@ -379,9 +379,17 @@ def _make_engine():
         settings = get_settings()
         db_url = settings.database_url.replace("postgres://", "postgresql://", 1)
         if db_url.startswith("sqlite"):
-            # SQLite (used in tests) does not support QueuePool connection-pool kwargs.
-            # Use a bare engine — StaticPool or SingletonThreadPool is fine for test isolation.
-            _engine = create_engine(db_url)
+            # SQLite (tests) rejects the QueuePool kwargs used for Postgres below.
+            # StaticPool is required, not optional: with the default pool every
+            # connection to ":memory:" gets its OWN empty database, so a table
+            # created on one connection is invisible to the next and queries fail
+            # with "no such table". StaticPool reuses a single connection so the
+            # in-memory DB behaves like a real one.
+            _engine = create_engine(
+                db_url,
+                connect_args={"check_same_thread": False},
+                poolclass=StaticPool,
+            )
         else:
             # Peak connection demand: 1 + (5 talent workers × 4 sessions each) = ~21 for poll,
             # + 6 for draft queue + 5 for other jobs/HTTP = ~32 peak. pool_size=10 + overflow=15

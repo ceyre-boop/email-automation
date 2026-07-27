@@ -1,6 +1,7 @@
 """SOP Admin router — manage talent data without directly editing sop.md."""
 from __future__ import annotations
 
+import logging
 import re
 import urllib.request
 from datetime import datetime
@@ -15,7 +16,13 @@ from backend.routers.deps import verify_api_key
 from backend.services import sop_writer as _writer
 from backend.services.sop_parser import parse_sop_md, validate_profiles
 
+logger = logging.getLogger(__name__)
+
 _SOP_PATH = Path(__file__).resolve().parents[2] / "sheets" / "sop.md"
+
+# Scenario headings other than A. extract_talent_sections() only pulls Scenario A,
+# so any of these present in an uploaded docx will NOT reach sop.md.
+_NON_A_SCENARIO_RE = re.compile(r"^[ \t]*Scenario\s+([B-Z])\b[^\n]*", re.IGNORECASE)
 
 _TALENT_HEADING_RE = re.compile(
     r"^[ \t]*(?:#+[ \t]*)?Talent:[ \t]*(?P<name>[^\r\n]*)[ \t]*$",
@@ -31,6 +38,51 @@ router = APIRouter(
 
 def _read_sop() -> str:
     return _SOP_PATH.read_text(encoding="utf-8")
+
+
+def _detect_unmerged_scenarios(docx_bytes: bytes, docx_talents: dict) -> list[str]:
+    """Warn about Scenario B/D/… blocks in the docx that the merge will not apply.
+
+    extract_talent_sections() returns Scenario A only. Production sop.md happens
+    to contain just Scenario A and C today, so nothing is lost — but a Scenario B
+    (the rate-negotiation counter-offer) added to a future SOP revision would be
+    dropped with no indication anywhere. Surface it instead.
+
+    Returns one message per (talent, scenario letter). Never raises: a failure to
+    warn must not fail the upload.
+    """
+    try:
+        from docx import Document
+    except ImportError:
+        return []
+
+    try:
+        paragraphs = [p.text for p in Document(BytesIO(docx_bytes)).paragraphs]
+    except Exception:
+        return []
+
+    messages: list[str] = []
+    current = None
+    seen: set[tuple[str, str]] = set()
+    for raw in paragraphs:
+        talent_match = _TALENT_HEADING_RE.match(raw)
+        if talent_match:
+            current = talent_match.group("name").strip()
+            continue
+        scenario_match = _NON_A_SCENARIO_RE.match(raw)
+        if scenario_match and current:
+            letter = scenario_match.group(1).upper()
+            # Scenario C is personal-email routing, which IS handled separately.
+            if letter == "C":
+                continue
+            if (current, letter) in seen:
+                continue
+            seen.add((current, letter))
+            messages.append(
+                f"Scenario {letter} for {current} was found in the docx but NOT merged "
+                f"— only Scenario A is applied. Update sop.md by hand if this is needed."
+            )
+    return messages
 
 
 def _ensure_sop_versions_table() -> None:
@@ -261,6 +313,12 @@ async def upload_sop_v2(
     Does NOT trigger a Render redeploy — that's a separate button.
     The startup handler restores the active DB version on the next deploy.
     """
+    # NB: guarding the module import alone is not enough — docx_parser imports
+    # python-docx *inside* extract_talent_sections(), so this import succeeds
+    # even when the dependency is missing and the ImportError surfaces at call
+    # time. It then got swallowed by the broad handler below and reported as
+    # 400 "Could not parse docx", blaming the operator's file for a missing
+    # server dependency. Catch ImportError separately at the call site.
     try:
         from backend.services.docx_parser import extract_talent_sections
     except ImportError as exc:
@@ -272,6 +330,15 @@ async def upload_sop_v2(
 
     try:
         docx_talents = extract_talent_sections(content)
+    except ImportError as exc:
+        logger.error("SOP upload failed — python-docx not installed on the server: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail=(
+                "Server is missing the python-docx dependency — this is not a problem "
+                f"with your file. Redeploy so requirements.txt installs. ({exc})"
+            ),
+        )
     except Exception as exc:
         raise HTTPException(status_code=400, detail=f"Could not parse docx: {exc}")
 
@@ -324,11 +391,27 @@ async def upload_sop_v2(
             except ValueError as exc:
                 warnings.append(f"{profile.key}: personal emails not updated — {exc}")
 
-    # Find docx talents that had no match in sop.md
+    # Find docx talents that had no match in sop.md. These are skipped on
+    # purpose: adding a talent needs metadata the docx does not carry (Key,
+    # Gmail, Min Rate, Auto Send, Paused), so a silent insert would create a
+    # half-configured profile. Log it so it shows up in Render logs, not just
+    # in the browser response.
     matched_name_lowers = {existing_profiles[k].full_name.lower() for k in matched}
     for docx_name, docx_entry in docx_talents.items():
         if docx_name not in matched_name_lowers:
             unmatched_docx.append(docx_entry["full_name"])
+            logger.warning(
+                "SOP upload: '%s' is in the docx but not in sop.md — skipped. "
+                "New talents need manual onboarding (Key/Gmail/Min Rate/Auto Send/Paused).",
+                docx_entry["full_name"],
+            )
+
+    # Scenario A is the only block the parser extracts. Anything else in the
+    # docx is silently ignored by the merge, so say so loudly rather than
+    # letting a counter-offer response quietly fail to ship.
+    for scenario_warning in _detect_unmerged_scenarios(content, docx_talents):
+        warnings.append(scenario_warning)
+        logger.warning("SOP upload: %s", scenario_warning)
 
     # Write updated sop.md to disk + clear caches
     _writer.write_sop_md(sop_text)
