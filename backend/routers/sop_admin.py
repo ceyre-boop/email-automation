@@ -33,6 +33,38 @@ def _read_sop() -> str:
     return _SOP_PATH.read_text(encoding="utf-8")
 
 
+def _ensure_sop_versions_table() -> None:
+    """Create sop_versions if it is missing, then add any new columns.
+
+    This service runs with SKIP_MIGRATIONS=true, so create_tables() never runs
+    and no schema change applies itself on deploy. sop_versions was therefore
+    never created at all, and every version-history call 500'd with
+    UndefinedTable. Rather than depend on the migration path, the SOP Manager
+    provisions its own table on demand.
+
+    Both operations are additive and idempotent: create() uses checkfirst, and
+    the ADD COLUMN is IF NOT EXISTS. Nothing here can drop or rewrite data.
+    """
+    from sqlalchemy import inspect, text
+    from backend.models.db import SopVersion, get_engine
+
+    engine = get_engine()
+    SopVersion.__table__.create(bind=engine, checkfirst=True)
+
+    # An older deploy may have created the table before doc_type existed.
+    try:
+        cols = {c["name"] for c in inspect(engine).get_columns("sop_versions")}
+    except Exception:
+        return
+    if "doc_type" not in cols and engine.dialect.name != "sqlite":
+        with engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE sop_versions "
+                "ADD COLUMN IF NOT EXISTS doc_type VARCHAR(32) NOT NULL DEFAULT 'sop'"
+            ))
+            conn.commit()
+
+
 def _extract_approved_response(sop_text: str, talent_key: str) -> str:
     """Extract the approved response text for a talent from sop.md text."""
     matches = list(_TALENT_HEADING_RE.finditer(sop_text))
@@ -305,6 +337,7 @@ async def upload_sop_v2(
     version_id: int | None = None
     try:
         from backend.models.db import SopVersion, get_session_factory
+        _ensure_sop_versions_table()
         db = get_session_factory()()
         try:
             # Scope to doc_type — the workflow doc keeps its own active version.
@@ -407,6 +440,7 @@ async def upload_workflow(
     save_warning: str | None = None
     try:
         from backend.models.db import SopVersion, get_session_factory
+        _ensure_sop_versions_table()
         db = get_session_factory()()
         try:
             db.query(SopVersion).filter(
@@ -449,6 +483,11 @@ def list_sop_versions():
     except ImportError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
 
+    try:
+        _ensure_sop_versions_table()
+    except Exception as exc:  # provisioning failure must not 500 the page
+        raise HTTPException(status_code=503, detail=f"Version store unavailable: {exc}")
+
     db = get_session_factory()()
     try:
         versions = (
@@ -481,6 +520,11 @@ def restore_sop_version(version_id: int):
         from backend.models.db import SopVersion, get_session_factory
     except ImportError as exc:
         raise HTTPException(status_code=500, detail=str(exc))
+
+    try:
+        _ensure_sop_versions_table()
+    except Exception as exc:  # provisioning failure must not 500 the page
+        raise HTTPException(status_code=503, detail=f"Version store unavailable: {exc}")
 
     db = get_session_factory()()
     try:

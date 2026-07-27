@@ -171,3 +171,31 @@ def test_empty_docx_returns_empty():
 
     result = extract_talent_sections(buf.getvalue())
     assert result == {}
+
+
+# ── sop_versions provisioning ────────────────────────────────────────────────
+
+def test_ensure_sop_versions_table_creates_when_missing():
+    """The SOP Manager must provision its own table.
+
+    Production runs with SKIP_MIGRATIONS=true, so create_tables() never runs.
+    sop_versions was consequently never created and every version-history call
+    returned 500 UndefinedTable. _ensure_sop_versions_table() must create it on
+    demand and be safe to call repeatedly.
+    """
+    from sqlalchemy import inspect
+    from backend.models.db import SopVersion, get_engine
+    from backend.routers.sop_admin import _ensure_sop_versions_table
+
+    engine = get_engine()
+    SopVersion.__table__.drop(bind=engine, checkfirst=True)
+    assert "sop_versions" not in inspect(engine).get_table_names()
+
+    _ensure_sop_versions_table()
+    assert "sop_versions" in inspect(engine).get_table_names()
+
+    cols = {c["name"] for c in inspect(engine).get_columns("sop_versions")}
+    assert "doc_type" in cols
+
+    # Idempotent — a second call must not raise.
+    _ensure_sop_versions_table()
