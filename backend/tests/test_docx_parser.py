@@ -175,6 +175,67 @@ def test_empty_docx_returns_empty():
 
 # ── sop_versions provisioning ────────────────────────────────────────────────
 
+def test_sop_fidelity_round_trip(_patch_sop_md_path):
+    """SOP fidelity: parser → verbatim gate full round-trip.
+
+    Builds a docx with a known approved response, parses it with
+    extract_talent_sections, then asserts:
+    - enforce_verbatim_response accepts the exact extracted text (returns None)
+    - enforce_verbatim_response rejects a one-word modification (returns an error)
+
+    This guards against parser regressions that would silently corrupt the
+    approved response text and cause every auto-send to be blocked by the
+    verbatim gate (or, worse, pass when they shouldn't).
+
+    The autouse _patch_sop_md_path fixture is what makes KatrinaD's section
+    available in the reply module's SOP cache. We need it injected here so we
+    can call enforce_verbatim_response against a real SOP entry.
+    """
+    from backend.services.docx_parser import extract_talent_sections
+    from backend.services.reply import enforce_verbatim_response
+
+    # The approved response for KatrinaD in test_talents_sop.md fixture.
+    # Deliberately uses the real fixture text so this test breaks if someone
+    # silently changes the fixture's wording.
+    known_approved = (
+        "Thank you so much for reaching out about a potential partnership with Katrina D!\n\n"
+        "Her rate is $150 per hour. Please let us know if you would like to move forward "
+        "and we can discuss the scope!"
+    )
+
+    # Build a docx that mirrors the fixture structure
+    doc = Document()
+    doc.add_paragraph("Talent: Katrina D")
+    doc.add_paragraph("Approved Response:")
+    # Add each paragraph line that composes the approved response
+    for line in known_approved.split("\n"):
+        doc.add_paragraph(line)
+
+    buf = BytesIO()
+    doc.save(buf)
+    parsed = extract_talent_sections(buf.getvalue())
+
+    assert "katrina d" in parsed, "Parser must find 'Katrina D' section"
+    extracted = parsed["katrina d"]["approved_response"]
+
+    # The extracted text must match exactly what the verbatim gate will check against.
+    # If it doesn't, every docx upload → auto-send would be dead on arrival.
+    err = enforce_verbatim_response("Katrina D", extracted)
+    assert err is None, (
+        f"enforce_verbatim_response rejected its own parser output — "
+        f"the round-trip is broken.\n"
+        f"Extracted: {extracted!r}\n"
+        f"Error: {err}"
+    )
+
+    # A one-word modification must be caught.
+    modified = extracted.replace("Thank you so much", "Thanks so much")
+    err_modified = enforce_verbatim_response("Katrina D", modified)
+    assert err_modified is not None, (
+        "enforce_verbatim_response should reject a modified draft but returned None"
+    )
+
+
 def test_ensure_sop_versions_table_creates_when_missing():
     """The SOP Manager must provision its own table.
 
