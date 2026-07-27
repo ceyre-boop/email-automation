@@ -358,6 +358,11 @@ class SopVersion(Base):
         DateTime, default=datetime.utcnow, nullable=False
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    # "sop" (sheets/sop.md) or "workflow" (sheets/Automated Send Workflow.md).
+    # Both documents share this table; is_active is tracked per doc_type.
+    doc_type: Mapped[str] = mapped_column(
+        String(32), nullable=False, default="sop", server_default="sop"
+    )
 
 
 # ── Engine / session factory ─────────────────────────────────────────────────
@@ -473,8 +478,12 @@ def create_tables():
             raw_content TEXT NOT NULL,
             talent_count INTEGER,
             uploaded_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            is_active BOOLEAN NOT NULL DEFAULT FALSE
+            is_active BOOLEAN NOT NULL DEFAULT FALSE,
+            doc_type VARCHAR(32) NOT NULL DEFAULT 'sop'
         )""",
+        # Must run AFTER the CREATE above: on an existing DB the table is
+        # already there without this column; on a fresh DB the CREATE supplies it.
+        "ALTER TABLE sop_versions ADD COLUMN IF NOT EXISTS doc_type VARCHAR(32) NOT NULL DEFAULT 'sop'",
         """CREATE TABLE IF NOT EXISTS external_channel_reviews (
             id SERIAL PRIMARY KEY,
             gmail_message_id VARCHAR(256) NOT NULL UNIQUE,

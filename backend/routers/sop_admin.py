@@ -307,15 +307,18 @@ async def upload_sop_v2(
         from backend.models.db import SopVersion, get_session_factory
         db = get_session_factory()()
         try:
-            db.query(SopVersion).filter(SopVersion.is_active == True).update(  # noqa: E712
-                {"is_active": False}
-            )
+            # Scope to doc_type — the workflow doc keeps its own active version.
+            db.query(SopVersion).filter(
+                SopVersion.is_active == True,  # noqa: E712
+                SopVersion.doc_type == "sop",
+            ).update({"is_active": False})
             version_label = label.strip() or f"Upload {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
             new_ver = SopVersion(
                 version_label=version_label,
                 raw_content=sop_text,
                 talent_count=len(existing_profiles),
                 is_active=True,
+                doc_type="sop",
             )
             db.add(new_ver)
             db.commit()
@@ -334,6 +337,104 @@ async def upload_sop_v2(
         "warnings": warnings,
         "version_id": version_id,
         "talent_count": len(existing_profiles),
+    }
+
+
+@router.post("/api/workflow/upload", dependencies=[Depends(verify_api_key)])
+async def upload_workflow(
+    file: UploadFile = File(...),
+    label: str = Form(""),
+    confirm: bool = Form(False),
+):
+    """
+    Accept a .docx of the Automated Send Workflow.
+
+    Two-step by design: the first call returns a unified diff and writes
+    nothing. Re-submit the same file with confirm=true to apply it.
+
+    Unlike sop.md this document carries no machine-read metadata, so a whole
+    document replace is safe — but it is still validated for the expected
+    section anchors, so an empty file, or the SOP dropped into the wrong box,
+    is rejected before anything is written.
+    """
+    import difflib
+
+    try:
+        from docx import Document
+    except ImportError as exc:
+        raise HTTPException(status_code=500, detail=f"python-docx not available: {exc}")
+
+    content = await file.read()
+    if not content:
+        raise HTTPException(status_code=400, detail="Uploaded file is empty")
+
+    try:
+        doc = Document(BytesIO(content))
+    except Exception as exc:
+        raise HTTPException(status_code=400, detail=f"Could not parse docx: {exc}")
+
+    # paragraph.text is correct here for the same reason it is for the SOP:
+    # the document's markup is typed as literal text, not Word formatting.
+    new_text = "\n".join(p.text for p in doc.paragraphs).strip() + "\n"
+
+    problems = _writer.validate_workflow_text(new_text)
+    if problems:
+        raise HTTPException(status_code=400, detail="; ".join(problems))
+
+    current = _writer.read_workflow_md()
+    diff = list(
+        difflib.unified_diff(
+            current.splitlines(), new_text.splitlines(),
+            fromfile="current", tofile="uploaded", lineterm="", n=2,
+        )
+    )
+    added = sum(1 for d in diff if d.startswith("+") and not d.startswith("+++"))
+    removed = sum(1 for d in diff if d.startswith("-") and not d.startswith("---"))
+
+    if not confirm:
+        return {
+            "status": "preview",
+            "changed": bool(diff),
+            "lines_added": added,
+            "lines_removed": removed,
+            "diff": diff[:400],
+            "message": "Nothing written. Re-submit with confirm to apply.",
+        }
+
+    _writer.write_workflow_md(new_text)
+
+    version_id: int | None = None
+    save_warning: str | None = None
+    try:
+        from backend.models.db import SopVersion, get_session_factory
+        db = get_session_factory()()
+        try:
+            db.query(SopVersion).filter(
+                SopVersion.is_active == True,  # noqa: E712
+                SopVersion.doc_type == "workflow",
+            ).update({"is_active": False})
+            new_ver = SopVersion(
+                version_label=label.strip() or f"Workflow {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}",
+                raw_content=new_text,
+                talent_count=None,
+                is_active=True,
+                doc_type="workflow",
+            )
+            db.add(new_ver)
+            db.commit()
+            db.refresh(new_ver)
+            version_id = new_ver.id
+        finally:
+            db.close()
+    except Exception as exc:
+        save_warning = f"DB version save failed (non-fatal — workflow is live on disk): {exc}"
+
+    return {
+        "status": "ok",
+        "lines_added": added,
+        "lines_removed": removed,
+        "version_id": version_id,
+        "warnings": [save_warning] if save_warning else [],
     }
 
 
@@ -364,6 +465,7 @@ def list_sop_versions():
                     "talent_count": v.talent_count,
                     "uploaded_at": v.uploaded_at.isoformat() if v.uploaded_at else None,
                     "is_active": v.is_active,
+                    "doc_type": getattr(v, "doc_type", "sop") or "sop",
                 }
                 for v in versions
             ]
@@ -386,17 +488,28 @@ def restore_sop_version(version_id: int):
         if version is None:
             raise HTTPException(status_code=404, detail=f"Version {version_id} not found")
 
-        # Write to disk + clear caches
-        _writer.write_sop_md(version.raw_content)
+        # Route by document type — restoring a workflow version must not be
+        # written into sop.md, and vice versa.
+        doc_type = getattr(version, "doc_type", "sop") or "sop"
+        if doc_type == "workflow":
+            _writer.write_workflow_md(version.raw_content)
+        else:
+            _writer.write_sop_md(version.raw_content)
 
-        # Mark this version active
-        db.query(SopVersion).filter(SopVersion.is_active == True).update(  # noqa: E712
-            {"is_active": False}
-        )
+        # Mark active within this document type only
+        db.query(SopVersion).filter(
+            SopVersion.is_active == True,  # noqa: E712
+            SopVersion.doc_type == doc_type,
+        ).update({"is_active": False})
         version.is_active = True
         db.commit()
 
-        return {"status": "ok", "version_id": version_id, "label": version.version_label}
+        return {
+            "status": "ok",
+            "version_id": version_id,
+            "label": version.version_label,
+            "doc_type": doc_type,
+        }
     finally:
         db.close()
 

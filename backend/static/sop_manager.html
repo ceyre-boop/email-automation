@@ -171,6 +171,43 @@
     </div>
   </div>
 
+  <!-- Automated Send Workflow -->
+  <div class="card">
+    <div class="card-header">
+      <span class="card-title">⚙️ Upload Automated Send Workflow</span>
+    </div>
+    <div class="card-body">
+
+      <div class="drop-zone" id="wf-drop-zone" onclick="document.getElementById('wf-file-input').click()">
+        <input type="file" id="wf-file-input" accept=".docx" onchange="onWfFileSelect(event)"/>
+        <div class="drop-icon">⬆️</div>
+        <div class="drop-title">Drop .docx here or click to browse</div>
+        <div class="drop-sub">Automated Send Workflow document · Shows a diff before anything is written</div>
+      </div>
+
+      <div class="file-selected" id="wf-file-selected">
+        <span class="file-name-badge" id="wf-file-name-badge"></span>
+        <input class="label-input" id="wf-version-label" type="text" placeholder="Version label (optional, e.g. v3)"/>
+        <button class="btn btn-primary" id="wf-upload-btn" onclick="uploadWorkflow(false)">
+          Preview Changes
+        </button>
+        <button class="btn btn-ghost" onclick="clearWfFile()">✕ Clear</button>
+      </div>
+
+      <div class="result-box" id="wf-result-box">
+        <div class="result-title" id="wf-result-title"></div>
+        <div class="result-grid" id="wf-result-grid"></div>
+        <pre id="wf-diff" style="display:none;max-height:320px;overflow:auto;background:rgba(0,0,0,.25);
+             padding:12px;border-radius:8px;font-size:12px;line-height:1.5;white-space:pre;margin-top:12px"></pre>
+        <div id="wf-confirm-wrap" style="display:none;margin-top:14px">
+          <button class="btn btn-primary" onclick="uploadWorkflow(true)">✓ Apply This Version</button>
+        </div>
+        <div id="wf-result-warnings" class="warnings-list"></div>
+      </div>
+
+    </div>
+  </div>
+
   <!-- Version History -->
   <div class="card">
     <div class="card-header">
@@ -244,6 +281,115 @@ function clearFile() {
   document.getElementById('file-input').value = '';
   document.getElementById('file-selected').classList.remove('show');
   document.getElementById('result-box').classList.remove('show');
+}
+
+// ── Automated Send Workflow upload ─────────────────────────────────────────
+
+let wfFile = null;
+
+function wfPick(f) {
+  wfFile = f;
+  document.getElementById('wf-file-name-badge').textContent = f.name;
+  document.getElementById('wf-file-selected').classList.add('show');
+  document.getElementById('wf-result-box').classList.remove('show');
+  document.getElementById('wf-confirm-wrap').style.display = 'none';
+}
+
+function onWfFileSelect(evt) {
+  const f = evt.target.files[0];
+  if (f) wfPick(f);
+}
+
+function clearWfFile() {
+  wfFile = null;
+  document.getElementById('wf-file-input').value = '';
+  document.getElementById('wf-file-selected').classList.remove('show');
+  document.getElementById('wf-result-box').classList.remove('show');
+  document.getElementById('wf-confirm-wrap').style.display = 'none';
+}
+
+const wfDz = document.getElementById('wf-drop-zone');
+wfDz.addEventListener('dragover', e => { e.preventDefault(); wfDz.classList.add('drag-over'); });
+wfDz.addEventListener('dragleave', () => wfDz.classList.remove('drag-over'));
+wfDz.addEventListener('drop', e => {
+  e.preventDefault();
+  wfDz.classList.remove('drag-over');
+  const f = e.dataTransfer.files[0];
+  if (f && f.name.endsWith('.docx')) wfPick(f);
+  else toast('Please drop a .docx file');
+});
+
+async function uploadWorkflow(confirm) {
+  const key = getKey();
+  if (!key) { toast('Save your API key first'); return; }
+  if (!wfFile) { toast('Choose a .docx first'); return; }
+
+  const btn = document.getElementById('wf-upload-btn');
+  btn.disabled = true;
+  btn.textContent = confirm ? 'Applying…' : 'Checking…';
+
+  const fd = new FormData();
+  fd.append('file', wfFile);
+  fd.append('label', document.getElementById('wf-version-label').value.trim());
+  fd.append('confirm', confirm ? 'true' : 'false');
+
+  const box = document.getElementById('wf-result-box');
+  const title = document.getElementById('wf-result-title');
+  const grid = document.getElementById('wf-result-grid');
+  const pre = document.getElementById('wf-diff');
+  const confirmWrap = document.getElementById('wf-confirm-wrap');
+  const warn = document.getElementById('wf-result-warnings');
+  warn.innerHTML = '';
+
+  try {
+    const resp = await fetch('/admin/api/workflow/upload', {
+      method: 'POST', headers: { 'x-api-key': key }, body: fd,
+    });
+    const data = await resp.json();
+    box.classList.add('show');
+
+    if (!resp.ok) {
+      title.textContent = '✕ Rejected — nothing was written';
+      grid.innerHTML = '';
+      pre.style.display = 'none';
+      confirmWrap.style.display = 'none';
+      warn.innerHTML = '<div class="warning-item">' + (data.detail || 'Upload failed') + '</div>';
+      return;
+    }
+
+    grid.innerHTML =
+      '<div><strong>' + data.lines_added + '</strong> lines added</div>' +
+      '<div><strong>' + data.lines_removed + '</strong> lines removed</div>';
+
+    if (data.status === 'preview') {
+      if (!data.changed) {
+        title.textContent = '= No changes — this matches the live workflow';
+        pre.style.display = 'none';
+        confirmWrap.style.display = 'none';
+      } else {
+        title.textContent = 'Preview — nothing written yet';
+        pre.textContent = data.diff.join('\n');
+        pre.style.display = 'block';
+        confirmWrap.style.display = 'block';
+      }
+    } else {
+      title.textContent = '✓ Workflow updated and activated';
+      pre.style.display = 'none';
+      confirmWrap.style.display = 'none';
+      (data.warnings || []).forEach(w => {
+        warn.innerHTML += '<div class="warning-item">' + w + '</div>';
+      });
+      toast('Workflow updated');
+      if (typeof loadVersions === 'function') loadVersions();
+    }
+  } catch (err) {
+    box.classList.add('show');
+    title.textContent = '✕ Upload failed';
+    warn.innerHTML = '<div class="warning-item">' + err + '</div>';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Preview Changes';
+  }
 }
 
 // Drag-and-drop
@@ -398,8 +544,10 @@ function renderVersions(versions) {
     const activeBadge = v.is_active ? '<span class="active-badge">Active</span>' : '';
     return `<tr>
       <td>${activeBadge || '<span style="color:var(--subtle)">—</span>'}</td>
-      <td style="font-weight:600">${escHtml(v.label || '—')}</td>
-      <td style="color:var(--muted)">${v.talent_count ?? '—'} talents</td>
+      <td style="font-weight:600">${escHtml(v.label || '—')}
+        <span style="color:var(--subtle);font-size:11px;font-weight:500">
+          ${(v.doc_type || 'sop') === 'workflow' ? '⚙️ Workflow' : '📄 SOP'}</span></td>
+      <td style="color:var(--muted)">${v.talent_count != null ? v.talent_count + ' talents' : '—'}</td>
       <td style="color:var(--muted);font-size:12px">${escHtml(dt)}</td>
       <td>
         ${!v.is_active ? `<button class="btn btn-ghost btn-sm" onclick="restoreVersion(${v.id}, '${escHtml(v.label || '')}')">Restore</button>` : ''}

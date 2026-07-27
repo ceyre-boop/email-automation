@@ -1,9 +1,20 @@
 """
-Extract rich-text content from SOP .docx files.
+Extract SOP content from .docx files.
 
-python-docx's paragraph.text strips bold formatting and hyperlinks, which
-corrupts the approved responses every time someone uploads the CEO's SOP docx.
-This module walks the XML directly to preserve **bold** and [anchor](url) links.
+IMPORTANT — do not "improve" this by walking runs for bold/hyperlinks.
+
+The SOP doc is authored with the markdown typed as LITERAL TEXT: the author
+writes the characters ``**1 TikTok**`` and ``[anchor](url)`` directly into
+Word. They are not Word bold runs and not Word hyperlink relationships. So
+``paragraph.text`` already returns exactly the string sop.md needs, and it
+round-trips 18/18 approved responses character-for-character.
+
+A previous version of this module walked the XML tree to re-emit ``**`` for
+Word's own bold formatting. Because the author's literal ``**`` was still
+there, that double-wrapped everything (``****fashion****``) and the cleanup
+regexes then ate the opening marker, producing ``1 TikTok**`` with an orphan
+delimiter that renders literally in the sent email. It corrupted 14 of 18
+talents. Verified by round-tripping the authored docx against sop.md.
 """
 from __future__ import annotations
 
@@ -46,55 +57,14 @@ _RSHIP_NS = "http://schemas.openxmlformats.org/officeDocument/2006/relationships
 
 def _para_to_md(para, rels: dict[str, str]) -> str:
     """
-    Convert a paragraph to Markdown text, preserving bold and hyperlinks.
+    Return the paragraph's literal text.
 
-    Walk para._p XML children instead of using para.runs so that inline
-    <w:hyperlink> elements (which python-docx exposes only via the XML tree)
-    are captured with their target URL.
+    The markdown in the SOP doc is typed by the author as plain characters, so
+    the literal text IS the markdown. Re-emitting Word's own bold/hyperlink
+    formatting on top of it double-wraps and corrupts the response — see the
+    module docstring. `rels` is retained for signature compatibility.
     """
-    from docx.oxml.ns import qn
-
-    parts: list[str] = []
-
-    for child in para._p:
-        local = child.tag.rsplit("}", 1)[-1]
-
-        if local == "hyperlink":
-            r_id = child.get(f"{{{_RSHIP_NS}}}id", "")
-            url = rels.get(r_id, "")
-            # Collect text from all <w:r> children inside the hyperlink
-            anchor_parts: list[str] = []
-            for r in child:
-                if r.tag.endswith("}r"):
-                    t_el = r.find(qn("w:t"))
-                    if t_el is not None and t_el.text:
-                        anchor_parts.append(t_el.text)
-            anchor = "".join(anchor_parts)
-            if anchor.strip() and url:
-                parts.append(f"[{anchor}]({url})")
-            elif anchor.strip():
-                parts.append(anchor)
-
-        elif local == "r":
-            # Regular text run
-            t_el = child.find(qn("w:t"))
-            if t_el is None or not t_el.text:
-                continue
-            text_val = t_el.text
-            rpr = child.find(qn("w:rPr"))
-            # A run is bold if <w:b/> exists inside <w:rPr>; ignore runs that
-            # are entirely whitespace so we don't produce **   ** artefacts.
-            is_bold = (
-                rpr is not None
-                and rpr.find(qn("w:b")) is not None
-                and text_val.strip()
-            )
-            if is_bold:
-                parts.append(f"**{text_val}**")
-            else:
-                parts.append(text_val)
-
-    return "".join(parts)
+    return para.text
 
 
 # ── Normalisation ─────────────────────────────────────────────────────────────
@@ -102,12 +72,19 @@ def _para_to_md(para, rels: dict[str, str]) -> str:
 
 def _normalize(text: str) -> str:
     """
-    Clean Word formatting artefacts from extracted markdown.
+    Strip trailing whitespace per line. Nothing else.
 
-    Word often emits adjacent bold runs as separate spans, producing patterns
-    like ``**   ****1 TikTok** **[link](url)`` that look wrong in the final SOP.
-    These regexes collapse them into clean markdown.
+    The asterisk-collapsing regexes that used to live here existed only to mop
+    up artefacts created by re-emitting Word's bold formatting. That extraction
+    is gone, so there are no artefacts — and the regexes were themselves
+    destructive: ``**     **1 TikTok**`` came out as ``1 TikTok**``, losing the
+    opening delimiter and shifting the authored indent. Leading whitespace is
+    significant (rate lines carry a 5-space indent) and must be preserved.
     """
+    return "\n".join(line.rstrip() for line in text.splitlines())
+
+
+def _normalize_legacy_unused(text: str) -> str:  # pragma: no cover - kept for reference
     # 3+ asterisks → **  (catches *** or **** from adjacent spans)
     text = re.sub(r"\*{3,}", "**", text)
     # Bold runs containing only whitespace: **   ** → spaces

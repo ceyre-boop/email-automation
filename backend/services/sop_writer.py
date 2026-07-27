@@ -128,6 +128,58 @@ def write_sop_md(new_text: str) -> None:
         _logger.warning("sop_writer: git auto-commit failed (changes saved in-memory only): %s", exc)
 
 
+_WORKFLOW_PATH = _SOP_PATH.parent / "Automated Send Workflow.md"
+
+# Anchors every valid Automated Send Workflow doc must contain. Guards against
+# writing an empty or wrong document (e.g. someone drops the SOP in this box).
+_WORKFLOW_ANCHORS = ("Send Gate", "Post-Send", "Locate Existing Draft")
+
+
+def validate_workflow_text(new_text: str) -> list[str]:
+    """Return blocking reasons why `new_text` is not a valid workflow doc ([] = OK)."""
+    problems: list[str] = []
+    body = (new_text or "").strip()
+    if len(body) < 200:
+        problems.append(f"Document is only {len(body)} characters — expected a full workflow doc")
+    missing = [a for a in _WORKFLOW_ANCHORS if a.lower() not in body.lower()]
+    if missing:
+        problems.append("Missing expected sections: " + ", ".join(missing))
+    if "Talent: " in body and "Approved Response" in body:
+        problems.append("This looks like the SOP document, not the Automated Send Workflow")
+    return problems
+
+
+def write_workflow_md(new_text: str) -> None:
+    """Write sheets/Automated Send Workflow.md and commit+push.
+
+    Unlike sop.md this file carries no machine-read metadata (no Key:, Gmail:,
+    Min Rate:), so a whole-document replace is safe — but callers must run
+    validate_workflow_text() first.
+    """
+    import logging
+    import subprocess
+
+    new_text = _MD_ESCAPE_RE.sub(r"\1", new_text)
+    _WORKFLOW_PATH.write_text(new_text, encoding="utf-8")
+    _logger = logging.getLogger(__name__)
+    try:
+        repo_root = str(_WORKFLOW_PATH.parents[1])
+        subprocess.run(["git", "add", str(_WORKFLOW_PATH)], cwd=repo_root, check=True, capture_output=True)
+        result = subprocess.run(
+            ["git", "commit", "-m", "admin: update Automated Send Workflow via SOP Manager"],
+            cwd=repo_root, capture_output=True, text=True,
+        )
+        if result.returncode == 0:
+            subprocess.run(["git", "push"], cwd=repo_root, check=False, capture_output=True)
+            _logger.info("sop_writer: committed and pushed workflow doc changes")
+    except Exception as exc:
+        _logger.warning("sop_writer: workflow git auto-commit failed: %s", exc)
+
+
+def read_workflow_md() -> str:
+    return _WORKFLOW_PATH.read_text(encoding="utf-8") if _WORKFLOW_PATH.exists() else ""
+
+
 def validate_before_write(
     minimum_rate_usd: int | None,
     personal_emails: list[str] | None,

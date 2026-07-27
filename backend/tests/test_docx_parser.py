@@ -108,29 +108,58 @@ def test_extract_multiple_talents():
     assert "Hello from Bob" in result["bob"]["approved_response"]
 
 
-def test_bold_text_preserved():
-    """Bold runs in Word must produce **bold** markdown in extracted text."""
+def test_literal_markdown_is_preserved_verbatim():
+    """The author types markdown as literal text — it must survive byte-for-byte.
+
+    Regression guard. A previous parser re-emitted "**" for Word's own bold
+    runs. Because the author's literal "**" was already in the text, that
+    double-wrapped ("****fashion****") and the cleanup regexes then ate the
+    opening delimiter, yielding "1 TikTok**" — an orphan marker that renders
+    literally in the sent email. It corrupted 14 of 18 talents.
+
+    The rate line below is the real authored shape, including the 5-space
+    indent, and it is also formatted bold in Word — exactly the combination
+    that broke before.
+    """
     from backend.services.docx_parser import extract_talent_sections
-    from docx.oxml.ns import qn
+
+    rate_line = "     **1 TikTok** [grayson.finks](https://www.tiktok.com/@grayson.finks) - $750"
 
     doc = Document()
     doc.add_paragraph("Talent: Bold Talent")
     doc.add_paragraph("Approved Response:")
-
-    # Create a paragraph with a bold run
+    # A greeting always precedes the rate lines in the real doc; the block is
+    # strip()ed as a whole, so the indent only survives on non-leading lines.
+    doc.add_paragraph("Happy to share her rates below:")
     p = doc.add_paragraph()
-    run = p.add_run("Important: ")
-    run.bold = True
-    p.add_run("please read this.")
+    run = p.add_run(rate_line)
+    run.bold = True  # Word bold ON TOP of the literal ** the author typed
 
     buf = BytesIO()
     doc.save(buf)
 
-    result = extract_talent_sections(buf.getvalue())
-    assert "bold talent" in result
-    ar = result["bold talent"]["approved_response"]
-    # The bold run should appear wrapped in **
-    assert "**Important:**" in ar or "**Important: **" in ar or "**Important:**" in ar or "Important" in ar
+    ar = extract_talent_sections(buf.getvalue())["bold talent"]["approved_response"]
+
+    assert ar.endswith(rate_line), f"expected literal text, got {ar!r}"
+    assert "****" not in ar, "Word bold was re-emitted on top of literal markdown"
+    assert ar.count("**") % 2 == 0, "unbalanced bold delimiters would render literally"
+
+
+def test_leading_indent_on_rate_lines_is_preserved():
+    """Leading whitespace is significant — rate lines carry a 5-space indent."""
+    from backend.services.docx_parser import extract_talent_sections
+
+    doc = Document()
+    doc.add_paragraph("Talent: Indent Talent")
+    doc.add_paragraph("Approved Response:")
+    doc.add_paragraph("Rates below:")
+    doc.add_paragraph("     **1 UGC Video** - $400")
+
+    buf = BytesIO()
+    doc.save(buf)
+
+    ar = extract_talent_sections(buf.getvalue())["indent talent"]["approved_response"]
+    assert "\n     **1 UGC Video** - $400" in ar, f"indent lost: {ar!r}"
 
 
 def test_empty_docx_returns_empty():
