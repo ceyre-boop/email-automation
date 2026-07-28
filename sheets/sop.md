@@ -309,10 +309,22 @@ Use Reply-To: talent-mgmt@taboost.me for the following talent inboxes:
 - Alana / alana@taboost.me
 - Stephanie / stephanie@taboost.me
 - Joceyln / joceyln@taboost.me
+- Hana / hana@taboost.me
+- Wesley / wesley@taboost.me
+
+Use Reply-To: creator-mgmt@taboost.me for the following talent inboxes:
+
+- Mahogany / mahogany@taboost.me
+- Anastasiya / anastasiya@taboost.me
+- Jenn / jenn@taboost.me
+- Grayson / grayson@taboost.me
+- BKuhl / bkuhl@taboost.me
+
+Use Reply-To: partnerships@taboost.me for the following talent inboxes:
+
 - Katrina / katrina@taboost.me
 - Kylika / kylika@taboost.me
 - Audur / audur@taboost.me
-- Mahogany / mahogany@taboost.me
 - Trinity / trinity@taboost.me
 
 If a talent or inbox is not listed here, leave Reply-To blank/default.

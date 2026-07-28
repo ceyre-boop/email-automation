@@ -47,16 +47,41 @@ def _safe_address(addr_str: str) -> str:
 
 
 def _reply_to_header(token_row) -> str | None:
-    """SOP v15 Rule 12: return the consolidated Reply-To address if this talent's
-    inbox is on the approved routing list (config/settings.json reply_to_routing),
-    else None. Header-only routing — never referenced in email bodies."""
+    """Return the Reply-To address for this talent's inbox, or None.
+
+    SOP v15-c Part 3 defines MULTIPLE routing groups — talent-mgmt@,
+    creator-mgmt@ and partnerships@ — each with its own inbox list, so a single
+    flat list plus one address can no longer express it. Config shape:
+
+        "reply_to_routing": {
+            "groups": {
+                "talent-mgmt@taboost.me": ["allee@taboost.me", ...],
+                "creator-mgmt@taboost.me": [...]
+            }
+        }
+
+    The legacy single-address shape ({"reply_to_address": ..., "inboxes": [...]})
+    is still honoured so an older config cannot silently stop routing.
+
+    Matching is on the TALENT INBOX (token_row.email), never the sender's
+    address — v2b Rule 2 is explicit about that. Header-only routing: never
+    added to or referenced in the email body. An inbox in no group gets None.
+    """
     try:
         from backend.core.config import get_settings
 
         routing = get_settings().app_config.get("reply_to_routing") or {}
-        inboxes = [str(a).lower().strip() for a in routing.get("inboxes", [])]
         inbox_email = (getattr(token_row, "email", "") or "").lower().strip()
-        if inbox_email and inbox_email in inboxes:
+        if not inbox_email:
+            return None
+
+        for address, members in (routing.get("groups") or {}).items():
+            if inbox_email in {str(a).lower().strip() for a in (members or [])}:
+                return str(address) or None
+
+        # Legacy single-group shape.
+        legacy = {str(a).lower().strip() for a in routing.get("inboxes", [])}
+        if inbox_email in legacy:
             return routing.get("reply_to_address") or None
     except Exception as exc:  # routing must never break drafting
         logger.warning("Reply-To routing lookup failed for %s: %s",

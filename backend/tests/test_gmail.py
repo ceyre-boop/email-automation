@@ -618,9 +618,11 @@ def test_create_draft_no_reply_to_for_unrouted_inbox(mock_build, mock_creds, moc
     from backend.services.gmail import create_gmail_draft
 
     token = _make_token()
-    # Must be an inbox absent from config/settings.json reply_to_routing.inboxes.
-    # Do NOT use katrina@ — SOP v15b added Katrina to the routing list.
-    token.email = "wesley@taboost.me"
+    # Must be an inbox absent from EVERY group in reply_to_routing. This fixture
+    # has gone stale twice now: katrina@ was routed by v15b, wesley@ by v15-c.
+    # skyler@ has never appeared in any routing group — check config before
+    # changing it again.
+    token.email = "skyler@taboost.me"
     svc = _mock_service()
     svc.users().drafts().create().execute.return_value = {"id": "d1"}
     mock_build.return_value = svc
@@ -649,3 +651,63 @@ def test_send_reply_sets_reply_to_for_routed_inbox(mock_build, mock_creds, mock_
     raw = svc.users().messages().send.call_args.kwargs["body"]["raw"]
     msg = _decode_raw(raw)
     assert msg["Reply-To"] == "talent-mgmt@taboost.me"
+
+
+# ── Multi-group Reply-To routing (SOP v15-c Part 3) ───────────────────────────
+
+@pytest.mark.parametrize("inbox,expected", [
+    ("allee@taboost.me",      "talent-mgmt@taboost.me"),
+    ("hana@taboost.me",       "talent-mgmt@taboost.me"),
+    ("wesley@taboost.me",     "talent-mgmt@taboost.me"),
+    ("mahogany@taboost.me",   "creator-mgmt@taboost.me"),
+    ("anastasiya@taboost.me", "creator-mgmt@taboost.me"),
+    ("bkuhl@taboost.me",      "creator-mgmt@taboost.me"),
+    ("katrina@taboost.me",    "partnerships@taboost.me"),
+    ("trinity@taboost.me",    "partnerships@taboost.me"),
+    ("skyler@taboost.me",     None),   # in no group
+    ("brittanie@taboost.me",  None),
+])
+def test_reply_to_group_routing(inbox, expected):
+    """v15-c Part 3 routes each inbox to one of three addresses, or none.
+
+    Before v15-c there was a single flat list and one address, so katrina/
+    kylika/audur/trinity were getting talent-mgmt@ (now partnerships@),
+    mahogany was getting talent-mgmt@ (now creator-mgmt@), and hana/wesley/
+    anastasiya/jenn/grayson/bkuhl were getting nothing at all.
+    """
+    from backend.services.gmail import _reply_to_header
+
+    token = MagicMock()
+    token.email = inbox
+    token.talent_key = inbox.split("@")[0]
+    assert _reply_to_header(token) == expected
+
+
+def test_reply_to_matches_inbox_not_sender():
+    """v2b Rule 2: match on the talent inbox, never the sender's address."""
+    from backend.services.gmail import _reply_to_header
+
+    token = MagicMock()
+    token.email = "skyler@taboost.me"          # unrouted inbox
+    token.talent_key = "Skyler"
+    token.sender = "katrina@taboost.me"        # a routed address, but as sender
+    assert _reply_to_header(token) is None
+
+
+def test_reply_to_legacy_flat_config_still_routes(monkeypatch):
+    """An older config shape must not silently stop routing."""
+    from backend.core.config import get_settings
+    from backend.services import gmail
+
+    settings = get_settings()
+    legacy = dict(settings.app_config)
+    legacy["reply_to_routing"] = {
+        "reply_to_address": "talent-mgmt@taboost.me",
+        "inboxes": ["legacy@taboost.me"],
+    }
+    monkeypatch.setattr(type(settings), "app_config", property(lambda self: legacy))
+
+    token = MagicMock()
+    token.email = "legacy@taboost.me"
+    token.talent_key = "Legacy"
+    assert gmail._reply_to_header(token) == "talent-mgmt@taboost.me"
