@@ -641,7 +641,7 @@ def test_send_reply_sets_reply_to_for_routed_inbox(mock_build, mock_creds, mock_
     from backend.services.gmail import send_reply
 
     token = _make_token()
-    token.email = "Joceyln@Taboost.me"  # case-insensitive match
+    token.email = "Jocelyn@Taboost.me"  # case-insensitive match
     svc = _mock_service()
     svc.users().messages().send().execute.return_value = {}
     mock_build.return_value = svc

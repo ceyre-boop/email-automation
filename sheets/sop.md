@@ -308,7 +308,7 @@ Use Reply-To: talent-mgmt@taboost.me for the following talent inboxes:
 - Angela / angela@taboost.me
 - Alana / alana@taboost.me
 - Stephanie / stephanie@taboost.me
-- Joceyln / joceyln@taboost.me
+- Jocelyn / jocelyn@taboost.me
 - Hana / hana@taboost.me
 - Wesley / wesley@taboost.me
 
