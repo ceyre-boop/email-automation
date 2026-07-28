@@ -302,6 +302,16 @@ def on_startup():
                 logger.info("DB tables ready.")
             except Exception:
                 logger.exception("Could not create/verify database tables — check DATABASE_URL")
+
+        # Always verify, even when migrations are skipped — especially then.
+        # With SKIP_MIGRATIONS=true a new table or column never appears and the
+        # only symptom is a 500 at the first query (sop_versions did exactly
+        # that). This is read-only: it logs the required DDL, never runs it.
+        try:
+            from backend.models.db import verify_schema_matches_models
+            verify_schema_matches_models()
+        except Exception:
+            logger.warning("Schema verification failed (non-fatal).", exc_info=True)
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
 
@@ -423,7 +433,8 @@ def on_startup():
                 if _tok.talent_key.lower() not in _profile_keys:
                     logger.error(
                         "Startup: active Gmail token for '%s' has NO matching sop.md profile — "
-                        "emails will be processed but drafts may fail validation",
+                        "this inbox is NOT being polled at all (poller skips tokens without a "
+                        "profile). Add the talent to sheets/sop.md or deactivate the token.",
                         _tok.talent_key,
                     )
         finally:

@@ -538,3 +538,58 @@ def create_tables():
                     logger.warning("DB migration warning (non-fatal): %s", _e)
     finally:
         _mig_engine.dispose()
+
+
+def verify_schema_matches_models() -> dict:
+    """Compare the live schema against the ORM models. Read-only — runs no DDL.
+
+    Render sets SKIP_MIGRATIONS=true, so create_tables() never runs and a new
+    table or column silently fails to appear. That is not hypothetical: the
+    sop_versions table was missing for its entire life, and every version-history
+    request returned 500 UndefinedTable until it was noticed by hand.
+
+    This surfaces the gap at boot instead. It logs one CRITICAL line per missing
+    table/column together with the exact ADD COLUMN / CREATE TABLE statement to
+    run, so the fix is a copy-paste into the Supabase SQL editor rather than an
+    investigation. It deliberately does NOT execute anything: applying DDL
+    automatically is what SKIP_MIGRATIONS exists to prevent.
+
+    Returns {"missing_tables": [...], "missing_columns": [("table", "col"), ...]}.
+    """
+    from sqlalchemy import inspect as _inspect
+
+    report: dict = {"missing_tables": [], "missing_columns": []}
+    try:
+        engine = get_engine()
+        inspector = _inspect(engine)
+        live_tables = set(inspector.get_table_names())
+    except Exception:
+        logger.warning("Schema check skipped — could not inspect the database.", exc_info=True)
+        return report
+
+    for table_name in sorted(Base.metadata.tables):
+        table = Base.metadata.tables[table_name]
+        if table_name not in live_tables:
+            report["missing_tables"].append(table_name)
+            logger.critical(
+                "SCHEMA DRIFT: table '%s' is defined in the models but does NOT exist in the "
+                "database. Every query against it will fail. Create it in the Supabase SQL "
+                "editor.", table_name,
+            )
+            continue
+
+        live_cols = {c["name"] for c in inspector.get_columns(table_name)}
+        for column in table.columns:
+            if column.name in live_cols:
+                continue
+            report["missing_columns"].append((table_name, column.name))
+            logger.critical(
+                "SCHEMA DRIFT: %s.%s is in the models but missing from the database. "
+                "Run:  ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
+                table_name, column.name, table_name, column.name,
+                column.type.compile(engine.dialect),
+            )
+
+    if not report["missing_tables"] and not report["missing_columns"]:
+        logger.info("Schema check: database matches all %d models.", len(Base.metadata.tables))
+    return report

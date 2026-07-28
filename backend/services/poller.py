@@ -118,12 +118,29 @@ def poll_all_inboxes(db: Session) -> dict:
         logger.info("No active tokens — nothing to poll")
         return summary
 
-    # Build per-talent job list, skipping talents with no sop.md profile
+    # Build per-talent job list, skipping talents with no ACTIVE sop.md profile.
+    # talent_map excludes paused talents, so a miss means one of two very
+    # different things — report them differently or a paused talent looks like
+    # a broken one, and a genuinely orphaned token gets lost in the noise.
+    all_profile_keys = {k.lower() for k in settings.talent_profiles}
+
     jobs: list[tuple[int, TalentProfile, bool]] = []
     for token_row in active_tokens:
-        profile = talent_map.get(token_row.talent_key.lower())
+        key_lower = token_row.talent_key.lower()
+        profile = talent_map.get(key_lower)
         if not profile:
-            logger.warning("No sop.md profile for talent_key=%s — skipping", token_row.talent_key)
+            if key_lower in all_profile_keys:
+                logger.info("Skipping %s — paused in sop.md", token_row.talent_key)
+            else:
+                # Orphaned token: an active Gmail connection with no profile at
+                # all. Nothing is triaged or drafted for it — the inbox is
+                # simply not serviced until someone adds the profile or
+                # deactivates the token.
+                logger.warning(
+                    "Orphaned Gmail token for talent_key=%s — no sop.md profile, inbox NOT "
+                    "being processed. Add a profile to sheets/sop.md or deactivate the token.",
+                    token_row.talent_key,
+                )
             continue
         jobs.append((token_row.id, profile, draft_mode))
 
