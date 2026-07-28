@@ -28,7 +28,14 @@ _TALENT_RE = re.compile(r"^Talent\s*:\s*(?P<name>.+)$", re.IGNORECASE)
 _APPROVED_RE = re.compile(r"^Approved\s+Response\s*:?\s*$", re.IGNORECASE)
 _SCENARIO_RE = re.compile(r"^Scenario\s+[A-Z]\b", re.IGNORECASE)
 _PERSONAL_EMAIL_RE = re.compile(r"^Personal\s+Emails?\s*:?\s*$", re.IGNORECASE)
-_BULLET_EMAIL_RE = re.compile(r"^[-•]\s*(?P<email>\S+@\S+\.\S+)\s*$")
+# The bullet is OPTIONAL. SOP revisions are inconsistent about it: v15 wrote
+# "- addr@x.com" under Personal Emails, v15-c writes a bare "addr@x.com". With a
+# mandatory bullet the v15-c form parsed to zero emails for all 18 talents,
+# which would silently freeze Scenario C personal-email routing at whatever was
+# last merged. Safe to loosen: this pattern is only applied while in "emails"
+# mode (i.e. after a "Personal Emails:" heading), and any non-email line still
+# terminates the list.
+_BULLET_EMAIL_RE = re.compile(r"^[-•]?\s*(?P<email>\S+@\S+\.\S+)\s*$")
 
 # Relationship type fragment for hyperlinks
 _HYPERLINK_REL = "hyperlink"

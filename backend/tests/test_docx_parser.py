@@ -260,3 +260,49 @@ def test_ensure_sop_versions_table_creates_when_missing():
 
     # Idempotent — a second call must not raise.
     _ensure_sop_versions_table()
+
+
+# ── Personal-email bullet formats ─────────────────────────────────────────────
+
+@pytest.mark.parametrize("prefix,label", [("- ", "hyphen bullet"), ("• ", "unicode bullet"), ("", "bare line")])
+def test_personal_emails_parse_with_or_without_bullets(prefix, label):
+    """SOP revisions disagree on the bullet: v15 used '- addr', v15-c uses 'addr'.
+
+    Requiring the bullet made v15-c parse to zero emails for all 18 talents,
+    which would silently freeze Scenario C personal-email routing.
+    """
+    from backend.services.docx_parser import extract_talent_sections
+
+    doc = Document()
+    doc.add_paragraph("Talent: Bullet Talent")
+    doc.add_paragraph("Approved Response:")
+    doc.add_paragraph("Hello.")
+    doc.add_paragraph("Scenario C: Personal Email Forward")
+    doc.add_paragraph("Personal Emails: ")
+    doc.add_paragraph(f"{prefix}one@example.com")
+    doc.add_paragraph(f"{prefix}two@example.com")
+    buf = BytesIO()
+    doc.save(buf)
+
+    got = extract_talent_sections(buf.getvalue())["bullet talent"]["personal_emails"]
+    assert got == ["one@example.com", "two@example.com"], f"{label} form failed: {got}"
+
+
+def test_non_email_line_still_ends_the_email_list():
+    """Loosening the bullet must not let prose leak into personal_emails."""
+    from backend.services.docx_parser import extract_talent_sections
+
+    doc = Document()
+    doc.add_paragraph("Talent: Boundary Talent")
+    doc.add_paragraph("Approved Response:")
+    doc.add_paragraph("Hello.")
+    doc.add_paragraph("Scenario C: Personal Email Forward")
+    doc.add_paragraph("Personal Emails:")
+    doc.add_paragraph("only@example.com")
+    doc.add_paragraph("Some trailing prose that is not an email.")
+    doc.add_paragraph("later@example.com")
+    buf = BytesIO()
+    doc.save(buf)
+
+    got = extract_talent_sections(buf.getvalue())["boundary talent"]["personal_emails"]
+    assert got == ["only@example.com"], f"prose or post-prose lines leaked: {got}"
