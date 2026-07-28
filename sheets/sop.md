@@ -718,12 +718,14 @@ Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-Thanks for reaching out about working with Mahogany!
+Thank you so much for reaching out about a potential partnership with Mahogany!! I'm happy to share her rates below:
+     **1 TikTok** [mahoganylox](https://www.tiktok.com/@mahoganylox) - $1,000
+     **1 Instagram** [Reel](https://www.instagram.com/mahoganylox) - $2,500
+     **1 UGC Video** - $1,500 (usage to be negotiated)
 
-You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to explore additional talent.
+Mahogany's pricing reflects her impressive social presence, with **7.5M** TikTok and **1.2M** Instagram followers. She creates beauty, fashion, and lifestyle content with a strong focus on personality and **self-expression**, allowing her to seamlessly connect with her audience across platforms.
 
-Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
-Looking forward to hearing your thoughts!
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We'd love to explore working together!
 
 Scenario C: Personal Email Forward
 Personal Emails:
