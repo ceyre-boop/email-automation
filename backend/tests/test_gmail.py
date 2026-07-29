@@ -589,125 +589,53 @@ def test_thread_has_prior_sent_reply_returns_false_on_api_error():
     assert thread_has_prior_sent_reply(fake_svc, "thread-err") is False
 
 
-# ── Reply-To routing (SOP v15 Rule 12) ───────────────────────────────────────
+# ── Alias routing — get_to_address (SOP v16 Rule 12) ────────────────────────
 
 
-@patch("backend.services.gmail.refresh_if_needed")
-@patch("backend.services.gmail.credentials_from_token_row")
-@patch("backend.services.gmail.build")
-def test_create_draft_sets_reply_to_for_routed_inbox(mock_build, mock_creds, mock_refresh):
-    from backend.services.gmail import create_gmail_draft
-
-    token = _make_token()
-    token.email = "allee@taboost.me"
-    svc = _mock_service()
-    svc.users().drafts().create().execute.return_value = {"id": "d1"}
-    mock_build.return_value = svc
-
-    create_gmail_draft(token, "t1", "brand@example.com", "Collab", "Hi!")
-
-    raw = svc.users().drafts().create.call_args.kwargs["body"]["message"]["raw"]
-    msg = _decode_raw(raw)
-    assert msg["Reply-To"] == "talent-mgmt@taboost.me"
-
-
-@patch("backend.services.gmail.refresh_if_needed")
-@patch("backend.services.gmail.credentials_from_token_row")
-@patch("backend.services.gmail.build")
-def test_create_draft_no_reply_to_for_unrouted_inbox(mock_build, mock_creds, mock_refresh):
-    from backend.services.gmail import create_gmail_draft
-
-    token = _make_token()
-    # Must be an inbox absent from EVERY group in reply_to_routing. This fixture
-    # has gone stale twice now: katrina@ was routed by v15b, wesley@ by v15-c.
-    # skyler@ has never appeared in any routing group — check config before
-    # changing it again.
-    token.email = "skyler@taboost.me"
-    svc = _mock_service()
-    svc.users().drafts().create().execute.return_value = {"id": "d1"}
-    mock_build.return_value = svc
-
-    create_gmail_draft(token, "t1", "brand@example.com", "Collab", "Hi!")
-
-    raw = svc.users().drafts().create.call_args.kwargs["body"]["message"]["raw"]
-    msg = _decode_raw(raw)
-    assert msg["Reply-To"] is None
-
-
-@patch("backend.services.gmail.refresh_if_needed")
-@patch("backend.services.gmail.credentials_from_token_row")
-@patch("backend.services.gmail.build")
-def test_send_reply_sets_reply_to_for_routed_inbox(mock_build, mock_creds, mock_refresh):
-    from backend.services.gmail import send_reply
-
-    token = _make_token()
-    token.email = "Jocelyn@Taboost.me"  # case-insensitive match
-    svc = _mock_service()
-    svc.users().messages().send().execute.return_value = {}
-    mock_build.return_value = svc
-
-    send_reply(token, "t1", "brand@example.com", "Collab", "Hi!")
-
-    raw = svc.users().messages().send.call_args.kwargs["body"]["raw"]
-    msg = _decode_raw(raw)
-    assert msg["Reply-To"] == "talent-mgmt@taboost.me"
-
-
-# ── Multi-group Reply-To routing (SOP v15-c Part 3) ───────────────────────────
-
-@pytest.mark.parametrize("inbox,expected", [
-    ("allee@taboost.me",      "talent-mgmt@taboost.me"),
-    ("hana@taboost.me",       "talent-mgmt@taboost.me"),
-    ("wesley@taboost.me",     "talent-mgmt@taboost.me"),
-    ("mahogany@taboost.me",   "creator-mgmt@taboost.me"),
-    ("anastasiya@taboost.me", "creator-mgmt@taboost.me"),
-    ("bkuhl@taboost.me",      "creator-mgmt@taboost.me"),
-    ("katrina@taboost.me",    "partnerships@taboost.me"),
-    ("trinity@taboost.me",    "partnerships@taboost.me"),
-    ("skyler@taboost.me",     None),   # in no group
-    ("brittanie@taboost.me",  None),
+@pytest.mark.parametrize("headers,expected", [
+    # Delivered-To is highest priority
+    ({"delivered-to": "hana@taboost.me", "to": "talent-mgmt@taboost.me"}, "hana@taboost.me"),
+    # X-Original-To when Delivered-To absent
+    ({"x-original-to": "allee@taboost.me"}, "allee@taboost.me"),
+    # Envelope-To fallback
+    ({"envelope-to": "lizz@taboost.me"}, "lizz@taboost.me"),
+    # To header as last resort
+    ({"to": "Brand Name <mahogany@taboost.me>"}, "mahogany@taboost.me"),
+    # No matching header
+    ({}, None),
+    # Empty headers
+    ({"delivered-to": "", "to": ""}, None),
 ])
-def test_reply_to_group_routing(inbox, expected):
-    """v15-c Part 3 routes each inbox to one of three addresses, or none.
-
-    Before v15-c there was a single flat list and one address, so katrina/
-    kylika/audur/trinity were getting talent-mgmt@ (now partnerships@),
-    mahogany was getting talent-mgmt@ (now creator-mgmt@), and hana/wesley/
-    anastasiya/jenn/grayson/bkuhl were getting nothing at all.
-    """
-    from backend.services.gmail import _reply_to_header
-
-    token = MagicMock()
-    token.email = inbox
-    token.talent_key = inbox.split("@")[0]
-    assert _reply_to_header(token) == expected
+def test_get_to_address(headers, expected):
+    """SOP v16 Rule 12: original recipient alias is extracted from headers in priority order."""
+    from backend.services.gmail import get_to_address
+    detail = {"headers": headers}
+    assert get_to_address(detail) == expected
 
 
-def test_reply_to_matches_inbox_not_sender():
-    """v2b Rule 2: match on the talent inbox, never the sender's address."""
-    from backend.services.gmail import _reply_to_header
-
-    token = MagicMock()
-    token.email = "skyler@taboost.me"          # unrouted inbox
-    token.talent_key = "Skyler"
-    token.sender = "katrina@taboost.me"        # a routed address, but as sender
-    assert _reply_to_header(token) is None
+def test_get_to_address_no_header_key():
+    """Missing 'headers' key in detail returns None without error."""
+    from backend.services.gmail import get_to_address
+    assert get_to_address({}) is None
 
 
-def test_reply_to_legacy_flat_config_still_routes(monkeypatch):
-    """An older config shape must not silently stop routing."""
-    from backend.core.config import get_settings
-    from backend.services import gmail
+def test_create_draft_no_reply_to_header():
+    """SOP v16: outgoing drafts must NOT set a Reply-To header (routing handled by alias, not headers)."""
+    from unittest.mock import patch, MagicMock
+    import base64
+    from email import message_from_bytes
+    from backend.services.gmail import create_gmail_draft
 
-    settings = get_settings()
-    legacy = dict(settings.app_config)
-    legacy["reply_to_routing"] = {
-        "reply_to_address": "talent-mgmt@taboost.me",
-        "inboxes": ["legacy@taboost.me"],
-    }
-    monkeypatch.setattr(type(settings), "app_config", property(lambda self: legacy))
+    token = _make_token()
+    token.email = "talent-mgmt@taboost.me"
+    svc = _mock_service()
+    svc.users().drafts().create().execute.return_value = {"id": "d1"}
 
-    token = MagicMock()
-    token.email = "legacy@taboost.me"
-    token.talent_key = "Legacy"
-    assert gmail._reply_to_header(token) == "talent-mgmt@taboost.me"
+    with patch("backend.services.gmail.build", return_value=svc), \
+         patch("backend.services.gmail.credentials_from_token_row"), \
+         patch("backend.services.gmail.refresh_if_needed"):
+        create_gmail_draft(token, "t1", "brand@example.com", "Collab", "Hi!")
+
+    raw = svc.users().drafts().create.call_args.kwargs["body"]["message"]["raw"]
+    msg = _decode_raw(raw)
+    assert msg["Reply-To"] is None, "Reply-To must not be set (SOP v16 — routing is by alias, not header)"

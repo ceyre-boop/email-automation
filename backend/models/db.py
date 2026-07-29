@@ -110,6 +110,8 @@ class ProcessedEmail(Base):
     time_to_draft_ms: Mapped[int | None] = mapped_column(Integer)
     human_override_occurred: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     scenario_needs_improvement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+    # SOP v16: original alias address the brand emailed (e.g. hana@taboost.me)
+    to_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
 
 class OAuthState(Base):
@@ -163,6 +165,8 @@ class Draft(Base):
     dismissed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     validation_failed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     validation_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # SOP v16: original alias address the brand emailed (e.g. hana@taboost.me)
+    to_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
 
 
 class DraftEditLog(Base):
@@ -509,6 +513,9 @@ def create_tables():
         # NOTE: score=0 ghost-row cleanup removed from startup — it can lock processed_emails
         # on a large table and delay port binding, causing Render R10 boot timeouts.
         # This cleanup now runs inside _run_guardian() (cron.py) at +35s after startup.
+        # SOP v16 single-inbox alias routing — track original recipient per email
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS to_address VARCHAR(256)",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS to_address VARCHAR(256)",
     ]
     settings = get_settings()
     mig_url = settings.database_url.replace("postgres://", "postgresql://", 1)

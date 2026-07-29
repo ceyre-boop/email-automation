@@ -46,46 +46,27 @@ def _safe_address(addr_str: str) -> str:
     return formataddr((name, addr)) if name else addr
 
 
-def _reply_to_header(token_row) -> str | None:
-    """Return the Reply-To address for this talent's inbox, or None.
+def get_to_address(message_detail: dict) -> str | None:
+    """Extract the original recipient alias from a parsed message detail dict.
 
-    SOP v15-c Part 3 defines MULTIPLE routing groups — talent-mgmt@,
-    creator-mgmt@ and partnerships@ — each with its own inbox list, so a single
-    flat list plus one address can no longer express it. Config shape:
+    SOP v16 Rule 12: talent identity is determined from the original recipient
+    address (the alias the brand emailed), NOT from which Gmail account received it.
 
-        "reply_to_routing": {
-            "groups": {
-                "talent-mgmt@taboost.me": ["allee@taboost.me", ...],
-                "creator-mgmt@taboost.me": [...]
-            }
-        }
+    Checks headers in priority order:
+      1. Delivered-To   — set by Gmail when delivering to an alias
+      2. X-Original-To  — set by MTA before aliasing
+      3. Envelope-To    — SMTP envelope recipient
+      4. To             — visible To: header (fallback)
 
-    The legacy single-address shape ({"reply_to_address": ..., "inboxes": [...]})
-    is still honoured so an older config cannot silently stop routing.
-
-    Matching is on the TALENT INBOX (token_row.email), never the sender's
-    address — v2b Rule 2 is explicit about that. Header-only routing: never
-    added to or referenced in the email body. An inbox in no group gets None.
+    Returns the first non-empty address found, lowercased, or None.
     """
-    try:
-        from backend.core.config import get_settings
-
-        routing = get_settings().app_config.get("reply_to_routing") or {}
-        inbox_email = (getattr(token_row, "email", "") or "").lower().strip()
-        if not inbox_email:
-            return None
-
-        for address, members in (routing.get("groups") or {}).items():
-            if inbox_email in {str(a).lower().strip() for a in (members or [])}:
-                return str(address) or None
-
-        # Legacy single-group shape.
-        legacy = {str(a).lower().strip() for a in routing.get("inboxes", [])}
-        if inbox_email in legacy:
-            return routing.get("reply_to_address") or None
-    except Exception as exc:  # routing must never break drafting
-        logger.warning("Reply-To routing lookup failed for %s: %s",
-                       getattr(token_row, "talent_key", "?"), exc)
+    headers = message_detail.get("headers") or {}
+    for key in ("delivered-to", "x-original-to", "envelope-to", "to"):
+        raw = headers.get(key, "")
+        if raw:
+            match = re.search(r"[\w.\-+]+@[\w.\-]+", raw)
+            if match:
+                return match.group(0).lower()
     return None
 
 
@@ -456,6 +437,8 @@ def get_message_detail(token_row, message_id: str, db=None, service=None) -> dic
         "label_ids": msg.get("labelIds", []),
         "email_date": email_date,
         "message_id_header": headers.get("message-id", ""),  # for In-Reply-To threading
+        # Full headers dict — used by get_to_address() for alias routing (SOP v16 Rule 12)
+        "headers": headers,
     }
 
 
@@ -746,9 +729,6 @@ def create_gmail_draft(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
-    _rt = _reply_to_header(token_row)
-    if _rt:
-        mime_msg["Reply-To"] = _rt
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
         mime_msg["References"] = in_reply_to
@@ -804,9 +784,6 @@ def send_reply(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
-    _rt = _reply_to_header(token_row)
-    if _rt:
-        mime_msg["Reply-To"] = _rt
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
         mime_msg["References"] = in_reply_to

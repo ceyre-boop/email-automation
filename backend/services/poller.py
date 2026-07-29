@@ -101,76 +101,267 @@ def _record_poll_health(db: Session, talent_key: str, emails_found: int, emails_
         logger.warning("Failed to write PollHealth for %s: %s", talent_key, exc)
 
 
+def _build_alias_map(settings) -> dict[str, str]:
+    """Return {alias_email: talent_key} from settings.json single_inbox.alias_map.
+
+    SOP v16 Part 3 routing table. Keys are lowercased alias addresses; values
+    are the talent_key strings matching TalentProfile.key in sop.md.
+    """
+    raw = settings.app_config.get("single_inbox", {}).get("alias_map", {})
+    return {k.lower().strip(): v for k, v in raw.items()}
+
+
+def _resolve_talent_from_to(to_address: str | None, alias_map: dict[str, str]) -> str | None:
+    """Return talent_key for a given To address, or None if unrecognized."""
+    if not to_address:
+        return None
+    return alias_map.get(to_address.lower().strip())
+
+
 def poll_all_inboxes(db: Session) -> dict:
     """
-    Main polling function. Processes all active connected talents concurrently.
-    Returns a summary dict for logging/monitoring.
+    Main polling function — SOP v16 single-inbox mode.
+
+    Reads ONE consolidated inbox (talent-mgmt@taboost.me), identifies the
+    correct talent from the original recipient alias header on each email
+    (Delivered-To / X-Original-To / Envelope-To / To), then processes each
+    message exactly as before. Emails with no recognized alias are logged as
+    unrouted and left in the inbox for human review.
     """
     settings = get_settings()
     talent_map = _talent_profile_map(settings)
     draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
+    alias_map = _build_alias_map(settings)
 
-    active_tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+    summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0, "unrouted": 0}
 
-    summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+    # Find the single shared inbox token — talent_key = "shared-inbox" OR email matches
+    inbox_email = settings.app_config.get("single_inbox", {}).get("inbox_email", "talent-mgmt@taboost.me")
+    token_row = (
+        db.query(TalentToken)
+        .filter(TalentToken.active == True, TalentToken.email == inbox_email)  # noqa: E712
+        .first()
+    )
 
-    if not active_tokens:
-        logger.info("No active tokens — nothing to poll")
+    if token_row is None:
+        # Fallback: any active token with talent_key "shared-inbox"
+        token_row = (
+            db.query(TalentToken)
+            .filter(TalentToken.active == True, TalentToken.talent_key == "shared-inbox")  # noqa: E712
+            .first()
+        )
+
+    if token_row is None:
+        logger.warning(
+            "Single inbox not connected — no active TalentToken for %s. "
+            "Connect talent-mgmt@taboost.me via /connect on the dashboard.",
+            inbox_email,
+        )
         return summary
 
-    # Build per-talent job list, skipping talents with no ACTIVE sop.md profile.
-    # talent_map excludes paused talents, so a miss means one of two very
-    # different things — report them differently or a paused talent looks like
-    # a broken one, and a genuinely orphaned token gets lost in the noise.
-    all_profile_keys = {k.lower() for k in settings.talent_profiles}
+    logger.info("Single-inbox poll starting — inbox=%s", token_row.email)
+    return _poll_single_inbox(token_row, alias_map, talent_map, draft_mode, db, summary)
 
-    jobs: list[tuple[int, TalentProfile, bool]] = []
-    for token_row in active_tokens:
-        key_lower = token_row.talent_key.lower()
-        profile = talent_map.get(key_lower)
-        if not profile:
-            if key_lower in all_profile_keys:
-                logger.info("Skipping %s — paused in sop.md", token_row.talent_key)
-            else:
-                # Orphaned token: an active Gmail connection with no profile at
-                # all. Nothing is triaged or drafted for it — the inbox is
-                # simply not serviced until someone adds the profile or
-                # deactivates the token.
-                logger.warning(
-                    "Orphaned Gmail token for talent_key=%s — no sop.md profile, inbox NOT "
-                    "being processed. Add a profile to sheets/sop.md or deactivate the token.",
-                    token_row.talent_key,
-                )
-            continue
-        jobs.append((token_row.id, profile, draft_mode))
 
-    if not jobs:
+def _poll_single_inbox(
+    token_row,
+    alias_map: dict[str, str],
+    talent_map: dict[str, TalentProfile],
+    draft_mode: bool,
+    db: Session,
+    summary: dict,
+) -> dict:
+    """Poll the consolidated inbox, route each message by alias, dispatch processing."""
+    from backend.services.inbox_sync import sync_inbox_for_talent, fetch_pending_bodies
+
+    talent_key_inbox = token_row.talent_key  # e.g. "shared-inbox" or "talent-mgmt"
+
+    # Inbox cache sync (same as per-talent flow — non-fatal)
+    try:
+        sync_result = sync_inbox_for_talent(token_row, db)
+        logger.info("Inbox sync %s: %s", talent_key_inbox, sync_result)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Inbox sync failed for %s (non-fatal): %s", talent_key_inbox, exc)
+
+    try:
+        fetch_pending_bodies(token_row, db, limit=BODY_FETCH_BATCH)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Body fetch failed for %s (non-fatal): %s", talent_key_inbox, exc)
+
+    try:
+        messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
+    except TokenRefreshError as exc:
+        logger.error("Token refresh rejected for shared inbox — marking inactive: %s", exc)
+        token_row.active = False
+        token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
+        token_row.last_error = str(exc)
+        db.add(token_row)
+        db.commit()
+        summary["errors"] += 1
+        return summary
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Gmail list failed for shared inbox: %s", exc)
+        token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
+        token_row.last_error = str(exc)
+        db.add(token_row)
+        db.commit()
+        summary["errors"] += 1
+        return summary
+
+    if not get_settings().app_config.get("ai_enabled", True):
+        logger.info("AI disabled — shared inbox synced but triage skipped (ai_enabled=false)")
+        token_row.last_poll_at = datetime.utcnow()
+        db.add(token_row)
+        db.commit()
+        return summary
+
+    all_ids = [m["id"] for m in messages]
+    already_done = _batch_already_processed_ids(db, all_ids)
+    pending = [m for m in messages if m["id"] not in already_done]
+    logger.info("Shared inbox: %d unread, %d new to process", len(messages), len(pending))
+
+    # Build service once — reused by all message workers
+    try:
+        service = gmail_svc.build_service(token_row, db)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Gmail service build failed for shared inbox: %s", exc)
+        summary["errors"] += 1
         return summary
 
     summary_lock = threading.Lock()
+    futures: dict = {}
 
-    # Process all talents concurrently — each gets its own DB session via _poll_one_talent
-    with ThreadPoolExecutor(max_workers=min(len(jobs), MAX_TALENT_WORKERS)) as executor:
-        future_to_key = {
-            executor.submit(_poll_one_talent, tid, profile, dm): profile.key
-            for tid, profile, dm in jobs
-        }
-        for future in as_completed(future_to_key):
-            talent_key = future_to_key[future]
+    with ThreadPoolExecutor(max_workers=MAX_CONCURRENT_EMAILS) as executor:
+        for msg in pending:
+            message_id = msg["id"]
+            future = executor.submit(
+                _process_shared_inbox_message,
+                token_row.id,
+                message_id,
+                alias_map,
+                talent_map,
+                draft_mode,
+            )
+            futures[future] = message_id
+
+        for future in as_completed(futures):
+            message_id = futures[future]
             try:
                 result = future.result()
-                if result:
-                    with summary_lock:
-                        for k, v in result.items():
-                            if k in summary:
-                                summary[k] += v
+                with summary_lock:
+                    for k, v in result.get("summary", {}).items():
+                        if k in summary:
+                            summary[k] += v
             except Exception as exc:  # noqa: BLE001
-                logger.error("Talent poll future error for %s: %s", talent_key, exc)
+                logger.error("Worker error for shared inbox / %s: %s", message_id, exc)
                 with summary_lock:
                     summary["errors"] += 1
 
-    logger.info("Poll complete: %s", summary)
+    token_row.consecutive_failures = 0
+    token_row.last_error = None
+    token_row.last_poll_at = datetime.utcnow()
+    db.add(token_row)
+    db.commit()
+
+    logger.info("Single-inbox poll complete: %s", summary)
     return summary
+
+
+def _process_shared_inbox_message(
+    token_row_id: int,
+    message_id: str,
+    alias_map: dict[str, str],
+    talent_map: dict[str, TalentProfile],
+    draft_mode: bool,
+) -> dict:
+    """
+    Worker: resolve alias → talent, then hand off to _process_message_in_thread.
+
+    SOP v16 Rule 12: if the original recipient alias cannot be matched to a
+    known talent, the email is left in inbox for human review (Option B).
+    """
+    Session = _get_session_factory()
+    db = Session()
+    summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0, "unrouted": 0}
+    try:
+        token_row = db.query(TalentToken).filter(TalentToken.id == token_row_id).first()
+        if not token_row:
+            return {"summary": {"errors": 1}}
+
+        try:
+            service = gmail_svc.build_service(token_row, db)
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Shared inbox service build failed: %s", exc)
+            return {"summary": {"errors": 1}}
+
+        # Fetch full message detail to read routing headers
+        detail = gmail_svc.get_message_detail(token_row, message_id, db=db, service=service)
+        if not detail:
+            logger.warning("Empty detail for shared inbox / %s — skipping", message_id)
+            return {"summary": {"errors": 1}}
+
+        # SOP v16 Rule 12 — resolve talent from original recipient header
+        to_address = gmail_svc.get_to_address(detail)
+        talent_key = _resolve_talent_from_to(to_address, alias_map)
+
+        if talent_key is None:
+            # Unrecognized alias — leave in inbox, log for human review (Option B)
+            logger.warning(
+                "Unrouted email %s — to_address=%s does not match any talent alias. "
+                "Leaving in inbox for human review (SOP v16 Rule 12 Option B).",
+                message_id, to_address,
+            )
+            # Record as unrouted so we don't retry it every cycle
+            from sqlalchemy.exc import IntegrityError
+            try:
+                db.add(ProcessedEmail(
+                    talent_key="UNROUTED",
+                    gmail_message_id=message_id,
+                    thread_id=detail.get("thread_id", ""),
+                    sender=detail.get("sender", ""),
+                    subject=detail.get("subject", ""),
+                    score=0,
+                    offer_type="Human Admin Required",
+                    triage_reason=f"No alias match — to_address={to_address}",
+                    status=EmailStatus.flagged,
+                    to_address=to_address,
+                    body_text=detail.get("body_text", "")[:500] if detail.get("body_text") else None,
+                    email_date=detail.get("email_date"),
+                ))
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+            summary["unrouted"] += 1
+            summary["processed"] += 1
+            return {"summary": summary}
+
+        profile = talent_map.get(talent_key.lower())
+        if not profile:
+            logger.info("Skipping %s — talent_key=%s is paused or has no sop.md profile", message_id, talent_key)
+            summary["processed"] += 1
+            return {"summary": summary}
+
+        # Delegate to the existing per-message processor (unchanged logic)
+        _process_one_message(
+            db=db,
+            token_row=token_row,
+            service=service,
+            message_id=message_id,
+            talent_key=talent_key,
+            talent_name=profile.full_name or talent_key,
+            minimum_rate=profile.minimum_rate_usd,
+            draft_mode=draft_mode,
+            summary=summary,
+            manager_name=profile.manager or "",
+            to_address=to_address,
+        )
+        return {"summary": summary}
+
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Shared inbox worker error for %s: %s", message_id, exc)
+        return {"summary": {"errors": 1}}
+    finally:
+        db.close()
 
 
 def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool) -> dict:
@@ -481,6 +672,7 @@ def _process_message_in_thread(
     minimum_rate: float,
     draft_mode: bool,
     manager_name: str = "",
+    to_address: str | None = None,
 ) -> dict:
     """Process one email in a worker thread with its own DB session and TalentToken."""
     Session = _get_session_factory()
@@ -497,7 +689,7 @@ def _process_message_in_thread(
         except Exception as exc:  # noqa: BLE001
             return {"status": "error", "reason": f"Gmail service build failed: {exc}"}
 
-        summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+        summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0, "unrouted": 0}
         _process_one_message(
             db=db,
             token_row=token_row,
@@ -509,6 +701,7 @@ def _process_message_in_thread(
             draft_mode=draft_mode,
             summary=summary,
             manager_name=manager_name,
+            to_address=to_address,
         )
         return {"status": "ok", "summary": summary}
     except Exception as exc:  # noqa: BLE001
@@ -529,6 +722,7 @@ def _process_one_message(
     summary: dict,
     manager_name: str = "",
     service=None,
+    to_address: str | None = None,
 ):
     import time as _time
     from sqlalchemy.exc import IntegrityError
@@ -634,7 +828,7 @@ def _process_one_message(
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
                 2, "", 0.0, "Human Admin Required", reason, EmailStatus.flagged,
-                body_text=body, email_date=email_date,
+                body_text=body, email_date=email_date, to_address=to_address,
             )
             db.commit()
             _safe_log_sheet(talent_key, sender, subject, 2, "", 0.0, "Human Admin Required", "flagged", reason)
@@ -689,7 +883,7 @@ def _process_one_message(
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.archived,
-            body_text=body, email_date=email_date, **_extra,
+            body_text=body, email_date=email_date, to_address=to_address, **_extra,
         )
         db.commit()
         _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason)
@@ -706,7 +900,7 @@ def _process_one_message(
         _record_processed(
             db, talent_key, message_id, thread_id, sender, subject,
             score, brand_name, proposed_rate, offer_type, reason, EmailStatus.flagged,
-            body_text=body, email_date=email_date, **_extra,
+            body_text=body, email_date=email_date, to_address=to_address, **_extra,
         )
         db.commit()
         _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason)
@@ -733,7 +927,7 @@ def _process_one_message(
                 db, talent_key, message_id, thread_id, sender, subject,
                 2, brand_name, proposed_rate, "Human Admin Required",
                 "Ongoing thread — prior reply detected. Human review required.",
-                EmailStatus.flagged, body_text=body, email_date=email_date,
+                EmailStatus.flagged, body_text=body, email_date=email_date, to_address=to_address,
             )
             db.commit()
             summary["flagged"] += 1
@@ -757,6 +951,7 @@ def _process_one_message(
                     db, talent_key, message_id, thread_id, sender, subject,
                     score, brand_name, proposed_rate, offer_type, reason,
                     EmailStatus.draft_saved, body_text=body, email_date=email_date,
+                    to_address=to_address,
                 )
                 db.commit()
             summary["processed"] += 1
@@ -821,7 +1016,7 @@ def _process_one_message(
                 score, brand_name, proposed_rate, offer_type,
                 escalate_reason or reason, EmailStatus.flagged,
                 body_text=body, email_date=email_date,
-                time_to_draft_ms=time_to_draft_ms, **_extra,
+                time_to_draft_ms=time_to_draft_ms, to_address=to_address, **_extra,
             )
             db.commit()
             _safe_log_sheet(
@@ -848,13 +1043,14 @@ def _process_one_message(
                 status=DraftStatus.pending,
                 is_escalate=False,
                 escalate_reason=None,
+                to_address=to_address,
             )
             db.add(draft_row)
             _record_processed(
                 db, talent_key, message_id, thread_id, sender, subject,
                 score, brand_name, proposed_rate, offer_type, reason, EmailStatus.draft_saved,
                 body_text=body, email_date=email_date,
-                time_to_draft_ms=time_to_draft_ms, **_extra,
+                time_to_draft_ms=time_to_draft_ms, to_address=to_address, **_extra,
             )
             db.commit()
 
@@ -960,6 +1156,7 @@ def _record_processed(
     time_to_classify_ms: int | None = None,
     time_to_draft_ms: int | None = None,
     human_override_occurred: bool = False,
+    to_address: str | None = None,
 ):
     # The claim row was pre-inserted at the start of _process_one_message.
     # Update it in-place rather than inserting a duplicate.
@@ -990,6 +1187,7 @@ def _record_processed(
         existing.time_to_classify_ms = time_to_classify_ms
         existing.time_to_draft_ms = time_to_draft_ms
         existing.human_override_occurred = human_override_occurred
+        existing.to_address = to_address
     else:
         row = ProcessedEmail(
             talent_key=talent_key,
@@ -1018,5 +1216,6 @@ def _record_processed(
             time_to_classify_ms=time_to_classify_ms,
             time_to_draft_ms=time_to_draft_ms,
             human_override_occurred=human_override_occurred,
+            to_address=to_address,
         )
         db.add(row)

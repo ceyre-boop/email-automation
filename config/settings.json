@@ -109,32 +109,27 @@
     "recovery_wait_minutes": 30,
     "recovery_health_threshold": 0.7
   },
-  "reply_to_routing": {
-    "_comment": "SOP v15-c Rule 12 + Part 3 Reply-To Routing List. Sets the Reply-To HEADER on drafts/replies, matched on the TALENT INBOX (never the sender). Routing instruction only: never added to the email body, never mentioned in the draft, From address unchanged. An inbox in no group gets no Reply-To. Source of truth: sheets/sop.md Part 3 — keep these groups in sync with it.",
-    "groups": {
-      "talent-mgmt@taboost.me": [
-        "allee@taboost.me",
-        "lizz@taboost.me",
-        "angela@taboost.me",
-        "alana@taboost.me",
-        "stephanie@taboost.me",
-        "jocelyn@taboost.me",
-        "hana@taboost.me",
-        "wesley@taboost.me"
-      ],
-      "creator-mgmt@taboost.me": [
-        "mahogany@taboost.me",
-        "anastasiya@taboost.me",
-        "jenn@taboost.me",
-        "grayson@taboost.me",
-        "bkuhl@taboost.me"
-      ],
-      "partnerships@taboost.me": [
-        "katrina@taboost.me",
-        "kylika@taboost.me",
-        "audur@taboost.me",
-        "trinity@taboost.me"
-      ]
+  "single_inbox": {
+    "_comment": "SOP v16 consolidated inbox routing. All talent alias emails route to talent-mgmt@taboost.me. The automation identifies the correct talent from the original recipient header (Delivered-To / X-Original-To / Envelope-To / To), NOT from which Gmail account received the email.",
+    "inbox_email": "talent-mgmt@taboost.me",
+    "alias_map": {
+      "allee@taboost.me": "Allee",
+      "lizz@taboost.me": "Lizz",
+      "angela@taboost.me": "Angela",
+      "alana@taboost.me": "Alana",
+      "stephanie@taboost.me": "Stephanie",
+      "joceyln@taboost.me": "Joceyln",
+      "hana@taboost.me": "Hana",
+      "wesley@taboost.me": "Wesley",
+      "mahogany@taboost.me": "Mahogany",
+      "anastasiya@taboost.me": "Anastasiya",
+      "jenn@taboost.me": "Jenn",
+      "grayson@taboost.me": "Grayson",
+      "bkuhl@taboost.me": "BKuhl",
+      "katrina@taboost.me": "Katrina",
+      "kylika@taboost.me": "Kylika",
+      "audur@taboost.me": "Audur",
+      "trinity@taboost.me": "Trinity"
     }
   }
 }
