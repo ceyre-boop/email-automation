@@ -456,27 +456,57 @@ def list_talents(db: Session = Depends(get_db)):
         for row in db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
     }
 
+    # SOP v16: single-inbox talents have no individual token but are "connected"
+    # whenever the shared inbox token (talent-mgmt@taboost.me) is active.
+    single_inbox_cfg = settings.app_config.get("single_inbox", {})
+    alias_map: dict[str, str] = single_inbox_cfg.get("alias_map", {})
+    # alias_map values are talent keys (e.g. "Hana") — build a lowercase set
+    alias_talent_keys: set[str] = {v.lower() for v in alias_map.values()}
+    shared_inbox_email: str = single_inbox_cfg.get("inbox_email", "talent-mgmt@taboost.me")
+    # Shared inbox token keyed by email in the DB; also check by talent_key "talentmgmt"
+    shared_inbox_token = connected.get("talentmgmt") or next(
+        (row for row in connected.values() if row.email == shared_inbox_email),
+        None,
+    )
+    shared_inbox_active = shared_inbox_token is not None
+
     global_draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
     auto_send_talents: set[str] = {k.lower() for k, p in settings.talent_profiles.items() if p.auto_send and not p.paused}
     auto_send_enabled: bool = settings.app_config.get("auto_send_enabled", False)
 
-    return [
-        TalentOut(
+    results = []
+    for t in talent_configs:
+        tkey = t["key"].lower()
+        individual_token = connected.get(tkey)
+        # A talent is connected if they have their own token OR are in the alias map
+        # and the shared inbox token is active.
+        is_connected = individual_token is not None or (
+            tkey in alias_talent_keys and shared_inbox_active
+        )
+        # For display: prefer individual token email; fall back to shared inbox email
+        display_email = individual_token.email if individual_token else (
+            shared_inbox_email if tkey in alias_talent_keys and shared_inbox_active else None
+        )
+        connected_at_str = individual_token.connected_at.isoformat() if individual_token and individual_token.connected_at else (
+            shared_inbox_token.connected_at.isoformat()
+            if shared_inbox_token and shared_inbox_token.connected_at and tkey in alias_talent_keys and shared_inbox_active
+            else None
+        )
+        results.append(TalentOut(
             key=t["key"],
             full_name=t.get("full_name", t["key"]),
             manager=t.get("manager"),
             category=t.get("category"),
             minimum_rate_usd=t.get("minimum_rate_usd"),
-            connected=t["key"].lower() in connected,
-            email=connected[t["key"].lower()].email if t["key"].lower() in connected else None,
+            connected=is_connected,
+            email=display_email,
             inbox_email=t.get("inbox_email"),
-            connected_at=connected[t["key"].lower()].connected_at.isoformat() if t["key"].lower() in connected else None,
+            connected_at=connected_at_str,
             paused=t.get("paused", False),
             draft_mode=global_draft_mode,
-            auto_send=auto_send_enabled and t["key"].lower() in auto_send_talents,
-        )
-        for t in talent_configs
-    ]
+            auto_send=auto_send_enabled and tkey in auto_send_talents,
+        ))
+    return results
 
 
 def _validate_talent(talent_key: str) -> None:
