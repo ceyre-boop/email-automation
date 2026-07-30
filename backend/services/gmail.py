@@ -52,21 +52,29 @@ def get_to_address(message_detail: dict) -> str | None:
     SOP v16 Rule 12: talent identity is determined from the original recipient
     address (the alias the brand emailed), NOT from which Gmail account received it.
 
-    Checks headers in priority order:
-      1. Delivered-To   — set by Gmail when delivering to an alias
-      2. X-Original-To  — set by MTA before aliasing
-      3. Envelope-To    — SMTP envelope recipient
-      4. To             — visible To: header (fallback)
+    Google Workspace alias forwarding puts the DELIVERY mailbox (talent-mgmt@taboost.me)
+    in Delivered-To and the ORIGINAL alias in X-Original-To. So we check X-Original-To
+    first, then fall back through the remaining headers. We also skip the consolidated
+    inbox address itself — it is never a valid alias.
 
-    Returns the first non-empty address found, lowercased, or None.
+    Checks headers in priority order:
+      1. X-Original-To  — set by MTA before aliasing; carries the alias
+      2. Envelope-To    — SMTP envelope recipient
+      3. To             — visible To: header
+      4. Delivered-To   — last resort (carries delivery mailbox in Workspace forwarding)
+
+    Returns the first non-inbox address found, lowercased, or None.
     """
+    _INBOX_ADDR = "talent-mgmt@taboost.me"
     headers = message_detail.get("headers") or {}
-    for key in ("delivered-to", "x-original-to", "envelope-to", "to"):
+    for key in ("x-original-to", "envelope-to", "to", "delivered-to"):
         raw = headers.get(key, "")
         if raw:
             match = re.search(r"[\w.\-+]+@[\w.\-]+", raw)
             if match:
-                return match.group(0).lower()
+                addr = match.group(0).lower()
+                if addr != _INBOX_ADDR:
+                    return addr
     return None
 
 

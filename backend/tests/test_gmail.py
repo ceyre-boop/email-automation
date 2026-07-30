@@ -593,10 +593,10 @@ def test_thread_has_prior_sent_reply_returns_false_on_api_error():
 
 
 @pytest.mark.parametrize("headers,expected", [
-    # Delivered-To is highest priority
-    ({"delivered-to": "hana@taboost.me", "to": "talent-mgmt@taboost.me"}, "hana@taboost.me"),
-    # X-Original-To when Delivered-To absent
-    ({"x-original-to": "allee@taboost.me"}, "allee@taboost.me"),
+    # X-Original-To is highest priority — carries the alias in Workspace forwarding
+    ({"x-original-to": "hana@taboost.me", "delivered-to": "talent-mgmt@taboost.me"}, "hana@taboost.me"),
+    # Delivered-To skipped when it contains the consolidated inbox address
+    ({"delivered-to": "talent-mgmt@taboost.me", "to": "hana@taboost.me"}, "hana@taboost.me"),
     # Envelope-To fallback
     ({"envelope-to": "lizz@taboost.me"}, "lizz@taboost.me"),
     # To header as last resort
@@ -605,9 +605,11 @@ def test_thread_has_prior_sent_reply_returns_false_on_api_error():
     ({}, None),
     # Empty headers
     ({"delivered-to": "", "to": ""}, None),
+    # Only consolidated inbox address present — returns None (no alias found)
+    ({"delivered-to": "talent-mgmt@taboost.me"}, None),
 ])
 def test_get_to_address(headers, expected):
-    """SOP v16 Rule 12: original recipient alias is extracted from headers in priority order."""
+    """SOP v16 Rule 12: X-Original-To carries the alias in Workspace forwarding; inbox addr is skipped."""
     from backend.services.gmail import get_to_address
     detail = {"headers": headers}
     assert get_to_address(detail) == expected
