@@ -1576,7 +1576,10 @@ function renderReconnectList() {
   const rows = [];
   (state.talents || []).forEach(t => {
     const health = state.tokenHealth?.[t.key.toLowerCase()];
-    if (needsReconnect(health) || !t.connected) {
+    // Only show in reconnect if there is a health record showing the token is broken.
+    // Do NOT add talents simply because t.connected is false — alias talents have no
+    // individual token and are connected via the shared inbox; showing them here is wrong.
+    if (needsReconnect(health)) {
       rows.push({ key: t.key, label: t.full_name || t.key });
     }
   });
