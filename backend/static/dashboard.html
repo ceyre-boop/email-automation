@@ -191,6 +191,30 @@ body {
 .t-dot.drafting  { background: #f4b400;       box-shadow: 0 0 6px #f4b400; }
 .t-dot.offline   { background: var(--red); box-shadow: 0 0 6px var(--red); }
 
+/* Reconnect section — same row shape as .talent-item so the sidebar reads as
+   one list. Lives below Talent Inboxes; rows are links, not click handlers. */
+#reconnect-list { padding: 2px 10px 0; }
+
+.reconnect-item {
+  display: flex; align-items: center; gap: 9px;
+  padding: 7px 12px; border-radius: 8px;
+  font-size: 13px; font-weight: 500; color: var(--text-3);
+  text-decoration: none; transition: var(--r); margin-bottom: 1px;
+  border: 1px solid transparent;
+}
+.reconnect-item:hover {
+  background: var(--amber-dim); color: var(--amber);
+  border-color: rgba(255,179,0,0.25);
+}
+.reconnect-item .t-avatar { opacity: 0.55; }
+.reconnect-item:hover .t-avatar { opacity: 1; }
+.reconnect-action {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--amber);
+  flex-shrink: 0; opacity: 0.75;
+}
+.reconnect-item:hover .reconnect-action { opacity: 1; }
+
 .t-badge {
   background: var(--red); color: #fff;
   font-size: 9px; font-weight: 700;
@@ -737,6 +761,12 @@ body {
   <div class="sidebar-section-label">Talent Inboxes</div>
 
   <ul id="talent-list" style="list-style:none;"></ul>
+
+  <div id="reconnect-block" hidden>
+    <div class="sidebar-divider"></div>
+    <div class="sidebar-section-label">Reconnect Gmail</div>
+    <ul id="reconnect-list" style="list-style:none;"></ul>
+  </div>
 
   <div class="sidebar-footer">
     <div class="sidebar-theme-row">
@@ -1513,18 +1543,69 @@ function renderSidebar() {
   state.report?.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_real_drafts ?? c.pending_drafts; });
   state.talents.filter(t => t.connected).forEach(t => {
     const pending = pendingMap[t.key] || 0;
-    const health = state.tokenHealth[t.key.toLowerCase()];
-    const needsReconnect = health && (!health.active || health.consecutive_failures >= 2);
     const li = document.createElement('li');
     li.className = 'talent-item';
     li.dataset.key = t.key;
     li.innerHTML = `
       <div class="t-avatar">${initial(t.full_name)}</div>
-      <span class="t-name">${esc(t.full_name)}${needsReconnect ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#f59e0b;margin-left:5px;vertical-align:middle;" title="Gmail connection broken"></span>' : ''}</span>
+      <span class="t-name">${esc(t.full_name)}</span>
       <div class="t-dot ${dotClass(t)}"></div>
-      ${needsReconnect ? `<div style="width:100%;padding:2px 0 0 36px;"><a href="/auth/connect?talent_key=${esc(t.key)}" target="_blank" onclick="event.stopPropagation()" style="font-size:10px;color:#f59e0b;text-decoration:underline;">Reconnect Gmail</a></div>` : ''}
     `;
     li.addEventListener('click', () => openRealGmail(t));
+    ul.appendChild(li);
+  });
+  renderReconnectList();
+}
+
+// ── Reconnect section ──────────────────────────────────────────────────────
+// Every inbox that needs re-authorising, collected below Talent Inboxes rather
+// than crammed into the talent rows. Covers three cases the old inline link
+// missed: talents whose token went inactive (and so vanish from the list
+// above), talents with repeated refresh failures, and system inboxes like
+// talent-mgmt that have no sop.md profile at all.
+function needsReconnect(health) {
+  return !!health && (!health.active || (health.consecutive_failures ?? 0) >= 2);
+}
+
+function renderReconnectList() {
+  const block = document.getElementById('reconnect-block');
+  const ul = document.getElementById('reconnect-list');
+  if (!block || !ul) return;
+  ul.innerHTML = '';
+
+  const rows = [];
+  (state.talents || []).forEach(t => {
+    const health = state.tokenHealth?.[t.key.toLowerCase()];
+    if (needsReconnect(health) || !t.connected) {
+      rows.push({ key: t.key, label: t.full_name || t.key });
+    }
+  });
+
+  // System inboxes are not talents, so they never appear above — surface them
+  // here by name so a disconnected shared inbox is visible rather than absent.
+  Object.entries(state.tokenHealth || {}).forEach(([key, health]) => {
+    if (rows.some(r => r.key.toLowerCase() === key)) return;
+    if (!needsReconnect(health)) return;
+    if ((state.talents || []).some(t => t.key.toLowerCase() === key)) return;
+    rows.push({ key, label: health.email || key });
+  });
+
+  block.hidden = rows.length === 0;
+  rows.sort((a, b) => a.label.localeCompare(b.label));
+  rows.forEach(r => {
+    const li = document.createElement('li');
+    const a = document.createElement('a');
+    a.className = 'reconnect-item';
+    a.href = `/auth/connect?talent_key=${encodeURIComponent(r.key)}`;
+    a.target = '_blank';
+    a.rel = 'noopener';
+    a.title = `Reauthorise Gmail for ${r.label}`;
+    a.innerHTML = `
+      <div class="t-avatar">${initial(r.label)}</div>
+      <span class="t-name">${esc(r.label)}</span>
+      <span class="reconnect-action">Connect</span>
+    `;
+    li.appendChild(a);
     ul.appendChild(li);
   });
 }
