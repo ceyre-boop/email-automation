@@ -427,9 +427,13 @@ def on_startup():
         _profiles = parse_sop_md(_load_sop_md())
         _profile_keys = {k.lower() for k in _profiles}
         _db = get_session_factory()()
+        # Keys that are intentionally not in sop.md — shared inbox and test tokens.
+        _SYSTEM_KEYS = {"shared-inbox", "talentmgmt", "talent-mgmt", "sam"}
         try:
             _active = _db.query(_TT).filter(_TT.active == True).all()  # noqa: E712
             for _tok in _active:
+                if _tok.talent_key.lower() in _SYSTEM_KEYS:
+                    continue  # shared-inbox and similar system tokens are expected to have no sop.md profile
                 if _tok.talent_key.lower() not in _profile_keys:
                     logger.error(
                         "Startup: active Gmail token for '%s' has NO matching sop.md profile — "

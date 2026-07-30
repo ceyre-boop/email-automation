@@ -57,8 +57,20 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
         .first()
     )
     if not token:
-        logger.warning("auto_send: no active token for %s — skipping", talent_key)
-        return
+        # SOP v16: single-inbox talents have no individual token — fall back to shared inbox.
+        settings = get_settings()
+        inbox_email = settings.app_config.get("single_inbox", {}).get("inbox_email", "talent-mgmt@taboost.me")
+        alias_map = settings.app_config.get("single_inbox", {}).get("alias_map", {})
+        alias_keys = {v.lower() for v in alias_map.values()}
+        if talent_key.lower() in alias_keys:
+            token = (
+                db.query(TalentToken)
+                .filter(TalentToken.active == True, TalentToken.email == inbox_email)  # noqa: E712
+                .first()
+            )
+        if not token:
+            logger.warning("auto_send: no active token for %s — skipping", talent_key)
+            return
 
     # Velocity guard: count auto-sends in last hour for this talent
     velocity_cap: int = int(get_settings().app_config.get("auto_send_velocity_cap", 25))
