@@ -62,7 +62,7 @@
     }
   },
   "reply": {
-    "draft_mode": true,
+    "draft_mode": false,
     "_draft_mode_comment": "true = Phase 2 saves replies as Gmail Drafts for supervisor review instead of sending. Set to false only after Marco approves full autonomous send (~1 month trial). When draft_mode is false, send_delay_minutes applies.",
     "send_delay_minutes": 15,
     "_send_delay_comment": "Minutes to wait after drafting before sending. Only applies when draft_mode is false. Set to 0 to disable. Keep at 15 during Phase 2 testing.",
