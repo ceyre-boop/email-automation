@@ -36,6 +36,7 @@ from backend.models.db import (
     TriageAudit,
 )
 from backend.routers.deps import get_db, verify_api_key
+from backend.services.inbox_routing import resolve_token_for_talent
 from backend.services.oauth import TokenRefreshError
 from backend.services.talent_access import ensure_talent_gmail_enabled, is_talent_paused
 
@@ -2432,7 +2433,7 @@ def repush_drafts(
     """
     from backend.services import gmail as gmail_svc
 
-    token = db.query(TalentToken).filter(TalentToken.talent_key == talent_key).first()
+    token = resolve_token_for_talent(db, talent_key)
     if not token:
         raise HTTPException(status_code=404, detail="Talent not found")
 
@@ -2485,7 +2486,7 @@ def purge_duplicate_drafts(
     """
     from backend.services import gmail as gmail_svc
 
-    token = db.query(TalentToken).filter(TalentToken.talent_key == talent_key).first()
+    token = resolve_token_for_talent(db, talent_key)
     if not token:
         raise HTTPException(status_code=404, detail="Talent not found")
 

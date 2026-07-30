@@ -100,19 +100,22 @@ def test_missing_shared_inbox_token_logs_warning(poller_env, db_session, caplog)
 
 
 def test_stray_token_does_not_generate_orphan_warning(poller_env, db_session, caplog):
-    """Stray tokens are silently ignored in single-inbox mode — no 'Orphaned' warning.
+    """Stray tokens with no sop.md profile generate an 'Orphaned' warning in hybrid mode.
 
-    In the old per-talent polling loop, every token was inspected and a missing
-    sop.md profile triggered an 'Orphaned' warning.  That concept doesn't apply
-    to single-inbox mode: the poller never iterates talent tokens at all, so no
-    individual token can be 'orphaned' by this path.
+    SOP v16 introduced a hybrid poller: phase 1 handles the shared inbox, phase 2
+    iterates remaining active tokens for the Partnerships talents.  Phase 2 still
+    runs the orphan guard — a token with no matching sop.md profile is logged as
+    'Orphaned' so zombie tokens don't silently sit in the DB unnoticed.
+
+    This is the CORRECT behaviour in hybrid mode; the old test asserted the
+    opposite because it was written when poll_all_inboxes() never iterated tokens.
     """
     _add_token(db_session, "Sam")
     _run(poller_env, db_session, caplog)
 
     all_msgs = [r.getMessage() for r in caplog.records]
-    assert not any("Orphaned" in m for m in all_msgs), \
-        f"No orphan warning expected in single-inbox mode; got: {all_msgs}"
+    assert any("Orphaned" in m for m in all_msgs), \
+        f"Expected orphan warning for unknown token 'Sam'; got: {all_msgs}"
 
 
 def test_paused_talent_token_silently_ignored(poller_env, db_session, caplog):
@@ -150,6 +153,72 @@ def test_shared_inbox_token_triggers_single_inbox_poll(poller_env, db_session, c
         summary = _run(poller_env, db_session, caplog)
 
     assert single_inbox.called, "shared-inbox token must trigger _poll_single_inbox"
+    assert summary["errors"] == 0
+
+
+# ── Hybrid mode: the shared inbox must not also be polled per-token ───────────
+
+def test_shared_inbox_token_is_never_polled_per_token(poller_env, db_session, caplog):
+    """The consolidated mailbox is handled by phase 1 only.
+
+    If phase 2 also picked it up, every message in it would be processed twice in
+    one cycle and double-drafted.
+    """
+    _add_token(db_session, "shared-inbox")
+
+    with patch("backend.services.poller._poll_single_inbox", return_value={}) as single, \
+         patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        _run(poller_env, db_session, caplog)
+
+    assert single.called, "phase 1 should have polled the shared inbox"
+    one_talent.assert_not_called(), "shared inbox must not be polled per-token"
+    assert not any("Orphaned" in r.getMessage() for r in caplog.records), \
+        "the shared inbox is not an orphaned token"
+
+
+def test_shared_inbox_excluded_by_email_even_with_an_odd_key(poller_env, db_session, caplog):
+    """OAuth auto-generates the talent_key, so exclusion must key off the email."""
+    from datetime import datetime, timedelta
+
+    db_session.add(TalentToken(
+        talent_key="talentmgmt7",
+        email="talent-mgmt@taboost.me",
+        access_token="a", refresh_token="r",
+        token_expiry=datetime.utcnow() + timedelta(hours=1),
+        active=True,
+    ))
+    db_session.commit()
+
+    with patch("backend.services.poller._poll_single_inbox", return_value={}), \
+         patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        _run(poller_env, db_session, caplog)
+
+    one_talent.assert_not_called()
+
+
+def test_partnerships_talent_is_polled_per_token(poller_env, db_session, caplog):
+    """Katrina keeps her own mailbox, so phase 2 must pick her up."""
+    _add_token(db_session, "Katrina")
+
+    with patch("backend.services.poller._poll_single_inbox", return_value={}), \
+         patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        _run(poller_env, db_session, caplog)
+
+    assert one_talent.called, "Katrina should have been polled per-token"
+    polled_keys = {c.args[1].key for c in one_talent.call_args_list}
+    assert "Katrina" in polled_keys
+
+
+def test_per_token_phase_runs_even_when_shared_inbox_is_missing(poller_env, db_session, caplog):
+    """A disconnected shared inbox must not silence the Partnerships tokens."""
+    _add_token(db_session, "Katrina")
+
+    with patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        summary = _run(poller_env, db_session, caplog)
+
+    assert one_talent.called, "per-token phase must still run"
+    assert any("not connected" in r.getMessage() for r in caplog.records), \
+        "a missing shared inbox must be logged, not silent"
     assert summary["errors"] == 0
 
 
