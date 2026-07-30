@@ -612,29 +612,23 @@ def _get_or_create_custom_label(service, label_name: str, *, background_color: s
 
 def archive_as_spam(token_row, message_id: str, db=None, service=None) -> bool:
     """
-    Atomic Option C: remove INBOX/UNREAD and apply Misc label in a single API call.
-    If the Misc label cannot be created, archives anyway without it — the archive action
-    (removing from INBOX) is never blocked by a label failure.
+    Atomic Option C: remove INBOX/UNREAD and all category labels in a single API call.
+    No label is applied — score-1 emails are archived cleanly with no Gmail label.
     """
     if service is None:
         service = _gmail_service(token_row, db)
-    label_id = _get_or_create_label(service, "Misc", "#e8eaed", "#202124")
-    if not label_id:
-        logger.warning(
-            "Misc label unavailable for %s/%s — archiving without it",
-            token_row.talent_key, message_id,
-        )
     try:
-        body: dict = {
-            "removeLabelIds": [
-                "INBOX", "UNREAD",
-                "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
-                "CATEGORY_UPDATES", "CATEGORY_FORUMS",
-            ],
-        }
-        if label_id:
-            body["addLabelIds"] = [label_id]
-        service.users().messages().modify(userId="me", id=message_id, body=body).execute()
+        service.users().messages().modify(
+            userId="me",
+            id=message_id,
+            body={
+                "removeLabelIds": [
+                    "INBOX", "UNREAD",
+                    "CATEGORY_PROMOTIONS", "CATEGORY_SOCIAL",
+                    "CATEGORY_UPDATES", "CATEGORY_FORUMS",
+                ],
+            },
+        ).execute()
         return True
     except HttpError as exc:
         logger.error("archive_as_spam failed for %s / %s: %s", token_row.talent_key, message_id, exc)
@@ -873,7 +867,7 @@ def thread_has_prior_sent_reply(service, thread_id: str) -> bool:
 # ── Triage labels ─────────────────────────────────────────────────────────────
 
 # Only these labels may ever be applied. All other label operations are rejected.
-_ALLOWED_LABELS: frozenset[str] = frozenset({"A Initial Response", "Spam", "Misc"})
+_ALLOWED_LABELS: frozenset[str] = frozenset({"A Initial Response", "Spam"})
 
 # These labels are permanently forbidden — applying any of them raises immediately.
 # Belt + suspenders: even if a label somehow exists in Gmail already, it can never
