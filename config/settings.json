@@ -2,7 +2,7 @@
   "_comment": "Global configuration for the Talent Inbox Automation system. Fill in all TODO values before deploying.",
   "ai_enabled": true,
   "_ai_enabled_comment": "HARD BLOCKER — set to false to prevent ALL OpenAI API calls. Triage and reply drafting are skipped entirely. Inbox syncing still runs. Only set to true when Colin explicitly re-enables AI.",
-  "auto_send_enabled": true,
+  "auto_send_enabled": false,
   "_auto_send_enabled_comment": "Auto-send list is now derived from sop.md (Auto Send: yes/no per talent). No longer a separate list here.",
   "auto_send_hold_minutes": 60,
   "auto_send_velocity_cap": 200,

@@ -34,6 +34,12 @@ def run_auto_send(db: Session) -> None:
     if not cfg.get("auto_send_enabled", False):
         return
 
+    # Hard interlock: draft_mode=true means drafts go to human review, never auto-send.
+    # auto_send_enabled and draft_mode are mutually exclusive — if both are true, draft_mode wins.
+    if cfg.get("reply", {}).get("draft_mode", True):
+        logger.warning("auto_send: draft_mode=true — auto-send is suppressed. Set draft_mode=false to enable.")
+        return
+
     talents: list[str] = [
         key for key, p in settings.talent_profiles.items() if p.auto_send and not p.paused
     ]
