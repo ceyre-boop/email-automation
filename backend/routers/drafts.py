@@ -21,6 +21,7 @@ from backend.models.db import Draft, DraftEditLog, DraftStatus, ProcessedEmail, 
 from backend.routers.deps import get_db, verify_api_key
 from backend.services import gmail as gmail_svc
 from backend.services.gmail import parse_cc_recipients
+from backend.services.inbox_routing import resolve_token_for_talent
 from backend.services.oauth import TokenRefreshError
 from backend.services.talent_access import ensure_talent_gmail_enabled
 
@@ -80,15 +81,16 @@ def _get_draft_or_404(db: Session, draft_id: int) -> Draft:
 
 def _get_token_or_404(db: Session, talent_key: str) -> TalentToken:
     ensure_talent_gmail_enabled(talent_key)
-    token = (
-        db.query(TalentToken)
-        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
-        .first()
-    )
+    # Own token first, consolidated inbox as fallback — a talent polled from the
+    # shared mailbox has their drafts there, so that is the account that sends.
+    token = resolve_token_for_talent(db, talent_key)
     if not token:
         raise HTTPException(
             status_code=404,
-            detail=f"No active Gmail token for talent '{talent_key}'. Have them reconnect.",
+            detail=(
+                f"No active Gmail token for talent '{talent_key}' and the shared inbox "
+                "is not connected. Reconnect Gmail on the dashboard."
+            ),
         )
     return token
 
@@ -236,9 +238,7 @@ def trash_all_orphaned(
     failed = 0
     for row in rows:
         try:
-            token_row = db.query(TalentToken).filter(
-                TalentToken.talent_key.ilike(row.talent_key)
-            ).first()
+            token_row = resolve_token_for_talent(db, row.talent_key)
             if token_row:
                 service = gmail_svc.build_service(token_row, db=db)
                 service.users().messages().trash(userId="me", id=row.gmail_message_id).execute()
@@ -297,11 +297,7 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
     if pe.score != 3:
         raise HTTPException(status_code=400, detail="Email is not Score 3 — cannot regenerate draft.")
 
-    token = (
-        db.query(TalentToken)
-        .filter(TalentToken.talent_key.ilike(pe.talent_key), TalentToken.active == True)  # noqa: E712
-        .first()
-    )
+    token = resolve_token_for_talent(db, pe.talent_key)
     if not token:
         raise HTTPException(status_code=404, detail="Talent Gmail not connected.")
 
@@ -339,7 +335,7 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
         raise
     except TokenRefreshError as exc:
         db.rollback()
-        tok = db.query(TalentToken).filter(TalentToken.talent_key.ilike(pe.talent_key)).first()
+        tok = resolve_token_for_talent(db, pe.talent_key)
         if tok:
             tok.active = False
             tok.consecutive_failures = (tok.consecutive_failures or 0) + 1
@@ -446,7 +442,7 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
         return {"ok": True, "draft_id": draft_row.id, "gmail_draft_id": gmail_draft_id}
     except TokenRefreshError as exc:
         db.rollback()
-        tok = db.query(TalentToken).filter(TalentToken.talent_key.ilike(pe.talent_key)).first()
+        tok = resolve_token_for_talent(db, pe.talent_key)
         if tok:
             tok.active = False
             tok.consecutive_failures = (tok.consecutive_failures or 0) + 1
@@ -716,10 +712,7 @@ def discard_all_pending(db: Session = Depends(get_db)):
                 db.add(draft)
                 cleared += 1
                 continue
-            token = db.query(TalentToken).filter(
-                TalentToken.talent_key == draft.talent_key,
-                TalentToken.active == True,  # noqa: E712
-            ).first()
+            token = resolve_token_for_talent(db, draft.talent_key)
             if token:
                 try:
                     gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)

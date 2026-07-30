@@ -416,6 +416,54 @@ def on_startup():
         sop_path = Path(__file__).parent.parent / "sheets" / "sop_data.json"
         sop_path.write_text(json.dumps(sop_data, indent=2))
         logger.info("SOP validator: sop_data.json regenerated (%d entries)", len(profiles))
+
+        # ── Routing coverage check ────────────────────────────────────────────
+        # A talent_key that resolves to no sop.md profile is dropped silently by
+        # the poller (INFO log, no DB row, no dashboard trace), and a talent in
+        # neither routing mode is simply never polled. Both are invisible at
+        # runtime, so surface them loudly here.
+        try:
+            from backend.services.inbox_routing import reply_to_groups
+
+            app_cfg = get_settings().app_config
+            alias_map = (app_cfg.get("single_inbox") or {}).get("alias_map") or {}
+            profile_keys = {k.lower() for k in profiles}
+
+            unknown = sorted(
+                {v for v in alias_map.values() if str(v).lower() not in profile_keys}
+            )
+            if unknown:
+                logger.critical(
+                    "STARTUP CRITICAL: alias_map maps to talent_key(s) with no sop.md profile: %s. "
+                    "Mail to those aliases is DROPPED SILENTLY. Fix config/settings.json "
+                    "single_inbox.alias_map so each value matches a 'Key:' in sheets/sop.md.",
+                    ", ".join(unknown),
+                )
+
+            per_token_inboxes = set().union(*reply_to_groups().values()) if reply_to_groups() else set()
+            per_token_keys = {
+                local.split("@")[0].lower() for local in per_token_inboxes
+            }
+            routed = {str(v).lower() for v in alias_map.values()}
+            uncovered = sorted(
+                key for key in profiles
+                if key.lower() not in routed
+                and key.lower() not in per_token_keys
+                and not any(key.lower().startswith(p) or p.startswith(key.lower())
+                            for p in per_token_keys)
+            )
+            if uncovered:
+                logger.warning(
+                    "Routing coverage: %d sop.md talent(s) are in NEITHER the shared-inbox "
+                    "alias_map NOR a per-token Reply-To group — their mail is never polled: %s",
+                    len(uncovered), ", ".join(uncovered),
+                )
+            logger.info(
+                "Routing: %d shared-inbox aliases, %d per-token inboxes, %d sop.md talents",
+                len(alias_map), len(per_token_inboxes), len(profiles),
+            )
+        except Exception:
+            logger.exception("Routing coverage check failed (non-fatal).")
     except Exception:
         logger.exception("SOP startup validator failed (non-fatal — poll cycle will continue).")
 

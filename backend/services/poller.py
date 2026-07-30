@@ -2,7 +2,14 @@
 Inbox polling engine.
 
 Called by the cron route (GET /cron/poll-inboxes) every 5 minutes.
-Iterates over every connected talent, processes unread emails end-to-end:
+
+Two modes run in one cycle (SOP v16):
+  1. The consolidated inbox (talent-mgmt@taboost.me) — one mailbox, talent
+     resolved from the original recipient alias header.
+  2. The Partnerships tokens — each talent's own mailbox, talent resolved from
+     which account received the mail (the pre-v16 behaviour).
+
+Either way each unread email is processed end-to-end:
   1. Fetch unread messages from Gmail
   2. Triage (GPT-4o-mini)
   3. Score 1 → archive + log
@@ -27,6 +34,11 @@ from backend.services import reply as reply_svc
 from backend.services import sheets as sheets_svc
 from backend.services import triage as triage_svc
 from backend.services.external_channel import detect_external_channel
+from backend.services.inbox_routing import (
+    get_shared_inbox_token,
+    is_shared_inbox_token,
+    shared_inbox_email,
+)
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
 from backend.services.oauth import TokenRefreshError
 from backend.services.sop_parser import TalentProfile, get_active_profiles
@@ -120,13 +132,19 @@ def _resolve_talent_from_to(to_address: str | None, alias_map: dict[str, str]) -
 
 def poll_all_inboxes(db: Session) -> dict:
     """
-    Main polling function — SOP v16 single-inbox mode.
+    Main polling function — SOP v16 hybrid mode.
 
-    Reads ONE consolidated inbox (talent-mgmt@taboost.me), identifies the
-    correct talent from the original recipient alias header on each email
-    (Delivered-To / X-Original-To / Envelope-To / To), then processes each
-    message exactly as before. Emails with no recognized alias are logged as
-    unrouted and left in the inbox for human review.
+    Phase 1: the consolidated inbox (talent-mgmt@taboost.me). One mailbox; the
+    talent is identified from the original recipient alias header on each email
+    (Delivered-To / X-Original-To / Envelope-To / To). Emails with no recognized
+    alias are logged as unrouted and left in the inbox for human review.
+
+    Phase 2: the Partnerships talents, who keep their own Gmail accounts. Each is
+    polled individually and the talent is identified by which account received
+    the mail — the pre-v16 behaviour, unchanged.
+
+    The phases run SEQUENTIALLY, not concurrently: their thread pools together
+    would exceed the SQLAlchemy pool ceiling documented above.
     """
     settings = get_settings()
     talent_map = _talent_profile_map(settings)
@@ -135,32 +153,88 @@ def poll_all_inboxes(db: Session) -> dict:
 
     summary = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0, "unrouted": 0}
 
-    # Find the single shared inbox token — talent_key = "shared-inbox" OR email matches
-    inbox_email = settings.app_config.get("single_inbox", {}).get("inbox_email", "talent-mgmt@taboost.me")
-    token_row = (
-        db.query(TalentToken)
-        .filter(TalentToken.active == True, TalentToken.email == inbox_email)  # noqa: E712
-        .first()
-    )
-
-    if token_row is None:
-        # Fallback: any active token with talent_key "shared-inbox"
-        token_row = (
-            db.query(TalentToken)
-            .filter(TalentToken.active == True, TalentToken.talent_key == "shared-inbox")  # noqa: E712
-            .first()
-        )
-
-    if token_row is None:
+    # ── Phase 1: consolidated inbox ───────────────────────────────────────────
+    shared_token = get_shared_inbox_token(db, settings=settings)
+    if shared_token is None:
         logger.warning(
             "Single inbox not connected — no active TalentToken for %s. "
-            "Connect talent-mgmt@taboost.me via /connect on the dashboard.",
-            inbox_email,
+            "Connect it via /connect on the dashboard. Partnerships tokens are "
+            "still polled below.",
+            shared_inbox_email(settings),
         )
-        return summary
+        _record_poll_health(
+            db, "shared-inbox", 0, 0,
+            f"Single inbox not connected ({shared_inbox_email(settings)})", 0,
+        )
+    else:
+        logger.info("Single-inbox poll starting — inbox=%s", shared_token.email)
+        _poll_single_inbox(shared_token, alias_map, talent_map, draft_mode, db, summary)
 
-    logger.info("Single-inbox poll starting — inbox=%s", token_row.email)
-    return _poll_single_inbox(token_row, alias_map, talent_map, draft_mode, db, summary)
+    # ── Phase 2: per-token talents (Partnerships) ─────────────────────────────
+    _poll_individual_tokens(db, settings, talent_map, draft_mode, summary)
+
+    return summary
+
+
+def _poll_individual_tokens(
+    db: Session,
+    settings,
+    talent_map: dict[str, TalentProfile],
+    draft_mode: bool,
+    summary: dict,
+) -> None:
+    """Poll every active token that is NOT the consolidated inbox.
+
+    SOP v16 Part 3: the Partnerships talents (Katrina, Kylika, Audur, Trinity)
+    still own their mailboxes. Their mail never reaches talent-mgmt, so alias
+    routing cannot see it — they need the per-token path.
+
+    The consolidated inbox is excluded explicitly. Without that it would be
+    polled twice in one cycle and every message double-drafted.
+    """
+    active_tokens = db.query(TalentToken).filter(TalentToken.active == True).all()  # noqa: E712
+    all_profile_keys = {k.lower() for k in settings.talent_profiles}
+
+    jobs: list[tuple[int, TalentProfile, bool]] = []
+    for token_row in active_tokens:
+        if is_shared_inbox_token(token_row, settings=settings):
+            continue
+        key_lower = (token_row.talent_key or "").lower()
+        profile = talent_map.get(key_lower)
+        if not profile:
+            if key_lower in all_profile_keys:
+                logger.info("Skipping %s — paused in sop.md", token_row.talent_key)
+            else:
+                logger.warning(
+                    "Orphaned Gmail token for talent_key=%s — no sop.md profile, inbox NOT "
+                    "being processed. Add a profile to sheets/sop.md or deactivate the token.",
+                    token_row.talent_key,
+                )
+            continue
+        jobs.append((token_row.id, profile, draft_mode))
+
+    if not jobs:
+        return
+
+    logger.info("Per-token poll starting — %d talent inbox(es)", len(jobs))
+    summary_lock = threading.Lock()
+    with ThreadPoolExecutor(max_workers=min(len(jobs), MAX_TALENT_WORKERS)) as executor:
+        futures = {
+            executor.submit(_poll_one_talent, token_id, profile, dm): profile.key
+            for token_id, profile, dm in jobs
+        }
+        for future in as_completed(futures):
+            talent_key = futures[future]
+            try:
+                result = future.result() or {}
+            except Exception as exc:  # noqa: BLE001
+                logger.error("Per-token poll failed for %s: %s", talent_key, exc)
+                with summary_lock:
+                    summary["errors"] += 1
+                continue
+            with summary_lock:
+                for k, v in result.items():
+                    summary[k] = summary.get(k, 0) + v
 
 
 def _poll_single_inbox(
@@ -474,6 +548,7 @@ def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool
                         minimum_rate,
                         draft_mode,
                         manager_name,
+                        token_row.email,
                     )
                     futures[future] = message_id
 

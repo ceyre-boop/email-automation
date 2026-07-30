@@ -34,6 +34,20 @@ class GmailDraftError(Exception):
 logger = logging.getLogger(__name__)
 
 
+def _reply_to_header(token_row) -> str | None:
+    """Return the Reply-To address for this token's mailbox, or None.
+
+    SOP v16 Part 3 keeps Reply-To for the Partnerships talents only — they still
+    poll their own Gmail accounts, and their replies route to
+    partnerships@taboost.me. Talents polled from the consolidated inbox get no
+    Reply-To, which falls out naturally: the shared mailbox is in no group.
+
+    Matching is on the talent inbox (token_row.email), never the sender.
+    """
+    from backend.services.inbox_routing import reply_to_for_token
+    return reply_to_for_token(token_row)
+
+
 def _safe_address(addr_str: str) -> str:
     """RFC 2047-encode the display name if it contains non-ASCII characters.
 
@@ -729,6 +743,9 @@ def create_gmail_draft(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
+    _rt = _reply_to_header(token_row)
+    if _rt:
+        mime_msg["Reply-To"] = _rt
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
         mime_msg["References"] = in_reply_to
@@ -784,6 +801,9 @@ def send_reply(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
+    _rt = _reply_to_header(token_row)
+    if _rt:
+        mime_msg["Reply-To"] = _rt
     if in_reply_to:
         mime_msg["In-Reply-To"] = in_reply_to
         mime_msg["References"] = in_reply_to

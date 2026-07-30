@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session
 from backend.core.config import get_settings
 from backend.models.db import Draft, DraftStatus, EmailStatus, ProcessedEmail, TalentToken
 from backend.services import gmail as gmail_svc
+from backend.services.inbox_routing import resolve_token_for_talent
 from backend.services.oauth import TokenRefreshError
 
 logger = logging.getLogger(__name__)
@@ -51,13 +52,12 @@ def run_auto_send(db: Session) -> None:
 
 
 def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
-    token = (
-        db.query(TalentToken)
-        .filter(TalentToken.talent_key.ilike(talent_key), TalentToken.active == True)  # noqa: E712
-        .first()
-    )
+    token = resolve_token_for_talent(db, talent_key)
     if not token:
-        logger.warning("auto_send: no active token for %s — skipping", talent_key)
+        logger.warning(
+            "auto_send: no active token for %s and shared inbox not connected — skipping",
+            talent_key,
+        )
         return
 
     # Velocity guard: count auto-sends in last hour for this talent

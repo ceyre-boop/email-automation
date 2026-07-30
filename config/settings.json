@@ -109,16 +109,28 @@
     "recovery_wait_minutes": 30,
     "recovery_health_threshold": 0.7
   },
+  "reply_to_routing": {
+    "_comment": "SOP v16 Part 3 — PARTNERSHIPS ONLY. Sets the Reply-To HEADER on drafts/replies, matched on the TALENT INBOX (token_row.email), never the sender. Header-only routing: never added to the email body, never mentioned in the draft, From address unchanged. The four talents below keep their own Gmail accounts and are polled per-token. Every talent polled from the consolidated inbox gets NO Reply-To. Keep in sync with sheets/sop.md Part 3.",
+    "groups": {
+      "partnerships@taboost.me": [
+        "katrina@taboost.me",
+        "kylika@taboost.me",
+        "audur@taboost.me",
+        "trinity@taboost.me"
+      ]
+    }
+  },
   "single_inbox": {
-    "_comment": "SOP v16 consolidated inbox routing. All talent alias emails route to talent-mgmt@taboost.me. The automation identifies the correct talent from the original recipient header (Delivered-To / X-Original-To / Envelope-To / To), NOT from which Gmail account received the email.",
+    "_comment": "SOP v16 consolidated inbox routing. These 15 talent aliases route to talent-mgmt@taboost.me. The automation identifies the correct talent from the original recipient header (Delivered-To / X-Original-To / Envelope-To / To), NOT from which Gmail account received the email. The four Partnerships talents are deliberately absent — they poll their own accounts, see reply_to_routing.",
     "inbox_email": "talent-mgmt@taboost.me",
+    "_alias_map_comment": "alias email → talent_key. Each value MUST match a 'Key:' in sheets/sop.md exactly; main.py warns at startup if one does not.",
     "alias_map": {
       "allee@taboost.me": "Allee",
       "lizz@taboost.me": "Lizz",
       "angela@taboost.me": "Angela",
       "alana@taboost.me": "Alana",
       "stephanie@taboost.me": "Stephanie",
-      "joceyln@taboost.me": "Joceyln",
+      "jocelyn@taboost.me": "Jocelyn",
       "hana@taboost.me": "Hana",
       "wesley@taboost.me": "Wesley",
       "mahogany@taboost.me": "Mahogany",
@@ -126,10 +138,8 @@
       "jenn@taboost.me": "Jenn",
       "grayson@taboost.me": "Grayson",
       "bkuhl@taboost.me": "BKuhl",
-      "katrina@taboost.me": "Katrina",
-      "kylika@taboost.me": "Kylika",
-      "audur@taboost.me": "Audur",
-      "trinity@taboost.me": "Trinity"
+      "skyler@taboost.me": "Skyler",
+      "brittanie@taboost.me": "Brittanie"
     }
   }
 }

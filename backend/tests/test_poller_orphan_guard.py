@@ -117,6 +117,72 @@ def test_known_active_talent_is_still_polled(poller_env, db_session, caplog):
     assert one_talent.called, f"{active_key} should have been polled"
 
 
+# ── Hybrid mode: the shared inbox must not also be polled per-token ───────────
+
+def test_shared_inbox_token_is_never_polled_per_token(poller_env, db_session, caplog):
+    """The consolidated mailbox is handled by phase 1 only.
+
+    If phase 2 also picked it up, every message in it would be processed twice in
+    one cycle and double-drafted.
+    """
+    _add_token(db_session, "shared-inbox")
+
+    with patch("backend.services.poller._poll_single_inbox", return_value={}) as single, \
+         patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        _run(poller_env, db_session, caplog)
+
+    assert single.called, "phase 1 should have polled the shared inbox"
+    one_talent.assert_not_called(), "shared inbox must not be polled per-token"
+    assert not any("Orphaned" in r.getMessage() for r in caplog.records), \
+        "the shared inbox is not an orphaned token"
+
+
+def test_shared_inbox_excluded_by_email_even_with_an_odd_key(poller_env, db_session, caplog):
+    """OAuth auto-generates the talent_key, so exclusion must key off the email."""
+    from datetime import datetime, timedelta
+
+    db_session.add(TalentToken(
+        talent_key="talentmgmt7",
+        email="talent-mgmt@taboost.me",
+        access_token="a", refresh_token="r",
+        token_expiry=datetime.utcnow() + timedelta(hours=1),
+        active=True,
+    ))
+    db_session.commit()
+
+    with patch("backend.services.poller._poll_single_inbox", return_value={}), \
+         patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        _run(poller_env, db_session, caplog)
+
+    one_talent.assert_not_called()
+
+
+def test_partnerships_talent_is_polled_per_token(poller_env, db_session, caplog):
+    """Katrina keeps her own mailbox, so phase 2 must pick her up."""
+    _add_token(db_session, "Katrina")
+
+    with patch("backend.services.poller._poll_single_inbox", return_value={}), \
+         patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        _run(poller_env, db_session, caplog)
+
+    assert one_talent.called, "Katrina should have been polled per-token"
+    polled_keys = {c.args[1].key for c in one_talent.call_args_list}
+    assert "Katrina" in polled_keys
+
+
+def test_per_token_phase_runs_even_when_shared_inbox_is_missing(poller_env, db_session, caplog):
+    """A disconnected shared inbox must not silence the Partnerships tokens."""
+    _add_token(db_session, "Katrina")
+
+    with patch("backend.services.poller._poll_one_talent", return_value={}) as one_talent:
+        summary = _run(poller_env, db_session, caplog)
+
+    assert one_talent.called, "per-token phase must still run"
+    assert any("not connected" in r.getMessage() for r in caplog.records), \
+        "a missing shared inbox must be logged, not silent"
+    assert summary["errors"] == 0
+
+
 # ── Schema drift detection ────────────────────────────────────────────────────
 
 def test_schema_check_reports_missing_table(db_engine, monkeypatch):
