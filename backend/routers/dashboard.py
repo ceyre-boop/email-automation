@@ -753,12 +753,20 @@ def reset_talent_badges(talent_key: str, db: Session = Depends(get_db)):
 def send_all_for_talent(talent_key: str, db: Session = Depends(get_db)):
     """Send all pending, non-escalated drafts for a single talent inbox."""
     _validate_talent(talent_key)
-    from backend.services import gmail as gmail_svc
 
-    token = db.query(TalentToken).filter(
-        TalentToken.talent_key.ilike(talent_key),
-        TalentToken.active == True,  # noqa: E712
-    ).first()
+    # Hard interlock: draft_mode=true means ALL sends require individual human approval.
+    # send-all must never bypass this — it is a bulk convenience, not a way to skip review.
+    settings = get_settings()
+    if settings.app_config.get("reply", {}).get("draft_mode", True):
+        raise HTTPException(
+            status_code=403,
+            detail="draft_mode is enabled — send-all is blocked. Approve drafts individually or set draft_mode=false.",
+        )
+
+    from backend.services import gmail as gmail_svc
+    from backend.services.inbox_routing import resolve_token_for_talent
+
+    token = resolve_token_for_talent(db, talent_key)
     if not token:
         raise HTTPException(status_code=404, detail=f"No active OAuth token for {talent_key}")
 
