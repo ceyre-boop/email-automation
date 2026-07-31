@@ -193,6 +193,11 @@ body {
 
 /* Reconnect section — same row shape as .talent-item so the sidebar reads as
    one list. Lives below Talent Inboxes; rows are links, not click handlers. */
+#reconnect-block {
+  flex: 0 0 auto;
+  max-height: 160px;
+  overflow-y: auto;
+}
 #reconnect-list { padding: 2px 10px 0; }
 
 .reconnect-item {
@@ -825,6 +830,17 @@ body {
       </div>
     </div>
 
+    <!-- ── Daily Deal Value ────────────────────────────────────────────────── -->
+    <div class="fade-up" style="margin-bottom:24px; background:var(--surface-2); border:1px solid rgba(0,214,143,0.2); border-radius:10px; padding:16px 22px; display:flex; align-items:center; justify-content:space-between;">
+      <div>
+        <div style="font-size:11px; font-weight:600; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;">Est. Daily Deal Value</div>
+        <div id="daily-deal-value" style="font-size:28px; font-weight:800; color:var(--green); letter-spacing:-0.02em;">$—</div>
+      </div>
+      <div style="font-size:11px; color:var(--text-3); text-align:right; line-height:1.6;">
+        Sum of proposed rates<br>on Score 3 emails today
+      </div>
+    </div>
+
     <!-- ── Draft Review Queue ────────────────────────────────────────────── -->
     <div class="fade-up" style="margin-bottom:24px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
@@ -924,17 +940,6 @@ body {
           <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; font-size:11px;">↺ Reset Badge Counts</button>
           <button class="btn btn-ghost" id="btn-purge-stale" onclick="purgeStaleDrafts()" style="width:100%; justify-content:center; font-size:11px; border-color:rgba(239,68,68,0.4); color:#ef4444;">🗑 Purge Stale Drafts</button>
         </div>
-      </div>
-    </div>
-
-    <!-- ── Daily Deal Value ────────────────────────────────────────────────── -->
-    <div class="fade-up" style="margin-top:20px; background:var(--surface-2); border:1px solid rgba(0,214,143,0.2); border-radius:10px; padding:16px 22px; display:flex; align-items:center; justify-content:space-between;">
-      <div>
-        <div style="font-size:11px; font-weight:600; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;">Est. Daily Deal Value</div>
-        <div id="daily-deal-value" style="font-size:28px; font-weight:800; color:var(--green); letter-spacing:-0.02em;">$—</div>
-      </div>
-      <div style="font-size:11px; color:var(--text-3); text-align:right; line-height:1.6;">
-        Sum of proposed rates<br>on Score 3 emails today
       </div>
     </div>
 
@@ -1625,10 +1630,13 @@ function renderReconnectList() {
 
   const rows = [];
   (state.talents || []).forEach(t => {
+    // Alias talents (SOP v16 shared inbox) are fully connected whenever the shared
+    // inbox token is active, even though their OWN individual token row is stale/
+    // inactive from before the migration. t.connected already accounts for this —
+    // never flag a talent the API says is connected, no matter what their legacy
+    // per-talent health record shows.
+    if (t.connected) return;
     const health = state.tokenHealth?.[t.key.toLowerCase()];
-    // Only show in reconnect if there is a health record showing the token is broken.
-    // Do NOT add talents simply because t.connected is false — alias talents have no
-    // individual token and are connected via the shared inbox; showing them here is wrong.
     if (needsReconnect(health)) {
       rows.push({ key: t.key, label: t.full_name || t.key });
     }
