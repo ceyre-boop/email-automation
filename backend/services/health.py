@@ -188,9 +188,18 @@ def compute_health_score(db: Session) -> dict:
     components["draft_velocity"] = round(velocity_score, 3)
 
     # ── 5. Per-talent draft balance (weight: 0.10) ────────────────────────────
+    # Excludes drafts already sent/discarded/dismissed — a legitimate backlog
+    # clear-out (e.g. bulk-approving hundreds of real, already-reviewed drafts
+    # in one sitting) shouldn't keep tripping this as if it were a runaway
+    # drafting loop. Only count drafts still outstanding or freshly created,
+    # which is what an actual runaway would look like.
     today_talent_counts = (
         db.query(Draft.talent_key, func.count(Draft.id))
-        .filter(Draft.created_at >= today_start)
+        .filter(
+            Draft.created_at >= today_start,
+            Draft.status.notin_([DraftStatus.sent, DraftStatus.discarded]),
+            Draft.dismissed == False,  # noqa: E712
+        )
         .group_by(Draft.talent_key)
         .all()
     )
