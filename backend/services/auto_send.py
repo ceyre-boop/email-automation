@@ -1,9 +1,15 @@
 """Auto-send service — sends qualifying pending drafts after a hold period.
 
+A real Gmail draft is ALWAYS created by poller.py for every approved response
+(see poller.py::_process_one_message) — nothing here skips draft creation, so
+there is no "phantom" state where an email is removed from INBOX without a
+visible draft. This service just sends an already-created, already-visible
+draft after it has sat untouched for the hold period.
+
 Controlled entirely by config/settings.json:
   auto_send_enabled: false          → function returns immediately, nothing fires
-  auto_send_talents: [...]          → pilot talent list
   auto_send_hold_minutes: 15        → drafts younger than this are never auto-sent
+  per-talent "Auto Send: yes/no" in sheets/sop.md — which talents are eligible
 
 Safeguards enforced per draft:
   - Velocity cap: no more than N auto-sends per talent per hour
@@ -33,12 +39,6 @@ def run_auto_send(db: Session) -> None:
     cfg = settings.app_config
 
     if not cfg.get("auto_send_enabled", False):
-        return
-
-    # Hard interlock: draft_mode=true means drafts go to human review, never auto-send.
-    # auto_send_enabled and draft_mode are mutually exclusive — if both are true, draft_mode wins.
-    if cfg.get("reply", {}).get("draft_mode", True):
-        logger.warning("auto_send: draft_mode=true — auto-send is suppressed. Set draft_mode=false to enable.")
         return
 
     talents: list[str] = [
@@ -96,6 +96,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
             Draft.dismissed == False,  # noqa: E712
             Draft.is_escalate == False,  # noqa: E712
             Draft.validation_failed != True,  # noqa: E712
+            Draft.gmail_draft_id.isnot(None),  # only ever send a real, visible Gmail draft
         )
         .order_by(Draft.created_at.asc())
         .all()

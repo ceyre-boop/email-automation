@@ -1053,9 +1053,15 @@ def _process_one_message(
         cc_str = reply_result.get("cc_recipients")
         cc_list = gmail_svc.parse_cc_recipients(cc_str) if cc_str else None
 
-        # Save as Gmail Draft in the talent's inbox (unless GPT escalated)
+        # Save as Gmail Draft in the talent's inbox (unless GPT escalated).
+        # A real, visible Gmail draft is ALWAYS created for an approved response —
+        # draft_mode no longer gates draft creation. draft_mode=false previously
+        # skipped this block while remove_from_inbox() below still ran unconditionally,
+        # causing emails to vanish from Gmail with no visible draft (the 2026-07-30
+        # incident). Auto-send now works by sending this same real draft after a
+        # hold period (see auto_send.py) instead of skipping draft creation.
         gmail_draft_id: str | None = None
-        if not is_escalate and draft_mode:
+        if not is_escalate:
             try:
                 gmail_draft_id = gmail_svc.create_gmail_draft(
                     token_row,
