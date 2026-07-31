@@ -785,7 +785,7 @@ Manager: Chenni Li <chenni@taboost.me>
 Gmail: Gmail - Trin
 Min Rate: $2000 per video
 Auto Send: yes
-Paused: yes
+Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
