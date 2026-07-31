@@ -780,9 +780,9 @@ Scenario C: Personal Email Forward
 Personal Emails:
 
 Talent: Trinity Blair
-Key: Trinity
+Key: Trin
 Manager: Chenni Li <chenni@taboost.me>
-Gmail: Gmail - Trinity
+Gmail: Gmail - Trin
 Min Rate: $2000 per video
 Auto Send: yes
 Paused: no
