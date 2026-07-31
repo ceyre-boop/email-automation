@@ -310,24 +310,62 @@ def sop_raw():
 @router.post("/api/sop/promote-repo-version", dependencies=[Depends(verify_api_key)])
 def promote_repo_version():
     """
-    Make the CURRENT on-disk sheets/sop.md (i.e. whatever git deployed) the new
-    active DB version, so it survives the next redeploy instead of being silently
-    overwritten by an older active SopVersion row from a prior docx upload.
+    Make the CURRENT on-disk sheets/sop.md the new active DB version.
 
-    Use this once after any git-committed sop.md change, right after it deploys —
-    otherwise main.py's startup restore will keep reverting to the stale DB row
-    on every subsequent boot, even though the repo file is correct.
+    WARNING: by the time any HTTP request reaches this app, main.py's startup
+    handler has ALREADY overwritten disk with whatever DB version was active —
+    so "current disk" here means "whatever the DB just restored," NOT
+    necessarily what's in the git repo. This endpoint only helps when the DB
+    has no active version at all, or when you've just made a live edit via
+    update_talent/toggle_auto_send (which now self-persist anyway). To push
+    git-committed sop.md content that differs from the DB, use
+    POST /admin/api/sop/upload-text with the file content directly instead.
     """
     sop_text = _read_sop()
     profiles = parse_sop_md(sop_text)
     version_id = _persist_active_sop_version(
-        sop_text, f"Promoted from repo — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+        sop_text, f"Promoted from disk — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
     )
     return {
         "status": "ok" if version_id else "disk_only",
         "version_id": version_id,
         "talent_count": len(profiles),
         "talent_keys": sorted(profiles.keys()),
+    }
+
+
+class SopTextUpload(BaseModel):
+    content: str
+    label: str = ""
+
+
+@router.post("/api/sop/upload-text", dependencies=[Depends(verify_api_key)])
+def upload_sop_text(body: SopTextUpload):
+    """
+    Push raw sop.md text directly — writes to disk AND persists as the new
+    active DB version in one shot. Use this to push git-committed content
+    that the DB's active version doesn't have yet (the startup restore always
+    overwrites disk with the DB version before any other code runs, so simply
+    redeploying is not enough to make a git change stick — see main.py
+    on_startup Step 2).
+    """
+    profiles = parse_sop_md(body.content)
+    if len(profiles) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {len(profiles)} talent profile(s) parsed from uploaded content — refusing to write, this looks truncated or malformed.",
+        )
+    warnings = validate_profiles(profiles)
+    _writer.write_sop_md(body.content)
+    version_id = _persist_active_sop_version(
+        body.content, body.label or f"Text upload — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    return {
+        "status": "ok" if version_id else "disk_only",
+        "version_id": version_id,
+        "talent_count": len(profiles),
+        "talent_keys": sorted(profiles.keys()),
+        "warnings": warnings,
     }
 
 
