@@ -62,8 +62,8 @@
     }
   },
   "reply": {
-    "draft_mode": true,
-    "_draft_mode_comment": "true = Phase 2 saves replies as Gmail Drafts for supervisor review instead of sending. Set to false only after Marco approves full autonomous send (~1 month trial). When draft_mode is false, send_delay_minutes applies.",
+    "draft_mode": false,
+    "_draft_mode_comment": "A real Gmail draft is ALWAYS created regardless of this flag (see poller.py). This flag now only gates the /send-all bulk-approve endpoint. TEMPORARILY set to false 2026-07-31 ~04:20 UTC so Colin can bulk-send Trinity's backlog tonight — revert to true after.",
     "send_delay_minutes": 15,
     "_send_delay_comment": "Minutes to wait after drafting before sending. Only applies when draft_mode is false. Set to 0 to disable. Keep at 15 during Phase 2 testing.",
     "send_delay_enabled": true
