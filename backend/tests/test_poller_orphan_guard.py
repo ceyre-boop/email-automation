@@ -73,10 +73,10 @@ def test_orphaned_token_is_skipped_and_never_triaged(poller_env, db_session, cap
     """A stray token for an unknown talent must never reach triage.
 
     In single-inbox mode poll_all_inboxes() only looks for the shared-inbox
-    token.  A token for "Sam" is completely invisible to it — _poll_one_talent
-    (and _poll_single_inbox) must never be called.
+    token.  A token for an unknown key is completely invisible to it —
+    _poll_one_talent (and _poll_single_inbox) must never be called.
     """
-    _add_token(db_session, "Sam")
+    _add_token(db_session, "UnknownOrphan")
 
     with patch("backend.services.poller._poll_one_talent") as one_talent, \
          patch("backend.services.poller._poll_single_inbox") as single_inbox:
@@ -110,12 +110,12 @@ def test_stray_token_does_not_generate_orphan_warning(poller_env, db_session, ca
     This is the CORRECT behaviour in hybrid mode; the old test asserted the
     opposite because it was written when poll_all_inboxes() never iterated tokens.
     """
-    _add_token(db_session, "Sam")
+    _add_token(db_session, "UnknownOrphan")
     _run(poller_env, db_session, caplog)
 
     all_msgs = [r.getMessage() for r in caplog.records]
     assert any("Orphaned" in m for m in all_msgs), \
-        f"Expected orphan warning for unknown token 'Sam'; got: {all_msgs}"
+        f"Expected orphan warning for unknown token 'UnknownOrphan'; got: {all_msgs}"
 
 
 def test_paused_talent_token_silently_ignored(poller_env, db_session, caplog):

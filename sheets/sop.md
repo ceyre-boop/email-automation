@@ -757,13 +757,35 @@ Personal Emails:
 
 - brittanykuhl.tiktok@gmail.com
 
+Talent: Sam Jones
+Key: Sam
+Manager: Cara <cara@taboost.me>
+Gmail: Gmail - Sam
+Min Rate: $700 per video
+Auto Send: yes
+Paused: no
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Sam!! I'm happy to share her rates below:
+• 1 TikTok: $900
+• 1 IG Reel: $600
+• 1 UGC Video: $1,500 (usage can be added on for an additional cost)
+
+Sam's pricing reflects her high-quality, conversion-focused content and consistent performance for brands. Last month on TikTok Shop her GMV was over $150k!
+
+Please let us know what type of collab you're looking for in your offer + if you have any questions moving forward. We'd love to explore working together!
+
+Scenario C: Personal Email Forward
+Personal Emails:
+
 Talent: Trinity Blair
 Key: Trin
 Manager: Chenni Li <chenni@taboost.me>
 Gmail: Gmail - Trin
 Min Rate: $2000 per video
-Auto Send: no
-Paused: yes
+Auto Send: yes
+Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:

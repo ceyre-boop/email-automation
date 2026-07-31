@@ -71,9 +71,13 @@
     "full_name": "Brittany Kuhl",
     "sop_status": "approved"
   },
+  "Sam": {
+    "full_name": "Sam Jones",
+    "sop_status": "approved"
+  },
   "Trin": {
     "full_name": "Trinity Blair",
     "sop_status": "approved"
   },
-  "_generated": "2026-07-30T22:48:52.434179"
+  "_generated": "2026-07-31T01:58:02.872465"
 }
