@@ -161,7 +161,7 @@ body {
   text-transform: uppercase; letter-spacing: 0.06em;
 }
 
-#talent-list { flex: 1; overflow-y: auto; padding: 2px 10px; }
+#talent-list { flex: 1; overflow-y: auto; padding: 2px 10px; min-height: 0; }
 
 .talent-item {
   display: flex; align-items: center; gap: 9px;
@@ -220,6 +220,16 @@ body {
   font-size: 9px; font-weight: 700;
   padding: 2px 5px; border-radius: 8px;
   flex-shrink: 0;
+}
+
+.talent-item-offline {
+  opacity: 0.55;
+}
+.talent-item-offline:hover {
+  opacity: 0.85;
+  background: rgba(227,28,37,0.06);
+  color: var(--text-3);
+  border-color: rgba(227,28,37,0.15);
 }
 
 .sidebar-footer {
@@ -947,18 +957,6 @@ body {
       </div>
     </div>
 
-    <!-- ── Human Edited Drafts ──────────────────────────────────────────── -->
-    <div class="fade-up" style="margin-bottom:24px;" id="human-edited-section">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div class="section-head" style="margin-bottom:0;">Human Edited</div>
-          <span id="human-edited-count" style="background:rgba(255,179,0,0.15); color:var(--amber); border:1px solid rgba(255,179,0,0.3); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
-        </div>
-        <button class="btn btn-ghost" onclick="loadHumanEdited()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
-      </div>
-      <div id="human-edited-list" style="display:flex; flex-direction:column; gap:8px;"></div>
-    </div>
-
     <!-- ── Marco section ───────────────────────────────────────────────── -->
     <div class="fade-up" style="padding-top:28px; border-top:1px solid var(--border); margin-bottom:40px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
@@ -980,21 +978,39 @@ body {
   </div>
 
   <!-- ── Inbox Feed view ─────────────────────────────────────────────────── -->
-  <div id="view-feed" style="display:none; padding:20px; flex:1; overflow-y:auto;">
-    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
-      <div>
-        <div style="font-size:22px; font-weight:800; letter-spacing:-0.01em;">Inbox Feed</div>
-        <div style="font-size:12px; color:var(--text-3); margin-top:3px;">All processed emails · last 24h · manual override available</div>
+  <div id="view-feed" style="display:none; flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+    <!-- Feed header — sticky so actions always visible -->
+    <div style="padding:20px 24px 14px; border-bottom:1px solid var(--border); background:var(--bg); position:sticky; top:0; z-index:10;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+        <div>
+          <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em; color:var(--text);">Inbox Feed</div>
+          <div style="font-size:12px; color:var(--text-3); margin-top:2px;">All processed emails · sorted newest first · use A/B/C to act on each row</div>
+        </div>
+        <div style="display:flex; gap:6px; align-items:center;">
+          <button class="btn btn-ghost" onclick="loadEmailFeed()" style="font-size:11px;">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
+          <button class="btn btn-ghost" onclick="retriageBackfill()" style="font-size:11px; border-color:rgba(251,191,36,0.5); color:#f59e0b;">⟳ Re-triage</button>
+          <button class="btn btn-ghost" onclick="revalidateDrafts(this)" style="font-size:11px; border-color:rgba(239,68,68,0.5); color:#ef4444;" title="Clear INVALID flags on drafts that now pass validation">✓ Re-validate</button>
+        </div>
       </div>
-      <div style="display:flex; gap:8px;">
-        <button class="btn btn-ghost" onclick="loadEmailFeed()" style="font-size:11px;">↻ Refresh</button>
-        <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
-        <button class="btn btn-ghost" onclick="retriageBackfill()" style="font-size:11px; border-color:rgba(251,191,36,0.5); color:#f59e0b;">⟳ Re-triage Score 2</button>
-        <button class="btn btn-ghost" onclick="revalidateDrafts(this)" style="font-size:11px; border-color:rgba(239,68,68,0.5); color:#ef4444;" title="Clear INVALID flags on drafts that now pass validation">✓ Re-validate INVALID</button>
+      <!-- Column headers -->
+      <div style="display:flex; align-items:center; gap:10px; padding:0 10px; font-size:10px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">
+        <span style="min-width:70px;">Talent</span>
+        <span style="min-width:68px;">Status</span>
+        <span style="min-width:120px;">Sender</span>
+        <span style="flex:1;">Subject</span>
+        <span style="max-width:240px; white-space:nowrap; overflow:hidden;">Triage Reason</span>
+        <span style="min-width:88px; text-align:right;">Actions</span>
       </div>
     </div>
-    <div id="email-feed-list" style="display:flex; flex-direction:column; gap:6px;"></div>
-    <div id="email-feed-empty" style="display:none; text-align:center; padding:48px 0; color:var(--text-3); font-size:13px;">No emails to show.</div>
+    <!-- Feed body -->
+    <div style="padding:12px 24px; flex:1;">
+      <div id="email-feed-list" style="display:flex; flex-direction:column; gap:4px;"></div>
+      <div id="email-feed-empty" style="display:none; text-align:center; padding:60px 0; color:var(--text-3); font-size:13px;">
+        <div style="font-size:36px; opacity:0.3; margin-bottom:12px;">📬</div>
+        No emails to show — the inbox is clear.
+      </div>
+    </div>
   </div>
 
 </main>
@@ -1354,7 +1370,6 @@ async function loadOverview({ silent = false } = {}) {
     const _wave2 = [
       () => loadDraftQueue().catch(() => {}),
       () => loadRecentlySent().catch(() => {}),
-      () => loadHumanEdited().catch(() => {}),
       () => loadOrphaned().catch(() => {}),
       () => loadExtReview().catch(() => {}),
       () => loadHealthScore().catch(() => {}),
@@ -1407,8 +1422,8 @@ async function blastBacklog() {
     let lastCount = null;
     const poll = setInterval(async () => {
       try {
-        const ov = await api('GET', '/api/dashboard/overview');
-        const backlog = ov.totals?.total_draft_backlog ?? ov.total_draft_backlog ?? null;
+        const ov = await api('GET', '/api/dashboard/report');
+        const backlog = ov.total_draft_backlog ?? null;
         if (backlog !== null) {
           const el = document.getElementById('total-draft-backlog');
           if (el) el.textContent = backlog.toLocaleString();
@@ -1553,11 +1568,11 @@ function closeSopModal() {
 }
 document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
 
-// ── Dot state: green = auto-send, yellow = draft-only, grey = disconnected/paused
+// ── Dot state: green = auto-send active, yellow = draft-only, red = no active token
 function dotClass(t) {
-  if (!t.connected || t.paused) return 'offline';
-  if (t.auto_send) return 'online';
-  return 'drafting';
+  if (!t.connected) return 'offline';       // red = no active OAuth token
+  if (t.auto_send) return 'online';         // green = connected + auto-send enabled in SOP
+  return 'drafting';                         // yellow = connected, draft/manual mode
 }
 
 // ── Sidebar ────────────────────────────────────────────────────────────────
@@ -1566,17 +1581,27 @@ function renderSidebar() {
   ul.innerHTML = '';
   const pendingMap = {};
   state.report?.talents.forEach(c => { pendingMap[c.talent_key] = c.pending_real_drafts ?? c.pending_drafts; });
-  state.talents.filter(t => t.connected).forEach(t => {
+  // Show ALL talents — connected get green/yellow dot, disconnected get red dot
+  state.talents.forEach(t => {
     const pending = pendingMap[t.key] || 0;
     const li = document.createElement('li');
-    li.className = 'talent-item';
+    li.className = 'talent-item' + (!t.connected ? ' talent-item-offline' : '');
     li.dataset.key = t.key;
+    const badge = pending > 0 ? `<span class="t-badge">${pending}</span>` : '';
     li.innerHTML = `
       <div class="t-avatar">${initial(t.full_name)}</div>
       <span class="t-name">${esc(t.full_name)}</span>
+      ${badge}
       <div class="t-dot ${dotClass(t)}"></div>
     `;
-    li.addEventListener('click', () => openRealGmail(t));
+    if (t.connected) {
+      li.addEventListener('click', () => openRealGmail(t));
+    } else {
+      li.title = 'Gmail not connected — click to connect';
+      li.addEventListener('click', () => {
+        window.open(`/auth/connect?talent_key=${encodeURIComponent(t.key)}`, '_blank');
+      });
+    }
     ul.appendChild(li);
   });
   renderReconnectList();
@@ -2261,17 +2286,15 @@ async function loadDraftQueue() {
       const senderName = (d.sender || '').replace(/^"?([^"<]+)"?\s*<.*>$/, '$1').trim() || d.sender || 'Unknown';
       const rate = d.proposed_rate ? ` · $${d.proposed_rate.toLocaleString()}` : '';
       const escalate = d.is_escalate ? `<span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">ESCALATION</span>` : '';
-      const humanEdited = d.human_edited ? `<span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">✎ EDITED</span>` : '';
       const invalidBadge = d.validation_failed ? `<span style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;" title="${(d.validation_error||'').replace(/"/g,'&quot;')}">INVALID</span>` : '';
       return `
-      <div id="draft-card-${d.id}" style="background:var(--surface-2); border:1px solid ${d.human_edited ? 'rgba(255,179,0,0.3)' : 'var(--border)'}; border-radius:10px; overflow:hidden;">
+      <div id="draft-card-${d.id}" style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
         <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer;" onclick="toggleDraftExpand(${d.id})">
           <div style="width:30px; height:30px; border-radius:50%; background:var(--red-dim); border:1px solid var(--red-line); color:var(--red); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${initials}</div>
           <div style="flex:1; min-width:0;">
             <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
               <span style="font-size:12px; font-weight:700; color:var(--text);">${esc(d.talent_key)}</span>
               ${escalate}
-              ${humanEdited}
               ${invalidBadge}
               ${d.brand_name ? `<span style="font-size:11px; color:var(--green);">${esc(d.brand_name)}${rate}</span>` : ''}
               ${d.created_at ? `<span style="margin-left:auto; font-size:11px; color:rgba(255,255,255,0.35); white-space:nowrap;">${fmtDraftTime(d.created_at)}</span>` : ''}
@@ -2321,37 +2344,6 @@ async function loadRecentlySent() {
     }).join('');
   } catch(e) {
     document.getElementById('recently-sent-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:8px;">Failed to load: ${esc(e.message)}</div>`;
-  }
-}
-
-// ── Human Edited Drafts ──────────────────────────────────────────────────────
-async function loadHumanEdited() {
-  try {
-    const rows = await api('GET', '/api/drafts/human-edited');
-    const list = document.getElementById('human-edited-list');
-    const countEl = document.getElementById('human-edited-count');
-    countEl.textContent = rows.length;
-    if (!rows.length) {
-      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:12px;">No human-edited drafts yet.</div>`;
-      return;
-    }
-    list.innerHTML = rows.map(r => {
-      const changed = r.original_draft_text && r.original_draft_text !== r.draft_text;
-      return `
-      <div style="background:var(--surface-2);border:1px solid rgba(255,179,0,0.25);border-left:3px solid var(--amber);border-radius:10px;padding:12px 16px;">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:6px;">
-          <span style="font-size:12px;font-weight:700;color:var(--text);">${esc(r.talent_key)}</span>
-          <span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">✎ HUMAN EDITED</span>
-          ${r.proposed_rate ? `<span style="background:rgba(0,214,143,0.12);border:1px solid rgba(0,214,143,0.25);color:var(--green);border-radius:6px;font-size:10px;font-weight:800;padding:2px 7px;">$${Number(r.proposed_rate).toLocaleString()}</span>` : ''}
-          <span style="font-size:10px;color:var(--text-3);margin-left:auto;">${r.status} · ${r.human_edited_at ? fmtDate(r.human_edited_at) : '—'}</span>
-        </div>
-        <div style="font-size:12px;color:var(--text-2);margin-bottom:4px;">${esc(r.brand_name || r.sender || '')} — ${esc(r.subject || '(no subject)')}</div>
-        ${r.human_edited_by ? `<div style="font-size:11px;color:var(--text-3);">Edited by: ${esc(r.human_edited_by)}</div>` : ''}
-        ${changed ? `<div style="font-size:10px;color:var(--amber);margin-top:4px;">⚠ Content was changed from AI original</div>` : ''}
-      </div>`;
-    }).join('');
-  } catch(e) {
-    document.getElementById('human-edited-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2810,26 +2802,26 @@ async function loadEmailFeed({ silent = false } = {}) {
     empty.style.display = 'none';
     list.innerHTML = rows.map(r => {
       const { color, label } = feedBadge(r);
-      const reason = (r.triage_reason || '').slice(0, 90);
-      const sender = (r.sender || '').replace(/<.*>/, '').trim().slice(0, 30);
-      const subject = (r.subject || '(no subject)').slice(0, 50);
+      const reason = (r.triage_reason || '').slice(0, 100);
+      const sender = (r.sender || '').replace(/<.*>/, '').trim().replace(/"/g, '').slice(0, 28);
+      const subject = (r.subject || '(no subject)').slice(0, 55);
       const talentObj = (state.talents || []).find(t => t.key === r.talent_key);
       const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (r.talent_key || '?');
-      return `<div id="feed-row-${r.gmail_message_id}" style="display:flex; align-items:center; gap:10px; padding:8px 10px; background:var(--surface-2,#1a1a1a); border-radius:8px; font-size:12px;">
-        <span style="background:var(--surface-3,#222); color:var(--text-2); font-size:10px; font-weight:600; padding:2px 7px; border-radius:99px; white-space:nowrap; min-width:60px; text-align:center;">${esc(talentLabel)}</span>
-        <span style="background:${color}22; color:${color}; font-weight:700; font-size:10px; padding:2px 7px; border-radius:99px; white-space:nowrap;">${label}</span>
-        <span style="color:var(--text-2); min-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${sender}</span>
-        <span style="flex:1; color:var(--text-1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${(r.subject||'').replace(/"/g,'&quot;')}">${subject}</span>
-        <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:260px;" title="${reason.replace(/"/g,'&quot;')}">${reason}</span>
-        <div style="display:flex;gap:4px;align-items:center;flex-shrink:0;">
-          <button onclick="feedActionA('${r.talent_key}','${r.gmail_message_id}',this)"
-            style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
+      return `<div id="feed-row-${r.gmail_message_id}" style="display:flex; align-items:center; gap:10px; padding:7px 10px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; font-size:12px; transition:background 0.15s;">
+        <span style="background:var(--surface-3); color:var(--text-2); font-size:10px; font-weight:600; padding:2px 7px; border-radius:99px; white-space:nowrap; min-width:68px; text-align:center; flex-shrink:0;">${esc(talentLabel)}</span>
+        <span style="background:${color}1a; color:${color}; border:1px solid ${color}33; font-weight:700; font-size:10px; padding:2px 8px; border-radius:99px; white-space:nowrap; min-width:66px; text-align:center; flex-shrink:0; letter-spacing:0.02em;">${label}</span>
+        <span style="color:var(--text-2); min-width:120px; max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0;" title="${esc(r.sender || '')}">${esc(sender)}</span>
+        <span style="flex:1; color:var(--text); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${esc(r.subject || '')}">${esc(subject)}</span>
+        <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; font-size:11px; font-style:italic; flex-shrink:0;" title="${esc(reason)}">${esc(reason)}</span>
+        <div style="display:flex; gap:4px; align-items:center; flex-shrink:0; min-width:88px; justify-content:flex-end;">
+          <button onclick="feedActionA('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
+            style="background:rgba(0,214,143,0.12);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);"
             title="Force-draft → Activity Hub">A</button>
-          <button onclick="feedActionB('${r.talent_key}','${r.gmail_message_id}',this)"
-            style="background:rgba(251,191,36,0.15);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
+          <button onclick="feedActionB('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
+            style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);"
             title="Keep in inbox for human review">B</button>
-          <button onclick="feedActionC('${r.talent_key}','${r.gmail_message_id}',this)"
-            style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;"
+          <button onclick="feedActionC('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
+            style="background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);"
             title="Archive as spam">C</button>
         </div>
       </div>`;
