@@ -22,6 +22,7 @@ This project is worked on by more than one AI coding tool (Claude Code / Cowork 
 
 ## Where things actually live (so you don't have to rediscover this)
 
+- `render.yaml` is NOT a faithful snapshot of the live service — the production service predates it and has drifted. Query the Render API for actual live config; editing the yaml does not reconfigure the existing service.
 - Talent roster + SOP rules: `sheets/sop.md` (source of truth at runtime — restored from a DB row on every boot, not just from git).
 - Routing/model config: `config/settings.json` (git-controlled, needs a real deploy to take effect).
 - Real secrets: Render env vars only (see above).

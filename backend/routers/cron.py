@@ -557,6 +557,23 @@ def db_check(db: Session = Depends(get_db)):
         return {"ok": False, "error": str(exc)}
 
 
+@router.get("/api/admin/schema-check", dependencies=[Depends(verify_api_key)])
+def schema_check():
+    """Read-only live-schema-vs-models comparison. Runs no DDL.
+
+    Exists so any agent (or human) can verify production schema matches the
+    code BEFORE deploying a change that queries a new column — production runs
+    with SKIP_MIGRATIONS=true, so git and the live DB can silently diverge
+    (see CLAUDE.md Incident Log, 2026-08-03). Expected healthy result:
+    {"ok": true, "missing_tables": [], "missing_columns": []}.
+    """
+    from backend.models.db import verify_schema_matches_models
+    try:
+        return {"ok": True, **verify_schema_matches_models()}
+    except Exception as exc:  # noqa: BLE001
+        return {"ok": False, "error": str(exc)}
+
+
 @router.get("/api/status", dependencies=[Depends(verify_api_key)])
 def get_status(db: Session = Depends(get_db)):
     """

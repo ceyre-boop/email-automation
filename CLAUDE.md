@@ -26,6 +26,7 @@ FastAPI backend deployed on Render. Each talent connects their Gmail via OAuth. 
 
 **Where secrets actually live — read before you "fix" anything here:**
 - All real secrets (`DATABASE_URL`, `OPENAI_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `GOOGLE_SHEETS_REFRESH_TOKEN`, `AGENCY_SECRET_KEY`, `API_KEY`) live **only** as Render environment variables on the `manager-email-automation` service (`srv-d7lb7oe47okc738vjkg0`). They are never committed to git (`.env` is gitignored) and `config/settings.json`/`render.yaml` only ever reference them by name (`sync: false`), never by value.
+- **`render.yaml` is NOT a faithful snapshot of the live service.** The production service was created before/outside this Blueprint and has drifted: env vars set via dashboard/API don't appear in the file, and editing `render.yaml` does not reconfigure the existing service. Treat the Render API (`GET /v1/services/{id}`, `/env-vars`, `/deploys`) as the only source of truth for what production actually runs.
 - **Render's env-var API does not let you read back a value once it's gone, and `PUT /v1/services/{id}/env-vars` (bulk, no key in the URL) REPLACES THE ENTIRE SET — it does not merge.** Wiping every secret on the live service with one malformed call is exactly what happened in the incident below. **Always use the per-key endpoint** — `PUT /v1/services/{id}/env-vars/{KEY}` — to change or add a single value. Never call the bulk endpoint unless you are deliberately writing the complete, correct set of every key at once.
 - A local backup of every secret (as of 2026-08-03) was generated and handed directly to Colin — it is NOT in this repo. If you are an agent and need a value you don't have, **ask Colin for the backup file or the specific value** — do not try to reconstruct or guess a secret, and do not regenerate/rotate a credential (e.g. Google OAuth client secret, DB password) without his explicit go-ahead, since rotating breaks whatever still has the old value cached.
 - There is a second, older Render service in the same account (`email-automation`, `srv-d7jdjfjbc2fs73c0apc0`, https://email-automation-qp2v.onrender.com) that shares the same Supabase DB and Google OAuth client as production but may have **stale** secret values (its `GOOGLE_CLIENT_SECRET` was already out of date as of this writing). It is not a sanctioned backup — treat anything pulled from it as unverified until cross-checked against a current source (e.g. Google Cloud Console, Supabase dashboard).
@@ -44,7 +45,8 @@ cd backend && python -m pytest tests/
 # Single test file
 cd backend && python -m pytest tests/test_triage.py -v
 
-# Apply DB schema (also runs on startup)
+# Apply DB schema — LOCAL/DEV ONLY. Production does NOT run this on startup
+# (SKIP_MIGRATIONS=true — see "DB migrations" section before touching schema)
 cd backend && python -c "from backend.models.db import create_tables; create_tables()"
 ```
 

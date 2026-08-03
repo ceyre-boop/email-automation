@@ -34,12 +34,43 @@ from backend.services.oauth import TokenRefreshError
 logger = logging.getLogger(__name__)
 
 
+STALE_CLAIM_ALERT_MINUTES = 15
+
+
 def run_auto_send(db: Session) -> None:
     settings = get_settings()
     cfg = settings.app_config
 
     if not cfg.get("auto_send_enabled", False):
         return
+
+    # Visibility for stale send claims: a claim that outlives any plausible
+    # send means a worker crashed mid-flight AFTER claiming and possibly AFTER
+    # Gmail accepted the send. Deliberately NOT auto-cleared here — blindly
+    # clearing and retrying risks a duplicate reply to a brand. A human should
+    # check the Gmail thread first; edit/discard allow acting on a stale claim
+    # (see drafts.py::_reject_if_send_in_progress) as the recovery path.
+    try:
+        stale_cutoff = datetime.utcnow() - timedelta(minutes=STALE_CLAIM_ALERT_MINUTES)
+        stale = (
+            db.query(Draft)
+            .filter(
+                Draft.status == DraftStatus.pending,
+                Draft.send_claimed_at.isnot(None),
+                Draft.send_claimed_at < stale_cutoff,
+            )
+            .all()
+        )
+        if stale:
+            logger.warning(
+                "auto_send: %d pending draft(s) hold a STALE send claim (> %d min): %s — "
+                "a send worker may have crashed mid-flight. Verify each Gmail thread before "
+                "retrying; do NOT blindly clear send_claimed_at.",
+                len(stale), STALE_CLAIM_ALERT_MINUTES,
+                ", ".join(f"#{d.id}/{d.talent_key}" for d in stale[:10]),
+            )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("auto_send: stale-claim check failed (non-fatal): %s", exc)
 
     talents: list[str] = [
         key for key, p in settings.talent_profiles.items() if p.auto_send and not p.paused

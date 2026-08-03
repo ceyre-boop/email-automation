@@ -10,7 +10,7 @@ GET  /api/drafts/{id}               → get single draft detail
 from __future__ import annotations
 
 import logging
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -78,6 +78,30 @@ def _get_draft_or_404(db: Session, draft_id: int) -> Draft:
     if not draft:
         raise HTTPException(status_code=404, detail="Draft not found")
     return draft
+
+
+# A claim older than this is considered stale (a send worker crashed mid-flight
+# without releasing it). Fresh claims block edit/discard/move so a manager can't
+# mutate a draft that is actively being sent; stale claims allow those actions
+# again as the deliberate human recovery path — verify the Gmail thread first.
+STALE_SEND_CLAIM_MINUTES = 10
+
+
+def _reject_if_send_in_progress(draft: Draft, action: str) -> None:
+    """409 if another worker holds a fresh send claim on this draft."""
+    if draft.send_claimed_at is None:
+        return
+    age = datetime.utcnow() - draft.send_claimed_at
+    if age < timedelta(minutes=STALE_SEND_CLAIM_MINUTES):
+        raise HTTPException(
+            status_code=409,
+            detail=f"A send is currently in progress for this draft — cannot {action} right now. Try again in a minute.",
+        )
+    logger.warning(
+        "Draft %d carries a stale send claim (%.0f min old) — allowing %s as the human recovery path. "
+        "Verify the Gmail thread to confirm whether the reply actually went out.",
+        draft.id, age.total_seconds() / 60, action,
+    )
 
 
 def _get_token_or_404(db: Session, talent_key: str) -> TalentToken:
@@ -550,13 +574,11 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
         db.commit()
         raise HTTPException(status_code=502, detail=f"Gmail send failed: {send_error}")
 
-    if draft.gmail_message_id:
-        gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
-
-    # Delete the Gmail draft copy (sent from the Sent folder now)
-    if draft.gmail_draft_id:
-        gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
-
+    # Persist the sent state FIRST — the external Gmail send already happened,
+    # so nothing after this point may leave the DB claiming otherwise. (2026-08-03
+    # audit finding: a failure in post-send cleanup used to abort before this
+    # update ran, leaving the draft pending+claimed even though the reply was
+    # genuinely sent — a stuck state that invited a dangerous manual retry.)
     draft.status = DraftStatus.sent
     draft.reviewed_at = datetime.utcnow()
     draft.reviewed_by = body.reviewed_by
@@ -572,6 +594,18 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
         db.add(pe)
 
     db.commit()
+
+    # Post-send Gmail cleanup is best-effort: a failure here is cosmetic (a
+    # leftover label or draft copy), never a reason to mask a successful send.
+    try:
+        if draft.gmail_message_id:
+            gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
+        # Delete the Gmail draft copy (sent from the Sent folder now)
+        if draft.gmail_draft_id:
+            gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Draft %s post-send cleanup failed (reply WAS sent): %s", draft_id, exc)
+
     logger.info("Draft %s approved and sent by %s", draft_id, body.reviewed_by)
     return {"ok": True, "message": "Reply sent successfully."}
 
@@ -585,6 +619,7 @@ def edit_draft(draft_id: int, body: EditBody, db: Session = Depends(get_db)):
     draft = _get_draft_or_404(db, draft_id)
     if draft.status not in (DraftStatus.pending,):
         raise HTTPException(status_code=400, detail=f"Cannot edit a draft with status '{draft.status}'.")
+    _reject_if_send_in_progress(draft, "edit")
 
     if not body.draft_text.strip():
         raise HTTPException(status_code=422, detail="draft_text cannot be empty.")
@@ -647,6 +682,7 @@ def discard_draft(draft_id: int, body: DiscardBody = DiscardBody(), db: Session 
     draft = _get_draft_or_404(db, draft_id)
     if draft.status not in (DraftStatus.pending,):
         raise HTTPException(status_code=400, detail=f"Cannot discard a draft with status '{draft.status}'.")
+    _reject_if_send_in_progress(draft, "discard")
 
     if draft.gmail_draft_id:
         token = _get_token_or_404(db, draft.talent_key)
@@ -680,6 +716,7 @@ def move_draft_to_inbox(draft_id: int, body: DiscardBody = DiscardBody(), db: Se
     draft = _get_draft_or_404(db, draft_id)
     if draft.status not in (DraftStatus.pending,):
         raise HTTPException(status_code=400, detail=f"Cannot move draft with status '{draft.status}' to inbox.")
+    _reject_if_send_in_progress(draft, "move to inbox")
     token = _get_token_or_404(db, draft.talent_key)
     if draft.gmail_draft_id:
         gmail_svc.delete_gmail_draft(token, draft.gmail_draft_id, db=db)

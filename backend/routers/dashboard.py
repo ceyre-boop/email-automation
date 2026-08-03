@@ -770,40 +770,84 @@ def send_all_for_talent(talent_key: str, db: Session = Depends(get_db)):
     if not token:
         raise HTTPException(status_code=404, detail=f"No active OAuth token for {talent_key}")
 
+    from sqlalchemy import update as _sa_update
+
     pending = db.query(Draft).filter(
         Draft.talent_key == talent_key,
         Draft.status == DraftStatus.pending,
         Draft.is_escalate == False,  # noqa: E712
         Draft.gmail_draft_id.isnot(None),
+        Draft.send_claimed_at.is_(None),
     ).all()
 
     sent_count = 0
     failed_count = 0
+    skipped_count = 0
     for draft in pending:
+        # Atomic claim — same guard as /approve and auto_send, so bulk send-all
+        # can never race either of them (or a second send-all) into a duplicate
+        # send. (2026-08-03 audit finding: this path used to bypass claims.)
+        claimed = db.execute(
+            _sa_update(Draft)
+            .where(
+                Draft.id == draft.id,
+                Draft.status == DraftStatus.pending,
+                Draft.reviewed_at.is_(None),
+                Draft.send_claimed_at.is_(None),
+            )
+            .values(send_claimed_at=datetime.utcnow())
+        ).rowcount
+        db.commit()
+        if claimed != 1:
+            skipped_count += 1
+            continue
+
         try:
             ok = gmail_svc.send_gmail_draft(token, draft.gmail_draft_id, db=db)
             if ok:
+                # Persist sent state immediately, per draft — the external send
+                # already happened; later failures must not roll this back.
                 draft.status = DraftStatus.sent
                 draft.reviewed_at = datetime.utcnow()
                 db.add(draft)
                 if draft.gmail_message_id:
-                    gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
                     pe = db.query(ProcessedEmail).filter(
                         ProcessedEmail.gmail_message_id == draft.gmail_message_id
                     ).first()
                     if pe:
                         pe.status = EmailStatus.sent
                         db.add(pe)
+                db.commit()
                 sent_count += 1
+                # Best-effort label cleanup; failure is cosmetic, reply was sent.
+                if draft.gmail_message_id:
+                    try:
+                        gmail_svc.mark_initial_response_sent(token, draft.gmail_message_id, db=db)
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("send-all: label cleanup failed for draft %s (reply WAS sent): %s", draft.id, exc)
             else:
+                draft.send_claimed_at = None
+                db.add(draft)
+                db.commit()
                 failed_count += 1
         except Exception as exc:
             logger.warning("send-all: failed to send draft %s for %s: %s", draft.id, talent_key, exc)
+            draft.send_claimed_at = None
+            db.add(draft)
+            db.commit()
             failed_count += 1
 
-    db.commit()
-    logger.info("send-all for %s: sent=%d failed=%d", talent_key, sent_count, failed_count)
-    return {"ok": True, "talent_key": talent_key, "sent_count": sent_count, "failed_count": failed_count}
+    logger.info(
+        "send-all for %s: sent=%d failed=%d skipped_claimed=%d",
+        talent_key, sent_count, failed_count, skipped_count,
+    )
+    return {
+        "ok": True,
+        "talent_key": talent_key,
+        "sent_count": sent_count,
+        "failed_count": failed_count,
+        "skipped_count": skipped_count,
+    }
 
 
 @router.get("/context", response_model=list[ContextOut])
