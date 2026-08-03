@@ -2830,3 +2830,107 @@ def cleanup_revisit_label(
     """
     background_tasks.add_task(_run_cleanup_revisit_label)
     return {"status": "started", "message": "Cleanup running in background — check Render logs for results"}
+
+
+def _run_recover_no_draft_emails(since_iso: str, until_iso: str) -> dict:
+    """
+    Recovery routine for the draft_mode=false incident (2026-07-30 22:49 – 2026-07-31 02:25 UTC).
+
+    During that window the poller archived emails out of inbox but never created a Gmail draft
+    because draft_mode=false skipped create_gmail_draft(). This function:
+      1. Finds all Draft DB rows in the window where gmail_draft_id IS NULL
+      2. Restores each email to INBOX via the Gmail API
+      3. Deletes the phantom Draft and ProcessedEmail rows so the poller re-triages them fresh
+    """
+    from datetime import datetime
+    from sqlalchemy.orm import Session as _Session
+    from backend.models.db import get_engine, Draft as _Draft, ProcessedEmail as _PE
+    from backend.services import gmail as gmail_svc
+    from backend.services.inbox_routing import resolve_token_for_talent
+
+    engine = get_engine()
+    since_dt = datetime.fromisoformat(since_iso)
+    until_dt = datetime.fromisoformat(until_iso)
+
+    logger.info("recover_no_draft: scanning window %s → %s", since_iso, until_iso)
+
+    with _Session(engine) as db:
+        orphans = (
+            db.query(_Draft)
+            .filter(
+                _Draft.gmail_draft_id.is_(None),
+                _Draft.created_at >= since_dt,
+                _Draft.created_at <= until_dt,
+                _Draft.status == DraftStatus.pending,
+            )
+            .all()
+        )
+
+        logger.info("recover_no_draft: found %d orphaned draft rows", len(orphans))
+
+        restored = 0
+        failed = 0
+        cleaned = 0
+
+        for draft in orphans:
+            try:
+                token_row = resolve_token_for_talent(draft.talent_key, db)
+                if token_row is None:
+                    logger.warning("recover_no_draft: no token for %s — skipping", draft.talent_key)
+                    failed += 1
+                    continue
+
+                ok = gmail_svc.restore_inbox_label(token_row, draft.gmail_message_id, db=db)
+                if ok:
+                    logger.info(
+                        "recover_no_draft: RESTORED %s / %s (%s)",
+                        draft.talent_key, draft.gmail_message_id, draft.subject,
+                    )
+                    restored += 1
+                else:
+                    logger.warning(
+                        "recover_no_draft: restore failed for %s / %s",
+                        draft.talent_key, draft.gmail_message_id,
+                    )
+                    failed += 1
+
+                # Remove phantom DB rows so the poller picks the email up fresh
+                pe = db.query(_PE).filter(
+                    _PE.gmail_message_id == draft.gmail_message_id
+                ).first()
+                if pe:
+                    db.delete(pe)
+                    cleaned += 1
+                db.delete(draft)
+                db.commit()
+
+            except Exception as exc:  # noqa: BLE001
+                logger.error("recover_no_draft: error for %s / %s: %s", draft.talent_key, draft.gmail_message_id, exc)
+                failed += 1
+
+    result = {"restored": restored, "failed": failed, "db_rows_cleaned": cleaned, "total_found": len(orphans)}
+    logger.info("recover_no_draft: complete — %s", result)
+    return result
+
+
+@router.post("/admin/recover-no-draft-emails")
+def recover_no_draft_emails(
+    background_tasks: BackgroundTasks,
+    since: str = "2026-07-30T22:49:00",
+    until: str = "2026-07-31T02:25:00",
+    _: str = Depends(verify_api_key),
+):
+    """
+    Recovery endpoint for the draft_mode=false incident.
+    Finds emails archived without a Gmail draft, restores them to INBOX,
+    and removes the phantom DB rows so the poller re-triages them.
+
+    Default window: 2026-07-30 22:49 UTC (bad deploy) → 2026-07-31 02:25 UTC (fix deployed).
+    Override with ?since=YYYY-MM-DDTHH:MM:SS&until=YYYY-MM-DDTHH:MM:SS if needed.
+    """
+    background_tasks.add_task(_run_recover_no_draft_emails, since, until)
+    return {
+        "status": "started",
+        "window": {"since": since, "until": until},
+        "message": "Recovery running in background — check Render logs for RESTORED lines and final count",
+    }

@@ -148,6 +148,44 @@ def _resolve_profile(talent_key: str):
     return profile
 
 
+def _persist_active_sop_version(sop_text: str, label: str) -> int | None:
+    """Save sop_text as the new active 'sop' SopVersion row.
+
+    Every Render deploy starts from a fresh filesystem and restores sheets/sop.md
+    from whichever SopVersion row is currently active (see main.py on_startup).
+    Any live edit that only calls sop_writer.write_sop_md() — e.g. update_talent,
+    toggle_auto_send — changes disk but NOT the DB, so it silently reverts on the
+    next deploy. This mirrors the persistence upload_sop_v2 already does, so every
+    write path keeps disk and DB in sync. Non-fatal: the live edit already
+    succeeded on disk even if this fails.
+    """
+    try:
+        from backend.models.db import SopVersion, get_session_factory
+        _ensure_sop_versions_table()
+        db = get_session_factory()()
+        try:
+            db.query(SopVersion).filter(
+                SopVersion.is_active == True,  # noqa: E712
+                SopVersion.doc_type == "sop",
+            ).update({"is_active": False})
+            new_ver = SopVersion(
+                version_label=label,
+                raw_content=sop_text,
+                talent_count=len(parse_sop_md(sop_text)),
+                is_active=True,
+                doc_type="sop",
+            )
+            db.add(new_ver)
+            db.commit()
+            db.refresh(new_ver)
+            return new_ver.id
+        finally:
+            db.close()
+    except Exception:
+        logger.warning("Live SOP edit: DB version persist failed (non-fatal — sop.md is still correct on disk)", exc_info=True)
+        return None
+
+
 # ── Endpoints ─────────────────────────────────────────────────────────────────
 
 @router.get("/api/talents", dependencies=[Depends(verify_api_key)])
@@ -243,7 +281,10 @@ def update_talent(talent_key: str, body: TalentUpdateRequest):
         sop_text = _writer.update_personal_emails(sop_text, profile.key, body.personal_emails)
 
     _writer.write_sop_md(sop_text)
-    return {"status": "ok", "key": profile.key}
+    version_id = _persist_active_sop_version(
+        sop_text, f"Live edit — {profile.key} — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    return {"status": "ok", "key": profile.key, "version_id": version_id}
 
 
 @router.post("/api/talents/{talent_key}/toggle-auto-send", dependencies=[Depends(verify_api_key)])
@@ -255,12 +296,77 @@ def toggle_auto_send(talent_key: str):
         sop_text, profile.key, "Auto Send", "yes" if new_value else "no"
     )
     _writer.write_sop_md(sop_text)
-    return {"key": profile.key, "auto_send": new_value}
+    version_id = _persist_active_sop_version(
+        sop_text, f"Live edit — {profile.key} auto-send toggle — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    return {"key": profile.key, "auto_send": new_value, "version_id": version_id}
 
 
 @router.get("/api/sop/raw", dependencies=[Depends(verify_api_key)])
 def sop_raw():
     return Response(content=_read_sop(), media_type="text/plain")
+
+
+@router.post("/api/sop/promote-repo-version", dependencies=[Depends(verify_api_key)])
+def promote_repo_version():
+    """
+    Make the CURRENT on-disk sheets/sop.md the new active DB version.
+
+    WARNING: by the time any HTTP request reaches this app, main.py's startup
+    handler has ALREADY overwritten disk with whatever DB version was active —
+    so "current disk" here means "whatever the DB just restored," NOT
+    necessarily what's in the git repo. This endpoint only helps when the DB
+    has no active version at all, or when you've just made a live edit via
+    update_talent/toggle_auto_send (which now self-persist anyway). To push
+    git-committed sop.md content that differs from the DB, use
+    POST /admin/api/sop/upload-text with the file content directly instead.
+    """
+    sop_text = _read_sop()
+    profiles = parse_sop_md(sop_text)
+    version_id = _persist_active_sop_version(
+        sop_text, f"Promoted from disk — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    return {
+        "status": "ok" if version_id else "disk_only",
+        "version_id": version_id,
+        "talent_count": len(profiles),
+        "talent_keys": sorted(profiles.keys()),
+    }
+
+
+class SopTextUpload(BaseModel):
+    content: str
+    label: str = ""
+
+
+@router.post("/api/sop/upload-text", dependencies=[Depends(verify_api_key)])
+def upload_sop_text(body: SopTextUpload):
+    """
+    Push raw sop.md text directly — writes to disk AND persists as the new
+    active DB version in one shot. Use this to push git-committed content
+    that the DB's active version doesn't have yet (the startup restore always
+    overwrites disk with the DB version before any other code runs, so simply
+    redeploying is not enough to make a git change stick — see main.py
+    on_startup Step 2).
+    """
+    profiles = parse_sop_md(body.content)
+    if len(profiles) < 5:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Only {len(profiles)} talent profile(s) parsed from uploaded content — refusing to write, this looks truncated or malformed.",
+        )
+    warnings = validate_profiles(profiles)
+    _writer.write_sop_md(body.content)
+    version_id = _persist_active_sop_version(
+        body.content, body.label or f"Text upload — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
+    )
+    return {
+        "status": "ok" if version_id else "disk_only",
+        "version_id": version_id,
+        "talent_count": len(profiles),
+        "talent_keys": sorted(profiles.keys()),
+        "warnings": warnings,
+    }
 
 
 @router.post("/api/sop/import-docx", dependencies=[Depends(verify_api_key)])
