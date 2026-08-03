@@ -38,6 +38,18 @@ function loadJSON(relPath) {
 
 const config  = loadJSON("config/settings.json");
 const sopData = loadJSON("sheets/sop_data.json");
+const sopMarkdownPath = path.join(ROOT, "sheets", "sop.md");
+const sopMarkdown = fs.existsSync(sopMarkdownPath)
+  ? fs.readFileSync(sopMarkdownPath, "utf8")
+  : "";
+// The FastAPI runtime now uses sheets/sop.md as its authoritative talent
+// source. Keep this legacy Make validator useful without manufacturing a
+// failure when config.talents is intentionally absent.
+const modernTalentKeys = [...sopMarkdown.matchAll(/^Key:\s*(\S[^\r\n]*)/gm)]
+  .map((m) => m[1].trim())
+  .filter((key) => key && !key.startsWith("["));
+const usesModernTalentSource = modernTalentKeys.length > 0 &&
+  (!Array.isArray(config.talents) || config.talents.length === 0);
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -281,7 +293,11 @@ section("Talent List");
 const talents = config.talents || [];
 
 if (!Array.isArray(talents) || talents.length === 0) {
-  fail("config.talents array is populated");
+  if (usesModernTalentSource) {
+    ok(`sheets/sop.md is the runtime talent source (${modernTalentKeys.length} key(s) found)`);
+  } else {
+    fail("config.talents array is populated");
+  }
 } else {
   ok(`${talents.length} talent(s) found`);
 }
@@ -359,7 +375,9 @@ for (const talent of talents) {
 
 section("SOP Tab Name Alignment (config <-> sop_data.json)");
 
-if (!sopData._missing && !sopData._parseError) {
+if (usesModernTalentSource) {
+  ok("SOP alignment checks delegated to the runtime sheets/sop.md parser");
+} else if (!sopData._missing && !sopData._parseError) {
   const sopKeys = Object.keys(sopData);
 
   for (const talent of talents) {

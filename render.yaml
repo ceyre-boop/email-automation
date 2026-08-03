@@ -40,3 +40,5 @@ services:
     envVars:
       - key: APP_BASE_URL
         sync: false
+      - key: API_KEY
+        sync: false

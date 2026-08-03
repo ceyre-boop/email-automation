@@ -16,6 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
+from sqlalchemy import update
 
 from backend.models.db import Draft, DraftEditLog, DraftStatus, ProcessedEmail, TalentToken
 from backend.routers.deps import get_db, verify_api_key
@@ -499,6 +500,23 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
             detail=f"Draft failed pre-send validation: {_err}",
         )
 
+    # Claim the draft in the database before calling Gmail. This closes the
+    # race between two manager clicks, auto-send, or multiple app workers.
+    claimed = db.execute(
+        update(Draft)
+        .where(
+            Draft.id == draft.id,
+            Draft.status == DraftStatus.pending,
+            Draft.reviewed_at.is_(None),
+            Draft.send_claimed_at.is_(None),
+        )
+        .values(send_claimed_at=datetime.utcnow())
+    ).rowcount
+    db.commit()
+    if claimed != 1:
+        raise HTTPException(status_code=409, detail="Draft is already being sent or was already processed.")
+    db.refresh(draft)
+
     try:
         cc = parse_cc_recipients(draft.cc_recipients)
         success, send_error = gmail_svc.send_reply(
@@ -512,12 +530,24 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
             cc=cc or None,
         )
     except TokenRefreshError:
+        draft.send_claimed_at = None
         token.active = False
         db.add(token)
         db.commit()
         raise HTTPException(status_code=401, detail="Gmail token expired — talent must reconnect.")
+    except Exception as exc:
+        # The Gmail call failed before a successful response was recorded.
+        # Release the claim so a later retry is possible.
+        draft.send_claimed_at = None
+        db.add(draft)
+        db.commit()
+        logger.exception("Draft %s send failed unexpectedly: %s", draft_id, exc)
+        raise HTTPException(status_code=502, detail="Gmail send failed unexpectedly.")
 
     if not success:
+        draft.send_claimed_at = None
+        db.add(draft)
+        db.commit()
         raise HTTPException(status_code=502, detail=f"Gmail send failed: {send_error}")
 
     if draft.gmail_message_id:

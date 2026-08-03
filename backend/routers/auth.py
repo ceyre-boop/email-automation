@@ -11,6 +11,7 @@ import logging
 import re
 import secrets
 import unicodedata
+from datetime import datetime, timedelta
 
 import requests
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -51,6 +52,11 @@ def connect_gmail(talent_key: str | None = Query(None), db: Session = Depends(ge
         if talent_key.lower() not in valid_keys:
             from fastapi import HTTPException
             raise HTTPException(status_code=404, detail=f"Unknown talent: {talent_key}")
+    # Keep the DB-backed CSRF state table bounded and ensure an old consent
+    # flow cannot be completed long after it was initiated.
+    db.query(OAuthState).filter(
+        OAuthState.created_at < datetime.utcnow() - timedelta(minutes=15)
+    ).delete(synchronize_session=False)
     state = secrets.token_urlsafe(32)
     db.add(OAuthState(state=state, pinned_talent_key=talent_key))
     db.commit()
@@ -87,6 +93,10 @@ def _oauth_callback_inner(
     # Validate CSRF state (DB-backed so restarts don't invalidate it)
     state_row = db.query(OAuthState).filter(OAuthState.state == state).first()
     if not state_row:
+        return HTMLResponse(content=_error_page("invalid_state"), status_code=400)
+    if state_row.created_at < datetime.utcnow() - timedelta(minutes=15):
+        db.delete(state_row)
+        db.commit()
         return HTMLResponse(content=_error_page("invalid_state"), status_code=400)
     pinned_talent_key = state_row.pinned_talent_key
     db.delete(state_row)
@@ -266,12 +276,6 @@ def disconnect_talent(talent_key: str, db: Session = Depends(get_db)):
     db.commit()
     logger.info("disconnect_talent: removed %s and all associated records", talent_key)
     return {"ok": True, "removed": talent_key}
-
-
-@router.get("/session-key")
-def get_session_key():
-    """Returns dashboard API key with no auth. Dashboard URL is internal-only (Render deployment)."""
-    return {"api_key": get_settings().api_key}
 
 
 def _error_page(error: str) -> str:

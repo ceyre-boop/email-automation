@@ -1099,30 +1099,6 @@ const _topbarThemeToggle = document.getElementById('topbar-theme-toggle');
 if (_topbarThemeToggle) _topbarThemeToggle.addEventListener('click', _handleThemeToggle);
 
 // ── API ────────────────────────────────────────────────────────────────────
-// Single in-flight promise for session-key refresh so concurrent 403s don't
-// each independently hit /auth/session-key and create a retry storm.
-let _sessionKeyRefresh = null;
-
-async function _refreshSessionKey() {
-  if (_sessionKeyRefresh) return _sessionKeyRefresh;
-  _sessionKeyRefresh = (async () => {
-    try {
-      const r = await fetch('/auth/session-key');
-      if (r.ok) {
-        const d = await r.json();
-        if (d.api_key) {
-          API_KEY = d.api_key;
-          sessionStorage.setItem('inbox_api_key', d.api_key);
-          return true;
-        }
-      }
-    } catch (_) {}
-    return false;
-  })();
-  try { return await _sessionKeyRefresh; }
-  finally { _sessionKeyRefresh = null; }
-}
-
 async function api(method, path, body = null) {
   const opts = { method, headers: { 'x-api-key': API_KEY, 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
@@ -1135,8 +1111,6 @@ async function api(method, path, body = null) {
   if (res.status === 403) {
     sessionStorage.removeItem('inbox_api_key');
     API_KEY = '';
-    const ok = await _refreshSessionKey();
-    if (ok) return api(method, path, body);
     showApiKeyOverlay();
     throw new Error('Invalid API key');
   }
@@ -1316,13 +1290,11 @@ async function pollGuardianStatus() {
 }
 
 async function bootstrap() {
-  // Guarantee API_KEY is set before any authenticated request fires.
-  // All callers share _refreshSessionKey()'s single in-flight promise so a
-  // fresh tab (empty sessionStorage) only hits /auth/session-key once.
+  // A fresh tab must receive the key from the manager, never from the server.
   if (!API_KEY) {
-    await _refreshSessionKey();
+    showApiKeyOverlay();
+    return;
   }
-  if (!API_KEY) { showApiKeyOverlay(); return; }
   // loadOverview, pollGuardianStatus, and loadTokenHealth all call api() —
   // run them sequentially until overview is painted, then fire the pollers.
   await loadOverview();

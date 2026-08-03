@@ -16,7 +16,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import or_
+from sqlalchemy import or_, update
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -96,6 +96,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
             Draft.dismissed == False,  # noqa: E712
             Draft.is_escalate == False,  # noqa: E712
             Draft.validation_failed != True,  # noqa: E712
+            Draft.send_claimed_at.is_(None),
         )
         .order_by(Draft.created_at.asc())
         .all()
@@ -119,9 +120,24 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
             logger.info("auto_send: velocity cap hit mid-cycle for %s — stopping", talent_key)
             break
 
-        # Already-sent guard
-        if draft.reviewed_at is not None:
+        # Atomically claim before any Gmail call. Another worker (or a human
+        # approval request) may have claimed it after the query above.
+        claimed_at = datetime.utcnow()
+        claimed = db.execute(
+            update(Draft)
+            .where(
+                Draft.id == draft.id,
+                Draft.status == DraftStatus.pending,
+                Draft.reviewed_at.is_(None),
+                Draft.send_claimed_at.is_(None),
+            )
+            .values(send_claimed_at=claimed_at)
+        ).rowcount
+        db.commit()
+        if claimed != 1:
             continue
+
+        db.refresh(draft)
 
         # Pre-send validation gate
         from backend.services.validation import run_pre_send_checks
@@ -129,6 +145,7 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
         if not ok:
             draft.validation_failed = True
             draft.validation_error = err
+            draft.send_claimed_at = None
             db.add(draft)
             db.commit()
             logger.warning(
@@ -182,13 +199,22 @@ def _send_draft(db: Session, draft: Draft, token: TalentToken, service) -> None:
         )
     except TokenRefreshError as exc:
         logger.error("auto_send: token refresh failed sending draft %d for %s: %s", draft.id, draft.talent_key, exc)
+        draft.send_claimed_at = None
+        db.add(draft)
+        db.commit()
         return
     except Exception as exc:  # noqa: BLE001
         logger.error("auto_send: unexpected error sending draft %d for %s: %s", draft.id, draft.talent_key, exc)
+        draft.send_claimed_at = None
+        db.add(draft)
+        db.commit()
         return
 
     if not success:
         logger.error("auto_send: Gmail send failed for draft %d (%s): %s", draft.id, draft.talent_key, send_error)
+        draft.send_claimed_at = None
+        db.add(draft)
+        db.commit()
         return
 
     now = datetime.utcnow()

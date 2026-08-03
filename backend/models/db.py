@@ -156,6 +156,10 @@ class Draft(Base):
     )
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime)
     reviewed_by: Mapped[str | None] = mapped_column(String(128))
+    # Set atomically immediately before an external Gmail send. This prevents
+    # a manual approval and the auto-send worker from sending the same draft
+    # concurrently. Successful sends keep the claim; failed sends clear it.
+    send_claimed_at: Mapped[datetime | None] = mapped_column(DateTime)
     # Human-touch audit
     human_edited: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     human_edited_at: Mapped[datetime | None] = mapped_column(DateTime)
@@ -469,6 +473,7 @@ def create_tables():
         "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_failed BOOLEAN NOT NULL DEFAULT FALSE",
         "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS validation_error TEXT",
         "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS reviewed_at TIMESTAMP",
+        "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS send_claimed_at TIMESTAMP",
         "CREATE UNIQUE INDEX IF NOT EXISTS uq_drafts_gmail_message_id ON drafts (gmail_message_id)",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS sender_domain VARCHAR(256)",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS email_length INTEGER",
