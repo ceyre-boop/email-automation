@@ -16,6 +16,22 @@ FastAPI backend deployed on Render. Each talent connects their Gmail via OAuth. 
 
 ---
 
+## CRITICAL — Read this before touching production. It exists because of a real incident (see Incident Log at the bottom).
+
+**This repo is sometimes worked on by more than one AI agent/tool at the same time** (Claude Code / Cowork sessions, Codex CLI, possibly others Colin runs locally). None of them can see each other's work except through git and the live Render/Supabase state. That means:
+
+- **Always `git fetch && git log HEAD..origin/main --oneline` before pushing.** If it shows commits, someone else already pushed — pull/rebase and check for overlapping changes before adding yours. Never push blind.
+- **Never assume you're the only one who might redeploy.** Before triggering a Render deploy, check `GET /v1/services/{id}/deploys?limit=3` for a deploy that started in the last few minutes you didn't trigger.
+- **A code change that adds a DB column is not live until the migration actually runs.** See "DB migrations" below — this got missed once already and broke production for ~25 minutes.
+
+**Where secrets actually live — read before you "fix" anything here:**
+- All real secrets (`DATABASE_URL`, `OPENAI_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `GOOGLE_SHEETS_REFRESH_TOKEN`, `AGENCY_SECRET_KEY`, `API_KEY`) live **only** as Render environment variables on the `manager-email-automation` service (`srv-d7lb7oe47okc738vjkg0`). They are never committed to git (`.env` is gitignored) and `config/settings.json`/`render.yaml` only ever reference them by name (`sync: false`), never by value.
+- **Render's env-var API does not let you read back a value once it's gone, and `PUT /v1/services/{id}/env-vars` (bulk, no key in the URL) REPLACES THE ENTIRE SET — it does not merge.** Wiping every secret on the live service with one malformed call is exactly what happened in the incident below. **Always use the per-key endpoint** — `PUT /v1/services/{id}/env-vars/{KEY}` — to change or add a single value. Never call the bulk endpoint unless you are deliberately writing the complete, correct set of every key at once.
+- A local backup of every secret (as of 2026-08-03) was generated and handed directly to Colin — it is NOT in this repo. If you are an agent and need a value you don't have, **ask Colin for the backup file or the specific value** — do not try to reconstruct or guess a secret, and do not regenerate/rotate a credential (e.g. Google OAuth client secret, DB password) without his explicit go-ahead, since rotating breaks whatever still has the old value cached.
+- There is a second, older Render service in the same account (`email-automation`, `srv-d7jdjfjbc2fs73c0apc0`, https://email-automation-qp2v.onrender.com) that shares the same Supabase DB and Google OAuth client as production but may have **stale** secret values (its `GOOGLE_CLIENT_SECRET` was already out of date as of this writing). It is not a sanctioned backup — treat anything pulled from it as unverified until cross-checked against a current source (e.g. Google Cloud Console, Supabase dashboard).
+
+---
+
 ## Commands
 
 ```bash
@@ -57,8 +73,15 @@ Single-file SPA at `backend/static/dashboard.html` (~1650 lines). Vanilla JS, no
 
 **Never migrate `triage.py` or `reply.py` to any other AI provider.** If quota errors appear, tell Colin to add billing credits at platform.openai.com — do not switch models.
 
-### DB migrations — additive only
-No Alembic. New columns added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `models/db.py::create_tables()`, which runs at every startup. Always use this pattern — never destructive migrations.
+### DB migrations — additive only, and NOT automatic in production
+No Alembic. New columns are added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` in `models/db.py::create_tables()`. **This function does NOT run on every production startup** — the live Render service sets `SKIP_MIGRATIONS=true` deliberately, because running the full migration list at every boot risked locking a large table (`processed_emails`) and causing Render R10 boot timeouts. That is a real, working safeguard — do not remove it as a "fix."
+
+The consequence: **adding a new column to a model in code does nothing to the live database by itself.** `verify_schema_matches_models()` (also in `db.py`) runs read-only on every boot and logs any mismatch, but does not fix it. This has already caused one production outage (see Incident Log) when a new column (`drafts.send_claimed_at`) was added in code, deployed, and never actually created in Postgres — every query touching that column crashed with `UndefinedColumn`.
+
+**Correct procedure any time you add a column:**
+1. Add it to the SQLAlchemy model AND to the `_MIGRATION_STMTS` list in `create_tables()` (additive, `IF NOT EXISTS`, no destructive statements — same as always).
+2. Before or immediately after deploying that code, temporarily unset `SKIP_MIGRATIONS` on the Render service (`DELETE /v1/services/{id}/env-vars/SKIP_MIGRATIONS`), trigger one deploy so `create_tables()` runs and applies the new statement, confirm via logs / `verify_schema_matches_models()` that it worked, then set `SKIP_MIGRATIONS=true` back (`PUT` the single key, value `"true"`).
+3. Never leave `SKIP_MIGRATIONS` unset/false on a deploy you're not actively watching — it re-runs the entire statement list, including the ones with real lock risk.
 
 ### Per-talent OAuth
 Each talent has a row in the `talents` table (`TalentToken`) with their own Gmail OAuth tokens. `services/oauth.py` refreshes tokens; `services/gmail.py` builds the Gmail API service from that token. Adding a new talent = connect their Gmail account → system auto-discovers them.
@@ -147,6 +170,31 @@ Write individual files per memory, link from `MEMORY.md` index. See global memor
 **What to save:** decisions future Claude can't infer from code (e.g. why OpenAI stays), corrections to approaches, new talents added, new env vars required, non-obvious bug root causes.
 
 **What not to save:** anything already in this file, git history, or directly readable from code.
+
+---
+
+## Incident Log
+
+Real production incidents, kept so the next agent doesn't re-derive (or repeat) them. Add to this, don't delete past entries.
+
+### 2026-08-03 — Production outage: missing DB column, then a full env-var wipe during recovery
+
+**What broke, in order:**
+1. A separate AI coding session (using Codex CLI, working on the same GitHub repo from Colin's local machine) independently built the same fix a Claude session was already mid-way through — an atomic "send claim" guard to stop duplicate Gmail sends — and pushed it straight to `main`, which auto-deployed to production.
+2. That change added a new column, `drafts.send_claimed_at`, to the SQLAlchemy model and referenced it in queries. It did **not** get added to the actual Postgres table, because production runs with `SKIP_MIGRATIONS=true` (see "DB migrations" above) and nobody ran the manual migration step. Every query touching `drafts` started failing with `psycopg2.errors.UndefinedColumn`, which broke the dashboard (pending drafts, recently-sent — everything showed "Failed to load") and silently stalled the email-polling loop for every talent (0 emails processed per cycle).
+3. While diagnosing this, the Claude session investigating it made an unrelated, unforced error: intending to update one Render environment variable, it called the **bulk** `PUT /v1/services/{id}/env-vars` endpoint (which replaces the entire env-var set) instead of the **per-key** endpoint, with a single placeholder value. This deleted every other environment variable on the live service — `DATABASE_URL`, `OPENAI_API_KEY`, `GOOGLE_CLIENT_ID`/`SECRET`, `GOOGLE_SHEETS_REFRESH_TOKEN`, `AGENCY_SECRET_KEY`, `N8N_WEBHOOK_SECRET`, `SKIP_MIGRATIONS` — gone, with no way to read the old values back via the Render API.
+
+**Why it wasn't worse:** Render does not hot-restart a running instance just because its stored env vars changed via the API — the already-running process kept working normally (module the pre-existing column bug) until something triggered a fresh boot. That gave a window to fix the env vars before any deploy/restart would have applied the broken (empty) set and taken the whole app down (no DB connection at all).
+
+**How it got fixed:** A second, older Render deployment of the same repo (`email-automation`, see "Where secrets actually live" above) turned out to still have a full, working copy of the same secrets — confirmed genuinely matching (not coincidence) because its `API_KEY` was byte-for-byte identical to production's. Every value was copied over via the safe per-key endpoint. `GOOGLE_CLIENT_SECRET` from that sibling turned out to be stale (rotated since), which Colin caught by comparing against the live Google Cloud Console value directly — a reminder that anything pulled from that sibling service should be cross-checked, not trusted blindly. `SKIP_MIGRATIONS` was intentionally unset for exactly one deploy to let the missing column get created, then restored to `true`.
+
+**Root causes:**
+- No coordination mechanism between AI agents/tools working on the same repo — two independent fixes for the same bug landed on `main` within the same session, and nobody checked for a schema/migration gap before deploying.
+- `CLAUDE.md` itself was stale — it flatly said migrations "run at every startup," which is false in production and could easily lead an agent (human or AI) to assume a new column "just appears."
+- No backup of production secrets existed anywhere outside Render's own env-var store, which does not support reading old values back. Recovery only worked because a lucky, unverified fallback (the sibling deployment) happened to exist.
+- The bulk vs. per-key env-var API distinction is a sharp edge with no safety rail — one wrong endpoint choice destroys the entire config with a 200 OK response and no confirmation prompt.
+
+**What changed as a result:** the "CRITICAL" section above, the corrected migration guidance, a `.env.example` added to the repo (documents every required var, no real values), and a real secrets backup handed directly to Colin to store outside of Render (a password manager, not this repo). If you're an agent reading this and about to make a similar env-var or migration change: re-read the CRITICAL section first.
 
 ---
 
