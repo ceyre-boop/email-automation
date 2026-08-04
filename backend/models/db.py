@@ -202,11 +202,14 @@ class InboxEmail(Base):
     gmail_message_id: Mapped[str] = mapped_column(String(128), nullable=False, index=True)
     thread_id: Mapped[str | None] = mapped_column(String(128))
     sender: Mapped[str | None] = mapped_column(String(256))
-    subject: Mapped[str | None] = mapped_column(String(512))
-    snippet: Mapped[str | None] = mapped_column(String(512))
+    # subject/snippet/label_ids are TEXT, not String(512): Gmail places no practical
+    # bound on any of them, and a long inbound subject line broke inbox sync in
+    # production (see CLAUDE.md Incident Log — 2026-08-04 varchar(512) overflow).
+    subject: Mapped[str | None] = mapped_column(Text)
+    snippet: Mapped[str | None] = mapped_column(Text)
     email_date: Mapped[datetime | None] = mapped_column(DateTime)
     is_unread: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    label_ids: Mapped[str | None] = mapped_column(String(512))
+    label_ids: Mapped[str | None] = mapped_column(Text)
     body_text: Mapped[str | None] = mapped_column(Text)
     body_fetched_at: Mapped[datetime | None] = mapped_column(DateTime)
     score: Mapped[int | None] = mapped_column(Integer)
@@ -521,6 +524,14 @@ def create_tables():
         # SOP v16 single-inbox alias routing — track original recipient per email
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS to_address VARCHAR(256)",
         "ALTER TABLE drafts ADD COLUMN IF NOT EXISTS to_address VARCHAR(256)",
+        # 2026-08-04 incident: Gmail subjects/snippets/label lists have no practical
+        # length bound. varchar(512) crashed inbox sync (StringDataRightTruncation)
+        # on a long inbound subject, poisoning the SQLAlchemy session and stalling
+        # the whole poll cycle every ~45s. Widening to TEXT is metadata-only in
+        # Postgres (no table rewrite) and safe to re-run (no-op once already TEXT).
+        "ALTER TABLE inbox_emails ALTER COLUMN subject TYPE TEXT",
+        "ALTER TABLE inbox_emails ALTER COLUMN snippet TYPE TEXT",
+        "ALTER TABLE inbox_emails ALTER COLUMN label_ids TYPE TEXT",
     ]
     settings = get_settings()
     mig_url = settings.database_url.replace("postgres://", "postgresql://", 1)

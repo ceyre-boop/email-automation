@@ -2,7 +2,7 @@
 
 This project is worked on by more than one AI coding tool (Claude Code / Cowork sessions, Codex CLI, possibly others). This file and `CLAUDE.md` are kept in sync — whichever one your tool reads, read the other too if you can; `CLAUDE.md` has the full architecture writeup, this file has the same critical safety rules in case you only load `AGENTS.md`.
 
-**On 2026-08-03 this system had a real production outage caused by two different AI agents working on this repo without knowing about each other.** Full postmortem is in `CLAUDE.md` under "Incident Log" — read it before making changes that touch the database schema, environment variables, or a production deploy.
+**On 2026-08-03 this system had a real production outage caused by two different AI agents working on this repo without knowing about each other, and on 2026-08-04 an unbounded Gmail field crashed the poller for ~7 hours while every health check reported "fine."** Full postmortems are in `CLAUDE.md` under "Incident Log" — read them before making changes that touch the database schema, environment variables, or a production deploy.
 
 ## Before you push
 
