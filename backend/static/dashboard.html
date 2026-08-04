@@ -300,6 +300,20 @@ body {
   -webkit-overflow-scrolling: touch;
 }
 
+/* Wraps the message body inside .reader-content. Referenced in markup with no
+   rule at all, so the body sat flush against the pane with no surface of its
+   own — this restores the card the layout assumes. */
+.email-card {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 20px 22px;
+  font-size: 13px;
+  line-height: 1.65;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+
 .ov-header {
   display: flex; align-items: baseline; justify-content: space-between;
   margin-bottom: 28px;
@@ -429,6 +443,19 @@ body {
 .btn-ghost:hover { color: var(--text); background: var(--surface-3); }
 .btn-primary { background: var(--red); color: #fff; box-shadow: 0 0 14px rgba(227,28,37,0.3); }
 .btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* Applied on its own (not alongside .btn) by the email reader's Archive button,
+   so it carries the full button shape rather than acting as a modifier.
+   Was referenced in markup with no rule at all — rendered as a raw UA button. */
+.btn-secondary {
+  padding: 7px 13px; border-radius: 8px;
+  font-family: var(--sans); font-size: 12px; font-weight: 600;
+  cursor: pointer; transition: var(--r);
+  background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text-2);
+  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
+}
+.btn-secondary:hover { color: var(--text); background: var(--surface-3); }
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ─── Split layout ──────────────────────────────────────────────────────── */
 .gmail-split { flex: 1; display: flex; overflow: hidden; min-height: 0; }
