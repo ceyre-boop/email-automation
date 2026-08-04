@@ -15,6 +15,7 @@ import logging
 from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
+from zoneinfo import ZoneInfo
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
@@ -49,6 +50,27 @@ logger = logging.getLogger(__name__)
 
 _DASHBOARD_RESET_KEY = "dashboard_reset_started_at"
 
+_PACIFIC = ZoneInfo("America/Los_Angeles")
+_UTC = ZoneInfo("UTC")
+_DAILY_ROLLOVER_HOUR = 12  # headline "today" stat tiles roll over at 12:00 PM Pacific
+
+
+def _daily_rollover_boundary_utc(reference_utc: datetime) -> datetime:
+    """Most recent 12:00 PM America/Los_Angeles boundary, as a naive UTC datetime.
+
+    Used only for read-only dashboard aggregation windows (headline stat tiles like
+    "Sent Today", "Ignored", "Replies", "Est. Daily Deal Value"). Handles PST/PDT
+    automatically via zoneinfo — does not touch any stored data, just shifts the
+    query window used to compute these display-only numbers.
+    """
+    reference_pacific = reference_utc.replace(tzinfo=_UTC).astimezone(_PACIFIC)
+    boundary_pacific = reference_pacific.replace(
+        hour=_DAILY_ROLLOVER_HOUR, minute=0, second=0, microsecond=0
+    )
+    if reference_pacific < boundary_pacific:
+        boundary_pacific -= timedelta(days=1)
+    return boundary_pacific.astimezone(_UTC).replace(tzinfo=None)
+
 
 # ── Pydantic schemas ──────────────────────────────────────────────────────────
 
@@ -81,8 +103,8 @@ class DailyReportOut(BaseModel):
     total_draft_backlog: int
     total_new_drafts_today: int
     total_ignore: int
-    total_deal_value_today: float  # sum of proposed_rate for Score-3 emails today
-    # Calendar-day fields (reset at midnight UTC regardless of manual reset)
+    total_deal_value_today: float  # sum of proposed_rate for Score-3 emails since the last 12PM Pacific rollover
+    # Calendar-day fields (roll over daily at 12:00 PM Pacific, regardless of manual reset)
     total_sent_cal_today: int = 0
     total_new_drafts_cal_today: int = 0
     total_revisit_cal_today: int = 0  # score=1 emails processed today
@@ -326,7 +348,11 @@ def daily_report(db: Session = Depends(get_db)):
 
     total_good = total_uncertain = total_trash = 0
     total_sent = total_draft_backlog = total_new_drafts_today = total_ignore = 0
-    total_deal_value_today: float = 0.0
+    # Note: this is the deal value accumulated since the last manual dashboard
+    # reset — kept for potential future use, but the headline "Est. Daily Deal
+    # Value" tile uses the 12PM-Pacific-rollover-scoped total computed below
+    # (deal_value_cal_today) so it actually updates day to day.
+    _deal_value_since_reset: float = 0.0
     cards: list[TalentReportCard] = []
 
     for t_cfg in talent_configs:
@@ -350,7 +376,7 @@ def daily_report(db: Session = Depends(get_db)):
         total_draft_backlog += count_backlog
         total_new_drafts_today += count_new_today
         total_ignore += count_ignore
-        total_deal_value_today += deal_value
+        _deal_value_since_reset += deal_value
 
         cards.append(TalentReportCard(
             talent_key=key,
@@ -370,24 +396,38 @@ def daily_report(db: Session = Depends(get_db)):
             pending_real_drafts=count_new_today,
         ))
 
-    # ── Calendar-day stats (midnight UTC → now, ignoring manual reset) ──────
-    cal_midnight = datetime(today_utc.year, today_utc.month, today_utc.day)
+    # ── Calendar-day stats (roll over at 12PM Pacific → now, ignoring manual reset) ──
+    cal_rollover = _daily_rollover_boundary_utc(datetime.utcnow())
 
     sent_cal_today = db.query(Draft).filter(
         Draft.status == DraftStatus.sent,
-        Draft.reviewed_at >= cal_midnight,
+        Draft.reviewed_at >= cal_rollover,
     ).count()
+
+    # Est. Daily Deal Value — sum of proposed_rate for Score-3 emails since the
+    # last 12PM Pacific rollover. Read-only aggregation query only; does not
+    # touch stored email/Supabase data.
+    deal_value_cal_today: float = (
+        db.query(func.coalesce(func.sum(ProcessedEmail.proposed_rate), 0.0))
+        .filter(
+            ProcessedEmail.score == 3,
+            ProcessedEmail.proposed_rate.isnot(None),
+            ProcessedEmail.processed_at >= cal_rollover,
+        )
+        .scalar()
+        or 0.0
+    )
 
     new_drafts_cal_today = db.query(Draft).filter(
         Draft.status == DraftStatus.pending,
         Draft.is_escalate == False,  # noqa: E712
-        Draft.created_at >= cal_midnight,
+        Draft.created_at >= cal_rollover,
     ).count()
 
     # Revisit (score=1) — calendar day only
     revisit_cal_today = db.query(ProcessedEmail).filter(
         ProcessedEmail.score == 1,
-        ProcessedEmail.processed_at >= cal_midnight,
+        ProcessedEmail.processed_at >= cal_rollover,
     ).count()
 
     # Reply emails: inbound today on threads where we previously sent — excluding
@@ -408,7 +448,7 @@ def daily_report(db: Session = Depends(get_db)):
     if sent_thread_ids:
         reply_email_rows = db.query(ProcessedEmail).filter(
             ProcessedEmail.thread_id.in_(sent_thread_ids),
-            ProcessedEmail.processed_at >= cal_midnight,
+            ProcessedEmail.processed_at >= cal_rollover,
         ).all()
         if reply_email_rows:
             reply_thread_ids = [e.thread_id for e in reply_email_rows if e.thread_id]
@@ -417,7 +457,7 @@ def daily_report(db: Session = Depends(get_db)):
                 .filter(
                     Draft.thread_id.in_(reply_thread_ids),
                     Draft.status.in_([DraftStatus.pending, DraftStatus.sent]),
-                    Draft.created_at >= cal_midnight,
+                    Draft.created_at >= cal_rollover,
                 )
                 .distinct().all()
                 if r[0]
@@ -437,7 +477,7 @@ def daily_report(db: Session = Depends(get_db)):
         total_draft_backlog=total_draft_backlog,
         total_new_drafts_today=total_new_drafts_today,
         total_ignore=total_ignore,
-        total_deal_value_today=round(total_deal_value_today, 2),
+        total_deal_value_today=round(deal_value_cal_today, 2),
         total_sent_cal_today=sent_cal_today,
         total_new_drafts_cal_today=new_drafts_cal_today,
         total_revisit_cal_today=revisit_cal_today,
