@@ -186,18 +186,41 @@ def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
             )
             continue
 
-        # Thread count guard: skip if thread already has a real sent reply (not just our draft)
+        # Manual-reply guard: dismiss only if a HUMAN already replied on this thread.
+        #
+        # This previously counted every non-DRAFT message in the thread, which meant
+        # inbound brand emails were mistaken for replies we had sent. Under the SOP v16
+        # consolidated inbox that became a silent killer: when one brand emails several
+        # aliases, all of them land in talent-mgmt@ and Gmail groups them into a single
+        # conversation, so the thread trivially holds 2+ inbound messages and every
+        # draft on it was dismissed unsent. See gmail.py::thread_has_prior_sent_reply,
+        # which already did the SENT-label check correctly.
+        #
+        # We now compare actual SENT messages against the sends we can account for
+        # ourselves. One reply per draft is intended: if a brand emails three talents,
+        # each talent answers with their own rates, exactly as they did when every
+        # talent had their own mailbox. Only an unaccounted-for SENT message — a human
+        # replying by hand — stops the send.
         if draft.thread_id:
             try:
                 thread = service.users().threads().get(
                     userId="me", id=draft.thread_id, format="metadata"
                 ).execute()
                 messages = thread.get("messages", [])
-                sent_messages = [m for m in messages if "DRAFT" not in m.get("labelIds", [])]
-                if len(sent_messages) > 1:
+                sent_in_thread = [m for m in messages if "SENT" in m.get("labelIds", [])]
+                our_sends = (
+                    db.query(Draft)
+                    .filter(
+                        Draft.thread_id == draft.thread_id,
+                        Draft.status == DraftStatus.sent,
+                    )
+                    .count()
+                )
+                if len(sent_in_thread) > our_sends:
                     logger.info(
-                        "auto_send: thread %s has %d sent messages — dismissing draft %d",
-                        draft.thread_id, len(sent_messages), draft.id,
+                        "auto_send: thread %s has %d sent message(s) but only %d are ours — "
+                        "a human replied manually; dismissing draft %d",
+                        draft.thread_id, len(sent_in_thread), our_sends, draft.id,
                     )
                     draft.dismissed = True
                     db.add(draft)
