@@ -452,7 +452,7 @@ def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool
     poll_start = time.monotonic()
     emails_found = 0
     emails_processed_count = 0
-    summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0}
+    summary: dict[str, int] = {"processed": 0, "archived": 0, "flagged": 0, "drafted": 0, "errors": 0, "unrouted": 0}
 
     try:
         token_row = db.query(TalentToken).filter(TalentToken.id == token_row_id).first()
@@ -559,7 +559,7 @@ def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool
                         emails_processed_count += 1
                         if result["status"] == "ok":
                             for k, v in result.get("summary", {}).items():
-                                summary[k] += v
+                                summary[k] = summary.get(k, 0) + v
                         else:
                             logger.error(
                                 "Worker error for %s / %s: %s",
