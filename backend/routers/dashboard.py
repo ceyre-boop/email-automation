@@ -30,6 +30,7 @@ from backend.models.db import (
     EmailStatus,
     ExternalChannelReview,
     InboxEmail,
+    MAX_DB_THREAD_WORKERS,
     ManagerContext,
     PollHealth,
     ProcessedEmail,
@@ -1390,7 +1391,7 @@ def _run_force_blast(talent_key: str, msg_ids: list):
     total = len(msg_ids)
     logger.info("Force blast START for %s: %d emails, 15 workers", talent_key, total)
 
-    with ThreadPoolExecutor(max_workers=15) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_DB_THREAD_WORKERS) as executor:
         futures = {executor.submit(_process_one, mid): mid for mid in msg_ids}
         done = 0
         for future in as_completed(futures):
@@ -1459,7 +1460,7 @@ def _run_process_batch(talent_key: str, msg_ids: list):
 
         from concurrent.futures import ThreadPoolExecutor
         unqueued = [m for m in msg_ids if not _already_processed(_db, m)]
-        with ThreadPoolExecutor(max_workers=15) as executor:
+        with ThreadPoolExecutor(max_workers=MAX_DB_THREAD_WORKERS) as executor:
             futures = [executor.submit(_process_in_thread, mid) for mid in unqueued]
             for f in futures:
                 try:
@@ -2211,7 +2212,7 @@ def _run_triage_unscored(talent_key: str, batch_size: int = 20):
                     thread_db.close()
                 return thread_summary
 
-            with ThreadPoolExecutor(max_workers=15) as executor:
+            with ThreadPoolExecutor(max_workers=MAX_DB_THREAD_WORKERS) as executor:
                 futures = [executor.submit(_process_in_thread, r.gmail_message_id) for r in rows]
                 for f in futures:
                     try:

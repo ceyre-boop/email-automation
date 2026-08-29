@@ -210,6 +210,19 @@ Real production incidents, kept so the next agent doesn't re-derive (or repeat) 
 
 **Also flagged during this incident, not yet acted on:** several drafts held stale send claims (`send_claimed_at` set, still `pending`) from workers that likely died mid-flight during the crash loop — per the existing safety design (see `_reject_if_send_in_progress` in `drafts.py`), these need a human to check the actual Gmail thread before clearing, not an automated clear. Also, Supabase's connection pooler hit `max clients reached` under concurrent 20-talent load — a separate capacity ceiling, unrelated to this bug, not yet sized or addressed.
 
+
+### 2026-08-29 — Poller crash loop: Supabase pooler session-mode client limit (15) exceeded
+
+**What broke:** every per-token poll cycle logged `psycopg2.OperationalError ... FATAL: (EMAXCONNSESSION) max clients reached in session mode - max clients are limited to pool_size: 15` for several talents (Katrina, Brittanie, Skyler), and the follow-up `PollHealth` write failed for the same reason — so those inboxes were silently not being processed while the shared inbox kept working.
+
+**Root cause:** the app was configured to open far more Postgres connections than the pooler allows. SQLAlchemy's engine was `pool_size=10 + max_overflow=15` (hard cap 25) and `poller.py` ran `MAX_TALENT_WORKERS=5 × (1 + MAX_CONCURRENT_EMAILS=3)` + 1 = 21 concurrent sessions per cycle, plus the draft queue, auto_send, guardian and dashboard HTTP. Supabase's pooler for this project runs in **session mode** and caps this service at **15 concurrent clients**. Over that limit the pooler does not queue — it refuses the connect, so the error surfaces as a per-talent poll failure rather than backpressure.
+
+**Fix (code, no infra change):** engine capped at `pool_size=6 + max_overflow=6` = 12 (overridable via `DB_POOL_SIZE`/`DB_MAX_OVERFLOW`), `pool_timeout` raised 15→30 so callers wait for a pooled connection instead of failing; poller concurrency reduced to `MAX_TALENT_WORKERS=3`, `MAX_CONCURRENT_EMAILS=2` → peak 10; the three dashboard backfill/force-blast paths that spun 15 threads *each holding its own DB session* now use `MAX_DB_THREAD_WORKERS` (default 6) from `db.py`. Gmail-only thread pools (`inbox_sync` header/body fetch, dashboard header prefetch) were left at 20/15 — they hold no DB session.
+
+**If more throughput is needed later:** do NOT just raise the pool numbers. Either move `DATABASE_URL` to Supabase's **transaction-mode** pooler port (6543), which supports far more clients, or raise the pooler's session-mode pool size in the Supabase dashboard — then re-size `DB_POOL_SIZE`/`MAX_TALENT_WORKERS` to match. The invariant to preserve: `MAX_TALENT_WORKERS × (1 + MAX_CONCURRENT_EMAILS) + 1 <= DB_POOL_SIZE + DB_MAX_OVERFLOW < pooler client limit`.
+
+**Also visible in the same logs, not fixed here:** `Sheets log failed ... invalid_grant` (dead `GOOGLE_SHEETS_REFRESH_TOKEN`, known) and 74 pending drafts holding stale send claims from workers killed mid-flight — per existing design those need a human to check the Gmail thread before clearing, never an automated sweep.
+
 ---
 
 ## Session End Protocol

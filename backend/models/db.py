@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import enum
 import logging
+import os
 from datetime import datetime
 
 from sqlalchemy import (
@@ -383,6 +384,12 @@ class SopVersion(Base):
 _engine = None
 _session_factory = None
 
+# Max worker threads any code path may run when each thread holds its own DB
+# session. Kept well under the engine pool cap (see _make_engine) so a manual
+# backfill/blast can never starve the poller or trip the Supabase session-mode
+# client limit.
+MAX_DB_THREAD_WORKERS = int(os.getenv("MAX_DB_THREAD_WORKERS", "6"))
+
 
 def _make_engine():
     global _engine
@@ -402,16 +409,24 @@ def _make_engine():
                 poolclass=StaticPool,
             )
         else:
-            # Peak connection demand: 1 + (5 talent workers × 4 sessions each) = ~21 for poll,
-            # + 6 for draft queue + 5 for other jobs/HTTP = ~32 peak. pool_size=10 + overflow=15
-            # gives 25 hard cap, which fits with the reduced MAX_TALENT_WORKERS=5 and
-            # MAX_CONCURRENT_EMAILS=3 in poller.py. Increasing these limits further would
-            # require Supabase connection limit audit first (free tier: ~60 concurrent).
+            # HARD CEILING: Supabase's pooler runs in SESSION mode and caps this
+            # service at 15 concurrent client connections
+            # ("EMAXCONNSESSION ... max clients are limited to pool_size: 15").
+            # SQLAlchemy's pool must therefore stay strictly BELOW 15 in total —
+            # anything above it does not queue politely, it raises
+            # psycopg2.OperationalError at connect time and kills the poll cycle.
+            # Default 6 + 6 = 12 leaves 3 connections of headroom for psql/dashboard
+            # sessions. Poller concurrency in poller.py is sized to match
+            # (MAX_TALENT_WORKERS × (1 + MAX_CONCURRENT_EMAILS) + 1 <= 12).
+            # Raise ONLY after confirming the pooler's session-mode limit was raised
+            # (or after moving DATABASE_URL to the transaction-mode pooler port).
+            pool_size = int(os.getenv("DB_POOL_SIZE", "6"))
+            max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "6"))
             _engine = create_engine(
                 db_url,
-                pool_size=10,       # was 5 — insufficient for 7 concurrent scheduler jobs + HTTP
-                max_overflow=15,    # was 10 — total cap: 25
-                pool_timeout=15,    # was 10 — extra breathing room under load
+                pool_size=pool_size,
+                max_overflow=max_overflow,
+                pool_timeout=30,    # wait for a pooled conn instead of failing fast
                 pool_recycle=300,
                 pool_pre_ping=True,
             )

@@ -19,6 +19,7 @@ Either way each unread email is processed end-to-end:
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -47,13 +48,15 @@ logger = logging.getLogger(__name__)
 
 BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle
 
-# Concurrency — reduced to prevent QueuePool exhaustion.
-# Peak DB connections per poll: 1 parent + (MAX_TALENT_WORKERS × (1+MAX_CONCURRENT_EMAILS))
-# = 1 + (5 × 4) = 21. Combined with draft queue (6) + other jobs (5) + HTTP (3) = ~35 peak,
-# which fits within pool_size=10 + max_overflow=15 = 25 hard cap (connections time-share).
-# Commit 3 target: release DB session before Gmail API I/O to drop this to ~10 peak.
-MAX_CONCURRENT_EMAILS = 3    # was 10 — each holds a session during Gmail API I/O
-MAX_TALENT_WORKERS = 5       # was 10 — halves talent-level parallelism
+# Concurrency — sized against the Supabase SESSION-mode pooler ceiling (15 clients).
+# Peak DB connections per poll: 1 parent + (MAX_TALENT_WORKERS × (1 + MAX_CONCURRENT_EMAILS))
+# = 1 + (3 × 3) = 10, which fits under the engine cap in db.py (pool_size 6 + overflow 6 = 12)
+# and leaves headroom for auto_send / guardian / dashboard HTTP.
+# Going higher does NOT just queue — the pooler rejects the connect outright with
+# "EMAXCONNSESSION ... max clients are limited to pool_size: 15" and the whole poll
+# cycle errors out per talent (this happened in production, see CLAUDE.md).
+MAX_CONCURRENT_EMAILS = int(os.getenv("MAX_CONCURRENT_EMAILS", "2"))
+MAX_TALENT_WORKERS = int(os.getenv("MAX_TALENT_WORKERS", "3"))
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
