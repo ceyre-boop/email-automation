@@ -4,6 +4,7 @@ from __future__ import annotations
 import enum
 import logging
 import os
+from urllib.parse import urlsplit, urlunsplit
 from datetime import datetime
 
 from sqlalchemy import (
@@ -391,6 +392,49 @@ _session_factory = None
 MAX_DB_THREAD_WORKERS = int(os.getenv("MAX_DB_THREAD_WORKERS", "6"))
 
 
+# Supabase pooler ports. Session mode (5432) caps this project at ~15 concurrent
+# clients; transaction mode (6543) multiplexes and allows far more.
+_SESSION_POOLER_PORT = 5432
+_TRANSACTION_POOLER_PORT = 6543
+
+
+def _resolve_pooler_url(db_url: str) -> tuple[str, bool]:
+    """Point a Supabase *pooler* URL at the transaction-mode port.
+
+    Returns (url, transaction_mode). Only rewrites when the host is a Supabase
+    pooler host on the session-mode port — a direct db.<ref>.supabase.co URL or
+    any other Postgres host is returned untouched. Set DB_POOLER_MODE=session to
+    opt out without editing DATABASE_URL.
+
+    Safe for this codebase because nothing here relies on session-scoped Postgres
+    state (no LISTEN/NOTIFY, advisory locks held across transactions, temp tables
+    or session-level SET), and psycopg2 does not use server-side prepared
+    statements, which is the usual incompatibility with transaction pooling.
+    """
+    if os.getenv("DB_POOLER_MODE", "").lower() == "session":
+        return db_url, False
+    try:
+        parts = urlsplit(db_url)
+        host = (parts.hostname or "")
+        if "pooler.supabase.com" not in host:
+            return db_url, False
+        if parts.port == _TRANSACTION_POOLER_PORT:
+            return db_url, True
+        if parts.port not in (None, _SESSION_POOLER_PORT):
+            return db_url, False
+        userinfo = ""
+        if parts.username:
+            userinfo = parts.username
+            if parts.password:
+                userinfo += f":{parts.password}"
+            userinfo += "@"
+        netloc = f"{userinfo}{host}:{_TRANSACTION_POOLER_PORT}"
+        return urlunsplit((parts.scheme, netloc, parts.path, parts.query, parts.fragment)), True
+    except Exception:  # noqa: BLE001 — never let URL parsing break startup
+        logger.warning("Could not parse DATABASE_URL for pooler port rewrite; using it as-is")
+        return db_url, False
+
+
 def _make_engine():
     global _engine
     if _engine is None:
@@ -409,19 +453,32 @@ def _make_engine():
                 poolclass=StaticPool,
             )
         else:
-            # HARD CEILING: Supabase's pooler runs in SESSION mode and caps this
-            # service at 15 concurrent client connections
-            # ("EMAXCONNSESSION ... max clients are limited to pool_size: 15").
-            # SQLAlchemy's pool must therefore stay strictly BELOW 15 in total —
-            # anything above it does not queue politely, it raises
-            # psycopg2.OperationalError at connect time and kills the poll cycle.
-            # Default 6 + 6 = 12 leaves 3 connections of headroom for psql/dashboard
-            # sessions. Poller concurrency in poller.py is sized to match
-            # (MAX_TALENT_WORKERS × (1 + MAX_CONCURRENT_EMAILS) + 1 <= 12).
-            # Raise ONLY after confirming the pooler's session-mode limit was raised
-            # (or after moving DATABASE_URL to the transaction-mode pooler port).
-            pool_size = int(os.getenv("DB_POOL_SIZE", "6"))
-            max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "6"))
+            # Connection budget must stay strictly BELOW whatever the pooler in
+            # front of Postgres allows. Over its client limit Supabase's pooler
+            # does not queue politely — it refuses the connect with
+            # "EMAXCONNSESSION ... max clients are limited to pool_size: N" and
+            # the caller (a poll cycle, a dashboard request) dies outright.
+            #
+            # Two modes, decided by which pooler PORT the URL points at:
+            #   5432 = SESSION mode   → ~15 clients for this project. Tight.
+            #   6543 = TRANSACTION mode → server connections are multiplexed, so
+            #                             many more clients are allowed.
+            # _resolve_pooler_url() below rewrites 5432 → 6543 automatically, so
+            # DATABASE_URL itself never has to be touched. The invariant to keep:
+            #   MAX_TALENT_WORKERS × (1 + MAX_CONCURRENT_EMAILS) + 1
+            #     <= pool_size + max_overflow < pooler client limit
+            db_url, transaction_mode = _resolve_pooler_url(db_url)
+            default_pool, default_overflow = (10, 10) if transaction_mode else (6, 6)
+            pool_size = int(os.getenv("DB_POOL_SIZE", str(default_pool)))
+            max_overflow = int(os.getenv("DB_MAX_OVERFLOW", str(default_overflow)))
+            if not transaction_mode:
+                # Session mode: hard-clamp regardless of env, 12 total < 15 limit.
+                pool_size, max_overflow = min(pool_size, 6), min(max_overflow, 6)
+            logger.info(
+                "DB engine: pooler=%s pool_size=%d max_overflow=%d",
+                "transaction(6543)" if transaction_mode else "session(5432)",
+                pool_size, max_overflow,
+            )
             _engine = create_engine(
                 db_url,
                 pool_size=pool_size,

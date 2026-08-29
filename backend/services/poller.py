@@ -48,15 +48,14 @@ logger = logging.getLogger(__name__)
 
 BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle
 
-# Concurrency — sized against the Supabase SESSION-mode pooler ceiling (15 clients).
+# Concurrency — bounded by the DB connection budget in models/db.py.
 # Peak DB connections per poll: 1 parent + (MAX_TALENT_WORKERS × (1 + MAX_CONCURRENT_EMAILS))
-# = 1 + (3 × 3) = 10, which fits under the engine cap in db.py (pool_size 6 + overflow 6 = 12)
-# and leaves headroom for auto_send / guardian / dashboard HTTP.
-# Going higher does NOT just queue — the pooler rejects the connect outright with
-# "EMAXCONNSESSION ... max clients are limited to pool_size: 15" and the whole poll
-# cycle errors out per talent (this happened in production, see CLAUDE.md).
-MAX_CONCURRENT_EMAILS = int(os.getenv("MAX_CONCURRENT_EMAILS", "2"))
-MAX_TALENT_WORKERS = int(os.getenv("MAX_TALENT_WORKERS", "3"))
+# = 1 + (4 × 4) = 17, which fits the transaction-mode pooler budget (pool 10 + overflow 10).
+# On the session-mode pooler db.py clamps the engine to 12, and the extra threads simply
+# wait on SQLAlchemy's pool (pool_timeout=30) instead of hitting the pooler's hard client
+# limit — waiting is fine, "EMAXCONNSESSION" at connect time is not (it kills the cycle).
+MAX_CONCURRENT_EMAILS = int(os.getenv("MAX_CONCURRENT_EMAILS", "3"))
+MAX_TALENT_WORKERS = int(os.getenv("MAX_TALENT_WORKERS", "4"))
 
 # Per-talent poll lock — prevents a slow poll from overlapping the next cycle
 _poll_locks: dict[str, bool] = {}
