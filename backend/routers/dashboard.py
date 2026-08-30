@@ -3076,3 +3076,81 @@ def debug_routing_headers(limit: int = 3, db: Session = Depends(get_db)):
         "alias_map_sample": sorted(alias_map.keys())[:5],
         "unrouted_samples": out,
     }
+
+
+@router.post("/admin/reroute-unrouted", dependencies=[Depends(verify_api_key)])
+def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depends(get_db)):
+    """Re-queue shared-inbox emails that failed alias routing but WOULD route now.
+
+    Emails already in `processed_emails` are never looked at again by the poller,
+    so mail that went unrouted under the old header-priority bug stays stuck even
+    after the fix. This re-checks each unrouted row against the current routing
+    logic and, for the ones that now resolve to a real talent alias, deletes the
+    marker row so the next poll cycle triages them normally.
+
+    Defaults to a DRY RUN — pass ?apply=true to actually delete the marker rows.
+    Rows that still resolve to nothing (mail genuinely addressed only to the
+    shared inbox) are left exactly as they are.
+    """
+    from backend.services import gmail as gmail_svc
+    from backend.services.inbox_routing import shared_inbox_email
+    from backend.services.poller import _build_alias_map, _resolve_talent_from_to
+
+    settings = get_settings()
+    inbox = shared_inbox_email(settings)
+    token = db.query(TalentToken).filter(TalentToken.email == inbox).first()
+    if not token:
+        return {"error": f"no token row for shared inbox {inbox}"}
+
+    alias_map = _build_alias_map(settings)
+    service = gmail_svc.build_service(token, db)
+    rows = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.triage_reason.like("No alias match%"))
+        .order_by(ProcessedEmail.processed_at.desc())
+        .limit(max(1, min(limit, 2000)))
+        .all()
+    )
+
+    routable, still_unroutable, errors = [], 0, 0
+    for row in rows:
+        try:
+            detail = gmail_svc.get_message_detail(token, row.gmail_message_id, db=db, service=service)
+            if not detail:
+                errors += 1
+                continue
+            addr = gmail_svc.get_to_address(detail, alias_map)
+            talent_key = _resolve_talent_from_to(addr, alias_map)
+            if talent_key:
+                routable.append({"id": row.id, "message_id": row.gmail_message_id,
+                                 "alias": addr, "talent": talent_key})
+            else:
+                still_unroutable += 1
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("reroute-unrouted check failed for %s: %s", row.gmail_message_id, exc)
+            errors += 1
+
+    deleted = 0
+    if apply and routable:
+        deleted = (
+            db.query(ProcessedEmail)
+            .filter(ProcessedEmail.id.in_([r["id"] for r in routable]))
+            .delete(synchronize_session=False)
+        )
+        db.commit()
+        logger.info("reroute-unrouted: cleared %d marker rows for re-triage", deleted)
+
+    by_talent: dict[str, int] = {}
+    for r in routable:
+        by_talent[r["talent"]] = by_talent.get(r["talent"], 0) + 1
+
+    return {
+        "dry_run": not apply,
+        "examined": len(rows),
+        "now_routable": len(routable),
+        "by_talent": by_talent,
+        "still_unroutable": still_unroutable,
+        "errors": errors,
+        "marker_rows_deleted": deleted,
+        "sample": routable[:10],
+    }
