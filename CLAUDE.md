@@ -225,6 +225,21 @@ Real production incidents, kept so the next agent doesn't re-derive (or repeat) 
 
 **Also visible in the same logs, not fixed here:** `Sheets log failed ... invalid_grant` (dead `GOOGLE_SHEETS_REFRESH_TOKEN`, known) and 74 pending drafts holding stale send claims from workers killed mid-flight — per existing design those need a human to check the Gmail thread before clearing, never an automated sweep.
 
+
+### 2026-08-30 — Shared inbox stopped routing: alias hidden in Delivered-To/Bcc, `To` trusted instead
+
+**What broke:** every email into the consolidated inbox (`talent-mgmt@taboost.me`) failed alias routing and was left for human review under Rule 12 Option B. In one 20-minute window: **220 unrouted, 1 drafted**. 15 of 20 talents receive mail through that inbox, so effectively no brand deals were being drafted. Nothing errored — `errors: 0` every cycle — because "leave it in the inbox" is a legitimate outcome, so the dashboard and `/health` looked perfectly healthy.
+
+**Root cause:** `gmail.py::get_to_address()` checked headers in the order `x-original-to, envelope-to, to, delivered-to` and took only the **first regex match per header**. Real brand mail does not look the way that assumed: brands **BCC the talent alias** and put their own address in `To:`, so the alias exists only in `Delivered-To` / `Bcc`. The function returned the sender's own gmail/foxmail/qq address, that matched no alias, and the email went unrouted. Blast emails with many recipients failed the same way — an alias sitting second in a header was never looked at.
+
+**Fix:** `get_to_address(detail, alias_map)` now takes the routing table and returns the first address, across **every** address in `x-original-to → envelope-to → delivered-to → to → cc → bcc`, that IS a known alias. Delivery headers now precede display headers, because the delivery path is what actually names the mailbox. Without an alias map it keeps the old first-non-inbox behaviour (used only for logging what an unroutable message was addressed to). Mail genuinely addressed only to `talent-mgmt@` still resolves to `None` — that is correct, not a miss. Tests in `backend/tests/test_alias_routing.py` are built from real production headers.
+
+**Diagnosing it needed a new tool:** the logs carried only `to_address=None`, which cannot distinguish "no alias exists" from "alias present but not read." `GET /api/dashboard/debug/routing-headers` (API-key protected, read-only, addressing headers only) dumps the raw routing headers of recent unrouted mail. Reach for it before theorising about any future routing failure. Note `render ssh` was blocked in that session, so a deployed diagnostic endpoint was the only way to see live headers — that pattern is worth repeating.
+
+**Stuck backlog needed a second step:** the poller never re-examines a message already in `processed_emails`, so mail unrouted under the bug stays stuck after the fix. `POST /api/dashboard/admin/reroute-unrouted` re-checks each unrouted row against current routing logic and deletes the marker row **only** for those that now resolve to a real talent (dry run by default; `?apply=true` to execute). Applied once: 55 examined, 14 re-queued (Allee 5, Angela 2, Alana 2, Wesley 2, Stephanie 1, BKuhl 1, Hana 1), 41 correctly left alone. Verified live afterwards — `drafted: 4` then `drafted: 2` on the next cycles, and an auto-send fired for Hana.
+
+**Also confirmed this session:** `manager-email-automation` has **autoDeploy off** (`autoDeployTrigger: "off"`). Pushing to `main` deploys nothing — every fix in this entry needed `render deploys create <srv> --commit <sha> --wait`. A "pushed" fix is not a live fix on this service.
+
 ---
 
 ## Session End Protocol
