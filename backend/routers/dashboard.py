@@ -3019,3 +3019,60 @@ def recover_no_draft_emails(
         "window": {"since": since, "until": until},
         "message": "Recovery running in background — check Render logs for RESTORED lines and final count",
     }
+
+
+@router.get("/debug/routing-headers", dependencies=[Depends(verify_api_key)])
+def debug_routing_headers(limit: int = 3, db: Session = Depends(get_db)):
+    """Return the raw routing headers of recently *unrouted* shared-inbox emails.
+
+    Diagnostic only — no bodies, no PII beyond the addressing headers themselves.
+    Exists because `to_address=None` alias-routing failures cannot be diagnosed
+    from logs alone: we need to see which headers Gmail actually delivered.
+    """
+    from backend.services import gmail as gmail_svc
+    from backend.services.inbox_routing import shared_inbox_email
+    from backend.services.poller import _build_alias_map, _resolve_talent_from_to
+
+    settings = get_settings()
+    inbox = shared_inbox_email(settings)
+    token = db.query(TalentToken).filter(TalentToken.email == inbox).first()
+    if not token:
+        return {"error": f"no token row for shared inbox {inbox}"}
+
+    rows = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.triage_reason.like("No alias match%"))
+        .order_by(ProcessedEmail.processed_at.desc())
+        .limit(max(1, min(limit, 10)))
+        .all()
+    )
+    alias_map = _build_alias_map(settings)
+    service = gmail_svc.build_service(token, db)
+
+    out = []
+    for row in rows:
+        detail = gmail_svc.get_message_detail(token, row.gmail_message_id, db=db, service=service)
+        headers = detail.get("headers") or {}
+        interesting = {
+            k: v[:300]
+            for k, v in headers.items()
+            if k in {
+                "x-original-to", "envelope-to", "to", "delivered-to", "cc", "bcc",
+                "x-forwarded-to", "x-gm-original-to", "x-envelope-to", "reply-to", "from",
+            }
+        }
+        out.append({
+            "message_id": row.gmail_message_id,
+            "processed_at": row.processed_at.isoformat() if row.processed_at else None,
+            "resolved_to_address": gmail_svc.get_to_address(detail),
+            "routing_headers": interesting,
+            "all_header_keys": sorted(headers.keys()),
+            "received_headers": [v[:300] for k, v in headers.items() if k == "received"],
+        })
+
+    return {
+        "shared_inbox": inbox,
+        "alias_map_size": len(alias_map),
+        "alias_map_sample": sorted(alias_map.keys())[:5],
+        "unrouted_samples": out,
+    }
