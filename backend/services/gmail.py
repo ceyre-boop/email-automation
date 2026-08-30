@@ -60,35 +60,59 @@ def _safe_address(addr_str: str) -> str:
     return formataddr((name, addr)) if name else addr
 
 
-def get_to_address(message_detail: dict) -> str | None:
-    """Extract the original recipient alias from a parsed message detail dict.
+def get_to_address(message_detail: dict, alias_map: dict[str, str] | None = None) -> str | None:
+    """Extract the talent alias this message was actually addressed to.
 
-    SOP v16 Rule 12: talent identity is determined from the original recipient
-    address (the alias the brand emailed), NOT from which Gmail account received it.
+    SOP v16 Rule 12: talent identity comes from the original recipient address
+    (the alias the brand emailed), NOT from which Gmail account received it.
 
-    Google Workspace alias forwarding puts the DELIVERY mailbox (talent-mgmt@taboost.me)
-    in Delivered-To and the ORIGINAL alias in X-Original-To. So we check X-Original-To
-    first, then fall back through the remaining headers. We also skip the consolidated
-    inbox address itself — it is never a valid alias.
+    When ``alias_map`` is supplied (the routing table from settings.json) the
+    headers are scanned for the first address that IS a known alias. That match
+    is what routing needs, and it is the only reliable strategy in practice:
 
-    Checks headers in priority order:
-      1. X-Original-To  — set by MTA before aliasing; carries the alias
-      2. Envelope-To    — SMTP envelope recipient
-      3. To             — visible To: header
-      4. Delivered-To   — last resort (carries delivery mailbox in Workspace forwarding)
+      * Brands BCC the alias and put their own address in ``To`` — the alias then
+        appears ONLY in ``Delivered-To`` / ``Bcc``. Trusting ``To`` here yields
+        the sender's own address and the mail goes unrouted.
+      * Blast emails carry many addresses in one header, so only checking the
+        first match in a header misses an alias sitting later in the list.
 
-    Returns the first non-inbox address found, lowercased, or None.
+    Header priority: X-Original-To, Envelope-To, Delivered-To, To, Cc, Bcc —
+    delivery headers before display headers, because the delivery path is what
+    actually names the mailbox.
+
+    Without ``alias_map`` (or when nothing matches) it falls back to the first
+    address that is not the consolidated inbox itself, which is only useful for
+    logging what an unroutable message was addressed to.
+
+    Returns a lowercased address, or None.
     """
     _INBOX_ADDR = "talent-mgmt@taboost.me"
     headers = message_detail.get("headers") or {}
-    for key in ("x-original-to", "envelope-to", "to", "delivered-to"):
-        raw = headers.get(key, "")
-        if raw:
-            match = re.search(r"[\w.\-+]+@[\w.\-]+", raw)
-            if match:
-                addr = match.group(0).lower()
-                if addr != _INBOX_ADDR:
+    header_order = (
+        "x-original-to", "envelope-to", "delivered-to", "to", "cc", "bcc",
+        "x-forwarded-to", "x-gm-original-to",
+    )
+
+    if alias_map:
+        known = {a.lower().strip() for a in alias_map}
+        for key in header_order:
+            raw = headers.get(key, "")
+            if not raw:
+                continue
+            for addr in re.findall(r"[\w.\-+]+@[\w.\-]+", raw):
+                addr = addr.lower()
+                if addr in known:
                     return addr
+
+    # Fallback: first non-inbox address, for logging an unroutable message.
+    for key in header_order:
+        raw = headers.get(key, "")
+        if not raw:
+            continue
+        for addr in re.findall(r"[\w.\-+]+@[\w.\-]+", raw):
+            addr = addr.lower()
+            if addr != _INBOX_ADDR:
+                return addr
     return None
 
 

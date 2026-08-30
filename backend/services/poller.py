@@ -377,7 +377,7 @@ def _process_shared_inbox_message(
             return {"summary": {"errors": 1}}
 
         # SOP v16 Rule 12 — resolve talent from original recipient header
-        to_address = gmail_svc.get_to_address(detail)
+        to_address = gmail_svc.get_to_address(detail, alias_map)
         talent_key = _resolve_talent_from_to(to_address, alias_map)
 
         if talent_key is None:
