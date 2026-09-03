@@ -38,7 +38,8 @@ _DEPLOY_TIME = _dt.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 _SOP_PATH = _Path(__file__).parent.parent.parent / "sheets" / "sop.md"
 
-def _compute_startup_sop_stats():
+def _compute_sop_stats_from_disk():
+    """Parse whatever sop.md currently holds. Returns (hash, count, warnings, ts)."""
     from backend.services.sop_parser import parse_sop_md, validate_profiles
     if not _SOP_PATH.exists():
         return "MISSING", 0, ["sop.md file not found"], _dt.utcnow().isoformat()
@@ -46,22 +47,76 @@ def _compute_startup_sop_stats():
     sop_hash = hashlib.sha256(text).hexdigest()[:12]
     profiles = parse_sop_md(text.decode())
     warnings = validate_profiles(profiles)
-    parse_ts = _dt.utcnow().isoformat()
-    return sop_hash, len(profiles), warnings, parse_ts
+    return sop_hash, len(profiles), warnings, _dt.utcnow().isoformat()
 
-_SOP_HASH, _TALENT_COUNT, _PROFILE_WARNINGS, _PARSE_TIMESTAMP = _compute_startup_sop_stats()
-_ANY_WARNINGS = len(_PROFILE_WARNINGS) > 0
+
+# Cache keyed on the file's (mtime, size) so /health stays cheap under cron polling
+# but still re-parses the moment sop.md changes underneath us.
+_sop_stats_cache: tuple | None = None
+_sop_stats_key: tuple | None = None
+
+
+def _sop_stats():
+    """Stats for the sop.md that is ACTUALLY live right now.
+
+    Deliberately NOT computed at import time. main.py's startup handler restores
+    the active SOP version from the database over sheets/sop.md *after* this
+    module is imported, so an import-time hash reports the git-repo seed file
+    rather than what the app is really drafting from — which is exactly how a
+    stale repo copy once looked like the live SOP on /health.
+    """
+    global _sop_stats_cache, _sop_stats_key
+    try:
+        st = _SOP_PATH.stat()
+        key = (st.st_mtime_ns, st.st_size)
+    except OSError:
+        key = None
+    if _sop_stats_cache is None or key != _sop_stats_key:
+        _sop_stats_cache = _compute_sop_stats_from_disk()
+        _sop_stats_key = key
+    return _sop_stats_cache
+
+
+def _active_sop_version() -> dict:
+    """Identify the active SOP row in the DB. Never raises — /health must not 500."""
+    try:
+        from backend.models.db import SopVersion, get_session_factory
+        db = get_session_factory()()
+        try:
+            row = (
+                db.query(SopVersion)
+                .filter(SopVersion.doc_type == "sop", SopVersion.is_active.is_(True))
+                .order_by(SopVersion.uploaded_at.desc())
+                .first()
+            )
+            if not row:
+                return {"sop_version_id": None, "sop_version_label": None,
+                        "sop_version_uploaded_at": None}
+            return {
+                "sop_version_id": row.id,
+                "sop_version_label": row.label,
+                "sop_version_uploaded_at": row.uploaded_at.isoformat() if row.uploaded_at else None,
+            }
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not read active SOP version for /health: %s", exc)
+        return {"sop_version_id": None, "sop_version_label": None,
+                "sop_version_uploaded_at": None, "sop_version_error": str(exc)[:200]}
+
 
 @router.get("/health")
 def health():
+    sop_hash, talent_count, warnings, parse_ts = _sop_stats()
     return {
         "status": "ok",
         "deployed_at": _DEPLOY_TIME,
-        "sop_hash": _SOP_HASH,
-        "talent_count": _TALENT_COUNT,
-        "talent_warnings": len(_PROFILE_WARNINGS),
-        "any_warnings": _ANY_WARNINGS,
-        "last_parse_timestamp": _PARSE_TIMESTAMP,
+        "sop_hash": sop_hash,
+        "talent_count": talent_count,
+        "talent_warnings": len(warnings),
+        "any_warnings": len(warnings) > 0,
+        "last_parse_timestamp": parse_ts,
+        **_active_sop_version(),
     }
 
 
