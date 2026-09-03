@@ -604,6 +604,20 @@ def create_tables():
         "ALTER TABLE inbox_emails ALTER COLUMN subject TYPE TEXT",
         "ALTER TABLE inbox_emails ALTER COLUMN snippet TYPE TEXT",
         "ALTER TABLE inbox_emails ALTER COLUMN label_ids TYPE TEXT",
+        # Performance: auto_send runs its eligibility query once per talent per
+        # minute. talent_key is filtered with ILIKE, which cannot use the plain
+        # btree index, so the query seq-scanned all ~33k drafts every time and
+        # eventually tripped Postgres' statement timeout — drafting stalled for
+        # three hours on 2026-09-03 with QueryCanceled errors. This partial index
+        # covers exactly the pending/undismissed/unedited slice the job reads.
+        """CREATE INDEX IF NOT EXISTS idx_drafts_pending_eligible
+           ON drafts (created_at)
+           WHERE status = 'pending' AND dismissed = false AND human_edited = false""",
+        # Trigram indexes so the many ILIKE talent_key filters across the
+        # dashboard and poller can use an index instead of a full scan.
+        "CREATE EXTENSION IF NOT EXISTS pg_trgm",
+        "CREATE INDEX IF NOT EXISTS idx_drafts_talent_key_trgm ON drafts USING gin (talent_key gin_trgm_ops)",
+        "CREATE INDEX IF NOT EXISTS idx_processed_emails_talent_key_trgm ON processed_emails USING gin (talent_key gin_trgm_ops)",
     ]
     settings = get_settings()
     mig_url = settings.database_url.replace("postgres://", "postgresql://", 1)
