@@ -43,3 +43,14 @@ def test_active_sop_version_never_raises(monkeypatch):
     out = cron._active_sop_version()
     assert out["sop_version_id"] is None
     assert "sop_version_error" in out
+
+
+def test_active_sop_version_uses_real_model_field_names():
+    """Guards against silently returning sop_version_error for a typo'd column.
+
+    The first cut read `row.label`; the model field is `version_label`, so
+    /health degraded to nulls in production while still returning 200.
+    """
+    from backend.models.db import SopVersion
+    for field in ("id", "version_label", "uploaded_at", "is_active", "doc_type"):
+        assert hasattr(SopVersion, field), f"SopVersion.{field} missing"

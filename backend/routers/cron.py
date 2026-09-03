@@ -94,7 +94,7 @@ def _active_sop_version() -> dict:
                         "sop_version_uploaded_at": None}
             return {
                 "sop_version_id": row.id,
-                "sop_version_label": row.label,
+                "sop_version_label": row.version_label,
                 "sop_version_uploaded_at": row.uploaded_at.isoformat() if row.uploaded_at else None,
             }
         finally:
