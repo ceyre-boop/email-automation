@@ -142,30 +142,14 @@ def _apply_special_routing(
 # ── OpenAI retry helper ───────────────────────────────────────────────────────
 
 def _call_openai_with_retry(client: OpenAI, talent_key: str, **kwargs):
+    """Backwards-compatible shim — the policy now lives in openai_client.
+
+    Kept so existing call sites and any external callers keep working; it adds
+    timeout handling and 5xx/connection retries that this local version never
+    had (it only ever retried 429).
     """
-    Call client.chat.completions.create with retry for per-minute rate limits.
-    Daily cap (RPD) errors are NOT retried — they won't clear until midnight.
-    RPM errors get up to 3 attempts with short backoff (5s, 10s, 20s).
-    """
-    last_exc: Exception | None = None
-    for attempt in range(3):
-        try:
-            return client.chat.completions.create(**kwargs)
-        except Exception as exc:  # noqa: BLE001
-            err_str = str(exc)
-            is_rate_limit = "429" in err_str or "rate_limit_exceeded" in err_str
-            is_daily_cap = "requests per day" in err_str.lower() or "RPD" in err_str
-            if is_rate_limit and not is_daily_cap:
-                wait = 5 * (2 ** attempt)  # 5s, 10s, 20s
-                logger.warning(
-                    "RPM rate limit for %s (attempt %d/3) — retrying in %ds",
-                    talent_key, attempt + 1, wait,
-                )
-                time.sleep(wait)
-                last_exc = exc
-                continue
-            raise  # daily cap or non-rate-limit error — propagate immediately
-    raise last_exc  # type: ignore[misc]
+    from backend.services.openai_client import call_with_retry
+    return call_with_retry(client, talent_key, **kwargs)
 
 
 # ── Main triage call ──────────────────────────────────────────────────────────
@@ -307,7 +291,14 @@ def triage_email(
         rate_note=rate_note,
     )
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    from backend.services.openai_client import DEFAULT_TIMEOUT_SECONDS
+    client = OpenAI(
+        api_key=settings.openai_api_key,
+        # Hard per-request bound: an untimed call blocks a poller worker (holding
+        # a DB session) indefinitely while the scheduler logs success anyway.
+        timeout=cfg.get("openai_timeout_seconds", DEFAULT_TIMEOUT_SECONDS),
+        max_retries=0,  # call_with_retry is the only retry layer
+    )
     model = cfg.get("triage_model", "gpt-4o-mini")
     max_tok = cfg.get("max_tokens_triage", 400)
     try:

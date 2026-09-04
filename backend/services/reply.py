@@ -495,7 +495,12 @@ def draft_reply(
             "cc_recipients": cc,
         }
 
-    client = OpenAI(api_key=settings.openai_api_key)
+    from backend.services.openai_client import DEFAULT_TIMEOUT_SECONDS, call_with_retry
+    client = OpenAI(
+        api_key=settings.openai_api_key,
+        timeout=cfg.get("openai_timeout_seconds", DEFAULT_TIMEOUT_SECONDS),
+        max_retries=0,  # call_with_retry is the only retry layer
+    )
 
     messages = _build_reply_messages(
         talent_key=talent_key,
@@ -513,7 +518,13 @@ def draft_reply(
     )
 
     try:
-        response = client.chat.completions.create(
+        # Retries transient 429/5xx/timeouts. Without this a single blip escalated
+        # a real brand deal to human review — silent revenue loss, invisible in
+        # every metric (see backend/services/openai_client.py).
+        response = call_with_retry(
+            client,
+            talent_key,
+            max_attempts=cfg.get("openai_max_attempts"),
             model=cfg.get("reply_model", "gpt-4o"),
             messages=messages,
             max_tokens=cfg.get("max_tokens_reply", 800),
@@ -521,7 +532,7 @@ def draft_reply(
         )
         text = response.choices[0].message.content.strip()
     except Exception as exc:  # noqa: BLE001
-        logger.error("Reply API error for %s: %s", talent_key, exc)
+        logger.error("Reply API error for %s after retries: %s", talent_key, exc)
         return _escalate_result(f"OpenAI API error: {exc}")
 
     # Strip any residual meta-instruction prefix GPT may have included despite instructions.

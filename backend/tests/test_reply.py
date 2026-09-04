@@ -224,12 +224,18 @@ def test_draft_reply_api_error_escalates(mock_openai_cls):
     mock_openai_cls.return_value = mock_client
     mock_client.chat.completions.create.side_effect = Exception("Network timeout")
 
-    result = draft_reply(
-        talent_key="Sylvia", talent_name="Sylvia", minimum_rate=1000,
-        subject="Subj", sender="a@b.com",
-        offer_type="Sponsored Post", brand_name="Nike",
-        proposed_rate=1000.0, triage_reason="reason",
-    )
+    # reply.py had no retry at all before 2026-09-04: one transient blip escalated
+    # a real brand deal straight to human review. It now exhausts its attempts
+    # first, and only then escalates. sleep is patched to skip the real backoff.
+    with patch("backend.services.openai_client.time.sleep"):
+        result = draft_reply(
+            talent_key="Sylvia", talent_name="Sylvia", minimum_rate=1000,
+            subject="Subj", sender="a@b.com",
+            offer_type="Sponsored Post", brand_name="Nike",
+            proposed_rate=1000.0, triage_reason="reason",
+        )
+
+    assert mock_client.chat.completions.create.call_count == 3
     assert result["is_escalate"] is True
     assert "OpenAI API error" in result["escalate_reason"]
 

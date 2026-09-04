@@ -232,8 +232,13 @@ def test_triage_email_api_error_falls_back(mock_openai_cls):
     mock_openai_cls.return_value = mock_client
     mock_client.chat.completions.create.side_effect = Exception("API timeout")
 
-    result = triage_email("Sylvia", "Sylvia", 1000, "Subj", "a@b.com", "b.com", "body")
+    # A timeout is transient, so it is retried before the fallback. sleep is
+    # patched so the suite does not actually wait out the 5s + 10s backoff.
+    with patch("backend.services.openai_client.time.sleep"):
+        result = triage_email("Sylvia", "Sylvia", 1000, "Subj", "a@b.com", "b.com", "body")
+
     assert result["score"] == 2
+    assert mock_client.chat.completions.create.call_count == 3
 
 
 @patch("backend.services.triage.OpenAI")

@@ -165,5 +165,8 @@
     "lease_minutes": 15,
     "batch_size": 25
   },
-  "_auto_send_hold_minutes_comment": "Minutes a draft must sit untouched before auto_send may send it — the window managers have to catch a bad draft. Lowered 60 -> 30 on 2026-09-04 at TABOOST's direction to halve brand response time. Not an SOP value: the Automated Send Workflow defines the send gate and Reply-To handling but specifies no hold period, so this is a tunable, not a compliance rule."
+  "_auto_send_hold_minutes_comment": "Minutes a draft must sit untouched before auto_send may send it — the window managers have to catch a bad draft. Lowered 60 -> 30 on 2026-09-04 at TABOOST's direction to halve brand response time. Not an SOP value: the Automated Send Workflow defines the send gate and Reply-To handling but specifies no hold period, so this is a tunable, not a compliance rule.",
+  "openai_timeout_seconds": 45,
+  "openai_max_attempts": 3,
+  "_openai_reliability_comment": "Hard per-request timeout and retry budget for triage and reply. Before 2026-09-04 neither call had a timeout (a hung request stalled a whole poll cycle while the scheduler still logged success) and reply had no retry at all (one transient 429 escalated a real deal to human review). SDK-level retries are disabled so these attempts are not multiplied."
 }
