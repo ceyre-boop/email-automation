@@ -312,14 +312,6 @@ Use Reply-To: talent-mgmt@taboost.me for the following talent inboxes:
 - Hana / hana@taboost.me
 - Wesley / wesley@taboost.me
 
-Use Reply-To: creator-mgmt@taboost.me for the following talent inboxes:
-
-- Mahogany / mahogany@taboost.me
-- Anastasiya / anastasiya@taboost.me
-- Jenn / jenn@taboost.me
-- Grayson / grayson@taboost.me
-- BKuhl / bkuhl@taboost.me
-
 Use Reply-To: partnerships@taboost.me for the following talent inboxes:
 
 - Katrina / katrina@taboost.me
@@ -361,12 +353,15 @@ Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-Thanks for reaching out about working with Anastasiya!
+Thank you so much for reaching out about a potential partnership with Anastasiya!! I’m happy to share her rates below:
+     **1 TikTok** [anastasiya_ray](https://www.tiktok.com/@anastasiya_ray) - $800
+     **1 TikTok (2nd)** [theraysfinds](https://www.tiktok.com/@theraysfinds) - $800
+     **1 Instagram** [Reel](https://www.instagram.com/ugcbyanastasiya/) - $750
+     **1 UGC Video** [Portfolio](https://ugcbyanastasiya.com/) - $1,000 (usage to be negotiated)
 
-You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to explore additional talent.
+Anastasiya's pricing reflects her high-quality, **polished** content with a bestie beauty vibe that feels authentic, relatable, and **brand-elevating**!! Plus she's a UGC expert so she knows how to make videos that convert!!
 
-Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
-Looking forward to hearing your thoughts!
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
 Scenario C: Personal Email Forward
 Personal Emails:
 

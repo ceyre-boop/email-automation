@@ -39,26 +39,28 @@ def _sop_part3_groups() -> dict[str, list[str]]:
     return groups
 
 
-# creator-mgmt@taboost.me is still listed in sop.md Part 3 but the mailbox has
-# been RETIRED, so it is deliberately not mirrored into settings.json. Pointing
-# Reply-To at a dead address would drop brand replies entirely — strictly worse
-# than the no-Reply-To behaviour those five talents already have. This is a known,
-# documented deviation pending an SOP correction by an owner.
+# The creator-mgmt@taboost.me mailbox was retired. Its five talents are
+# deliberately listed in NO Part 3 group, which per Part 3's closing line means
+# blank/default Reply-To — the behaviour they already had. Adding a group back
+# for a dead mailbox would drop brand replies entirely.
 RETIRED_GROUPS = {"creator-mgmt@taboost.me"}
+NO_REPLY_TO_BY_DESIGN = {
+    "mahogany@taboost.me", "anastasiya@taboost.me", "jenn@taboost.me",
+    "grayson@taboost.me", "bkuhl@taboost.me",
+}
 
 
-def test_config_mirrors_sop_part3_except_retired_groups():
-    """Drift between settings.json and Part 3 is an SOP violation unless it is a
-    retired mailbox recorded in RETIRED_GROUPS above."""
-    sop = {addr: sorted(m) for addr, m in _sop_part3_groups().items()
-           if addr not in RETIRED_GROUPS}
+def test_config_mirrors_sop_part3_exactly():
+    """settings.json is a mirror of Part 3 — any drift is an SOP violation."""
+    sop = {addr: sorted(m) for addr, m in _sop_part3_groups().items()}
     cfg = {addr: sorted(m) for addr, m in reply_to_groups().items()}
     assert cfg == sop
 
 
-def test_retired_group_is_not_configured():
-    """Guards against someone 'fixing' the SOP mismatch by adding a dead mailbox back."""
+def test_retired_group_appears_in_neither_sop_nor_config():
+    """Guards against a dead mailbox being reintroduced to either file."""
     assert not (set(reply_to_groups()) & RETIRED_GROUPS)
+    assert not (set(_sop_part3_groups()) & RETIRED_GROUPS)
 
 
 def test_live_groups_are_present():
@@ -113,11 +115,12 @@ def test_unlisted_talent_gets_no_reply_to():
     assert reply_to_for_talent(None, token_row=Token()) is None
 
 
-def test_every_alias_map_talent_is_accounted_for_in_sop_part3():
-    """Every shared-inbox talent must appear somewhere in Part 3 — including the
-    retired group. An alias in neither is invisible: no Reply-To, no error, and
-    nobody finds out until a deal is lost."""
+def test_every_alias_map_talent_is_either_routed_or_knowingly_blank():
+    """A shared-inbox talent in no Part 3 group gets no Reply-To. That is correct
+    for the five ex-creator-mgmt talents and a silent bug for anyone else — no
+    error, no log line, and nobody finds out until a deal is lost. New aliases
+    must be added to Part 3 or to NO_REPLY_TO_BY_DESIGN with a reason."""
     alias_map = (get_settings().app_config.get("single_inbox") or {}).get("alias_map") or {}
-    listed = set().union(*_sop_part3_groups().values())
+    listed = set().union(*_sop_part3_groups().values()) | NO_REPLY_TO_BY_DESIGN
     missing = sorted(a for a in alias_map if a.lower() not in listed)
-    assert not missing, f"aliases in alias_map but not in sop.md Part 3: {missing}"
+    assert not missing, f"aliases neither in sop.md Part 3 nor knowingly blank: {missing}"
