@@ -335,6 +335,25 @@ def _run_backlog_blaster():
     _run_draft_queue(batch_size=300)
 
 
+def _run_claim_reaper():
+    """Resolve expired send claims against Gmail — runs every 5 minutes.
+
+    Does not blindly clear claims: a worker may have died after Gmail accepted
+    the send, so it asks Gmail what happened and only acts when the answer is
+    unambiguous. See backend/services/claim_reaper.py.
+    """
+    from backend.models.db import get_session_factory
+    from backend.services.claim_reaper import reap_stale_claims
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        reap_stale_claims(db)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Claim reaper job failed: %s", exc)
+    finally:
+        db.close()
+
+
 def _run_stall_alarm():
     """Pipeline stall watchdog — runs every 5 minutes.
 

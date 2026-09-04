@@ -158,5 +158,11 @@
     "stall_minutes": 30,
     "cooldown_minutes": 60,
     "alert_email": "colineyre222@gmail.com"
+  },
+  "claim_reaper": {
+    "_comment": "Resolves expired auto_send claims by asking Gmail what actually happened, rather than clearing them blindly — a worker can die AFTER Gmail accepts a send, and a blind retry would send a brand a duplicate reply. Only two outcomes are actioned: Gmail draft still exists (nothing sent -> release the claim) or the thread carries a SENT message (it did send -> record it). Anything else is left for a human.",
+    "enabled": true,
+    "lease_minutes": 15,
+    "batch_size": 25
   }
 }

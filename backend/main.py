@@ -517,7 +517,7 @@ def on_startup():
     try:
         from datetime import datetime, timedelta
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send, _run_poll_health_retention, _run_stall_alarm
+        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send, _run_poll_health_retention, _run_stall_alarm, _run_claim_reaper
         _scheduler = BackgroundScheduler(daemon=True)
         now = datetime.now()
         _scheduler.add_job(_run_poll, "interval", seconds=45, jitter=10,
@@ -550,6 +550,9 @@ def on_startup():
         _scheduler.add_job(_run_stall_alarm, "interval", minutes=5, jitter=20,
             next_run_time=now + timedelta(minutes=6),  # let the first poll cycle land first
             id="stall_alarm", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_claim_reaper, "interval", minutes=5, jitter=20,
+            next_run_time=now + timedelta(minutes=8),
+            id="claim_reaper", replace_existing=True, max_instances=1)
         _scheduler.start()
         logger.info("Scheduler started — poll +5s/45s±10, draft queue +90s/20s±5, backlog blaster +120s/30s±7, guardian +35s/60s±15, auto_send +47s/60s±10, reconcile +90s/5min±30, token refresh +3min/10min±60, inbox reconcile +15min/1hr, poll_health retention +20min/1hr.")
     except Exception:
