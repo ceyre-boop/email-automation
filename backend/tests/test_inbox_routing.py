@@ -54,16 +54,21 @@ def test_partnerships_inboxes_get_reply_to(inbox):
 
 
 @pytest.mark.parametrize("inbox", [
-    SHARED,                    # the consolidated mailbox itself
-    "allee@taboost.me",        # polled via the shared inbox
-    "hana@taboost.me",
-    "skyler@taboost.me",
+    SHARED,                    # a group ADDRESS, never a member of a group
+    "skyler@taboost.me",       # genuinely absent from sop.md Part 3
     "brittanie@taboost.me",
     "someone@example.com",
     "",
     None,
 ])
-def test_non_partnerships_inboxes_get_no_reply_to(inbox):
+def test_inboxes_absent_from_sop_part3_get_no_reply_to(inbox):
+    """Part 3: "If a talent or inbox is not listed here, leave Reply-To blank/default."
+
+    allee@ and hana@ used to be asserted here as getting no Reply-To. That was
+    wrong — both are listed under the talent-mgmt@ group in sop.md Part 3, and
+    only two of Part 3's three groups had ever been mirrored into settings.json.
+    See test_reply_to_routing.py, which checks config against sop.md directly.
+    """
     from backend.services.inbox_routing import reply_to_for_inbox
 
     assert reply_to_for_inbox(inbox) is None

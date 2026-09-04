@@ -34,18 +34,20 @@ class GmailDraftError(Exception):
 logger = logging.getLogger(__name__)
 
 
-def _reply_to_header(token_row) -> str | None:
-    """Return the Reply-To address for this token's mailbox, or None.
+def _reply_to_header(token_row, talent_key: str | None = None) -> str | None:
+    """Return the Reply-To address for this reply, or None.
 
-    SOP v16 Part 3 keeps Reply-To for the Partnerships talents only — they still
-    poll their own Gmail accounts, and their replies route to
-    partnerships@taboost.me. Talents polled from the consolidated inbox get no
-    Reply-To, which falls out naturally: the shared mailbox is in no group.
+    SOP v16 Part 3 defines three groups (talent-mgmt@, creator-mgmt@,
+    partnerships@) keyed on the TALENT INBOX — which, post-consolidation, is the
+    alias the brand emailed, not the mailbox that received it. Passing
+    ``talent_key`` is therefore required for correct routing; without it this
+    falls back to the token's own mailbox, which resolves only the Partnerships
+    talents and leaves everyone on the shared inbox with no Reply-To.
 
-    Matching is on the talent inbox (token_row.email), never the sender.
+    Matching is never on the sender. Header-only: never added to the body.
     """
-    from backend.services.inbox_routing import reply_to_for_token
-    return reply_to_for_token(token_row)
+    from backend.services.inbox_routing import reply_to_for_talent
+    return reply_to_for_talent(talent_key, token_row=token_row)
 
 
 def _safe_address(addr_str: str) -> str:
@@ -753,6 +755,7 @@ def create_gmail_draft(
     in_reply_to: str | None = None,
     cc: list[str] | None = None,
     service=None,
+    talent_key: str | None = None,
 ) -> str | None:
     """
     Save a draft reply in the talent's Gmail account, threaded correctly.
@@ -769,7 +772,7 @@ def create_gmail_draft(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
-    _rt = _reply_to_header(token_row)
+    _rt = _reply_to_header(token_row, talent_key)
     if _rt:
         mime_msg["Reply-To"] = _rt
     if in_reply_to:
@@ -813,6 +816,7 @@ def send_reply(
     db=None,
     in_reply_to: str | None = None,
     cc: list[str] | None = None,
+    talent_key: str | None = None,
 ) -> tuple[bool, str]:
     """
     Send a reply email as the talent.
@@ -827,7 +831,7 @@ def send_reply(
     if cc:
         mime_msg["Cc"] = ", ".join(_safe_address(a) for a in cc)
     mime_msg["Subject"] = subject if subject.startswith("Re:") else f"Re: {subject}"
-    _rt = _reply_to_header(token_row)
+    _rt = _reply_to_header(token_row, talent_key)
     if _rt:
         mime_msg["Reply-To"] = _rt
     if in_reply_to:

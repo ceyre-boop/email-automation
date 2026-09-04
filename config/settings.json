@@ -110,8 +110,19 @@
     "recovery_health_threshold": 0.7
   },
   "reply_to_routing": {
-    "_comment": "SOP v16 Part 3 — PARTNERSHIPS ONLY. Sets the Reply-To HEADER on drafts/replies, matched on the TALENT INBOX (token_row.email), never the sender. Header-only routing: never added to the email body, never mentioned in the draft, From address unchanged. The four talents below keep their own Gmail accounts and are polled per-token. Every talent polled from the consolidated inbox gets NO Reply-To. Keep in sync with sheets/sop.md Part 3.",
+    "_comment": "SOP v16 Part 3 — Reply-To Routing List. Sets the Reply-To HEADER on drafts/replies. Header-only routing: never added to the email body, never mentioned in the draft, From address unchanged. Matching is on the TALENT INBOX (the alias the brand emailed, per single_inbox.alias_map — NOT the receiving account, since 13 talents now share talent-mgmt@taboost.me), never on the sender. A talent in no group gets no Reply-To, per Part 3's closing line.",
+    "_deviation_from_sop": "sop.md Part 3 lists a third group, creator-mgmt@taboost.me, for Mahogany / Anastasiya / Jenn / Grayson / BKuhl. That mailbox has been retired, so the group is DELIBERATELY not mirrored here — pointing Reply-To at a dead address would send brand replies nowhere, which is worse than the no-Reply-To behaviour those five have had all along. They keep getting no Reply-To until sop.md Part 3 is corrected by an SOP owner. Do not add the group back without confirming the mailbox exists.",
     "groups": {
+      "talent-mgmt@taboost.me": [
+        "allee@taboost.me",
+        "lizz@taboost.me",
+        "angela@taboost.me",
+        "alana@taboost.me",
+        "stephanie@taboost.me",
+        "jocelyn@taboost.me",
+        "hana@taboost.me",
+        "wesley@taboost.me"
+      ],
       "partnerships@taboost.me": [
         "katrina@taboost.me",
         "kylika@taboost.me",
@@ -139,5 +150,12 @@
       "grayson@taboost.me": "Grayson",
       "bkuhl@taboost.me": "BKuhl"
     }
+  },
+  "stall_alarm": {
+    "_comment": "Pipeline stall watchdog. Alarms on the ABSENCE of expected work — the scheduler logs jobs as 'executed successfully' even when they throw, so error-based monitoring missed the 2026-09-03 and 2026-08-04 outages entirely.",
+    "enabled": true,
+    "stall_minutes": 30,
+    "cooldown_minutes": 60,
+    "alert_email": "colineyre222@gmail.com"
   }
 }

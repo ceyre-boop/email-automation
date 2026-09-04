@@ -81,6 +81,52 @@ def reply_to_for_inbox(inbox_email: str | None, settings=None) -> str | None:
     return None
 
 
+def talent_inbox_map(settings=None) -> dict[str, str]:
+    """Return {talent_key_lower: talent inbox address} from single_inbox.alias_map.
+
+    Since the v16 consolidation a talent's "inbox" is the ALIAS the brand emailed
+    (allee@taboost.me), not the mailbox that received it — 13 talents now share
+    talent-mgmt@taboost.me. sop.md Part 3 lists those aliases, so the alias map is
+    what Part 3's membership must be matched against.
+    """
+    if settings is None:
+        from backend.core.config import get_settings
+        settings = get_settings()
+    raw = (settings.app_config.get("single_inbox") or {}).get("alias_map") or {}
+    return {_norm(talent): _norm(alias) for alias, talent in raw.items()}
+
+
+def reply_to_for_talent(talent_key: str | None, token_row=None, settings=None) -> str | None:
+    """Return the Reply-To address for a talent, per sop.md Part 3.
+
+    Resolution order:
+      1. the talent's own alias (single_inbox.alias_map) — covers every talent
+         polled through the shared inbox, which is most of them;
+      2. the mailbox of the token being used — covers the Partnerships talents,
+         who still poll their own Gmail accounts.
+
+    A talent in no Part 3 group returns None: "If a talent or inbox is not listed
+    here, leave Reply-To blank/default."
+
+    Resolving on the token alone (the pre-fix behaviour) silently gave 13 talents
+    NO Reply-To, because their shared mailbox is in no group — including the five
+    creator-mgmt talents whose replies were therefore misrouted.
+    """
+    key = _norm(talent_key)
+    if key:
+        try:
+            alias = talent_inbox_map(settings).get(key)
+            if alias:
+                address = reply_to_for_inbox(alias, settings=settings)
+                if address:
+                    return address
+        except Exception as exc:  # noqa: BLE001 — routing must never break drafting
+            logger.warning("Reply-To talent lookup failed for %s: %s", talent_key, exc)
+    if token_row is not None:
+        return reply_to_for_inbox(getattr(token_row, "email", None), settings=settings)
+    return None
+
+
 def reply_to_for_token(token_row, settings=None) -> str | None:
     """Return the Reply-To address for the mailbox this token belongs to."""
     return reply_to_for_inbox(getattr(token_row, "email", None), settings=settings)

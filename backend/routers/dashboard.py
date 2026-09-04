@@ -1783,6 +1783,7 @@ def force_draft_email(
             db=db,
             in_reply_to=message_id_header,
             cc=cc_list,
+            talent_key=talent_key,
         )
         if not gmail_draft_id:
             raise HTTPException(
@@ -2551,6 +2552,7 @@ def repush_drafts(
                 cc=cc_list or None,
                 db=db,
                 in_reply_to=draft.message_id_header or None,
+                talent_key=draft.talent_key,
             )
             if gmail_draft_id:
                 draft.gmail_draft_id = gmail_draft_id

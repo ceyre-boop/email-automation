@@ -425,6 +425,7 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
                 db=db,
                 in_reply_to=None,
                 cc=cc_list,
+                talent_key=getattr(pe, "talent_key", None) or talent_key,
             )
         except gmail_svc.GmailDraftError as exc:
             raise HTTPException(
@@ -552,6 +553,7 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
             db=db,
             in_reply_to=getattr(draft, "message_id_header", None),
             cc=cc or None,
+            talent_key=draft.talent_key,
         )
     except TokenRefreshError:
         draft.send_claimed_at = None
@@ -661,6 +663,7 @@ def edit_draft(draft_id: int, body: EditBody, db: Session = Depends(get_db)):
                 body=body.draft_text,
                 db=db,
                 cc=parse_cc_recipients(draft.cc_recipients) or None,
+                talent_key=draft.talent_key,
             )
             draft.gmail_draft_id = new_gmail_draft_id
         except gmail_svc.GmailDraftError as exc:

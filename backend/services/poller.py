@@ -697,6 +697,7 @@ def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> in
                     db=db,
                     in_reply_to=message_id_header or None,
                     service=service,
+                    talent_key=talent_key,
                 )
             except gmail_svc.GmailDraftError as exc:
                 logger.warning(
@@ -1075,6 +1076,7 @@ def _process_one_message(
                     db=db,
                     in_reply_to=message_id_header or None,
                     service=service,
+                    talent_key=talent_key,
                 )
             except gmail_svc.GmailDraftError as exc:
                 # Gmail API failed — escalate so it routes to human review instead of

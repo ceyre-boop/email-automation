@@ -641,3 +641,75 @@ def test_create_draft_no_reply_to_header():
     raw = svc.users().drafts().create.call_args.kwargs["body"]["message"]["raw"]
     msg = _decode_raw(raw)
     assert msg["Reply-To"] is None, "Reply-To must not be set (SOP v16 — routing is by alias, not header)"
+
+
+# ── Reply-To header wiring (SOP v16 Part 3) ───────────────────────────────────
+
+
+def _shared_inbox_token():
+    token = MagicMock()
+    token.talent_key = "talentmgmt"
+    token.email = "talent-mgmt@taboost.me"
+    token.access_token = "fake-access"
+    token.refresh_token = "fake-refresh"
+    token.token_expiry = None
+    return token
+
+
+@patch("backend.services.gmail.refresh_if_needed")
+@patch("backend.services.gmail.credentials_from_token_row")
+@patch("backend.services.gmail.build")
+def test_draft_reply_to_follows_the_talent_not_the_receiving_mailbox(
+    mock_build, mock_creds, mock_refresh
+):
+    """Allee is polled through talent-mgmt@taboost.me, which is itself in no
+    group — so resolving from the token alone produced no Reply-To. Part 3 keys
+    on the talent's own alias, which is what the header must follow."""
+    from backend.services.gmail import create_gmail_draft
+
+    fake_svc = _mock_service()
+    mock_build.return_value = fake_svc
+    mock_creds.return_value = MagicMock(token="t", expiry=None)
+    mock_refresh.return_value = MagicMock(token="t", expiry=None)
+    fake_svc.users().drafts().create().execute.return_value = {"id": "d1"}
+
+    create_gmail_draft(
+        token_row=_shared_inbox_token(),
+        thread_id="t1",
+        reply_to="brand@example.com",
+        subject="Collab",
+        body="Rates below",
+        talent_key="Allee",
+    )
+
+    body_arg = fake_svc.users().drafts().create.call_args.kwargs["body"]
+    raw = _decode_raw(body_arg["message"]["raw"])
+    assert raw["Reply-To"] == "talent-mgmt@taboost.me"
+
+
+@patch("backend.services.gmail.refresh_if_needed")
+@patch("backend.services.gmail.credentials_from_token_row")
+@patch("backend.services.gmail.build")
+def test_draft_has_no_reply_to_for_a_talent_absent_from_part3(
+    mock_build, mock_creds, mock_refresh
+):
+    from backend.services.gmail import create_gmail_draft
+
+    fake_svc = _mock_service()
+    mock_build.return_value = fake_svc
+    mock_creds.return_value = MagicMock(token="t", expiry=None)
+    mock_refresh.return_value = MagicMock(token="t", expiry=None)
+    fake_svc.users().drafts().create().execute.return_value = {"id": "d2"}
+
+    create_gmail_draft(
+        token_row=_shared_inbox_token(),
+        thread_id="t1",
+        reply_to="brand@example.com",
+        subject="Collab",
+        body="Rates below",
+        talent_key="Skyler",
+    )
+
+    body_arg = fake_svc.users().drafts().create.call_args.kwargs["body"]
+    raw = _decode_raw(body_arg["message"]["raw"])
+    assert raw["Reply-To"] is None

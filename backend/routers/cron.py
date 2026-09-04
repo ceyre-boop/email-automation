@@ -105,6 +105,34 @@ def _active_sop_version() -> dict:
                 "sop_version_uploaded_at": None, "sop_version_error": str(exc)[:200]}
 
 
+_pipeline_cache: tuple | None = None  # (computed_at, payload)
+
+
+def _pipeline_block() -> dict:
+    """Pipeline liveness for /health, memoised for 60s.
+
+    /health is polled frequently; these are count queries over the two largest
+    tables, so the result is cached rather than recomputed on every hit.
+    """
+    global _pipeline_cache
+    now = _dt.utcnow()
+    if _pipeline_cache and (now - _pipeline_cache[0]).total_seconds() < 60:
+        return _pipeline_cache[1]
+    try:
+        from backend.models.db import get_session_factory
+        from backend.services.stall_alarm import check_pipeline_stall
+        db = get_session_factory()()
+        try:
+            payload = check_pipeline_stall(db)
+        finally:
+            db.close()
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not compute pipeline block for /health: %s", exc)
+        payload = {"stalled": None, "reason": None, "error": str(exc)[:200]}
+    _pipeline_cache = (now, payload)
+    return payload
+
+
 @router.get("/health")
 def health():
     sop_hash, talent_count, warnings, parse_ts = _sop_stats()
@@ -117,6 +145,7 @@ def health():
         "any_warnings": len(warnings) > 0,
         "last_parse_timestamp": parse_ts,
         **_active_sop_version(),
+        "pipeline": _pipeline_block(),
     }
 
 
@@ -304,6 +333,25 @@ def _run_backlog_blaster():
     total backlog; each scheduler tick just keeps biting chunks until it's empty.
     """
     _run_draft_queue(batch_size=300)
+
+
+def _run_stall_alarm():
+    """Pipeline stall watchdog — runs every 5 minutes.
+
+    Watches for the ABSENCE of expected work, which is the only thing that would
+    have caught the 2026-09-03 outage: the scheduler reports jobs as executed
+    successfully even when they raise, so error-based monitoring sees nothing.
+    """
+    from backend.models.db import get_session_factory
+    from backend.services.stall_alarm import run_stall_alarm
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        run_stall_alarm(db)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Stall alarm job failed: %s", exc)
+    finally:
+        db.close()
 
 
 def _run_guardian():
