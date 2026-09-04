@@ -102,6 +102,20 @@ class GuardianWatchdog:
         by_talent = {k: c for k, c in rows}
         return by_talent, sum(by_talent.values())
 
+    def _drafts_per_email(self, db: Session, window_minutes: int) -> tuple[float, int, int]:
+        """Drafts created per email triaged in the window — the runaway signature.
+
+        A runaway loop drafts repeatedly for the same email, so the ratio climbs.
+        Catch-up after a stall drafts once per queued email, so the ratio stays ~1
+        no matter how large the burst is. Raw draft count alone cannot tell the
+        two apart.
+        """
+        from backend.models.db import Draft, ProcessedEmail
+        since = datetime.utcnow() - timedelta(minutes=window_minutes)
+        drafts = db.query(Draft).filter(Draft.created_at >= since).count()
+        emails = db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= since).count()
+        return drafts / max(emails, 1), drafts, emails
+
     def _check_draft_velocity(
         self, db: Session, cfg: dict, by_talent: dict[str, int], total: int
     ) -> list[dict]:
@@ -112,13 +126,42 @@ class GuardianWatchdog:
         window = cfg.get("velocity_window_minutes", 10)
 
         if total >= hard_global:
-            triggers.append({
-                "type": "global_kill",
-                "talent_key": None,
-                "reason": f"Global draft velocity {total} in {window}min exceeds hard limit {hard_global}",
-                "detail": {"velocity_by_talent": by_talent, "total": total},
-            })
-            return triggers  # global kill supersedes per-talent
+            # Volume alone is not runaway evidence. On 2026-09-04 the backlog
+            # flushed 200 drafts in 10 minutes the moment a missing index was
+            # added — one draft per queued email, entirely legitimate — and this
+            # guard killed AI four times in a row. Every stall guarantees a burst
+            # on recovery, so a bare count kills the system exactly when it has
+            # just come back. Require the ratio to corroborate before killing.
+            ratio, drafts_seen, emails_seen = self._drafts_per_email(db, window)
+            warn_ratio = cfg.get("draft_email_ratio_warn", 3.0)
+            detail = {
+                "velocity_by_talent": by_talent, "total": total,
+                "drafts_in_window": drafts_seen, "emails_in_window": emails_seen,
+                "drafts_per_email": round(ratio, 2), "ratio_warn_threshold": warn_ratio,
+            }
+            if ratio >= warn_ratio:
+                triggers.append({
+                    "type": "global_kill",
+                    "talent_key": None,
+                    "reason": (
+                        f"Global draft velocity {total} in {window}min exceeds hard limit "
+                        f"{hard_global} AND {ratio:.1f} drafts per email triaged "
+                        f"(warn {warn_ratio}) — drafts are not backed by inbound mail"
+                    ),
+                    "detail": detail,
+                })
+            else:
+                triggers.append({
+                    "type": "ratio_warn",
+                    "talent_key": None,
+                    "reason": (
+                        f"High draft volume: {total} in {window}min (limit {hard_global}), but "
+                        f"only {ratio:.1f} drafts per email triaged — reads as backlog catch-up, "
+                        f"not a runaway loop. AI left enabled."
+                    ),
+                    "detail": detail,
+                })
+            return triggers  # global check supersedes per-talent
 
         for talent_key, count in by_talent.items():
             if count >= hard_talent:

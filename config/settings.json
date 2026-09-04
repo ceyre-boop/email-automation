@@ -94,7 +94,7 @@
     "_comment": "Self-healing watchdog — all thresholds tunable without redeploy",
     "enabled": true,
     "velocity_window_minutes": 10,
-    "global_draft_hard_limit": 200,
+    "global_draft_hard_limit": 500,
     "per_talent_draft_warn_limit": 120,
     "per_talent_draft_hard_limit": 160,
     "per_talent_hourly_hard_limit": 1000,
@@ -103,11 +103,12 @@
     "draft_email_ratio_kill": 5.0,
     "stuck_processing_threshold_minutes": 5,
     "alert_cooldown_minutes": 30,
-    "alert_email": "skyler@taboost.me",
+    "alert_email": "colineyre222@gmail.com",
     "sender_talent_key": "Skyler",
     "_sender_talent_key_comment": "Talent whose Gmail OAuth token is used to send Guardian alert emails. Must have an active token in the DB.",
     "recovery_wait_minutes": 30,
-    "recovery_health_threshold": 0.7
+    "recovery_health_threshold": 0.7,
+    "_global_draft_hard_limit_comment": "Raised from 200 on 2026-09-04: a 200-draft backlog flush after an outage is normal recovery, not a runaway. Breaching this no longer kills AI on its own — the drafts-per-email ratio must also exceed draft_email_ratio_warn, since a runaway drafts repeatedly for the same email while catch-up drafts once per queued email."
   },
   "reply_to_routing": {
     "_comment": "SOP v16 Part 3 — Reply-To Routing List. Sets the Reply-To HEADER on drafts/replies. Header-only routing: never added to the email body, never mentioned in the draft, From address unchanged. Matching is on the TALENT INBOX (the alias the brand emailed, per single_inbox.alias_map — NOT the receiving account, since 13 talents now share talent-mgmt@taboost.me), never on the sender. A talent in no group gets no Reply-To, per Part 3's closing line.",
