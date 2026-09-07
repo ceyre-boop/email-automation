@@ -11,7 +11,7 @@ from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
 
 from backend.models.db import InboxEmail, TalentToken
-from backend.services.inbox_sync import SYNC_TOUCH_MINUTES, sync_inbox_for_talent
+from backend.services.inbox_sync import sync_inbox_for_talent
 
 
 def _token(db):
@@ -67,11 +67,17 @@ def test_a_new_message_is_still_inserted(db_session):
     assert row.is_unread is True
 
 
-def test_a_very_stale_timestamp_is_refreshed_even_with_no_other_change(db_session):
-    """last_synced_at still moves, just on a 30-minute floor rather than every 45s."""
-    stale = datetime.utcnow() - timedelta(minutes=SYNC_TOUCH_MINUTES + 5)
+def test_sync_time_is_recorded_once_per_talent_not_once_per_email(db_session):
+    """"When did this talent last sync" is one fact per talent. Stamping it on every
+    cached email was the whole write storm."""
+    stale = datetime.utcnow() - timedelta(hours=2)
     row = _seed(db_session, last_synced_at=stale)
+    before = datetime.utcnow()
+
     summary = _run(db_session)
+
     db_session.refresh(row)
-    assert summary["updated"] == 1
-    assert row.last_synced_at > stale
+    assert summary.get("updated", 0) == 0          # the email row was not rewritten
+    assert row.last_synced_at == stale             # untouched
+    token = db_session.query(TalentToken).filter_by(talent_key="Allee").one()
+    assert token.last_synced_at is not None and token.last_synced_at >= before

@@ -144,6 +144,16 @@ def _pipeline_block() -> dict:
     return payload
 
 
+def _write_block() -> dict:
+    """Database writes per minute — the metric whose absence let a write storm run
+    for months while every health check stayed green."""
+    try:
+        from backend.services.write_meter import snapshot
+        return snapshot()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)[:200]}
+
+
 def _pool_block() -> dict:
     """Connection-pool occupancy. Cheap: reads SQLAlchemy's own counters.
 
@@ -181,6 +191,7 @@ def health():
         **_active_sop_version(),
         "pipeline": _pipeline_block(),
         "db_pool": _pool_block(),
+        "db_writes": _write_block(),
     }
 
 
@@ -385,6 +396,28 @@ def _run_claim_reaper():
         reap_stale_claims(db)
     except Exception as exc:  # noqa: BLE001
         logger.error("Claim reaper job failed: %s", exc)
+    finally:
+        db.close()
+
+
+def _run_retention():
+    """Purge terminal drafts, stale inbox cache rows, and old poll_health rows.
+
+    Runs every 6 hours with dry_run=False. Never deletes pending drafts or
+    processed_emails — see backend/services/retention.py for why.
+    """
+    from backend.models.db import get_session_factory
+    from backend.services.retention import run_retention
+    SessionLocal = get_session_factory()
+    db = SessionLocal()
+    try:
+        summary = run_retention(db, dry_run=False)
+        if summary.get("errors"):
+            logger.error("Retention job completed with errors: %s", summary)
+        else:
+            logger.info("Retention job: %s", summary)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Retention job failed: %s", exc)
     finally:
         db.close()
 

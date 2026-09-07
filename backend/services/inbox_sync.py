@@ -22,7 +22,6 @@ MAX_INBOX_RESULTS = 500   # sync up to 500 messages per cycle
 BODY_FETCH_BATCH = 20
 HEADER_WORKERS = 20       # parallel header fetches (was 10)
 BODY_WORKERS = 20         # parallel body fetches (was 10)
-SYNC_TOUCH_MINUTES = 30   # how stale last_synced_at may get on an otherwise unchanged row
 
 
 def sync_inbox_for_talent(token_row, db: Session) -> dict:
@@ -127,18 +126,13 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
                     existing.offer_type = triage.offer_type
                     changed = True
 
-            # last_synced_at is only read for a "last updated" display, so it does
-            # not need to be exact. Refresh it when something else already dirties
-            # the row, or at most once every SYNC_TOUCH_MINUTES, instead of turning
-            # every read into a write.
+            # last_synced_at is NOT stamped here any more. "when did this talent last
+            # sync" is one fact per talent, not one per email — it now lives on
+            # talents.last_synced_at, written once per cycle below. Writing it per row
+            # was the entire write storm: ~1,300 rows x every 45s, none of them
+            # carrying a changed value.
             if changed:
                 existing.last_synced_at = now
-            elif (
-                existing.last_synced_at is None
-                or (now - existing.last_synced_at) > timedelta(minutes=SYNC_TOUCH_MINUTES)
-            ):
-                existing.last_synced_at = now
-                changed = True
 
             if changed:
                 summary["updated"] += 1
@@ -170,6 +164,10 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
             )
             db.add(row)
             summary["upserted"] += 1
+
+    # One row, one write, per talent per cycle — replaces the per-email stamping.
+    token_row.last_synced_at = now
+    db.add(token_row)
 
     db.commit()
 

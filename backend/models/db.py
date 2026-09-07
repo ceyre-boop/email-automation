@@ -70,6 +70,10 @@ class TalentToken(Base):
     )
     active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     last_poll_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # One row per talent instead of one write per cached email per cycle. Stamping
+    # InboxEmail.last_synced_at on every row every sync was ~1,700 UPDATEs a minute
+    # of pure churn and is what drove the database to 100% CPU on 2026-09-06.
+    last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -502,6 +506,11 @@ def _make_engine():
                     "keepalives_count": 5,
                 },
             )
+    try:
+        from backend.services.write_meter import install as _install_write_meter
+        _install_write_meter(_engine)
+    except Exception:  # noqa: BLE001 — instrumentation must never block startup
+        pass
     return _engine
 
 
@@ -619,6 +628,7 @@ def create_tables():
         "ALTER TABLE inbox_emails ALTER COLUMN subject TYPE TEXT",
         "ALTER TABLE inbox_emails ALTER COLUMN snippet TYPE TEXT",
         "ALTER TABLE inbox_emails ALTER COLUMN label_ids TYPE TEXT",
+        "ALTER TABLE talents ADD COLUMN IF NOT EXISTS last_synced_at TIMESTAMP",
         # Performance: auto_send runs its eligibility query once per talent per
         # minute. talent_key is filtered with ILIKE, which cannot use the plain
         # btree index, so the query seq-scanned all ~33k drafts every time and

@@ -517,7 +517,7 @@ def on_startup():
     try:
         from datetime import datetime, timedelta
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send, _run_poll_health_retention, _run_stall_alarm, _run_claim_reaper
+        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send, _run_poll_health_retention, _run_stall_alarm, _run_claim_reaper, _run_retention
         _scheduler = BackgroundScheduler(daemon=True)
         now = datetime.now()
         _scheduler.add_job(_run_poll, "interval", seconds=90, jitter=20,
@@ -553,7 +553,10 @@ def on_startup():
         _scheduler.add_job(_run_claim_reaper, "interval", minutes=5, jitter=20,
             next_run_time=now + timedelta(minutes=8),
             id="claim_reaper", replace_existing=True, max_instances=1)
+        _scheduler.add_job(_run_retention, "interval", hours=6, jitter=300,
+            next_run_time=now + timedelta(minutes=25),
+            id="retention", replace_existing=True, max_instances=1)
         _scheduler.start()
-        logger.info("Scheduler started — poll 90s±20, draft queue 60s±10, backlog blaster 180s±20, guardian 60s±15, auto_send 60s±10, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr, poll_health retention 1hr, stall alarm 5min, claim reaper 5min. Cadence cut 2026-09-07: the old 45s/20s/30s loops were the query-volume multiplier behind the DB hitting 100% CPU.")
+        logger.info("Scheduler started — poll 90s±20, draft queue 60s±10, backlog blaster 180s±20, guardian 60s±15, auto_send 60s±10, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr, poll_health retention 1hr, stall alarm 5min, claim reaper 5min, retention 6hr±5min. Cadence cut 2026-09-07: the old 45s/20s/30s loops were the query-volume multiplier behind the DB hitting 100% CPU.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")

@@ -31,7 +31,6 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timedelta
 
-from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -52,35 +51,6 @@ def _cfg() -> dict:
     return get_settings().app_config.get("retention", {}) or {}
 
 
-def _delete_in_batches(
-    db: Session,
-    query_factory,
-    batch_size: int,
-    max_batches: int,
-    dry_run: bool,
-) -> int:
-    """Delete rows matched by `query_factory()` in committed batches.
-
-    `query_factory` must return a fresh Query object each call (ordered,
-    limited to `batch_size` primary keys) so re-running it after a commit
-    picks up the next batch rather than rows already deleted.
-
-    When `dry_run` is True this only counts — nothing is deleted or committed.
-    """
-    if dry_run:
-        return query_factory(count_only=True)
-
-    total_deleted = 0
-    for _ in range(max_batches):
-        ids = query_factory()
-        if not ids:
-            break
-        (
-            db.query(*query_factory.model_pk)  # placeholder, unused — see callers
-        )
-    return total_deleted
-
-
 def run_retention(db: Session, dry_run: bool = True) -> dict:
     """Purge terminal drafts, stale inbox cache rows, and old poll_health rows.
 
@@ -89,13 +59,6 @@ def run_retention(db: Session, dry_run: bool = True) -> dict:
 
     dry_run=True (default) only counts matching rows; nothing is deleted.
     """
-    cfg = _cfg()
-    drafts_days = int(cfg.get("drafts_retention_days", DEFAULT_DRAFTS_RETENTION_DAYS))
-    inbox_days = int(cfg.get("inbox_cache_retention_days", DEFAULT_INBOX_CACHE_RETENTION_DAYS))
-    poll_health_days = int(cfg.get("poll_health_retention_days", DEFAULT_POLL_HEALTH_RETENTION_DAYS))
-    batch_size = max(1, int(cfg.get("batch_size", DEFAULT_BATCH_SIZE)))
-    max_batches = max(1, int(cfg.get("max_batches_per_run", DEFAULT_MAX_BATCHES_PER_RUN)))
-
     summary: dict = {
         "dry_run": dry_run,
         "drafts": {"deleted": 0, "batches": 0},
@@ -103,6 +66,18 @@ def run_retention(db: Session, dry_run: bool = True) -> dict:
         "poll_health": {"deleted": 0, "batches": 0},
         "errors": [],
     }
+
+    try:
+        cfg = _cfg()
+        drafts_days = int(cfg.get("drafts_retention_days", DEFAULT_DRAFTS_RETENTION_DAYS))
+        inbox_days = int(cfg.get("inbox_cache_retention_days", DEFAULT_INBOX_CACHE_RETENTION_DAYS))
+        poll_health_days = int(cfg.get("poll_health_retention_days", DEFAULT_POLL_HEALTH_RETENTION_DAYS))
+        batch_size = max(1, int(cfg.get("batch_size", DEFAULT_BATCH_SIZE)))
+        max_batches = max(1, int(cfg.get("max_batches_per_run", DEFAULT_MAX_BATCHES_PER_RUN)))
+    except Exception as exc:  # noqa: BLE001
+        logger.error("retention: config load failed: %s", exc)
+        summary["errors"].append(f"config: {exc}"[:300])
+        return summary
 
     # processed_emails is intentionally never touched here — see module docstring.
 

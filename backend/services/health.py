@@ -237,15 +237,44 @@ def compute_health_score(db: Session) -> dict:
             issues.append(f"Poll error rate today: {error_rate:.0%}")
     components["poll_health"] = round(poll_score, 3)
 
+    # ── 8. Database write rate (weight: 0.10) ─────────────────────────────────
+    # The write storm that eventually pinned the database at 100% CPU ran for
+    # MONTHS in plain sight: ~1,700 UPDATEs a minute that changed nothing. Every
+    # health check was green because every individual query succeeded — nothing
+    # measured cost. This component exists so the next one shows up as a falling
+    # score long before it takes the instance down.
+    from backend.services.write_meter import snapshot as _write_snapshot
+
+    writes = _write_snapshot()
+    wpm = writes.get("writes_per_minute", 0.0)
+    warn_wpm = 500
+    crit_wpm = 1500
+    if wpm < warn_wpm:
+        write_score = 1.0
+    elif wpm < crit_wpm:
+        write_score = 0.5
+        issues.append(
+            f"High DB write rate: {wpm:.0f} writes/min (warn at {warn_wpm}) — "
+            "something may be rewriting rows that have not changed"
+        )
+    else:
+        write_score = 0.0
+        issues.append(
+            f"CRITICAL DB write rate: {wpm:.0f} writes/min (limit {crit_wpm}) — "
+            "write amplification will exhaust database CPU if left running"
+        )
+    components["db_write_rate"] = round(write_score, 3)
+
     # ── Weighted final score ──────────────────────────────────────────────────
     weights = {
-        "triage_reliability": 0.25,
-        "queue_liveness": 0.20,
+        "triage_reliability": 0.22,
+        "queue_liveness": 0.18,
         "draft_freshness": 0.15,
-        "draft_velocity": 0.20,
-        "per_talent_balance": 0.10,
+        "draft_velocity": 0.18,
+        "per_talent_balance": 0.07,
         "token_health": 0.05,
         "poll_health": 0.05,
+        "db_write_rate": 0.10,
     }
     score = sum(components[k] * weights[k] for k in weights)
 
@@ -260,6 +289,7 @@ def compute_health_score(db: Session) -> dict:
 
     return {
         "score": round(score, 3),
+        "db_writes": writes,
         "status": status,
         "components": components,
         "issues": issues,
