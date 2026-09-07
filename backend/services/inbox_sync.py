@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from sqlalchemy.orm import Session
 
@@ -22,6 +22,7 @@ MAX_INBOX_RESULTS = 500   # sync up to 500 messages per cycle
 BODY_FETCH_BATCH = 20
 HEADER_WORKERS = 20       # parallel header fetches (was 10)
 BODY_WORKERS = 20         # parallel body fetches (was 10)
+SYNC_TOUCH_MINUTES = 30   # how stale last_synced_at may get on an otherwise unchanged row
 
 
 def sync_inbox_for_talent(token_row, db: Session) -> dict:
@@ -91,25 +92,58 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
         existing = existing_map.get(mid)
 
         if existing:
-            existing.last_synced_at = now
+            # WRITE ONLY WHAT CHANGED. This block used to assign last_synced_at (and
+            # is_unread/label_ids/triage_status) unconditionally on every row, every
+            # cycle. SQLAlchemy then flushed an UPDATE for every cached email —
+            # ~1,300 rows across talents every 45 seconds, ~1,700 row versions a
+            # minute of pure churn. In Postgres each UPDATE writes a new row version,
+            # so that pinned WAL, autovacuum, disk IO and ultimately CPU at 100%,
+            # which is what took the database down on 2026-09-06.
+            changed = False
+
             hdr = headers_map.get(mid)
             if hdr:
-                existing.is_unread = "UNREAD" in hdr.get("label_ids", [])
-                existing.label_ids = ",".join(hdr.get("label_ids", []))
+                new_unread = "UNREAD" in hdr.get("label_ids", [])
+                new_labels = ",".join(hdr.get("label_ids", []))
+                if existing.is_unread != new_unread:
+                    existing.is_unread = new_unread
+                    changed = True
+                if existing.label_ids != new_labels:
+                    existing.label_ids = new_labels
+                    changed = True
+
             if triage:
-                # Always update all triage fields so TRASH/DRAFT status stays current.
-                # Only overwrite score/brand/rate fields if they haven't been set yet,
-                # since those can change if re-triaged, but we never downgrade a scored email.
-                existing.triage_status = str(triage.status) if triage.status else None
-                # Always backfill triage_reason when it's missing — independent of score.
+                new_status = str(triage.status) if triage.status else None
+                if existing.triage_status != new_status:
+                    existing.triage_status = new_status
+                    changed = True
                 if existing.triage_reason is None and triage.triage_reason:
                     existing.triage_reason = triage.triage_reason
-                if existing.score is None:
+                    changed = True
+                if existing.score is None and triage.score is not None:
                     existing.score = triage.score
                     existing.brand_name = triage.brand_name
                     existing.proposed_rate = triage.proposed_rate
                     existing.offer_type = triage.offer_type
-            summary["updated"] += 1
+                    changed = True
+
+            # last_synced_at is only read for a "last updated" display, so it does
+            # not need to be exact. Refresh it when something else already dirties
+            # the row, or at most once every SYNC_TOUCH_MINUTES, instead of turning
+            # every read into a write.
+            if changed:
+                existing.last_synced_at = now
+            elif (
+                existing.last_synced_at is None
+                or (now - existing.last_synced_at) > timedelta(minutes=SYNC_TOUCH_MINUTES)
+            ):
+                existing.last_synced_at = now
+                changed = True
+
+            if changed:
+                summary["updated"] += 1
+            else:
+                summary["unchanged"] = summary.get("unchanged", 0) + 1
         else:
             hdr = headers_map.get(mid, {})
             stub = stub_map.get(mid, {})
