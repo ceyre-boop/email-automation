@@ -119,6 +119,17 @@ def _pipeline_block() -> dict:
     if _pipeline_cache and (now - _pipeline_cache[0]).total_seconds() < 60:
         return _pipeline_cache[1]
     try:
+        # /health must answer even when the DB cannot. When the pool is saturated
+        # this query would block for the full 30s checkout timeout, so the one
+        # endpoint you reach for during an outage becomes the one that hangs —
+        # exactly what happened on 2026-09-06. Report the starvation instead.
+        pool_state = _pool_block()
+        if pool_state.get("saturated"):
+            return {
+                "stalled": None,
+                "reason": "db pool saturated — pipeline metrics unavailable",
+                "db_pool": pool_state,
+            }
         from backend.models.db import get_session_factory
         from backend.services.stall_alarm import check_pipeline_stall
         db = get_session_factory()()
