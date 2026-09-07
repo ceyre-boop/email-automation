@@ -479,6 +479,12 @@ def _make_engine():
                 "transaction(6543)" if transaction_mode else "session(5432)",
                 pool_size, max_overflow,
             )
+            # statement_timeout is the single most important guardrail here. Without
+            # it one slow query pins a connection until it finishes, connections pile
+            # up, the pool empties and every scheduled job fails — which is how this
+            # database reached 100% CPU on 2026-09-06 and stopped answering at all.
+            # A capped statement dies instead of taking the instance with it.
+            statement_timeout_ms = int(os.getenv("DB_STATEMENT_TIMEOUT_MS", "20000"))
             _engine = create_engine(
                 db_url,
                 pool_size=pool_size,
@@ -486,6 +492,15 @@ def _make_engine():
                 pool_timeout=30,    # wait for a pooled conn instead of failing fast
                 pool_recycle=300,
                 pool_pre_ping=True,
+                connect_args={
+                    "options": f"-c statement_timeout={statement_timeout_ms}",
+                    # Kill sessions left idle mid-transaction (a crashed worker), which
+                    # otherwise hold locks and block autovacuum indefinitely.
+                    "keepalives": 1,
+                    "keepalives_idle": 30,
+                    "keepalives_interval": 10,
+                    "keepalives_count": 5,
+                },
             )
     return _engine
 

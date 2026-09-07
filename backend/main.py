@@ -520,13 +520,13 @@ def on_startup():
         from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send, _run_poll_health_retention, _run_stall_alarm, _run_claim_reaper
         _scheduler = BackgroundScheduler(daemon=True)
         now = datetime.now()
-        _scheduler.add_job(_run_poll, "interval", seconds=45, jitter=10,
+        _scheduler.add_job(_run_poll, "interval", seconds=90, jitter=20,
             next_run_time=now + timedelta(seconds=5),
             id="auto_poll", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_draft_queue, "interval", seconds=20, jitter=5,
+        _scheduler.add_job(_run_draft_queue, "interval", seconds=60, jitter=10,
             next_run_time=now + timedelta(seconds=90),  # was 12s — now waits for first poll to complete
             id="draft_queue", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_backlog_blaster, "interval", seconds=30, jitter=7,
+        _scheduler.add_job(_run_backlog_blaster, "interval", seconds=180, jitter=20,
             next_run_time=now + timedelta(seconds=120),  # was 22s — staggered after draft_queue
             id="backlog_blaster", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_guardian, "interval", seconds=60, jitter=15,
@@ -554,6 +554,6 @@ def on_startup():
             next_run_time=now + timedelta(minutes=8),
             id="claim_reaper", replace_existing=True, max_instances=1)
         _scheduler.start()
-        logger.info("Scheduler started — poll +5s/45s±10, draft queue +90s/20s±5, backlog blaster +120s/30s±7, guardian +35s/60s±15, auto_send +47s/60s±10, reconcile +90s/5min±30, token refresh +3min/10min±60, inbox reconcile +15min/1hr, poll_health retention +20min/1hr.")
+        logger.info("Scheduler started — poll 90s±20, draft queue 60s±10, backlog blaster 180s±20, guardian 60s±15, auto_send 60s±10, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr, poll_health retention 1hr, stall alarm 5min, claim reaper 5min. Cadence cut 2026-09-07: the old 45s/20s/30s loops were the query-volume multiplier behind the DB hitting 100% CPU.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")
