@@ -144,6 +144,16 @@ def _pipeline_block() -> dict:
     return payload
 
 
+def _sheets_block() -> dict:
+    """Sheets auth breaker state. Silence is not health — once the breaker opens,
+    Master Log writes are skipped, and that has to be visible somewhere."""
+    try:
+        from backend.services.sheets import breaker_state
+        return breaker_state()
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)[:200]}
+
+
 def _write_block() -> dict:
     """Database writes per minute — the metric whose absence let a write storm run
     for months while every health check stayed green."""
@@ -192,6 +202,7 @@ def health():
         "pipeline": _pipeline_block(),
         "db_pool": _pool_block(),
         "db_writes": _write_block(),
+        "sheets_auth": _sheets_block(),
     }
 
 
