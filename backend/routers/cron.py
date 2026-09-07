@@ -616,9 +616,13 @@ def _run_full_reconcile():
     _run_inbox_reconcile()
 
 
-def _run_poll_health_retention(retain_days: int = 30) -> None:
+def _run_poll_health_retention(retain_days: int = 7) -> None:
     """
     Delete poll_health rows older than `retain_days` days.
+
+    Cut 30 -> 7 on 2026-09-07. At 30 days this telemetry log had grown to 318,081
+    rows / 102 MB — four times the row count of the actual email data it describes,
+    on an instance that was out of CPU. Purged to 7 days it is 57,636 rows / 6.8 MB.
 
     The poll_health table writes one row per talent per cycle (~45s × 19 talents ≈ 24 k/day).
     Without pruning it exceeds 1.5 M rows in ~60 days and bloats the DB.
