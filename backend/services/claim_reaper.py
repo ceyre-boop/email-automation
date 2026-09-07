@@ -55,23 +55,34 @@ def reap_stale_claims(db: Session) -> dict:
     cutoff = datetime.utcnow() - timedelta(minutes=lease)
     summary = {"examined": 0, "released": 0, "marked_sent": 0, "ambiguous": 0, "errors": 0}
 
+    # Read the candidate IDs and let go of the connection immediately. Holding one
+    # session across 25 sequential Gmail round-trips pins a pooled connection for
+    # minutes; with a 20-connection pool shared by the poller, draft queue and
+    # guardian, that alone can exhaust the pool when Gmail or the DB is slow.
     try:
-        rows = (
-            db.query(Draft)
-            .filter(
-                Draft.status == DraftStatus.pending,
-                Draft.send_claimed_at.isnot(None),
-                Draft.send_claimed_at < cutoff,
+        draft_ids = [
+            row_id for (row_id,) in (
+                db.query(Draft.id)
+                .filter(
+                    Draft.status == DraftStatus.pending,
+                    Draft.send_claimed_at.isnot(None),
+                    Draft.send_claimed_at < cutoff,
+                )
+                .order_by(Draft.send_claimed_at.asc())
+                .limit(max(1, batch))
+                .all()
             )
-            .order_by(Draft.send_claimed_at.asc())
-            .limit(max(1, batch))
-            .all()
-        )
+        ]
+        db.rollback()  # end the read transaction, return the connection
     except Exception as exc:  # noqa: BLE001
         logger.error("claim_reaper: query failed: %s", exc)
+        db.rollback()
         return {**summary, "error": str(exc)[:200]}
 
-    for draft in rows:
+    for draft_id in draft_ids:
+        draft = db.query(Draft).filter(Draft.id == draft_id).first()
+        if not draft or draft.status != DraftStatus.pending or draft.send_claimed_at is None:
+            continue  # resolved by a real send while we were working
         summary["examined"] += 1
         try:
             token = resolve_token_for_talent(db, draft.talent_key)

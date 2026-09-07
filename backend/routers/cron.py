@@ -133,6 +133,29 @@ def _pipeline_block() -> dict:
     return payload
 
 
+def _pool_block() -> dict:
+    """Connection-pool occupancy. Cheap: reads SQLAlchemy's own counters.
+
+    Pool exhaustion is the failure mode that keeps taking this service down —
+    slow queries hold connections, the pool empties, and every scheduled job then
+    fails with InFailedSqlTransaction or a 30s checkout timeout. None of that is
+    visible until it has already happened, so the numbers belong on /health.
+    """
+    try:
+        from backend.models.db import get_engine
+        pool = get_engine().pool
+        checked_out = pool.checkedout()
+        capacity = pool.size() + pool.overflow()
+        return {
+            "checked_out": checked_out,
+            "capacity": capacity,
+            "available": max(capacity - checked_out, 0),
+            "saturated": capacity > 0 and checked_out >= capacity,
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"error": str(exc)[:200]}
+
+
 @router.get("/health")
 def health():
     sop_hash, talent_count, warnings, parse_ts = _sop_stats()
@@ -146,6 +169,7 @@ def health():
         "last_parse_timestamp": parse_ts,
         **_active_sop_version(),
         "pipeline": _pipeline_block(),
+        "db_pool": _pool_block(),
     }
 
 

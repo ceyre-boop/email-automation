@@ -86,6 +86,15 @@ def run_auto_send(db: Session) -> None:
             _process_talent(db, talent_key, cutoff)
         except Exception as exc:  # noqa: BLE001
             logger.error("auto_send: unexpected error for %s: %s", talent_key, exc)
+            # A failed statement aborts the whole transaction, and every later
+            # talent in this loop then dies with InFailedSqlTransaction — one real
+            # error turning into a dozen fake ones and no sends for anybody.
+            # Roll back so the next talent starts on a clean transaction.
+            try:
+                db.rollback()
+            except Exception as rb_exc:  # noqa: BLE001
+                logger.error("auto_send: rollback failed after %s: %s", talent_key, rb_exc)
+                return  # session is unusable; the next scheduled run gets a fresh one
 
 
 def _process_talent(db: Session, talent_key: str, cutoff: datetime) -> None:
