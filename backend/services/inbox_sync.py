@@ -11,7 +11,7 @@ import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, defer
 
 from backend.models.db import InboxEmail, ProcessedEmail
 from backend.services import gmail as gmail_svc
@@ -47,8 +47,15 @@ def sync_inbox_for_talent(token_row, db: Session) -> dict:
     stub_map = {s["id"]: s for s in stubs}
 
     # Load existing cache rows for these IDs
+    # defer(body_text) is not a micro-optimisation — it is the single biggest cost
+    # in this system. This query loads every cached email for the talent on every
+    # sync, and body_text averages several KB per row. ~1,300 rows x every cycle
+    # shipped roughly 640 GB out of Postgres in August ($57.89 of a $60.39 bill,
+    # 95% of it egress) and drove disk IO to 100%. Sync needs labels and triage
+    # fields; it never reads the body.
     existing_rows = (
         db.query(InboxEmail)
+        .options(defer(InboxEmail.body_text))
         .filter(
             InboxEmail.talent_key == talent_key,
             InboxEmail.gmail_message_id.in_(current_ids),
@@ -204,6 +211,7 @@ def fetch_pending_bodies(token_row, db: Session, limit: int = BODY_FETCH_BATCH) 
 
     pending = (
         db.query(InboxEmail)
+        .options(defer(InboxEmail.body_text))
         .filter(
             InboxEmail.talent_key == talent_key,
             InboxEmail.body_text.is_(None),
