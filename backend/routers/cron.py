@@ -176,10 +176,18 @@ def _pool_block() -> dict:
         from backend.models.db import get_engine
         pool = get_engine().pool
         checked_out = pool.checkedout()
-        capacity = pool.size() + pool.overflow()
+        # NOT pool.overflow(): that returns the CURRENT overflow counter, which
+        # starts NEGATIVE (-pool_size) and climbs as connections are created. Using
+        # it as a maximum produced nonsense capacities ("13 of 20", "4 of 5") that
+        # were reported as fact during the 2026-09-07 incident. _max_overflow is the
+        # configured ceiling.
+        max_overflow = getattr(pool, "_max_overflow", 0)
+        capacity = pool.size() + max_overflow
         return {
             "checked_out": checked_out,
             "capacity": capacity,
+            "pool_size": pool.size(),
+            "max_overflow": max_overflow,
             "available": max(capacity - checked_out, 0),
             "saturated": capacity > 0 and checked_out >= capacity,
         }

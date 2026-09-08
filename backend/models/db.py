@@ -496,6 +496,13 @@ def _make_engine():
                 pool_timeout=30,    # wait for a pooled conn instead of failing fast
                 pool_recycle=300,
                 pool_pre_ping=True,
+                # SQLAlchemy's psycopg2 dialect probes pg_type for hstore OIDs on
+                # EVERY new connection. We do not use hstore, and through a
+                # transaction-mode pooler (where connections churn constantly) that
+                # is a wasted catalog round-trip per connect — and a failure point:
+                # it is exactly where "SSL connection has been closed unexpectedly"
+                # was surfacing on 2026-09-08.
+                use_native_hstore=False,
                 connect_args={
                     "options": f"-c statement_timeout={statement_timeout_ms}",
                     # Kill sessions left idle mid-transaction (a crashed worker), which
