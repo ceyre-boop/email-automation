@@ -6,6 +6,7 @@ from __future__ import annotations
 import html as html_lib
 import logging
 import os
+import threading
 import sys
 from pathlib import Path
 
@@ -282,6 +283,30 @@ _scheduler = None
 
 @app.on_event("startup")
 def on_startup():
+    """Bind the port FIRST; do the slow work on a background thread.
+
+    Everything below this line touches the database — schema verification, the
+    SOP restore, the startup data fix, the scheduler's first cycles. Uvicorn does
+    not open the listening socket until this handler returns, so any of that
+    blocking means Render's port scan times out and the deploy is rolled back.
+    That is exactly what happened on 2026-09-07: the pool was starved, the schema
+    check took 15 minutes, the port never opened, and two deploys failed —
+    including the one carrying the fix for the very condition that blocked them.
+
+    A deploy must never be gated on a healthy database. Booting into a degraded
+    state and reporting it on /health is strictly better than not booting at all.
+    """
+    # Under pytest the work runs inline: the TestClient's app lifespan must be
+    # deterministic, and a background thread racing the test's own fixtures (the
+    # SOP restore rewriting a sandboxed file mid-assertion) is exactly the kind of
+    # flake that erodes trust in the suite.
+    if "pytest" in sys.modules:
+        _startup_work()
+        return
+    threading.Thread(target=_startup_work, name="startup-work", daemon=True).start()
+
+
+def _startup_work():
     global _scheduler
     settings = get_settings()
     missing = [k for k in ("google_client_id", "google_client_secret", "openai_api_key", "database_url")
