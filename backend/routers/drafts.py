@@ -764,6 +764,73 @@ def get_edit_history(draft_id: int, db: Session = Depends(get_db)):
     ]
 
 
+@router.post("/discard-stale")
+def discard_stale_drafts(
+    older_than_days: int = 3,
+    apply: bool = False,
+    db: Session = Depends(get_db),
+):
+    """Discard pending drafts whose SOURCE EMAIL is older than `older_than_days`.
+
+    Distinct from /discard-all, which wipes everything including today's real work.
+    This clears only what the automation can no longer act on: the draft queue
+    refuses to draft mail older than DRAFT_MAX_AGE_DAYS, so those drafts can never
+    send and sit in the review queue forever. On 2026-09-08 that backlog was 275
+    drafts going back to June, none of them actionable, drowning the 4 that were.
+
+    Marks rows discarded rather than deleting them. Deleting draft rows is what
+    caused that day's incident: the queue reads a missing row as "never answered"
+    and re-drafts the email.
+
+    Drafts holding a send claim are skipped — that guard is what stops a brand
+    getting two replies.
+
+    DRY RUN by default; pass apply=true to act.
+    """
+    from backend.models.db import ProcessedEmail
+
+    cutoff = datetime.utcnow() - timedelta(days=max(1, older_than_days))
+    rows = (
+        db.query(Draft)
+        .join(ProcessedEmail, ProcessedEmail.gmail_message_id == Draft.gmail_message_id)
+        .filter(
+            Draft.status == DraftStatus.pending,
+            Draft.send_claimed_at.is_(None),
+            ProcessedEmail.processed_at < cutoff,
+        )
+        .all()
+    )
+
+    skipped_claimed = (
+        db.query(Draft)
+        .join(ProcessedEmail, ProcessedEmail.gmail_message_id == Draft.gmail_message_id)
+        .filter(
+            Draft.status == DraftStatus.pending,
+            Draft.send_claimed_at.isnot(None),
+            ProcessedEmail.processed_at < cutoff,
+        )
+        .count()
+    )
+
+    if apply:
+        now = datetime.utcnow()
+        for draft in rows:
+            draft.status = DraftStatus.discarded
+            draft.reviewed_at = now
+            draft.reviewed_by = "discard-stale"
+            db.add(draft)
+        db.commit()
+        logger.info("discard-stale: cleared %d drafts older than %dd", len(rows), older_than_days)
+
+    return {
+        "dry_run": not apply,
+        "older_than_days": older_than_days,
+        "matched": len(rows),
+        "discarded": len(rows) if apply else 0,
+        "skipped_send_in_progress": skipped_claimed,
+    }
+
+
 @router.post("/discard-all")
 def discard_all_pending(db: Session = Depends(get_db)):
     """Discard every pending draft — wipes the badge counts to zero for a clean start."""

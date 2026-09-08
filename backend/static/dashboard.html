@@ -878,6 +878,7 @@ body {
         <div style="display:flex; gap:6px;">
           <button class="btn btn-ghost" onclick="loadDraftQueue()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
           <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; padding:4px 10px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
+          <button class="btn btn-ghost" onclick="clearStaleDrafts(this)" style="font-size:11px; padding:4px 10px; border-color:rgba(245,158,11,0.4); color:#f59e0b;" title="Discard drafts whose email is older than 3 days — the automation can no longer send those">🧹 Clear old</button>
         </div>
       </div>
       <div id="draft-queue-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -2145,6 +2146,31 @@ async function saveDraft(draftId) {
     await loadTalentData(state.selectedTalent);
   } catch (_) {}
 }
+async function clearStaleDrafts(btn) {
+  // Drafts whose source email is older than the draft queue's age guard can never
+  // send — they just bury the ones that can. On 2026-09-08 that backlog was 275
+  // drafts going back to June, hiding the 4 that were actually actionable.
+  const label = btn ? btn.textContent : '';
+  try {
+    if (btn) { btn.disabled = true; btn.textContent = 'Checking…'; }
+    const preview = await api('POST', '/api/drafts/discard-stale?older_than_days=3&apply=false');
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+    if (!preview.matched) { showToast('No old drafts to clear.'); return; }
+    const skipped = preview.skipped_send_in_progress
+      ? `\n\n${preview.skipped_send_in_progress} skipped — a send may be in progress on those.` : '';
+    if (!confirm(`Discard ${preview.matched} draft(s) whose email is older than 3 days?` +
+                 `\n\nThese can no longer be sent by the automation. Recent drafts are untouched.${skipped}`)) return;
+    if (btn) { btn.disabled = true; btn.textContent = 'Clearing…'; }
+    const res = await api('POST', '/api/drafts/discard-stale?older_than_days=3&apply=true');
+    showToast(`Cleared ${res.discarded} old draft(s).`);
+    await loadDraftQueue();
+    await loadTalentData(state.selectedTalent);
+  } catch (_) {
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = label; }
+  }
+}
+
 async function discardDraft(draftId) {
   if (!confirm('Permanently discard this draft?')) return;
   try {
