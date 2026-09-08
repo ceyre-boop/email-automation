@@ -8,6 +8,7 @@ GET  /api/status          → talent connection status overview
 from __future__ import annotations
 
 import logging
+import os
 import threading
 from datetime import datetime, timedelta
 
@@ -28,6 +29,11 @@ logger = logging.getLogger(__name__)
 # Both jobs run 50-worker thread pools against the same NOT-IN subquery —
 # without this lock they race to create duplicate Gmail drafts.
 _draft_queue_lock = threading.Lock()
+
+# Oldest email the automation may draft a reply for. See the AGE GUARD comment in
+# _run_draft_queue_inner: this is what stops a missing draft row from being read as
+# "never answered" and re-drafting mail that was handled weeks ago.
+DRAFT_MAX_AGE_DAYS = int(os.getenv("DRAFT_MAX_AGE_DAYS", "3"))
 
 
 import hashlib
@@ -303,11 +309,26 @@ def _run_draft_queue_inner(batch_size: int = 60):
             .where(Draft.gmail_message_id == ProcessedEmail.gmail_message_id)
             .exists()
         )
+        # AGE GUARD — never draft for old mail.
+        #
+        # "Needs a draft" is defined as "Score 3 with no draft row". That makes the
+        # queue only as correct as the draft table's history: on 2026-09-08 a
+        # retention purge removed 29,247 old sent drafts and 29,000 already-answered
+        # emails instantly looked brand new. The queue began re-drafting them and
+        # would have sent second replies to brands answered weeks earlier; only the
+        # guardian's runaway kill stopped it.
+        #
+        # No legitimate new brand deal arrives as a three-week-old email. Anything
+        # older than DRAFT_MAX_AGE_DAYS has been handled, and if it truly has not,
+        # that is a human decision rather than an automated one. This makes the queue
+        # immune to the entire class of mistake — including any future purge.
+        _draft_age_cutoff = _dt.utcnow() - _td(days=DRAFT_MAX_AGE_DAYS)
         candidates = (
             db.query(ProcessedEmail)
             .filter(
                 ProcessedEmail.score == 3,
                 ProcessedEmail.status != "archived",
+                ProcessedEmail.processed_at >= _draft_age_cutoff,
                 ~drafted_exists,
             )
             .order_by(ProcessedEmail.processed_at.desc())  # newest first
@@ -727,6 +748,8 @@ def _blast_all_until_empty():
             remaining = db.query(ProcessedEmail).filter(
                 ProcessedEmail.score == 3,
                 ProcessedEmail.status != "archived",
+                # Same age guard as the draft queue — see _run_draft_queue_inner.
+                ProcessedEmail.processed_at >= datetime.utcnow() - timedelta(days=DRAFT_MAX_AGE_DAYS),
                 ~drafted_exists,
             ).count()
         finally:

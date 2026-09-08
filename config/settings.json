@@ -171,7 +171,8 @@
     "inbox_cache_retention_days": 30,
     "poll_health_retention_days": 7,
     "batch_size": 500,
-    "max_batches_per_run": 20
+    "max_batches_per_run": 20,
+    "_draft_row_warning": "Deleting drafts removes the ONLY record that an email was answered: the draft queue treats a Score-3 email with no draft row as needing a draft. On 2026-09-08 purging 29,247 old sent drafts made 29,000 answered emails look new and the queue began re-drafting them. The DRAFT_MAX_AGE_DAYS guard in cron.py is what makes this safe — do not raise drafts_retention_days below that guard's horizon, and never remove the guard."
   },
   "_auto_send_hold_minutes_comment": "Minutes a draft must sit untouched before auto_send may send it — the window managers have to catch a bad draft. Lowered 60 -> 30 on 2026-09-04 at TABOOST's direction to halve brand response time. Not an SOP value: the Automated Send Workflow defines the send gate and Reply-To handling but specifies no hold period, so this is a tunable, not a compliance rule.",
   "openai_timeout_seconds": 45,
