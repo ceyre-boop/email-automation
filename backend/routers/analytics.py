@@ -12,6 +12,8 @@ Panel 5  GET /api/analytics/marco/messages        → AI narrative messages for 
 from __future__ import annotations
 
 import logging
+import threading
+import time
 from collections import defaultdict
 from datetime import datetime, timedelta, time as dt_time
 from typing import Optional
@@ -40,6 +42,31 @@ router = APIRouter(
 )
 logger = logging.getLogger(__name__)
 
+# ── Response cache ────────────────────────────────────────────────────────────
+# These endpoints run GROUP BY aggregates over processed_emails (70k rows, 180MB).
+# The dashboard polls them continuously while anyone has it open, so an open
+# browser tab meant a full scan of the largest table every few seconds — one of
+# them was still being killed by the statement timeout on 2026-09-08 with
+# "SSL connection has been closed unexpectedly". Analytics describe trends over
+# days; serving them from a short cache costs nothing in accuracy and takes the
+# load off entirely.
+_ANALYTICS_TTL_SECONDS = 120
+_analytics_cache: dict[str, tuple[float, object]] = {}
+_analytics_cache_lock = threading.Lock()
+
+
+def _cached(key: str, producer):
+    """Return a cached analytics payload, recomputing at most every TTL."""
+    now = time.monotonic()
+    with _analytics_cache_lock:
+        hit = _analytics_cache.get(key)
+        if hit and (now - hit[0]) < _ANALYTICS_TTL_SECONDS:
+            return hit[1]
+    value = producer()
+    with _analytics_cache_lock:
+        _analytics_cache[key] = (now, value)
+    return value
+
 
 def _window_start(days: int = 7) -> datetime:
     # Snap to midnight UTC so daily_volume bars sum exactly to total_emails.
@@ -52,6 +79,10 @@ def _window_start(days: int = 7) -> datetime:
 
 @router.get("/triage-intelligence")
 def triage_intelligence(days: int = 1, db: Session = Depends(get_db)):
+    return _cached(f"triage_intelligence:{days}", lambda: _triage_intelligence_uncached(days, db))
+
+
+def _triage_intelligence_uncached(days: int = 1, db: Session = None):
     """Today's triage decision breakdown + top Score 2 reasons for the dashboard."""
     since = datetime.utcnow() - timedelta(days=days)
 
@@ -108,6 +139,10 @@ def triage_intelligence(days: int = 1, db: Session = Depends(get_db)):
 
 @router.get("/talent-health")
 def talent_health(days: int = 7, db: Session = Depends(get_db)):
+    return _cached(f"talent_health:{days}", lambda: _talent_health_uncached(days, db))
+
+
+def _talent_health_uncached(days: int = 7, db: Session = None):
     """Per-talent volume, response load, escalation rate, spam rate, risk flags."""
     settings = get_settings()
     talent_configs = {t["key"].lower(): t for t in settings.talent_list}
@@ -173,6 +208,10 @@ def talent_health(days: int = 7, db: Session = Depends(get_db)):
 
 @router.get("/scenario-performance")
 def scenario_performance(days: int = 7, db: Session = Depends(get_db)):
+    return _cached(f"scenario_performance:{days}", lambda: _scenario_performance_uncached(days, db))
+
+
+def _scenario_performance_uncached(days: int = 7, db: Session = None):
     """Which offer types fire most, which escalate, which score highest."""
     since = _window_start(days)
 
@@ -217,6 +256,10 @@ def scenario_performance(days: int = 7, db: Session = Depends(get_db)):
 
 @router.get("/operational-load")
 def operational_load(days: int = 7, db: Session = Depends(get_db)):
+    return _cached(f"operational_load:{days}", lambda: _operational_load_uncached(days, db))
+
+
+def _operational_load_uncached(days: int = 7, db: Session = None):
     """Emails per hour/day, automation rate, time saved, human interventions."""
     since = _window_start(days)
 
