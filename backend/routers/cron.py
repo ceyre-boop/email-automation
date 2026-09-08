@@ -281,15 +281,26 @@ def _run_draft_queue_inner(batch_size: int = 60):
             )
             return
 
-        # Subquery: find Score-3 ProcessedEmails that have no matching Draft row
-        # Uses NOT EXISTS instead of loading all draft IDs into Python memory
-        drafted_subq = select(Draft.gmail_message_id)
+        # Score-3 ProcessedEmails with no matching Draft row.
+        #
+        # This was NOT IN (SELECT gmail_message_id FROM drafts), which materialises
+        # every draft id (34k) and re-scans it for each of the 70k processed rows.
+        # On 2026-09-08 it began exceeding the 20s statement_timeout outright, which
+        # is why the draft queue went down for hours and no drafts were produced —
+        # the job "executed successfully" every cycle while its one query died.
+        # NOT EXISTS is a correlated anti-join: it stops at the first match and can
+        # use the unique index on drafts.gmail_message_id.
+        drafted_exists = (
+            select(Draft.id)
+            .where(Draft.gmail_message_id == ProcessedEmail.gmail_message_id)
+            .exists()
+        )
         candidates = (
             db.query(ProcessedEmail)
             .filter(
                 ProcessedEmail.score == 3,
                 ProcessedEmail.status != "archived",
-                ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+                ~drafted_exists,
             )
             .order_by(ProcessedEmail.processed_at.desc())  # newest first
             .limit(batch_size)
@@ -700,11 +711,15 @@ def _blast_all_until_empty():
         SessionLocal = get_session_factory()
         db = SessionLocal()
         try:
-            drafted_subq = select(Draft.gmail_message_id)
+            drafted_exists = (
+                select(Draft.id)
+                .where(Draft.gmail_message_id == ProcessedEmail.gmail_message_id)
+                .exists()
+            )
             remaining = db.query(ProcessedEmail).filter(
                 ProcessedEmail.score == 3,
                 ProcessedEmail.status != "archived",
-                ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+                ~drafted_exists,
             ).count()
         finally:
             db.close()
