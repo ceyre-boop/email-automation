@@ -3156,3 +3156,86 @@ def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depend
         "marker_rows_deleted": deleted,
         "sample": routable[:10],
     }
+
+@router.post("/admin/orphaned-gmail-drafts", dependencies=[Depends(verify_api_key)])
+def cleanup_orphaned_gmail_drafts(
+    apply: bool = False,
+    talent_key: str | None = None,
+    db: Session = Depends(get_db),
+):
+    """Trash Gmail drafts that no longer have a row in the drafts table.
+
+    A Gmail draft and its DB row are two halves of one thing. Deleting rows —
+    retention, a purge, a manual cleanup — leaves the Gmail side behind with no
+    pointer back, because the gmail_draft_id lived on the row that was deleted.
+    That happened on 2026-09-08: 325 bogus drafts were removed from the database
+    and their Gmail copies stayed in the mailbox, cluttering the review queue.
+
+    An orphan is safe to remove: nothing in the system can ever send it (the send
+    path drives from the DB row), so it is dead weight in a human's inbox. Gmail's
+    trash is recoverable for 30 days, which is the safety net here.
+
+    DRY RUN by default. Pass ?apply=true to actually trash.
+    """
+    from backend.services import gmail as gmail_svc
+    from backend.services.inbox_routing import shared_inbox_email
+
+    known_ids = {
+        row_id for (row_id,) in db.query(Draft.gmail_draft_id)
+        .filter(Draft.gmail_draft_id.isnot(None)).all()
+    }
+
+    if talent_key:
+        tokens = [resolve_token_for_talent(db, talent_key)]
+        tokens = [t for t in tokens if t]
+    else:
+        tokens = db.query(TalentToken).filter(TalentToken.active.is_(True)).all()
+
+    results = []
+    total_orphans = 0
+    total_trashed = 0
+
+    for token in tokens:
+        mailbox = getattr(token, "email", "?")
+        try:
+            service = gmail_svc.build_service(token, db)
+            stubs, page_token = [], None
+            while True:
+                kwargs = {"userId": "me", "maxResults": 500}
+                if page_token:
+                    kwargs["pageToken"] = page_token
+                page = service.users().drafts().list(**kwargs).execute()
+                stubs.extend(page.get("drafts", []))
+                page_token = page.get("nextPageToken")
+                if not page_token:
+                    break
+
+            orphans = [d["id"] for d in stubs if d.get("id") not in known_ids]
+            total_orphans += len(orphans)
+            trashed = 0
+            if apply:
+                for did in orphans:
+                    try:
+                        service.users().drafts().delete(userId="me", id=did).execute()
+                        trashed += 1
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("orphan cleanup: %s / %s failed: %s", mailbox, did, exc)
+            total_trashed += trashed
+            results.append({
+                "mailbox": mailbox,
+                "gmail_drafts": len(stubs),
+                "orphans": len(orphans),
+                "trashed": trashed,
+                "sample": orphans[:5],
+            })
+        except Exception as exc:  # noqa: BLE001
+            results.append({"mailbox": mailbox, "error": str(exc)[:200]})
+
+    return {
+        "dry_run": not apply,
+        "known_db_draft_ids": len(known_ids),
+        "total_orphans": total_orphans,
+        "total_trashed": total_trashed,
+        "shared_inbox": shared_inbox_email(),
+        "by_mailbox": results,
+    }
