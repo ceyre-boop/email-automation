@@ -379,6 +379,42 @@ def _process_shared_inbox_message(
         # SOP v16 Rule 12 — resolve talent from original recipient header
         to_address = gmail_svc.get_to_address(detail, alias_map)
         talent_key = _resolve_talent_from_to(to_address, alias_map)
+        thread_id = detail.get("thread_id", "")
+
+        if talent_key is None and thread_id:
+            # THREAD-CONTINUITY FALLBACK. Once talent-mgmt@'s own automated reply goes
+            # out, the brand's next reply naturally addresses talent-mgmt@ itself —
+            # their mail client replies to whoever sent the last message, not to the
+            # alias that started the thread. The alias then appears in NO header of
+            # the reply, so alias matching fails on every second message of every
+            # negotiation for every shared-inbox talent. Found 2026-09-14: 27 of 37
+            # currently-unrouted emails were exactly this — real ongoing deals (a
+            # counter-offer, a follow-up question) silently misfiled as UNROUTED
+            # instead of showing on the correct talent's dashboard.
+            #
+            # If this thread already resolved to a real talent, trust that — a
+            # thread_id is Gmail's own conversation identity, scoped to one mailbox,
+            # so a collision with an unrelated talent is not a realistic risk. This
+            # does not skip review: _process_one_message's existing ongoing-thread
+            # check (below) will see the prior activity and correctly flag it for
+            # human review under that talent, per SOP Rule 5/10 — it just does so
+            # attributed to the right person instead of a generic unrouted pile.
+            prior = (
+                db.query(ProcessedEmail.talent_key)
+                .filter(
+                    ProcessedEmail.thread_id == thread_id,
+                    ProcessedEmail.talent_key != "UNROUTED",
+                )
+                .order_by(ProcessedEmail.processed_at.asc())
+                .first()
+            )
+            if prior and prior[0] and prior[0].lower() in talent_map:
+                talent_key = prior[0]
+                logger.info(
+                    "Thread-continuity fallback: %s has no alias match but thread %s "
+                    "previously resolved to %s — routing there instead of UNROUTED.",
+                    message_id, thread_id, talent_key,
+                )
 
         if talent_key is None:
             # Unrecognized alias — leave in inbox, log for human review (Option B)
@@ -393,7 +429,7 @@ def _process_shared_inbox_message(
                 db.add(ProcessedEmail(
                     talent_key="UNROUTED",
                     gmail_message_id=message_id,
-                    thread_id=detail.get("thread_id", ""),
+                    thread_id=thread_id,
                     sender=detail.get("sender", ""),
                     subject=detail.get("subject", ""),
                     score=0,
