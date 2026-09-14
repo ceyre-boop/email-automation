@@ -3104,7 +3104,9 @@ def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depend
     if not token:
         return {"error": f"no token row for shared inbox {inbox}"}
 
+    from backend.services.sop_parser import get_active_profiles
     alias_map = _build_alias_map(settings)
+    talent_map = {k.lower() for k in get_active_profiles(settings.talent_profiles)}
     service = gmail_svc.build_service(token, db)
     rows = (
         db.query(ProcessedEmail)
@@ -3123,6 +3125,23 @@ def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depend
                 continue
             addr = gmail_svc.get_to_address(detail, alias_map)
             talent_key = _resolve_talent_from_to(addr, alias_map)
+            if talent_key is None and row.thread_id:
+                # Same thread-continuity fallback as poller.py: a reply late in a
+                # negotiation carries the alias in NO header once talent-mgmt@'s own
+                # reply is what the brand is answering. Trust a thread that already
+                # resolved to a real, still-active talent.
+                prior = (
+                    db.query(ProcessedEmail.talent_key)
+                    .filter(
+                        ProcessedEmail.thread_id == row.thread_id,
+                        ProcessedEmail.talent_key != "UNROUTED",
+                        ProcessedEmail.id != row.id,
+                    )
+                    .order_by(ProcessedEmail.processed_at.asc())
+                    .first()
+                )
+                if prior and prior[0] and prior[0].lower() in talent_map:
+                    talent_key = prior[0]
             if talent_key:
                 routable.append({"id": row.id, "message_id": row.gmail_message_id,
                                  "alias": addr, "talent": talent_key})
