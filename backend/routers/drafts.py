@@ -433,33 +433,67 @@ def regenerate_draft(gmail_message_id: str, db: Session = Depends(get_db)):
                 detail=f"Gmail draft creation failed for {pe.talent_key} — status={exc.status} reason={exc.reason}",
             )
 
-        # Discard old pending drafts for this email before saving new one
-        old_drafts = db.query(Draft).filter(
-            Draft.gmail_message_id == gmail_message_id,
-            Draft.status == DraftStatus.pending,
-        ).all()
-        for old in old_drafts:
-            old.status = DraftStatus.discarded
-            db.add(old)
-
-        draft_row = Draft(
-            talent_key=pe.talent_key.lower(),
-            gmail_message_id=gmail_message_id,
-            thread_id=thread_id,
-            sender=sender,
-            subject=subject,
-            brand_name=pe.brand_name,
-            proposed_rate=pe.proposed_rate,
-            offer_type=pe.offer_type,
-            draft_text=draft_text,
-            cc_recipients=cc_str,
-            gmail_draft_id=gmail_draft_id,
-            message_id_header=None,
-            status=DraftStatus.pending,
-            is_escalate=False,
-            triggered_by_job="regenerate-button",
+        # Regeneration is an UPDATE, not an insert. drafts.gmail_message_id carries
+        # a UNIQUE constraint — one draft row per email is the invariant that stops
+        # the same brand being replied to twice — so discarding the old row and
+        # inserting a new one failed outright with UniqueViolation, which is exactly
+        # what happened when the two Anastasiya drafts needed regenerating after the
+        # V-16d SOP change on 2026-09-14. The endpoint had never worked for an email
+        # that already had a draft, which is every case a human actually reaches for.
+        existing = (
+            db.query(Draft)
+            .filter(Draft.gmail_message_id == gmail_message_id)
+            .first()
         )
-        db.add(draft_row)
+        if existing:
+            _reject_if_send_in_progress(existing, "regenerate")
+            existing.talent_key = pe.talent_key.lower()
+            existing.thread_id = thread_id
+            existing.sender = sender
+            existing.subject = subject
+            existing.brand_name = pe.brand_name
+            existing.proposed_rate = pe.proposed_rate
+            existing.offer_type = pe.offer_type
+            existing.draft_text = draft_text
+            existing.cc_recipients = cc_str
+            existing.gmail_draft_id = gmail_draft_id
+            existing.status = DraftStatus.pending
+            existing.is_escalate = False
+            existing.escalate_reason = None
+            # The stale text is gone, so the verbatim failure that flagged this row
+            # is gone with it. Leaving these set would keep it INVALID forever.
+            existing.validation_failed = False
+            existing.validation_error = None
+            existing.human_edited = False
+            existing.dismissed = False
+            existing.reviewed_at = None
+            existing.reviewed_by = None
+            existing.send_claimed_at = None
+            # Restart the auto-send hold so a regenerated draft gets a fresh review
+            # window rather than sending the instant it is written.
+            existing.created_at = datetime.utcnow()
+            existing.triggered_by_job = "regenerate-button"
+            db.add(existing)
+            draft_row = existing
+        else:
+            draft_row = Draft(
+                talent_key=pe.talent_key.lower(),
+                gmail_message_id=gmail_message_id,
+                thread_id=thread_id,
+                sender=sender,
+                subject=subject,
+                brand_name=pe.brand_name,
+                proposed_rate=pe.proposed_rate,
+                offer_type=pe.offer_type,
+                draft_text=draft_text,
+                cc_recipients=cc_str,
+                gmail_draft_id=gmail_draft_id,
+                message_id_header=None,
+                status=DraftStatus.pending,
+                is_escalate=False,
+                triggered_by_job="regenerate-button",
+            )
+            db.add(draft_row)
 
         # SOP Rule 11: remove from INBOX at draft creation; "A Initial Response" label applied post-send only
         gmail_svc.remove_from_inbox(token, gmail_message_id, db=db)
