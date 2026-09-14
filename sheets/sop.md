@@ -311,6 +311,10 @@ Use Reply-To: talent-mgmt@taboost.me for the following talent inboxes:
 - Jocelyn / jocelyn@taboost.me
 - Hana / hana@taboost.me
 - Wesley / wesley@taboost.me
+- Lindsay / lindsay@taboost.me
+- Jenn / jenn@taboost.me
+- Grayson / grayson@taboost.me
+- BKuhl / bkuhl@taboost.me
 
 Use Reply-To: partnerships@taboost.me for the following talent inboxes:
 
@@ -318,6 +322,8 @@ Use Reply-To: partnerships@taboost.me for the following talent inboxes:
 - Kylika / kylika@taboost.me
 - Audur / audur@taboost.me
 - Trinity / trinity@taboost.me
+- Mahogany / mahogany@taboost.me
+- Anastasiya / anastasiya@taboost.me
 
 If a talent or inbox is not listed here, leave Reply-To blank/default.
 
@@ -516,6 +522,28 @@ Scenario C: Personal Email Forward
 Personal Email:
 
 - thebanksedit@gmail.com
+Talent: Lindsay Reisert
+Key: Lindsay
+Manager: N/A
+Gmail: Gmail - Lindsay
+Min Rate: $750 per video
+Auto Send: yes
+Paused: no
+
+Scenario A: Initial Inbound (Default Response)
+Approved Response:
+Thank you so much for reaching out about a potential partnership with Lindsay!! I’m happy to share her rates below:
+     **1 TikTok** [livingwith.lindsay](https://www.tiktok.com/@livingwith.lindsay) - $750
+     **1 UGC Video** - $600 (usage to be negotiated)
+
+Lindsay is an **L5+ creator** specializing in **fashion**, with a strong ability to authentically sell elevated yet affordable styles through relatable, everyday content. As a hairstylist, she also has a natural authority with hair products, making her recommendations feel trusted and organic!
+
+Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Scenario C: Personal Email Forward
+Personal Emails:
+
+- lindsay@lindsayreisert.com
+
 Talent: Skyler Clark
 Key: Skyler
 Manager: Marco Perez <marco@taboost.me>

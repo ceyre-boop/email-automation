@@ -39,15 +39,13 @@ def _sop_part3_groups() -> dict[str, list[str]]:
     return groups
 
 
-# The creator-mgmt@taboost.me mailbox was retired. Its five talents are
-# deliberately listed in NO Part 3 group, which per Part 3's closing line means
-# blank/default Reply-To — the behaviour they already had. Adding a group back
-# for a dead mailbox would drop brand replies entirely.
+# creator-mgmt@taboost.me was retired, and for a while its five talents sat in no
+# Part 3 group at all — meaning they sent with no Reply-To and brand replies went
+# wherever the brand's own reply-to pointed. SOP V-16d closes that: Mahogany and
+# Anastasiya move to partnerships@, Jenn/Grayson/BKuhl to talent-mgmt@. Every alias
+# now resolves to a live mailbox, so there is no deviation left to carry.
 RETIRED_GROUPS = {"creator-mgmt@taboost.me"}
-NO_REPLY_TO_BY_DESIGN = {
-    "mahogany@taboost.me", "anastasiya@taboost.me", "jenn@taboost.me",
-    "grayson@taboost.me", "bkuhl@taboost.me",
-}
+NO_REPLY_TO_BY_DESIGN: set[str] = set()
 
 
 def test_config_mirrors_sop_part3_exactly():
@@ -92,13 +90,27 @@ def test_talent_key_is_case_insensitive():
     assert reply_to_for_talent("ALLEE") == "talent-mgmt@taboost.me"
 
 
-@pytest.mark.parametrize("talent_key", ["Mahogany", "Anastasiya", "Jenn", "Grayson", "BKuhl"])
-def test_retired_creator_mgmt_talents_get_no_reply_to(talent_key):
-    """Unchanged from current live behaviour, and deliberately so — a Reply-To
-    pointing at the retired creator-mgmt@ mailbox would lose the reply outright."""
+@pytest.mark.parametrize("talent_key,expected", [
+    ("Mahogany", "partnerships@taboost.me"),
+    ("Anastasiya", "partnerships@taboost.me"),
+    ("Jenn", "talent-mgmt@taboost.me"),
+    ("Grayson", "talent-mgmt@taboost.me"),
+    ("BKuhl", "talent-mgmt@taboost.me"),
+])
+def test_former_creator_mgmt_talents_now_resolve(talent_key, expected):
+    """V-16d rehomes the five talents orphaned by the retired creator-mgmt@ mailbox.
+    Before this they sent with no Reply-To and brand replies were unrouted."""
     class Token:
         email = "talent-mgmt@taboost.me"
-    assert reply_to_for_talent(talent_key, token_row=Token()) is None
+    assert reply_to_for_talent(talent_key, token_row=Token()) == expected
+
+
+def test_lindsay_routes_to_talent_mgmt():
+    """New in V-16d. Her mail arrives at the shared inbox via her alias, so the
+    Reply-To has to follow the talent, not the receiving mailbox."""
+    class Token:
+        email = "talent-mgmt@taboost.me"
+    assert reply_to_for_talent("Lindsay", token_row=Token()) == "talent-mgmt@taboost.me"
 
 
 def test_partnerships_talents_still_resolve_from_their_own_token():
