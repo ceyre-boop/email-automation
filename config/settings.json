@@ -164,7 +164,9 @@
     "enabled": true,
     "stall_minutes": 30,
     "cooldown_minutes": 60,
-    "alert_email": "colineyre222@gmail.com"
+    "alert_email": "colineyre222@gmail.com",
+    "unrouted_warn_per_24h": 15,
+    "_unrouted_warn_comment": "Alerts when UNROUTED emails in the last 24h exceed this. Added 2026-09-14: a routing regression does not stall the pipeline — poll/triage/draft/send all keep looking healthy while real brand deals quietly drop into the UNROUTED bucket instead of a talent's dashboard. This is the check that would have caught the thread-continuity gap in a day instead of weeks."
   },
   "claim_reaper": {
     "_comment": "Resolves expired auto_send claims by asking Gmail what actually happened, rather than clearing them blindly — a worker can die AFTER Gmail accepts a send, and a blind retry would send a brand a duplicate reply. Only two outcomes are actioned: Gmail draft still exists (nothing sent -> release the claim) or the thread carries a SENT message (it did send -> record it). Anything else is left for a human.",

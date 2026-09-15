@@ -3176,6 +3176,47 @@ def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depend
         "sample": routable[:10],
     }
 
+@router.post("/admin/unrouted/{gmail_message_id}/assign", dependencies=[Depends(verify_api_key)])
+def assign_unrouted_email(gmail_message_id: str, talent_key: str, db: Session = Depends(get_db)):
+    """Manually assign an UNROUTED email to a talent — and unlock its whole thread.
+
+    The thread-continuity fallback (poller.py) routes a reply with no alias match
+    to whichever talent the thread already resolved to. That self-heals every
+    negotiation EXCEPT the one case it structurally cannot: when the very first
+    message in a brand-new thread fails to route, there is no prior resolution to
+    fall back to, so every reply after it stays UNROUTED too — with no automated
+    way out. This is that way out. Fixing the root email here means the
+    fallback picks up every later reply in the same thread automatically; nobody
+    should ever need to call this endpoint twice for the same negotiation.
+
+    Sets the row's talent_key (out of the UNROUTED bucket) so it shows on that
+    talent's dashboard, exactly like SOP Rule 5/10's ongoing-thread review does.
+    Does not draft or send anything — a human decided the talent, a human still
+    reviews the reply.
+    """
+    from backend.services.sop_parser import get_active_profiles
+
+    profiles = get_active_profiles(get_settings().talent_profiles)
+    match = next((k for k in profiles if k.lower() == talent_key.lower()), None)
+    if not match:
+        raise HTTPException(status_code=400, detail=f"'{talent_key}' is not an active talent.")
+
+    row = (
+        db.query(ProcessedEmail)
+        .filter(ProcessedEmail.gmail_message_id == gmail_message_id, ProcessedEmail.talent_key == "UNROUTED")
+        .first()
+    )
+    if not row:
+        raise HTTPException(status_code=404, detail="No UNROUTED row found for that message id.")
+
+    row.talent_key = match
+    row.triage_reason = f"Manually assigned to {match} — {row.triage_reason or ''}".strip(" —")
+    db.add(row)
+    db.commit()
+    logger.info("Manually assigned unrouted email %s to %s (thread %s)", gmail_message_id, match, row.thread_id)
+    return {"ok": True, "gmail_message_id": gmail_message_id, "talent_key": match, "thread_id": row.thread_id}
+
+
 @router.post("/admin/orphaned-gmail-drafts", dependencies=[Depends(verify_api_key)])
 def cleanup_orphaned_gmail_drafts(
     apply: bool = False,

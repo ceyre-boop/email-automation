@@ -56,6 +56,9 @@ def check_pipeline_stall(db: Session) -> dict:
     since = now - timedelta(minutes=stall_minutes)
     hour_ago = now - timedelta(minutes=60)
 
+    day_ago = now - timedelta(hours=24)
+    unrouted_warn = int(cfg.get("unrouted_warn_per_24h", 15))
+
     try:
         processed_in_window = (
             db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= since).count()
@@ -72,6 +75,17 @@ def check_pipeline_stall(db: Session) -> dict:
             .filter(Draft.reviewed_at >= hour_ago, Draft.status == "sent")
             .count()
         )
+        # Revenue-relevant, not just liveness: a routing regression does not stop
+        # the pipeline (poll/triage/draft/send all keep looking healthy), it just
+        # quietly drops real brand deals into the UNROUTED pile instead of a
+        # talent's dashboard. That is exactly how the 2026-09-14 thread-continuity
+        # gap ran for weeks unnoticed — every other metric here stayed green the
+        # whole time. This is the check that would have caught it in a day.
+        unrouted_last_24h = (
+            db.query(ProcessedEmail)
+            .filter(ProcessedEmail.processed_at >= day_ago, ProcessedEmail.talent_key == "UNROUTED")
+            .count()
+        )
     except Exception as exc:  # noqa: BLE001
         logger.warning("stall_alarm: metric query failed: %s", exc)
         return {"stalled": False, "reason": None, "error": str(exc)[:200]}
@@ -83,6 +97,7 @@ def check_pipeline_stall(db: Session) -> dict:
         "score3_last_hour": score3_last_hour,
         "drafts_last_hour": drafts_last_hour,
         "sends_last_hour": sends_last_hour,
+        "unrouted_last_24h": unrouted_last_24h,
     }
 
     reason = None
@@ -95,6 +110,13 @@ def check_pipeline_stall(db: Session) -> dict:
         reason = (
             f"NOTHING DRAFTED — {score3_last_hour} Score 3 email(s) in the last hour "
             f"produced 0 drafts. Triage is working, draft creation is not."
+        )
+    elif unrouted_last_24h > unrouted_warn:
+        reason = (
+            f"ROUTING REGRESSION — {unrouted_last_24h} emails landed UNROUTED in the last "
+            f"24h (warn at {unrouted_warn}). The pipeline looks healthy on every other metric, "
+            "but real brand mail may be silently missing its talent's dashboard. Check "
+            "/api/dashboard/debug/routing-headers and /api/dashboard/admin/reroute-unrouted."
         )
 
     return {"stalled": reason is not None, "reason": reason, **metrics}
