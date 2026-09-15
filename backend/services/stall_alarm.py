@@ -90,6 +90,77 @@ def check_pipeline_stall(db: Session) -> dict:
         logger.warning("stall_alarm: metric query failed: %s", exc)
         return {"stalled": False, "reason": None, "error": str(exc)[:200]}
 
+    # Dead-token detection: a REFRESH FAILURE deactivation (oauth.py) leaves
+    # consecutive_failures > 0 or a recorded last_error. The 13 shared-inbox
+    # talents are also active=False, but deliberately so — never polled
+    # individually, zero failures, no error — and must not trip this.
+    dead_tokens = [
+        t.talent_key for t in
+        db.query(TalentToken)
+        .filter(
+            TalentToken.active.is_(False),
+            (TalentToken.consecutive_failures > 0) | (TalentToken.last_error.isnot(None)),
+        )
+        .all()
+    ]
+
+    # Guardian-paused talents: mail isn't even ingested while paused (poller.py
+    # skips the Gmail account outright), so nothing about a stuck pause shows up
+    # anywhere else. guardian_pause_sent_at_<key> is the timestamp the guardian
+    # itself writes when it pauses a talent.
+    paused_warn_minutes = int(cfg.get("paused_talent_warn_minutes", 180))
+    paused_talents: list[tuple[str, float]] = []
+    try:
+        from backend.services.guardian import _get_state
+        for key, profile in get_settings().talent_profiles.items():
+            if not profile.paused:
+                continue
+            ts = _get_state(db, f"guardian_pause_sent_at_{key}")
+            if not ts:
+                continue
+            try:
+                paused_since = datetime.fromisoformat(ts)
+            except ValueError:
+                continue
+            minutes = (now - paused_since).total_seconds() / 60
+            if minutes > paused_warn_minutes:
+                paused_talents.append((key, minutes))
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("stall_alarm: paused-talent check failed (non-fatal): %s", exc)
+
+    # Escalated drafts ("no matching approved response") can NEVER auto-send
+    # regardless of the talent's Auto Send setting (auto_send.py excludes
+    # is_escalate rows outright) and have no dedicated review view anywhere.
+    escalation_warn_hours = int(cfg.get("escalation_warn_hours", 24))
+    stale_escalations = (
+        db.query(Draft)
+        .filter(
+            Draft.is_escalate.is_(True),
+            Draft.status == "pending",
+            Draft.created_at < now - timedelta(hours=escalation_warn_hours),
+        )
+        .count()
+    )
+
+    # Score-2 ("human review required") backlog. By design these never auto-send —
+    # a live negotiation reply needs a human judgment call — but the queue has no
+    # staleness signal anywhere else, and it has been growing 300-800/week for
+    # months. This does not claim the whole backlog is a fire; it is the number
+    # that lets a human decide whether it is.
+    score2_warn = int(cfg.get("score2_backlog_warn", 5000))
+    score2_total = (
+        db.query(ProcessedEmail).filter(ProcessedEmail.score == 2, ProcessedEmail.status == "flagged").count()
+    )
+    score2_older_than_7d = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.score == 2, ProcessedEmail.status == "flagged",
+            ProcessedEmail.processed_at < now - timedelta(days=7),
+        )
+        .count()
+    )
+    score2_backlog_growth_flag = score2_older_than_7d > score2_warn
+
     metrics = {
         "window_minutes": stall_minutes,
         "processed_in_window": processed_in_window,
@@ -98,6 +169,11 @@ def check_pipeline_stall(db: Session) -> dict:
         "drafts_last_hour": drafts_last_hour,
         "sends_last_hour": sends_last_hour,
         "unrouted_last_24h": unrouted_last_24h,
+        "dead_tokens": dead_tokens,
+        "paused_talents": [{"talent_key": k, "minutes_paused": round(m)} for k, m in paused_talents],
+        "stale_escalations": stale_escalations,
+        "score2_backlog_total": score2_total,
+        "score2_backlog_older_than_7d": score2_older_than_7d,
     }
 
     reason = None
@@ -117,6 +193,37 @@ def check_pipeline_stall(db: Session) -> dict:
             f"24h (warn at {unrouted_warn}). The pipeline looks healthy on every other metric, "
             "but real brand mail may be silently missing its talent's dashboard. Check "
             "/api/dashboard/debug/routing-headers and /api/dashboard/admin/reroute-unrouted."
+        )
+    elif dead_tokens:
+        reason = (
+            f"TALENT INBOX DOWN — {len(dead_tokens)} Gmail token(s) deactivated after repeated "
+            f"refresh failures and never reconnected: {', '.join(dead_tokens[:5])}. Polling, "
+            "triage and drafting are silently excluded for these talents — every other metric "
+            "here stays green because the rest of the roster keeps working. Reconnect Gmail "
+            "for the affected talent(s)."
+        )
+    elif paused_talents:
+        reason = (
+            f"TALENT PAUSED — {', '.join(f'{k} ({int(mins)}min)' for k, mins in paused_talents[:5])} "
+            f"paused by the guardian for over {paused_warn_minutes} minutes with no auto-recovery. "
+            "Mail for a paused talent is not even ingested, so nothing shows in the dashboard "
+            "while it stays paused. Un-pause via the SOP admin once the underlying trigger is "
+            "understood, or confirm the pause is intentional."
+        )
+    elif stale_escalations:
+        reason = (
+            f"{stale_escalations} escalated draft(s) ('no matching approved response') are "
+            f"older than {escalation_warn_hours}h. These can NEVER auto-send regardless of the "
+            "talent's Auto Send setting and have no dedicated review view — a real brand deal "
+            "sits waiting on a human to write a reply from scratch."
+        )
+    elif score2_backlog_growth_flag:
+        reason = (
+            f"SCORE-2 BACKLOG — {score2_older_than_7d} 'human review required' emails "
+            f"(ongoing negotiations, event invites) are older than 7 days, out of "
+            f"{score2_total} total. This queue has no staleness tracking; a real counter-offer "
+            "can sit unanswered indefinitely with nothing surfacing it. Not necessarily a bug — "
+            "confirm someone is actively working this queue."
         )
 
     return {"stalled": reason is not None, "reason": reason, **metrics}

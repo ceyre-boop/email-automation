@@ -345,7 +345,24 @@ def _startup_work():
     # If an admin uploaded a new SOP docx since the last git push, the DB has
     # the authoritative version.  Write it to disk NOW so all subsequent code
     # (validation, triage, reply) sees the correct SOP.
-    if settings.database_url:
+    #
+    # HARD-GATED OFF UNDER PYTEST. On 2026-09-15 this step was found writing
+    # test-fixture content (an "active" SopVersion row created by an unrelated
+    # test, via a leak this file's own history couldn't fully pin down — a
+    # shared engine, fixture ordering, or both) straight over the REAL
+    # sheets/sop.md and sheets/Automated Send Workflow.md on disk, wiping a
+    # talent's real approved response and truncating the workflow doc, on
+    # every subsequent app/TestClient construction in that pytest run. It was
+    # only caught because `git status` showed the damage before anything got
+    # committed — a `git commit -a` right after running the suite would have
+    # pushed corrupted SOP content to the source of truth. Rather than fully
+    # pin the leak path, this step is unconditionally inert under pytest —
+    # `_SOP_PATH`/`_WORKFLOW_PATH` are real, non-monkeypatchable-by-default
+    # module constants and this is the only code path that writes to them
+    # outside an explicit, sandboxed test fixture (sop_sandbox in
+    # test_sop_merge.py), which exercises this exact restore logic safely on
+    # its own temp copies — no coverage is lost by skipping it here.
+    if settings.database_url and "pytest" not in sys.modules:
         try:
             from backend.models.db import SopVersion, get_session_factory as _gsf
             # SKIP_MIGRATIONS=true means create_tables() never ran, so this

@@ -67,6 +67,26 @@ def run_pre_send_checks(draft: Draft, db: Session) -> tuple[bool, str | None]:
             verbatim_err = enforce_verbatim_response(talent_name, body)
             if verbatim_err:
                 return False, f"Verbatim SOP check failed at send time: {verbatim_err}"
+    else:
+        # Verbatim is deliberately skipped here, but a manager typo on a dollar
+        # figure is exactly the kind of mistake this whole gate exists to catch —
+        # skipping it entirely for edits left that one case with NO check at all.
+        # This is narrower than verbatim: it only rejects a rate BELOW the
+        # talent's floor, never a rewritten sentence or added context.
+        profile = get_settings().talent_profiles.get(draft.talent_key) or next(
+            (p for p in get_settings().talent_profiles.values()
+             if p.key.lower() == draft.talent_key.lower()), None,
+        )
+        if profile and profile.minimum_rate_usd:
+            below_floor = [
+                m for m in re.findall(r"\$\s?([\d,]+(?:\.\d+)?)", body)
+                if float(m.replace(",", "")) < float(profile.minimum_rate_usd)
+            ]
+            if below_floor:
+                return False, (
+                    f"Human-edited draft quotes ${below_floor[0]}, below {draft.talent_key}'s "
+                    f"minimum rate of ${profile.minimum_rate_usd:.0f} — check before sending"
+                )
 
     # Check 5 — talent match (source from sop.md profiles, not settings.json talents[])
     known_keys = {k.lower() for k in get_settings().talent_profiles}
