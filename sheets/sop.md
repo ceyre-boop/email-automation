@@ -312,9 +312,12 @@ Use Reply-To: talent-mgmt@taboost.me for the following talent inboxes:
 - Hana / hana@taboost.me
 - Wesley / wesley@taboost.me
 - Lindsay / lindsay@taboost.me
+- BKuhl / bkuhl@taboost.me
+
+(TEMP placements as of 2026-09-18, pending a permanent routing decision — do not
+treat as settled the way the names above are)
 - Jenn / jenn@taboost.me
 - Grayson / grayson@taboost.me
-- BKuhl / bkuhl@taboost.me
 
 Use Reply-To: partnerships@taboost.me for the following talent inboxes:
 

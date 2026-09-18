@@ -113,6 +113,7 @@
   "reply_to_routing": {
     "_comment": "SOP v16 Part 3 — Reply-To Routing List. Sets the Reply-To HEADER on drafts/replies. Header-only routing: never added to the email body, never mentioned in the draft, From address unchanged. Matching is on the TALENT INBOX (the alias the brand emailed, per single_inbox.alias_map — NOT the receiving account, since 13 talents now share talent-mgmt@taboost.me), never on the sender. A talent in no group gets no Reply-To, per Part 3's closing line.",
     "_deviation_from_sop": "V-16d retires the creator-mgmt@taboost.me group: Mahogany and Anastasiya move to partnerships@, and Jenn / Grayson / BKuhl move to talent-mgmt@. That closes the gap where those five sent with no Reply-To at all because their group pointed at a dead mailbox. No deviation remains.",
+    "_temp_placements": "As of 2026-09-18, Jenn and Grayson's spot in talent-mgmt@ is TEMPORARY pending a permanent routing decision — unlike Allee/Lizz/Angela/Alana/Stephanie/Jocelyn/Hana/Wesley/BKuhl/Lindsay, which are permanent. Sam and Brittanie are connected with individual auto-send and must never appear in a group (see test_individual_auto_send_talents_have_no_reply_to_group). Sylvia and Colleen are not yet Gmail-connected and have no entry anywhere in this config or sop.md.",
     "groups": {
       "talent-mgmt@taboost.me": [
         "alana@taboost.me",

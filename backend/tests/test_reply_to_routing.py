@@ -127,6 +127,27 @@ def test_unlisted_talent_gets_no_reply_to():
     assert reply_to_for_talent(None, token_row=Token()) is None
 
 
+INDIVIDUAL_AUTO_SEND_TALENTS = {
+    "Sam": "samjones@taboost.me",
+    "Brittanie": "bestiebriitt@taboost.me",
+}
+
+
+def test_individual_auto_send_talents_have_no_reply_to_group():
+    """Sam and Brittanie run their own connected Gmail with individual auto-send —
+    they are not on the talent-mgmt/partnerships shared inboxes and must never be
+    added to a Part 3 group. Guards against a future roster edit silently folding
+    them into shared routing, which would put a Reply-To header on mail that
+    should carry none."""
+    all_members = set().union(*reply_to_groups().values())
+    for talent_key, own_email in INDIVIDUAL_AUTO_SEND_TALENTS.items():
+        assert own_email not in all_members, f"{talent_key} must stay out of every Reply-To group"
+
+        class Token:
+            email = own_email
+        assert reply_to_for_talent(talent_key, token_row=Token()) is None
+
+
 def test_every_alias_map_talent_is_either_routed_or_knowingly_blank():
     """A shared-inbox talent in no Part 3 group gets no Reply-To. That is correct
     for the five ex-creator-mgmt talents and a silent bug for anyone else — no
