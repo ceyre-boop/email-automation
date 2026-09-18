@@ -825,6 +825,41 @@ def _process_message_in_thread(
         db.close()
 
 
+def thread_already_answered(db: Session, service, thread_id: str, message_id: str | None = None) -> bool:
+    """True if this Gmail thread already has draft/sent activity from another
+    message — the "only one response per thread, ever" guardrail.
+
+    Originally inline only in `_process_one_message`'s automated poll path.
+    `force-draft` (dashboard.py) and the bulk `orphaned/regenerate-all` endpoint
+    (drafts.py) had no equivalent check — a manager invoking either on a message
+    in an already-answered thread could create an uncontrolled second real
+    response with zero guardrail. Shared here so every draft-creating path uses
+    the same check.
+    """
+    existing_thread_activity = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.thread_id == thread_id,
+            ProcessedEmail.gmail_message_id != message_id,
+            ProcessedEmail.status.in_([EmailStatus.draft_saved, EmailStatus.sent]),
+        )
+        .first()
+    )
+    existing_thread_draft = (
+        db.query(Draft)
+        .filter(
+            Draft.thread_id == thread_id,
+            Draft.gmail_message_id != message_id,
+            Draft.status.in_([DraftStatus.pending, DraftStatus.sent, DraftStatus.approved]),
+        )
+        .first()
+    )
+    # Also check Gmail directly: if the thread has any SENT message the talent
+    # or a manager already replied manually (no DB record exists for those threads).
+    thread_manually_handled = gmail_svc.thread_has_prior_sent_reply(service, thread_id)
+    return bool(existing_thread_activity or existing_thread_draft or thread_manually_handled)
+
+
 def _process_one_message(
     db: Session,
     token_row,
@@ -913,42 +948,19 @@ def _process_one_message(
     _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date, service=service)
 
     # ── Guardrail: ongoing thread with existing draft/sent work → manual only ──
-    if thread_id:
-        existing_thread_activity = (
-            db.query(ProcessedEmail)
-            .filter(
-                ProcessedEmail.thread_id == thread_id,
-                ProcessedEmail.gmail_message_id != message_id,
-                ProcessedEmail.status.in_([EmailStatus.draft_saved, EmailStatus.sent]),
-            )
-            .first()
+    if thread_id and thread_already_answered(db, service, thread_id, message_id):
+        reason = "Ongoing thread — prior sent activity detected. Human review required."
+        # SOP Rule 10B: leave Gmail untouched — no labels, no inbox removal
+        _record_processed(
+            db, talent_key, message_id, thread_id, sender, subject,
+            2, "", 0.0, "Human Admin Required", reason, EmailStatus.flagged,
+            body_text=body, email_date=email_date, to_address=to_address,
         )
-        existing_thread_draft = (
-            db.query(Draft)
-            .filter(
-                Draft.thread_id == thread_id,
-                Draft.gmail_message_id != message_id,
-                Draft.status.in_([DraftStatus.pending, DraftStatus.sent, DraftStatus.approved]),
-            )
-            .first()
-        )
-        # Also check Gmail directly: if the thread has any SENT message the talent
-        # or a manager already replied manually (no DB record exists for those threads).
-        thread_manually_handled = gmail_svc.thread_has_prior_sent_reply(service, thread_id)
-
-        if existing_thread_activity or existing_thread_draft or thread_manually_handled:
-            reason = "Ongoing thread — prior sent activity detected. Human review required."
-            # SOP Rule 10B: leave Gmail untouched — no labels, no inbox removal
-            _record_processed(
-                db, talent_key, message_id, thread_id, sender, subject,
-                2, "", 0.0, "Human Admin Required", reason, EmailStatus.flagged,
-                body_text=body, email_date=email_date, to_address=to_address,
-            )
-            db.commit()
-            _safe_log_sheet(talent_key, sender, subject, 2, "", 0.0, "Human Admin Required", "flagged", reason)
-            summary["flagged"] += 1
-            summary["processed"] += 1
-            return
+        db.commit()
+        _safe_log_sheet(talent_key, sender, subject, 2, "", 0.0, "Human Admin Required", "flagged", reason)
+        summary["flagged"] += 1
+        summary["processed"] += 1
+        return
 
     # ── Triage ───────────────────────────────────────────────────────────────
     _triage_start = _time.monotonic()

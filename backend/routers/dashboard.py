@@ -1736,6 +1736,19 @@ def force_draft_email(
     message_id_header = None
 
     try:
+        # Same "only one response per thread, ever" guardrail the poller enforces
+        # before drafting — force-draft had no equivalent check, so a manager
+        # invoking it on a message in an already-answered thread could create an
+        # uncontrolled second real response.
+        from backend.services.poller import thread_already_answered
+        service = gmail_svc._gmail_service(token, db)
+        if thread_already_answered(db, service, thread_id, gmail_message_id):
+            raise HTTPException(
+                status_code=409,
+                detail=f"Thread {thread_id} already has draft/sent activity — this would be a second "
+                "response to the same email. Review the thread in Gmail before drafting manually.",
+            )
+
         if not body_text:
             try:
                 detail = gmail_svc.get_message_detail(token, gmail_message_id, db=db)
