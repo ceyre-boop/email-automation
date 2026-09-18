@@ -111,3 +111,17 @@ def test_score2_backlog_only_counts_mail_still_in_the_live_inbox(db_session):
     assert result["score2_backlog_total"] == 1
     assert result["score2_backlog_older_than_7d"] == 1
     assert result["stalled"] is False
+
+
+def test_score2_backlog_matches_regardless_of_talent_key_case(db_session):
+    """inbox_sync.py lowercases InboxEmail.talent_key on write, but
+    ProcessedEmail.talent_key keeps its original case (e.g. "Allee"). The
+    live-inbox join must key on gmail_message_id alone, or every row silently
+    drops out and the backlog undercounts to zero."""
+    _processed(db_session, minutes_ago=60 * 24 * 10, score=2,
+               status=EmailStatus.flagged, key="Allee", gmail_message_id="live1")
+    _unread(db_session, key="allee", gmail_message_id="live1")
+    _processed(db_session, minutes_ago=2, score=1)  # keeps condition A quiet
+
+    result = check_pipeline_stall(db_session)
+    assert result["score2_backlog_total"] == 1

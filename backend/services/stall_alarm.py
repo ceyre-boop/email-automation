@@ -160,13 +160,13 @@ def check_pipeline_stall(db: Session) -> dict:
     # inbox_emails is the source of truth for "still needs a human" — only count
     # a flagged row whose message is still present there.
     score2_warn = int(cfg.get("score2_backlog_warn", 5000))
+    # Join on gmail_message_id only — it's globally unique on processed_emails,
+    # and InboxEmail.talent_key is lowercased by inbox_sync.py while
+    # ProcessedEmail.talent_key isn't, so an added talent_key equality here
+    # silently matches nothing.
     score2_still_pending = (
         db.query(ProcessedEmail)
-        .join(
-            InboxEmail,
-            (InboxEmail.gmail_message_id == ProcessedEmail.gmail_message_id)
-            & (InboxEmail.talent_key == ProcessedEmail.talent_key),
-        )
+        .join(InboxEmail, InboxEmail.gmail_message_id == ProcessedEmail.gmail_message_id)
         .filter(ProcessedEmail.score == 2, ProcessedEmail.status == "flagged")
     )
     score2_total = score2_still_pending.count()
