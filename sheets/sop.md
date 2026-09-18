@@ -362,15 +362,12 @@ Paused: no
 
 Scenario A: Initial Inbound (Default Response)
 Approved Response:
-Thank you so much for reaching out about a potential partnership with Anastasiya!! I’m happy to share her rates below:
-     **1 TikTok** [anastasiya_ray](https://www.tiktok.com/@anastasiya_ray) - $800
-     **1 TikTok (2nd)** [theraysfinds](https://www.tiktok.com/@theraysfinds) - $800
-     **1 Instagram** [Reel](https://www.instagram.com/ugcbyanastasiya/) - $750
-     **1 UGC Video** [Portfolio](https://ugcbyanastasiya.com/) - $1,000 (usage to be negotiated)
+Thanks for reaching out about working with Anastasiya!
 
-Anastasiya's pricing reflects her high-quality, **polished** content with a bestie beauty vibe that feels authentic, relatable, and **brand-elevating**!! Plus she's a UGC expert so she knows how to make videos that convert!!
+You can view our full [TABOOST Creator Roster](https://talent.taboost.me) to explore additional talent.
 
-Please let us know **what type of collab you're looking for** in your offer + if you have any questions moving forward. We’d love to explore working together!
+Please let me know if there are any additional creators you'd like to explore, and I'd be happy to provide their specific rates.
+Looking forward to hearing your thoughts!
 Scenario C: Personal Email Forward
 Personal Emails:
 
@@ -603,7 +600,7 @@ Scenario A: Initial Inbound (Default Response)
 Approved Response:
 Thank you so much for reaching out about a potential partnership with Jocelyn!! I’m happy to share her rates below:
      **1 TikTok** [ohsoitsjocelyn](https://www.tiktok.com/@ohsoitsjocelyn) - $850
-     **1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $700
+     **1 Instagram** [Reel](https://www.instagram.com/ohsoitsjocelyn/) - $1,000
      **1 UGC Video** - $1,000 (usage to be negotiated)
 
 Jocelyn creates eye-catching fashion content that keeps her audience engaged and inspired. Her pricing reflects her strong following and ability to drive conversions!
