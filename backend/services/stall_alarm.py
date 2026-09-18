@@ -144,21 +144,35 @@ def check_pipeline_stall(db: Session) -> dict:
 
     # Score-2 ("human review required") backlog. By design these never auto-send —
     # a live negotiation reply needs a human judgment call — but the queue has no
-    # staleness signal anywhere else, and it has been growing 300-800/week for
-    # months. This does not claim the whole backlog is a fire; it is the number
-    # that lets a human decide whether it is.
+    # staleness signal anywhere else.
+    #
+    # ProcessedEmail.status is written once at triage time and never reconciled
+    # with what actually happens to the message afterward — managers routinely
+    # handle a flagged negotiation directly in Gmail (reply, archive) rather than
+    # through the dashboard's archive/keep buttons, which is the only thing that
+    # flips status to "archived". That left status='flagged' accumulating
+    # forever. Checked live 2026-09-17: 18,158 rows read "flagged" in this table,
+    # but only 1,344 of those messages were still actually sitting in the Gmail
+    # inbox (inbox_emails, synced from Gmail's INBOX label every 5 min) — the
+    # other ~93% were already resolved outside the app. Counting the raw ledger
+    # tripped this alarm hourly on a number ~15x the real backlog.
+    #
+    # inbox_emails is the source of truth for "still needs a human" — only count
+    # a flagged row whose message is still present there.
     score2_warn = int(cfg.get("score2_backlog_warn", 5000))
-    score2_total = (
-        db.query(ProcessedEmail).filter(ProcessedEmail.score == 2, ProcessedEmail.status == "flagged").count()
-    )
-    score2_older_than_7d = (
+    score2_still_pending = (
         db.query(ProcessedEmail)
-        .filter(
-            ProcessedEmail.score == 2, ProcessedEmail.status == "flagged",
-            ProcessedEmail.processed_at < now - timedelta(days=7),
+        .join(
+            InboxEmail,
+            (InboxEmail.gmail_message_id == ProcessedEmail.gmail_message_id)
+            & (InboxEmail.talent_key == ProcessedEmail.talent_key),
         )
-        .count()
+        .filter(ProcessedEmail.score == 2, ProcessedEmail.status == "flagged")
     )
+    score2_total = score2_still_pending.count()
+    score2_older_than_7d = score2_still_pending.filter(
+        ProcessedEmail.processed_at < now - timedelta(days=7)
+    ).count()
     score2_backlog_growth_flag = score2_older_than_7d > score2_warn
 
     metrics = {

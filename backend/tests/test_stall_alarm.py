@@ -7,15 +7,16 @@ would have caught it, and the two quiet-system cases that must NOT alarm.
 """
 from datetime import datetime, timedelta
 
-from backend.models.db import Draft, DraftStatus, InboxEmail, ProcessedEmail
+from backend.models.db import Draft, DraftStatus, EmailStatus, InboxEmail, ProcessedEmail
 from backend.services.stall_alarm import check_pipeline_stall
 
 
-def _processed(db, minutes_ago, score=3, key="Allee"):
+def _processed(db, minutes_ago, score=3, key="Allee", status=None, gmail_message_id=None):
     row = ProcessedEmail(
         talent_key=key,
-        gmail_message_id=f"m{datetime.utcnow().timestamp()}{minutes_ago}{score}",
+        gmail_message_id=gmail_message_id or f"m{datetime.utcnow().timestamp()}{minutes_ago}{score}",
         score=score,
+        status=status,
         processed_at=datetime.utcnow() - timedelta(minutes=minutes_ago),
     )
     db.add(row)
@@ -23,10 +24,10 @@ def _processed(db, minutes_ago, score=3, key="Allee"):
     return row
 
 
-def _unread(db, key="Allee"):
+def _unread(db, key="Allee", gmail_message_id=None):
     row = InboxEmail(
         talent_key=key,
-        gmail_message_id=f"u{datetime.utcnow().timestamp()}",
+        gmail_message_id=gmail_message_id or f"u{datetime.utcnow().timestamp()}",
         is_unread=True,
     )
     db.add(row)
@@ -91,3 +92,22 @@ def test_metrics_are_reported_even_when_not_stalled(db_session):
     for field in ("processed_in_window", "unread_waiting", "score3_last_hour",
                   "drafts_last_hour", "sends_last_hour", "window_minutes"):
         assert field in result
+
+
+def test_score2_backlog_only_counts_mail_still_in_the_live_inbox(db_session):
+    """A flagged row whose message already left the Gmail inbox (handled outside
+    the app) must not count toward the backlog — status is never reconciled back,
+    so the live inbox cache is the only trustworthy signal for "still pending"."""
+    for i in range(3):
+        _processed(db_session, minutes_ago=60 * 24 * 10, score=2,
+                   status=EmailStatus.flagged, gmail_message_id=f"stale{i}")
+    # Only this one is still actually sitting in the inbox.
+    _processed(db_session, minutes_ago=60 * 24 * 10, score=2,
+               status=EmailStatus.flagged, gmail_message_id="live1")
+    _unread(db_session, gmail_message_id="live1")
+    _processed(db_session, minutes_ago=2, score=1)  # keeps condition A quiet
+
+    result = check_pipeline_stall(db_session)
+    assert result["score2_backlog_total"] == 1
+    assert result["score2_backlog_older_than_7d"] == 1
+    assert result["stalled"] is False
