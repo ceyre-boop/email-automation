@@ -12,17 +12,19 @@ Do not re-run response matching.
 Do not modify labels before sending.
 Do not modify the original inbound email before sending.
 2. Reply-To Handling
-Before sending the draft, check the matched talent inbox against the Reply-To Routing List in the SOP.
+Before sending the draft, check the matched talent inbox against the Reply-To Routing List in the SOP (sop.md Part 3).
 Set the Reply-To field based on the matched inbox only.
 Reply-To routing:
 If the matched inbox is listed under talent-mgmt@taboost.me:
 Set Reply-To to: talent-mgmt@taboost.me
-If the matched inbox is listed under creator-mgmt@taboost.me:
-Set Reply-To to: creator-mgmt@taboost.me
 If the matched inbox is listed under partnerships@taboost.me:
 Set Reply-To to: partnerships@taboost.me
 If the matched inbox is not listed in the Reply-To Routing List:
 Leave Reply-To blank/default
+
+Note: creator-mgmt@taboost.me was retired under SOP V-16d — Mahogany and
+Anastasiya moved to partnerships@, Jenn/Grayson/BKuhl moved to talent-mgmt@.
+It is not a valid Reply-To target and must never appear in this list again.
 Important:
 Match based on the inbound talent inbox, not the sender’s email address.
 Do not guess the Reply-To address.
