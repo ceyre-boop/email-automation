@@ -300,12 +300,10 @@ def daily_report(db: Session = Depends(get_db)):
     ).all()
 
     best_by_talent: dict[str, object] = {}
-    deal_value_by_talent: dict[str, float] = defaultdict(float)
     for row in best_deal_rows:
         lkey = _safe_lkey(row.talent_key)
         if not lkey:
             continue
-        deal_value_by_talent[lkey] += row.proposed_rate or 0
         prev = best_by_talent.get(lkey)
         if prev is None or (row.proposed_rate or 0) > (prev.proposed_rate or 0):
             best_by_talent[lkey] = row
@@ -349,11 +347,6 @@ def daily_report(db: Session = Depends(get_db)):
 
     total_good = total_uncertain = total_trash = 0
     total_sent = total_draft_backlog = total_new_drafts_today = total_ignore = 0
-    # Note: this is the deal value accumulated since the last manual dashboard
-    # reset — kept for potential future use, but the headline "Est. Daily Deal
-    # Value" tile uses the 12PM-Pacific-rollover-scoped total computed below
-    # (deal_value_cal_today) so it actually updates day to day.
-    _deal_value_since_reset: float = 0.0
     cards: list[TalentReportCard] = []
 
     for t_cfg in talent_configs:
@@ -368,7 +361,6 @@ def daily_report(db: Session = Depends(get_db)):
         count_new_today = new_today_by_talent.get(lkey, 0)
         count_ignore = count_trash
         best = best_by_talent.get(lkey)
-        deal_value = deal_value_by_talent.get(lkey, 0.0)
 
         total_good += count_good
         total_uncertain += count_uncertain
@@ -377,7 +369,6 @@ def daily_report(db: Session = Depends(get_db)):
         total_draft_backlog += count_backlog
         total_new_drafts_today += count_new_today
         total_ignore += count_ignore
-        _deal_value_since_reset += deal_value
 
         cards.append(TalentReportCard(
             talent_key=key,
@@ -1730,7 +1721,10 @@ def force_draft_email(
     sender = (inbox_row.sender if inbox_row else None) or ""
     thread_id = (inbox_row.thread_id if inbox_row else None) or gmail_message_id
     brand_name = (inbox_row.brand_name if inbox_row else None) or ""
-    proposed_rate = (inbox_row.proposed_rate if inbox_row else None) or 0.0
+    # None (not 0.0) when unknown — this value is stored straight into the new
+    # Draft row below, and 0.0 there would read as a real $0 rate in every
+    # deal-value aggregation that filters on proposed_rate.isnot(None).
+    proposed_rate = inbox_row.proposed_rate if inbox_row else None
     offer_type = (inbox_row.offer_type if inbox_row else None) or ""
     triage_reason = (inbox_row.triage_reason if inbox_row else None) or ""
     message_id_header = None
@@ -2435,7 +2429,10 @@ def _retry_one_fallback(processed_email_id: int) -> None:
         row.score = new_score
         row.triage_reason = result["reason"]
         row.offer_type = result.get("offer_type", "")
-        row.proposed_rate = result.get("proposed_rate_usd", 0)
+        # triage_email() already parsed this to float|None — don't coalesce None
+        # (no rate stated) to 0 (a real $0 rate); that's the bug that made every
+        # deal-value stat in this dashboard permanently zero.
+        row.proposed_rate = result.get("proposed_rate_usd")
         row.brand_name = result.get("brand_name", "")
 
         if new_score == 1:
@@ -2466,7 +2463,7 @@ def _retry_one_fallback(processed_email_id: int) -> None:
                         sender=row.sender or "",
                         subject=row.subject or "",
                         brand_name=result.get("brand_name", ""),
-                        proposed_rate=float(result.get("proposed_rate_usd") or 0),
+                        proposed_rate=result.get("proposed_rate_usd"),
                         offer_type=result.get("offer_type", ""),
                         draft_text=draft_result["draft_text"],
                         status=DraftStatus.pending,

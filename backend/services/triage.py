@@ -111,13 +111,55 @@ def _build_triage_messages(
     ]
 
 
+def _parse_proposed_rate(raw) -> float | None:
+    """
+    Defensively coerce whatever GPT put in proposed_rate_usd into a float, or
+    None if no rate was stated / the value is unusable. Never raises.
+
+    None means "GPT did not extract a rate" (genuinely no rate stated, or the
+    value was unparseable) — callers must NOT silently coalesce this to 0.0
+    before it reaches the DB. proposed_rate is a nullable column specifically
+    so "unknown" and "a real $0" stay distinguishable; collapsing both to 0.0
+    is the exact bug that made every deal-value stat in the dashboard useless.
+    """
+    if raw is None:
+        return None
+    if isinstance(raw, bool):
+        return None
+    if isinstance(raw, (int, float)):
+        if raw != raw or raw < 0:  # NaN or negative guard
+            return None
+        return float(raw)
+    if isinstance(raw, str):
+        s = raw.strip()
+        if not s or s.upper() in ("N/A", "NA", "NONE", "NULL", "UNKNOWN", "TBD"):
+            return None
+        if s.lstrip("$").strip().startswith("-"):
+            return None
+        # Range: "$500-$700" / "500 - 700" → low end
+        m = re.match(r"^\$?\s*([\d,]+(?:\.\d+)?)\s*-\s*\$?\s*[\d,]+", s)
+        if m:
+            s = m.group(1)
+        else:
+            m = re.search(r"[\d,]+(?:\.\d+)?", s)
+            if not m:
+                return None
+            s = m.group(0)
+        try:
+            val = float(s.replace(",", ""))
+        except ValueError:
+            return None
+        return val if val >= 0 else None
+    return None
+
+
 # ── Special per-talent overrides ──────────────────────────────────────────────
 
 def _apply_special_routing(
     talent_key: str,
     score: int,
     offer_type: str,
-    proposed_rate: float,
+    proposed_rate: float | None,
     policy: dict,
     brand_name: str = "",
 ) -> int:
@@ -126,14 +168,15 @@ def _apply_special_routing(
     offer_lower = (offer_type or "").lower()
 
     # Trin: affiliate/commission-only offer with no cash rate → downgrade to Score 1.
-    # We never reply to pure commission deals for Trin; a $0 proposed_rate confirms
-    # GPT couldn't find a dollar amount, making it a commission-only offer.
-    if key_lower == "trin" and "commission" in offer_lower and proposed_rate == 0.0:
+    # `not proposed_rate` covers both None (no rate stated) and 0.0 (the rare real
+    # $0 offer) — either way there's no cash rate, making it commission-only.
+    if key_lower == "trin" and "commission" in offer_lower and not proposed_rate:
         return 1
 
     # Michaela: rate above zero but below $1,000 floor → downgrade to Score 1.
-    # proposed_rate==0 means "unknown" — we don't override in that case.
-    if key_lower == "michaela" and 0 < proposed_rate < 1000:
+    # `proposed_rate and ...` short-circuits on None/0.0 (both mean "unknown") —
+    # we only override when a real stated rate is below the floor.
+    if key_lower == "michaela" and proposed_rate and 0 < proposed_rate < 1000:
         return 1
 
     return score
@@ -171,7 +214,7 @@ def triage_email(
         "score": 1|2|3,
         "reason": str,
         "offer_type": str,
-        "proposed_rate_usd": 0.0,
+        "proposed_rate_usd": float | None,  # None = no rate stated/extracted, not $0
         "brand_name": str,
     }
     Falls back to score=2 on any error (never silently drops emails).
@@ -228,7 +271,7 @@ def triage_email(
             "score": 1,
             "reason": "Matched never-reply rule (sender/domain/keyword blocklist).",
             "offer_type": "Blocked",
-            "proposed_rate_usd": 0.0,
+            "proposed_rate_usd": None,
             "brand_name": "",
             "sentiment_score": 0,
             "urgency_score": 0,
@@ -262,7 +305,7 @@ def triage_email(
             "score": 1,
             "reason": "Automated system email — not a real partnership offer.",
             "offer_type": "Automated",
-            "proposed_rate_usd": 0.0,
+            "proposed_rate_usd": None,
             "brand_name": "",
             "sentiment_score": 5,
             "urgency_score": 0,
@@ -335,8 +378,11 @@ def triage_email(
         logger.error("Triage API error for %s: %s", talent_key, exc)
         return _fallback(talent_key, f"API error: {exc}")
 
-    # Schema validation — required fields must all be present
-    _REQUIRED = {"score", "reason", "offer_type", "brand_name"}
+    # Schema validation — required fields must all be present. proposed_rate_usd
+    # is required so a future prompt regression that drops the field fails loudly
+    # (falls to Score 2) instead of silently reverting to always-0.0/never-asked —
+    # exactly the bug this schema addition fixes.
+    _REQUIRED = {"score", "reason", "offer_type", "brand_name", "proposed_rate_usd"}
     missing = _REQUIRED - set(result.keys())
     if missing:
         logger.error(
@@ -351,7 +397,7 @@ def triage_email(
         logger.warning("Invalid score %r for %s — routing to Score 2", score, talent_key)
         return _fallback(talent_key, f"invalid score value: {score}")
 
-    proposed_rate = float(result.get("proposed_rate_usd") or 0.0)
+    proposed_rate = _parse_proposed_rate(result.get("proposed_rate_usd"))
     offer_type = str(result.get("offer_type", "Unknown"))
     brand_name = str(result.get("brand_name", "") or "")
 
@@ -393,7 +439,7 @@ def _ignore_leave_inbox(reason: str, offer_type: str = "Event Invite") -> dict:
         "score": 2,
         "reason": reason,
         "offer_type": offer_type,
-        "proposed_rate_usd": 0.0,
+        "proposed_rate_usd": None,
         "brand_name": "",
         "sentiment_score": 5,
         "urgency_score": 0,
@@ -408,7 +454,7 @@ def _fallback(talent_key: str, note: str) -> dict:
         "score": 2,
         "reason": f"Triage fallback — {note}",
         "offer_type": "Unknown",
-        "proposed_rate_usd": 0.0,
+        "proposed_rate_usd": None,
         "brand_name": "",
         "sentiment_score": 5,
         "urgency_score": 0,

@@ -435,7 +435,7 @@ def draft_reply(
     sender: str,
     offer_type: str,
     brand_name: str,
-    proposed_rate: float,
+    proposed_rate: float | None,
     triage_reason: str,
     db=None,
     body_text: str = "",
@@ -451,6 +451,12 @@ def draft_reply(
     }
     Always returns something — falls back to ESCALATE on error.
     """
+    # None (triage found no stated rate) and 0.0 (a real $0 rate) mean the same
+    # thing for scenario-matching purposes below — normalize once here so
+    # _deterministic_initial_or_counter_reply's numeric comparisons never see
+    # None. Callers/DB storage keep the None/0.0 distinction; this is purely
+    # internal to reply generation.
+    proposed_rate = proposed_rate if proposed_rate is not None else 0.0
     settings = get_settings()
     if not settings.app_config.get("ai_enabled", True):
         raise RuntimeError("AI is disabled (ai_enabled=false in settings.json) — reply drafting skipped")

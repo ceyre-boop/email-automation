@@ -14,8 +14,36 @@ from backend.services.triage import (
     _apply_special_routing,
     _build_triage_messages,
     _fallback,
+    _parse_proposed_rate,
     triage_email,
 )
+
+
+# ── _parse_proposed_rate ────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("raw,expected", [
+    ("$500", 500.0),
+    ("500", 500.0),
+    (500, 500.0),
+    (500.0, 500.0),
+    (None, None),
+    ("$500-$700", 500.0),
+    ("500 - 700", 500.0),
+    ("N/A", None),
+    ("n/a", None),
+    ("", None),
+    ("   ", None),
+    ("Unknown", None),
+    ("TBD", None),
+    ("$1,000", 1000.0),
+    ("$1,000.50", 1000.5),
+    (-50, None),
+    ("-50", None),
+    (True, None),  # bool is technically an int subclass — must not become 1.0
+    ("free", None),
+])
+def test_parse_proposed_rate(raw, expected):
+    assert _parse_proposed_rate(raw) == expected
 
 
 # ── Prompt building ────────────────────────────────────────────────────────────
@@ -110,6 +138,20 @@ def test_michaela_zero_rate_not_overridden_by_floor():
     assert result == 3
 
 
+def test_michaela_none_rate_not_overridden_by_floor():
+    """Rate=None (no rate stated) must behave identically to 0.0 — unknown, don't override."""
+    policy = {"special_talent_routing": {}}
+    result = _apply_special_routing("Michaela", 3, "Sponsored Post", None, policy)
+    assert result == 3
+
+
+def test_trin_commission_only_overrides_to_score1_with_none_rate():
+    """None (no rate stated) must trigger the same downgrade as 0.0."""
+    policy = {"special_talent_routing": {"Trin": {}}}
+    result = _apply_special_routing("Trin", 3, "affiliate commission", None, policy)
+    assert result == 1
+
+
 def test_other_talent_not_affected():
     policy = {"special_talent_routing": {}}
     result = _apply_special_routing("Colleen", 3, "Sponsored Post", 100.0, policy)
@@ -172,7 +214,9 @@ def test_fallback_returns_score2():
     assert r["score"] == 2
     assert "test error" in r["reason"]
     assert r["offer_type"] == "Unknown"
-    assert r["proposed_rate_usd"] == 0.0
+    # None, not 0.0 — a fallback never attempted extraction, so it must not
+    # look like a confirmed $0 rate to any downstream deal-value aggregation.
+    assert r["proposed_rate_usd"] is None
 
 
 # ── triage_email with mocked OpenAI ───────────────────────────────────────────
@@ -361,3 +405,53 @@ def test_triage_never_reply_domain_blocklist_short_circuits(mock_settings, mock_
     assert result["score"] == 1
     assert result["offer_type"] == "Blocked"
     mock_openai_cls.assert_not_called()
+
+
+@patch("backend.services.triage.OpenAI")
+def test_triage_email_missing_rate_field_falls_back(mock_openai_cls):
+    """proposed_rate_usd is in _REQUIRED — if a future prompt regression drops
+    the field from GPT's output, this must fail loudly (Score 2) instead of
+    silently reverting to the old always-0.0 behavior."""
+    mock_client = MagicMock()
+    mock_openai_cls.return_value = mock_client
+    bad_response = MagicMock()
+    bad_response.choices[0].message.content = json.dumps({
+        "score": 3, "reason": "looks real", "offer_type": "Sponsored Post", "brand_name": "Nike",
+    })
+    mock_client.chat.completions.create.return_value = bad_response
+
+    result = triage_email("Sylvia", "Sylvia", 1000, "Subj", "a@b.com", "b.com", "body")
+    assert result["score"] == 2
+    assert "proposed_rate_usd" in result["reason"]
+
+
+@patch("backend.services.triage.OpenAI")
+def test_triage_email_null_rate_means_none_not_zero(mock_openai_cls):
+    """GPT explicitly returning proposed_rate_usd: null must produce None, not 0.0."""
+    mock_client = MagicMock()
+    mock_openai_cls.return_value = mock_client
+    response = MagicMock()
+    response.choices[0].message.content = json.dumps({
+        "score": 3, "reason": "no rate mentioned", "offer_type": "Unknown",
+        "brand_name": "Acme", "proposed_rate_usd": None,
+    })
+    mock_client.chat.completions.create.return_value = response
+
+    result = triage_email("Sylvia", "Sylvia", 1000, "Subj", "a@b.com", "b.com", "body")
+    assert result["proposed_rate_usd"] is None
+
+
+@patch("backend.services.triage.OpenAI")
+def test_triage_email_string_rate_parsed(mock_openai_cls):
+    """GPT returning the rate as a currency string still parses to a clean float."""
+    mock_client = MagicMock()
+    mock_openai_cls.return_value = mock_client
+    response = MagicMock()
+    response.choices[0].message.content = json.dumps({
+        "score": 3, "reason": "offered $900", "offer_type": "UGC",
+        "brand_name": "Olenis", "proposed_rate_usd": "$900",
+    })
+    mock_client.chat.completions.create.return_value = response
+
+    result = triage_email("Sylvia", "Sylvia", 1000, "Subj", "a@b.com", "b.com", "body")
+    assert result["proposed_rate_usd"] == 900.0

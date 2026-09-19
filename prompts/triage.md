@@ -32,6 +32,15 @@ If you cannot identify the offer type, that is fine — use offer_type "Unknown"
 **Rule 5 — Rate does not determine score.**
 Do not score 1 or 2 solely because the rate is low, absent, or below minimum. Real brands with low offers still get Score 3 — rates can be negotiated.
 
+**Rule 6 — Extract the stated rate, but never estimate one.**
+If the email states a specific dollar amount for the collaboration (a flat fee, a "we can offer $X", a day rate, a total contract value), put that number — digits only, no symbols or commas — in `proposed_rate_usd`.
+- No dollar amount anywhere in the email → `proposed_rate_usd: null`. Do not guess a "typical" rate for the offer type.
+- A range is given (e.g. "$500-$700") → use the LOW end of the range: `500`.
+- Multiple deliverables/line items with different rates are listed for this one collaboration (e.g. "$300 for a TikTok, $200 for a Story") → use the SUM of all stated line-item rates: `500`. Do not use only the largest line item.
+- A non-USD currency is stated → convert using your best estimate to USD and note the original currency and amount in `reason`; if you cannot confidently convert, treat it as no rate stated (`null`).
+- The email only mentions a budget range for a campaign across multiple creators, not this creator specifically → treat as no rate stated (`null`) rather than guessing this creator's share.
+- Never infer a rate from the offer type, brand tier, or what this kind of deal "usually" pays. Only extract a number explicitly written in the email text.
+
 ---
 
 ### SCORING DEFINITIONS
@@ -54,7 +63,7 @@ Also score 1 for: emails where the sender name closely matches the talent name (
 Return ONLY a JSON object. No explanation, no extra text.
 
 Format:
-{"score": <1|2|3>, "reason": "<one sentence explaining the score>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|PR Request|Event Appearance|Gifting|Rate Inquiry|Other|Unknown>", "brand_name": "<brand or company name, or empty string>", "sentiment_score": <0-10>, "urgency_score": <0-10>, "risk_score": <0-10>, "alternatives_considered": "<one sentence on what other score was considered and why rejected>"}
+{"score": <1|2|3>, "reason": "<one sentence explaining the score>", "offer_type": "<Sponsored Post|Story|UGC|Affiliate|PR Request|Event Appearance|Gifting|Rate Inquiry|Other|Unknown>", "brand_name": "<brand or company name, or empty string>", "proposed_rate_usd": <number or null — a rate ONLY if explicitly stated in the email, per Rule 6, never estimated>, "sentiment_score": <0-10>, "urgency_score": <0-10>, "risk_score": <0-10>, "alternatives_considered": "<one sentence on what other score was considered and why rejected>"}
 
 ---
 

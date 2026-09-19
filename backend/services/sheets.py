@@ -157,7 +157,7 @@ def log_email(
     subject: str,
     score: int,
     brand_name: str,
-    proposed_rate: float,
+    proposed_rate: float | None,
     offer_type: str,
     status: str,
     notes: str = "",

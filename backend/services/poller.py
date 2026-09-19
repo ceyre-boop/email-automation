@@ -678,7 +678,10 @@ def _spam_sweep_for_talent(token_row, profile: TalentProfile, db: Session) -> in
             )
             score = triage_result.get("score", 1)
             brand_name = triage_result.get("brand_name")
-            proposed_rate = triage_result.get("proposed_rate")
+            # Was "proposed_rate" — triage_email() only ever returns "proposed_rate_usd",
+            # so this always evaluated to None regardless of what triage found. Every
+            # Draft/ProcessedEmail row created via this spam-sweep path had a dead rate.
+            proposed_rate = triage_result.get("proposed_rate_usd")
             offer_type = triage_result.get("offer_type")
             reason = triage_result.get("reason", "")
 
@@ -1271,7 +1274,7 @@ def _record_processed(
     subject: str,
     score: int,
     brand_name: str,
-    proposed_rate: float,
+    proposed_rate: float | None,
     offer_type: str,
     reason: str,
     status: EmailStatus,
