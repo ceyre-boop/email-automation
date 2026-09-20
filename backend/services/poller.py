@@ -32,7 +32,6 @@ from backend.core.config import get_settings
 from backend.models.db import Draft, DraftStatus, EmailStatus, ExternalChannelReview, PollHealth, ProcessedEmail, TalentToken
 from backend.services import gmail as gmail_svc
 from backend.services import reply as reply_svc
-from backend.services import sheets as sheets_svc
 from backend.services import triage as triage_svc
 from backend.services.external_channel import detect_external_channel
 from backend.services.inbox_routing import (
@@ -960,7 +959,6 @@ def _process_one_message(
             body_text=body, email_date=email_date, to_address=to_address,
         )
         db.commit()
-        _safe_log_sheet(talent_key, sender, subject, 2, "", 0.0, "Human Admin Required", "flagged", reason)
         summary["flagged"] += 1
         summary["processed"] += 1
         return
@@ -1015,7 +1013,6 @@ def _process_one_message(
             body_text=body, email_date=email_date, to_address=to_address, **_extra,
         )
         db.commit()
-        _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "archived", reason)
         summary["archived"] += 1
 
     # ── Score 2 → Human review (Option B) ───────────────────────────────────
@@ -1032,7 +1029,6 @@ def _process_one_message(
             body_text=body, email_date=email_date, to_address=to_address, **_extra,
         )
         db.commit()
-        _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, "flagged", reason)
         summary["flagged"] += 1
 
     # ── Score 3 → Draft reply ───────────────────────────────────────────────────
@@ -1155,10 +1151,6 @@ def _process_one_message(
                 time_to_draft_ms=time_to_draft_ms, to_address=to_address, **_extra,
             )
             db.commit()
-            _safe_log_sheet(
-                talent_key, sender, subject, score, brand_name, proposed_rate,
-                offer_type, "escalated", escalate_reason or reason,
-            )
             summary["flagged"] += 1
 
         else:
@@ -1199,21 +1191,9 @@ def _process_one_message(
 
             # SOP Rule 11 Option A: remove INBOX at draft creation (label applied post-send only)
             gmail_svc.remove_from_inbox(token_row, message_id, db=db, service=service)
-            _safe_log_sheet(
-                talent_key, sender, subject, score, brand_name, proposed_rate,
-                offer_type, "draft_saved", reason,
-            )
             summary["drafted"] += 1
 
     summary["processed"] += 1
-
-
-def _safe_log_sheet(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, status_label, reason):
-    """Log to Google Sheets — failure is non-fatal."""
-    try:
-        sheets_svc.log_email(talent_key, sender, subject, score, brand_name, proposed_rate, offer_type, status_label, reason)
-    except Exception as exc:
-        logger.warning("Sheets log failed for %s / %s (non-fatal): %s", talent_key, subject, exc)
 
 
 def _record_external_channel(db, talent_key, message_id, thread_id, sender, subject, body, email_date, service=None):

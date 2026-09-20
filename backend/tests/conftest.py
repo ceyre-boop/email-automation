@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import itertools
 import os
-import json
 import pathlib
 from datetime import datetime, timedelta
 from unittest.mock import MagicMock, patch
@@ -19,10 +18,6 @@ os.environ.setdefault("GOOGLE_CLIENT_SECRET", "test-client-secret")
 os.environ.setdefault("GOOGLE_REDIRECT_URI", "http://localhost/auth/callback")
 os.environ.setdefault("OPENAI_API_KEY", "test-openai-key")
 os.environ.setdefault("DATABASE_URL", "sqlite:///:memory:")
-os.environ.setdefault(
-    "GOOGLE_SHEETS_SERVICE_ACCOUNT_JSON",
-    json.dumps({"type": "service_account", "project_id": "test"}),
-)
 os.environ.setdefault("AGENCY_SECRET_KEY", "test-secret")
 
 from backend.core.config import get_settings

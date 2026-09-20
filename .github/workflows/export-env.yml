@@ -18,7 +18,6 @@ jobs:
           echo "GOOGLE_REDIRECT_URI=${{ secrets.GOOGLE_REDIRECT_URI }}" >> backend/.env
           echo "OPENAI_API_KEY=${{ secrets.OPENAI_API_KEY }}" >> backend/.env
           echo "DATABASE_URL=${{ secrets.DATABASE_URL }}" >> backend/.env
-          echo "GOOGLE_SHEETS_REFRESH_TOKEN=${{ secrets.GOOGLE_SHEETS_REFRESH_TOKEN }}" >> backend/.env
           echo "APP_BASE_URL=${{ secrets.APP_BASE_URL }}" >> backend/.env
           echo "AGENCY_SECRET_KEY=${{ secrets.AGENCY_SECRET_KEY }}" >> backend/.env
           echo "API_KEY=${{ secrets.API_KEY }}" >> backend/.env
