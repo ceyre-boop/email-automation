@@ -491,12 +491,30 @@ def _run_guardian():
     db = SessionLocal()
     try:
         GuardianWatchdog(scheduler=_main_module._scheduler).run(db)
-        # Cleanup score=0 ghost rows from crashed poll cycles.
-        # Moved here from create_tables() startup — locking processed_emails at boot
-        # was delaying port binding and triggering Render R10 restart timeouts.
+        # Cleanup score=0 ghost rows from crashed poll cycles (status='processing' —
+        # the atomic claim row inserted before triage runs, orphaned if the worker
+        # died mid-cycle). Moved here from create_tables() startup — locking
+        # processed_emails at boot was delaying port binding and triggering Render
+        # R10 restart timeouts.
+        #
+        # MUST filter on status='processing'. UNROUTED markers (poller.py's
+        # "no alias match" rows) also use score=0 — with status='flagged', not
+        # 'processing' — and share this same sentinel value by coincidence, not
+        # design. Without this filter, this job deleted every UNROUTED row within
+        # 10 minutes of creation, every 60 seconds, since 2026-06-01. Deleting the
+        # marker row is exactly what un-does the "don't retry every cycle" dedup
+        # poller.py relies on (_batch_already_processed_ids), so the poller
+        # immediately re-processed the same still-unread message, got the same
+        # "no alias match" result, and recreated the row — forever. Real unrouted
+        # brand mail never had a chance to be seen and fixed because its own
+        # marker kept disappearing before anyone could act on it. Silent for
+        # months until the unrouted_last_24h stall-alarm check (2026-09-14)
+        # started surfacing the same recreated rows as a fresh-looking regression
+        # roughly daily.
         try:
             db.execute(_text(
                 "DELETE FROM processed_emails WHERE score = 0 "
+                "AND status = 'processing' "
                 "AND processed_at < NOW() - INTERVAL '10 minutes'"
             ))
             db.commit()
