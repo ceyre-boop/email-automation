@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import logging
 import os
+import re
 import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
@@ -129,6 +130,71 @@ def _resolve_talent_from_to(to_address: str | None, alias_map: dict[str, str]) -
     if not to_address:
         return None
     return alias_map.get(to_address.lower().strip())
+
+
+# First names too short or too common to trust as a standalone routing signal —
+# real brand/manager text routinely contains these as ordinary words or other
+# people's names ("Sam" the account manager, "Sam" the brand rep), not the talent.
+_CONTENT_MATCH_DENYLIST_FIRST_NAMES = {"sam"}
+
+
+def _resolve_talent_from_content(subject: str, body: str, talent_map: dict[str, TalentProfile]) -> str | None:
+    """Last-resort routing fallback: match a known talent's name against the
+    subject/body when neither the alias headers nor thread continuity resolve one.
+
+    Real senders increasingly email the shared inbox directly (an account
+    manager, a repeat PR/creator-platform contact) instead of a per-talent
+    alias, naming the talent only in the subject or body — e.g. "AliExpress US
+    x Lizz", "OGHom x Jenn Lyles". Header-based routing structurally cannot see
+    this; the name is the only signal that exists.
+
+    Two tiers, both word-boundary matches (never a substring of a longer word):
+      1. Full name ("Jenn Lyles") — always trusted, effectively no collision risk.
+      2. First name alone ("Lizz") — only when >= 4 characters and not in the
+         denylist above, since a bare short/common first name in free-text brand
+         email is too likely to be someone else's name or an ordinary word.
+
+    Returns the single unambiguous talent_key, or None — 0 or 2+ matches both
+    correctly fall through to UNROUTED for a human to decide; this fallback
+    must never guess between two plausible talents.
+    """
+    haystack = f"{subject or ''}\n{(body or '')[:1000]}"
+    matches: set[str] = set()
+    for profile in talent_map.values():
+        full_name = (profile.full_name or "").strip()
+        if not full_name:
+            continue
+        if re.search(r"\b" + re.escape(full_name) + r"\b", haystack, re.IGNORECASE):
+            matches.add(profile.key)
+            continue
+        first_name = full_name.split(" ", 1)[0]
+        if len(first_name) >= 4 and first_name.lower() not in _CONTENT_MATCH_DENYLIST_FIRST_NAMES:
+            if re.search(r"\b" + re.escape(first_name) + r"\b", haystack, re.IGNORECASE):
+                matches.add(profile.key)
+    if len(matches) == 1:
+        return next(iter(matches))
+    return None
+
+
+# RFC 3834 sets Auto-Submitted on any compliant auto-responder/bounce. Combined
+# with the standard bounce-report header and the well-known system sender
+# addresses, this reliably identifies mail that was never sent by a brand at
+# all — the "sender" IS a mail system, so no amount of routing-header or
+# content matching can ever attach it to a talent. These must never enter the
+# UNROUTED bucket: they aren't a routing failure, and counting them there
+# both wastes human review time and pollutes the routing-regression alarm.
+_BOUNCE_SENDER_RE = re.compile(r"mailer-daemon@|postmaster@|mail delivery subsystem", re.IGNORECASE)
+
+
+def _is_auto_generated_notification(detail: dict) -> bool:
+    """True for bounce/delivery-failure notices — never a real brand inquiry."""
+    headers = detail.get("headers") or {}
+    auto_submitted = (headers.get("auto-submitted") or "").strip().lower()
+    if auto_submitted and auto_submitted != "no":
+        return True
+    if headers.get("x-failed-recipients"):
+        return True
+    return bool(_BOUNCE_SENDER_RE.search(detail.get("sender") or ""))
 
 
 def poll_all_inboxes(db: Session) -> dict:
@@ -375,6 +441,34 @@ def _process_shared_inbox_message(
             logger.warning("Empty detail for shared inbox / %s — skipping", message_id)
             return {"summary": {"errors": 1}}
 
+        # Bounce / delivery-failure notification — never a brand inquiry, and no
+        # routing signal (header or content) can ever attach it to a talent
+        # because the "sender" is a mail system, not a brand. Record it under a
+        # distinct bucket so it never enters the UNROUTED review queue or trips
+        # the routing-regression alarm.
+        if _is_auto_generated_notification(detail):
+            logger.info("Auto-generated notification %s — not a talent inquiry, skipping routing", message_id)
+            from sqlalchemy.exc import IntegrityError
+            try:
+                db.add(ProcessedEmail(
+                    talent_key="SYSTEM_NOTIFICATION",
+                    gmail_message_id=message_id,
+                    thread_id=detail.get("thread_id", ""),
+                    sender=detail.get("sender", ""),
+                    subject=detail.get("subject", ""),
+                    score=1,
+                    offer_type="Automated",
+                    triage_reason="Auto-generated bounce/delivery notification — not a brand inquiry.",
+                    status=EmailStatus.archived,
+                    email_date=detail.get("email_date"),
+                ))
+                db.commit()
+            except IntegrityError:
+                db.rollback()
+            summary["archived"] += 1
+            summary["processed"] += 1
+            return {"summary": summary}
+
         # SOP v16 Rule 12 — resolve talent from original recipient header
         to_address = gmail_svc.get_to_address(detail, alias_map)
         talent_key = _resolve_talent_from_to(to_address, alias_map)
@@ -413,6 +507,25 @@ def _process_shared_inbox_message(
                     "Thread-continuity fallback: %s has no alias match but thread %s "
                     "previously resolved to %s — routing there instead of UNROUTED.",
                     message_id, thread_id, talent_key,
+                )
+
+        if talent_key is None:
+            # CONTENT-MATCH FALLBACK. Neither the alias headers nor thread history
+            # resolved a talent — last resort before giving up. Real senders
+            # increasingly email the shared inbox directly (an account manager, a
+            # repeat PR/creator-platform contact) naming the talent only in the
+            # subject or body ("AliExpress US x Lizz", "OGHom x Jenn Lyles"), which
+            # header-based routing structurally cannot see. Only acts on an
+            # unambiguous single match — see _resolve_talent_from_content.
+            content_match = _resolve_talent_from_content(
+                detail.get("subject", ""), detail.get("body_text", ""), talent_map,
+            )
+            if content_match:
+                talent_key = content_match
+                logger.info(
+                    "Content-match fallback: %s named %s in subject/body with no "
+                    "alias or thread match — routing there instead of UNROUTED.",
+                    message_id, talent_key,
                 )
 
         if talent_key is None:

@@ -3106,7 +3106,12 @@ def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depend
     """
     from backend.services import gmail as gmail_svc
     from backend.services.inbox_routing import shared_inbox_email
-    from backend.services.poller import _build_alias_map, _resolve_talent_from_to
+    from backend.services.poller import (
+        _build_alias_map,
+        _resolve_talent_from_content,
+        _resolve_talent_from_to,
+        _talent_profile_map,
+    )
 
     settings = get_settings()
     inbox = shared_inbox_email(settings)
@@ -3114,9 +3119,8 @@ def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depend
     if not token:
         return {"error": f"no token row for shared inbox {inbox}"}
 
-    from backend.services.sop_parser import get_active_profiles
     alias_map = _build_alias_map(settings)
-    talent_map = {k.lower() for k in get_active_profiles(settings.talent_profiles)}
+    talent_map = _talent_profile_map(settings)
     service = gmail_svc.build_service(token, db)
     rows = (
         db.query(ProcessedEmail)
@@ -3152,6 +3156,12 @@ def reroute_unrouted(apply: bool = False, limit: int = 500, db: Session = Depend
                 )
                 if prior and prior[0] and prior[0].lower() in talent_map:
                     talent_key = prior[0]
+            if talent_key is None:
+                # Same content-match fallback as poller.py: the sender named the
+                # talent in the subject/body instead of using a per-talent alias.
+                talent_key = _resolve_talent_from_content(
+                    detail.get("subject", ""), detail.get("body_text", ""), talent_map,
+                )
             if talent_key:
                 routable.append({"id": row.id, "message_id": row.gmail_message_id,
                                  "alias": addr, "talent": talent_key})
