@@ -163,8 +163,8 @@
     "stall_minutes": 30,
     "cooldown_minutes": 60,
     "alert_email": "colineyre222@gmail.com",
-    "unrouted_warn_per_24h": 15,
-    "_unrouted_warn_comment": "Alerts when UNROUTED emails in the last 24h exceed this. Added 2026-09-14: a routing regression does not stall the pipeline — poll/triage/draft/send all keep looking healthy while real brand deals quietly drop into the UNROUTED bucket instead of a talent's dashboard. This is the check that would have caught the thread-continuity gap in a day instead of weeks."
+    "unrouted_warn_per_24h": 25,
+    "_unrouted_warn_comment": "Alerts when UNROUTED emails in the last 24h exceed this. Added 2026-09-14: a routing regression does not stall the pipeline — poll/triage/draft/send all keep looking healthy while real brand deals quietly drop into the UNROUTED bucket instead of a talent's dashboard. This is the check that would have caught the thread-continuity gap in a day instead of weeks. Raised 15 -> 25 on 2026-09-22 after two real bugs were fixed (guardian ghost-row cleanup deleting UNROUTED markers every ~10min, and bounce notifications being counted as routing failures) plus a content-match fallback that resolves brand mail naming a talent by name instead of alias. The genuine floor rate measured after both fixes was ~3/24h; 25 leaves real headroom above that while still catching a regression in about a day, same as the original intent — do not raise this again without first checking the actual floor rate, since raising it just to silence noise (rather than because the noise was fixed) defeats the alarm's purpose."
   },
   "claim_reaper": {
     "_comment": "Resolves expired auto_send claims by asking Gmail what actually happened, rather than clearing them blindly — a worker can die AFTER Gmail accepts a send, and a blind retry would send a brand a duplicate reply. Only two outcomes are actioned: Gmail draft still exists (nothing sent -> release the claim) or the thread carries a SENT message (it did send -> record it). Anything else is left for a human.",
