@@ -4,7 +4,7 @@ Found 2026-09-18: this stat had been ~$0 essentially forever because
 triage never populated ProcessedEmail.proposed_rate (see triage.py /
 prompts/triage.md). The read-side query (GET /api/dashboard/report) was
 already correct — it filters proposed_rate.isnot(None) and sums since the
-12PM-Pacific rollover. These tests pin that read-side behavior with a
+midnight-Pacific rollover. These tests pin that read-side behavior with a
 realistic mix of real rates, unknown (None) rates, and non-score-3 rows,
 and document that the sum does NOT dedupe across talents sharing the same
 brand/rate (see poller.py's shared-inbox vs partnerships-token routing —

@@ -53,11 +53,11 @@ _DASHBOARD_RESET_KEY = "dashboard_reset_started_at"
 
 _PACIFIC = ZoneInfo("America/Los_Angeles")
 _UTC = ZoneInfo("UTC")
-_DAILY_ROLLOVER_HOUR = 12  # headline "today" stat tiles roll over at 12:00 PM Pacific
+_DAILY_ROLLOVER_HOUR = 0  # headline "today" stat tiles roll over at midnight Pacific
 
 
 def _daily_rollover_boundary_utc(reference_utc: datetime) -> datetime:
-    """Most recent 12:00 PM America/Los_Angeles boundary, as a naive UTC datetime.
+    """Most recent midnight America/Los_Angeles boundary, as a naive UTC datetime.
 
     Used only for read-only dashboard aggregation windows (headline stat tiles like
     "Sent Today", "Ignored", "Replies", "Est. Daily Deal Value"). Handles PST/PDT
@@ -104,8 +104,8 @@ class DailyReportOut(BaseModel):
     total_draft_backlog: int
     total_new_drafts_today: int
     total_ignore: int
-    total_deal_value_today: float  # sum of proposed_rate for Score-3 emails since the last 12PM Pacific rollover
-    # Calendar-day fields (roll over daily at 12:00 PM Pacific, regardless of manual reset)
+    total_deal_value_today: float  # sum of proposed_rate for Score-3 emails since the last midnight Pacific rollover
+    # Calendar-day fields (roll over daily at midnight Pacific, regardless of manual reset)
     total_sent_cal_today: int = 0
     total_new_drafts_cal_today: int = 0
     total_revisit_cal_today: int = 0  # score=1 emails processed today
@@ -388,7 +388,7 @@ def daily_report(db: Session = Depends(get_db)):
             pending_real_drafts=count_new_today,
         ))
 
-    # ── Calendar-day stats (roll over at 12PM Pacific → now, ignoring manual reset) ──
+    # ── Calendar-day stats (roll over at midnight Pacific → now, ignoring manual reset) ──
     cal_rollover = _daily_rollover_boundary_utc(datetime.utcnow())
 
     sent_cal_today = db.query(Draft).filter(
@@ -397,7 +397,7 @@ def daily_report(db: Session = Depends(get_db)):
     ).count()
 
     # Est. Daily Deal Value — sum of proposed_rate for Score-3 emails since the
-    # last 12PM Pacific rollover. Read-only aggregation query only; does not
+    # last midnight Pacific rollover. Read-only aggregation query only; does not
     # touch stored email/Supabase data.
     deal_value_cal_today: float = (
         db.query(func.coalesce(func.sum(ProcessedEmail.proposed_rate), 0.0))
