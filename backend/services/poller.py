@@ -25,6 +25,7 @@ import threading
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta
 
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 import time
@@ -91,12 +92,79 @@ def _batch_already_processed_ids(db: Session, message_ids: list[str]) -> set[str
     """Return the subset of message_ids already present in ProcessedEmail (single query)."""
     if not message_ids:
         return set()
+    now = datetime.utcnow()
     rows = (
         db.query(ProcessedEmail.gmail_message_id)
         .filter(ProcessedEmail.gmail_message_id.in_(message_ids))
+        # A retry_pending row that is due is NOT "done" — it must be re-fetched and
+        # re-triaged. Not-yet-due retry_pending rows stay excluded (skip this cycle).
+        .filter(~and_(
+            ProcessedEmail.status == EmailStatus.retry_pending,
+            ProcessedEmail.triage_next_retry_at.isnot(None),
+            ProcessedEmail.triage_next_retry_at <= now,
+        ))
         .all()
     )
     return {r.gmail_message_id for r in rows}
+
+
+_DEFAULT_TRIAGE_MAX_RETRIES = 25
+_DEFAULT_TRIAGE_BACKOFF_CAP_MINUTES = 30
+
+
+def _triage_retry_config() -> tuple[int, int]:
+    """Return (max_retries, backoff_cap_minutes) from settings.json triage.retry."""
+    cfg = (get_settings().app_config.get("triage", {}) or {}).get("retry", {}) or {}
+    return (
+        int(cfg.get("max_retries", _DEFAULT_TRIAGE_MAX_RETRIES)),
+        int(cfg.get("backoff_cap_minutes", _DEFAULT_TRIAGE_BACKOFF_CAP_MINUTES)),
+    )
+
+
+def _triage_backoff_minutes(retry_count: int, cap_minutes: int) -> int:
+    """min(2^retry_count, cap) minutes; retry_count is the post-increment count."""
+    return min(2 ** max(retry_count, 0), cap_minutes)
+
+
+def _park_for_triage_retry(db: Session, message_id: str, now: datetime | None = None) -> bool:
+    """Make a retryable triage failure non-terminal.
+
+    Updates the claim row to retry_pending, increments triage_retry_count and sets
+    triage_next_retry_at. Returns False (row untouched) when the row has already used
+    max_retries, so the caller finalizes it as the terminal score-2 fallback.
+    """
+    row = db.query(ProcessedEmail).filter(ProcessedEmail.gmail_message_id == message_id).first()
+    if row is None:
+        return False
+    max_retries, cap = _triage_retry_config()
+    count = row.triage_retry_count or 0
+    if count >= max_retries:
+        return False
+    count += 1
+    row.triage_retry_count = count
+    row.triage_next_retry_at = (now or datetime.utcnow()) + timedelta(
+        minutes=_triage_backoff_minutes(count, cap)
+    )
+    row.status = EmailStatus.retry_pending
+    db.add(row)
+    db.commit()
+    return True
+
+
+def _reclaim_due_retry(db: Session, message_id: str, now: datetime | None = None) -> bool:
+    """Atomically flip a due retry_pending row back to processing. True if we won it."""
+    updated = (
+        db.query(ProcessedEmail)
+        .filter(
+            ProcessedEmail.gmail_message_id == message_id,
+            ProcessedEmail.status == EmailStatus.retry_pending,
+            ProcessedEmail.triage_next_retry_at.isnot(None),
+            ProcessedEmail.triage_next_retry_at <= (now or datetime.utcnow()),
+        )
+        .update({ProcessedEmail.status: EmailStatus.processing}, synchronize_session=False)
+    )
+    db.commit()
+    return bool(updated)
 
 
 def _record_poll_health(db: Session, talent_key: str, emails_found: int, emails_processed: int,
@@ -1003,13 +1071,18 @@ def _process_one_message(
         score=0,
         status=EmailStatus.processing,
     )
-    try:
-        db.add(claim)
-        db.commit()
-    except IntegrityError:
-        db.rollback()
-        logger.info("Skipping %s / %s — already claimed by another worker", talent_key, message_id)
-        return
+    # A due retry_pending row already exists (unique gmail_message_id): re-claim it with an
+    # atomic conditional UPDATE instead of INSERTing. Only one worker can win it.
+    if _reclaim_due_retry(db, message_id):
+        logger.info("Re-claimed due triage retry for %s / %s", talent_key, message_id)
+    else:
+        try:
+            db.add(claim)
+            db.commit()
+        except IntegrityError:
+            db.rollback()
+            logger.info("Skipping %s / %s — already claimed by another worker", talent_key, message_id)
+            return
 
     detail = gmail_svc.get_message_detail(token_row, message_id, db=db, service=service)
     if not detail:
@@ -1088,6 +1161,16 @@ def _process_one_message(
         body=body,
     )
     time_to_classify_ms = int((_time.monotonic() - _triage_start) * 1000)
+    # Transient/infra triage failure (quota, rate limit, network, timeout, non-JSON,
+    # truncation): don't finalize. Park as retry_pending; Gmail stays untouched (UNREAD).
+    # Once max_retries is exhausted, fall through to the terminal score-2 handling below.
+    if triage_result.get("retryable") and _park_for_triage_retry(db, message_id):
+        logger.warning(
+            "Triage retryable failure for %s / %s — parked retry_pending (%s)",
+            talent_key, message_id, triage_result.get("reason", ""),
+        )
+        return
+
     score = triage_result["score"]
     reason = triage_result["reason"]
 

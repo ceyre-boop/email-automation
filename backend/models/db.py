@@ -48,6 +48,7 @@ class EmailStatus(str, enum.Enum):
     draft_saved = "draft_saved"  # Score 3 draft created
     sent = "sent"              # Reply sent
     error = "error"
+    retry_pending = "retry_pending"  # Transient triage failure — re-triaged after triage_next_retry_at
 
 
 # ── Tables ───────────────────────────────────────────────────────────────────
@@ -118,6 +119,10 @@ class ProcessedEmail(Base):
     scenario_needs_improvement: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
     # SOP v16: original alias address the brand emailed (e.g. hana@taboost.me)
     to_address: Mapped[str | None] = mapped_column(String(256), nullable=True)
+    # Triage retry: transient OpenAI failures park the row as retry_pending instead of
+    # finalizing it as a score-2 fallback. See poller._park_for_triage_retry.
+    triage_retry_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    triage_next_retry_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class OAuthState(Base):
@@ -595,6 +600,9 @@ def create_tables():
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS human_override_occurred BOOLEAN DEFAULT FALSE",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS scenario_needs_improvement BOOLEAN DEFAULT FALSE",
         "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'processing'",
+        "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'retry_pending'",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS triage_retry_count INTEGER NOT NULL DEFAULT 0",
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS triage_next_retry_at TIMESTAMP",
         """CREATE TABLE IF NOT EXISTS sop_versions (
             id SERIAL PRIMARY KEY,
             version_label VARCHAR(256) NOT NULL DEFAULT '',

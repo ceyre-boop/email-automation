@@ -25,6 +25,11 @@
     "score_1_label": "trash",
     "score_2_label": "uncertain",
     "score_3_label": "respond",
+    "retry": {
+      "_comment": "Transient triage failures (OpenAI quota/rate/network/timeout/non-JSON) are retried on later polls instead of finalized as score-2. Backoff = min(2^retry_count minutes, backoff_cap_minutes); after max_retries the email is finalized as the terminal score-2 fallback.",
+      "max_retries": 25,
+      "backoff_cap_minutes": 30
+    },
     "never_reply": {
       "_comment": "Emails matching any rule here are immediately archived (Score 1) without calling GPT. Add senders/domains/keywords that should NEVER receive an auto-reply.",
       "domains": [

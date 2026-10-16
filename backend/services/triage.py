@@ -364,7 +364,7 @@ def triage_email(
                 "Raise max_tokens_triage in settings.json. Raw: %.80s",
                 talent_key, max_tok, raw_json,
             )
-            return _fallback(talent_key, f"output truncated at {max_tok} tokens — raise max_tokens_triage")
+            return _fallback(talent_key, f"output truncated at {max_tok} tokens — raise max_tokens_triage", retryable=True)
 
         result = json.loads(raw_json)
     except json.JSONDecodeError as exc:
@@ -373,10 +373,10 @@ def triage_email(
             "finish_reason unknown. Raw snippet: %.80s — %s",
             talent_key, raw_json[:80] if "raw_json" in dir() else "N/A", exc,
         )
-        return _fallback(talent_key, "non-JSON output from triage model")
+        return _fallback(talent_key, "non-JSON output from triage model", retryable=True)
     except Exception as exc:  # noqa: BLE001
         logger.error("Triage API error for %s: %s", talent_key, exc)
-        return _fallback(talent_key, f"API error: {exc}")
+        return _fallback(talent_key, f"API error: {exc}", retryable=True)
 
     # Schema validation — required fields must all be present. proposed_rate_usd
     # is required so a future prompt regression that drops the field fails loudly
@@ -449,7 +449,9 @@ def _ignore_leave_inbox(reason: str, offer_type: str = "Event Invite") -> dict:
     }
 
 
-def _fallback(talent_key: str, note: str) -> dict:
+def _fallback(talent_key: str, note: str, retryable: bool = False) -> dict:
+    """Score-2 fallback. ``retryable=True`` marks transient/infra failures (API error,
+    non-JSON, truncation) so the poller re-triages later instead of finalizing."""
     return {
         "score": 2,
         "reason": f"Triage fallback — {note}",
@@ -460,4 +462,5 @@ def _fallback(talent_key: str, note: str) -> dict:
         "urgency_score": 0,
         "risk_score": 0,
         "alternatives_considered": "",
+        "retryable": retryable,
     }
