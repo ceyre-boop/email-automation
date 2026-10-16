@@ -161,7 +161,14 @@ def _reclaim_due_retry(db: Session, message_id: str, now: datetime | None = None
             ProcessedEmail.triage_next_retry_at.isnot(None),
             ProcessedEmail.triage_next_retry_at <= (now or datetime.utcnow()),
         )
-        .update({ProcessedEmail.status: EmailStatus.processing}, synchronize_session=False)
+        # processed_at refreshed in the same UPDATE: gives the reclaimed row a fresh
+        # window so the ghost-row reapers (poller 10 min, cron 10 min, guardian 5 min
+        # stuck-processing) don't treat it as an orphaned claim mid-triage.
+        .update(
+            {ProcessedEmail.status: EmailStatus.processing,
+             ProcessedEmail.processed_at: datetime.utcnow()},
+            synchronize_session=False,
+        )
     )
     db.commit()
     return bool(updated)
@@ -683,6 +690,8 @@ def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool
             db.query(ProcessedEmail).filter(
                 ProcessedEmail.talent_key == talent_key,
                 ProcessedEmail.score == 0,
+                # Parked retry rows keep score=0 and legitimately live >10 min (backoff).
+                ProcessedEmail.status != EmailStatus.retry_pending,
                 ProcessedEmail.processed_at < datetime.utcnow() - timedelta(minutes=10),
             ).delete(synchronize_session=False)
             db.commit()

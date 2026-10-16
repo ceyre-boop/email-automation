@@ -10,7 +10,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from backend.models.db import EmailStatus, ProcessedEmail
+from backend.models.db import EmailStatus, ProcessedEmail, TalentToken
 from backend.services import poller
 from backend.services import triage as triage_svc
 
@@ -183,3 +183,136 @@ def test_fresh_message_still_inserts_claim(db_session):
     _run_process(db_session, triage_svc._fallback("Sylvia", "API error", retryable=True))
     row = db_session.query(ProcessedEmail).filter_by(gmail_message_id="m1").one()
     assert row.status == EmailStatus.retry_pending and row.triage_retry_count == 1
+
+
+# ── Ghost-row reapers must not eat parked / reclaimed retry rows ────────────
+
+class _SqliteNowSession:
+    """Proxy so cron's Postgres `NOW() - INTERVAL '10 minutes'` runs on SQLite."""
+    def __init__(self, db):
+        self._db = db
+
+    def execute(self, stmt, *a, **kw):
+        from sqlalchemy import text
+        sql = str(stmt).replace("NOW() - INTERVAL '10 minutes'", "datetime('now','-10 minutes')")
+        return self._db.execute(text(sql), *a, **kw)
+
+    def __getattr__(self, name):
+        return getattr(self._db, name)
+
+    def close(self):  # keep the shared test session open
+        pass
+
+
+def _run_cron_reaper(db_session):
+    from backend.routers import cron
+    factory = MagicMock(return_value=_SqliteNowSession(db_session))
+    with patch("backend.models.db.get_session_factory", return_value=factory), \
+         patch("backend.services.guardian.GuardianWatchdog"), \
+         patch("backend.main._scheduler", None, create=True):
+        cron._run_guardian()
+    db_session.expire_all()
+
+
+class _Stop(BaseException):
+    """Aborts _poll_one_talent right after the ghost sweep (BaseException: not swallowed)."""
+
+
+class _StopAfterSweep:
+    """Session proxy: fakes the TalentToken lookup, runs the real sweep, aborts at its commit."""
+    def __init__(self, db):
+        self._db = db
+
+    def query(self, model, *a, **kw):
+        if model is TalentToken:
+            q = MagicMock()
+            q.filter.return_value.first.return_value = MagicMock(talent_key="Sylvia")
+            return q
+        return self._db.query(model, *a, **kw)
+
+    def commit(self):
+        self._db.commit()
+        raise _Stop()
+
+    def close(self):
+        pass
+
+    def __getattr__(self, name):
+        return getattr(self._db, name)
+
+
+def _run_poller_sweep(db_session):
+    """Run only the start-of-poll ghost sweep inside the real _poll_one_talent."""
+    profile = MagicMock(key="Sylvia", full_name="Sylvia", minimum_rate_usd=500.0)
+    with patch("backend.services.poller._get_session_factory",
+               return_value=lambda: _StopAfterSweep(db_session)):
+        try:
+            poller._poll_one_talent(1, profile, True)
+        except _Stop:
+            pass
+        finally:
+            poller._poll_locks.pop("Sylvia", None)
+    db_session.expire_all()
+
+
+OLD = lambda: datetime.utcnow() - timedelta(minutes=30)  # noqa: E731
+
+
+def _old_row(db, mid, status, count=1, next_at=None):
+    row = _row(db, mid, status, count, next_at)
+    row.processed_at = OLD()
+    db.commit()
+    return row
+
+
+def test_cron_reaper_spares_parked_retry_row_but_reaps_ghost(db_session):
+    _old_row(db_session, "parked", EmailStatus.retry_pending, 1, datetime.utcnow() + timedelta(minutes=20))
+    _old_row(db_session, "ghost", EmailStatus.processing, 0)
+    _run_cron_reaper(db_session)
+    ids = {r.gmail_message_id for r in db_session.query(ProcessedEmail).all()}
+    assert "parked" in ids and "ghost" not in ids
+
+
+def test_cron_reaper_spares_freshly_reclaimed_row(db_session):
+    _old_row(db_session, "m1", EmailStatus.retry_pending, 1, datetime.utcnow() - timedelta(minutes=1))
+    assert poller._reclaim_due_retry(db_session, "m1") is True
+    _run_cron_reaper(db_session)
+    row = db_session.query(ProcessedEmail).filter_by(gmail_message_id="m1").one()
+    assert row.status == EmailStatus.processing
+    assert row.triage_retry_count == 1  # count preserved
+
+
+def test_poller_sweep_spares_parked_retry_row_but_reaps_ghost(db_session):
+    _old_row(db_session, "parked", EmailStatus.retry_pending, 1, datetime.utcnow() + timedelta(minutes=20))
+    _old_row(db_session, "ghost", EmailStatus.processing, 0)
+    _run_poller_sweep(db_session)
+    ids = {r.gmail_message_id for r in db_session.query(ProcessedEmail).all()}
+    assert "parked" in ids and "ghost" not in ids
+
+
+def test_poller_sweep_spares_freshly_reclaimed_row(db_session):
+    _old_row(db_session, "m1", EmailStatus.retry_pending, 1, datetime.utcnow() - timedelta(minutes=1))
+    assert poller._reclaim_due_retry(db_session, "m1") is True
+    _run_poller_sweep(db_session)
+    assert db_session.query(ProcessedEmail).filter_by(gmail_message_id="m1").count() == 1
+
+
+def test_parked_row_reaches_giveup_across_cycles_with_reapers_running(db_session):
+    """Full lifecycle: fail -> park -> sweeps -> due -> reclaim ... until max_retries finalizes."""
+    fail = triage_svc._fallback("Sylvia", "API error", retryable=True)
+    with patch("backend.services.poller._triage_retry_config", return_value=(3, 30)):
+        for _ in range(3):
+            _run_process(db_session, fail)
+            row = db_session.query(ProcessedEmail).filter_by(gmail_message_id="m1").one()
+            assert row.status == EmailStatus.retry_pending
+            # time passes: parked row is >10 min old and now due; reapers run
+            row.processed_at = OLD()
+            row.triage_next_retry_at = datetime.utcnow() - timedelta(minutes=1)
+            db_session.commit()
+            _run_cron_reaper(db_session)
+            _run_poller_sweep(db_session)
+        assert db_session.query(ProcessedEmail).filter_by(gmail_message_id="m1").one().triage_retry_count == 3
+        _run_process(db_session, fail)
+    db_session.expire_all()
+    row = db_session.query(ProcessedEmail).filter_by(gmail_message_id="m1").one()
+    assert row.status == EmailStatus.flagged and row.score == 2

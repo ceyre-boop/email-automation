@@ -375,6 +375,7 @@ def triage_email(
         )
         return _fallback(talent_key, "non-JSON output from triage model", retryable=True)
     except Exception as exc:  # noqa: BLE001
+        # Deliberately broad: any unexpected error is retryable, bounded by triage.retry.max_retries.
         logger.error("Triage API error for %s: %s", talent_key, exc)
         return _fallback(talent_key, f"API error: {exc}", retryable=True)
 
