@@ -205,6 +205,30 @@ def list_human_edited_drafts(
     ]
 
 
+def _orphaned_query(db: Session):
+    """Score-3 emails with no draft that are still sitting in the talent's Gmail INBOX.
+
+    Joining inbox_emails (the live inbox mirror) keeps historical Score-3 rows whose
+    draft rows were purged or whose thread was handled from showing as lost — without
+    the join the panel counted ~44k old rows and Trash All / Regenerate All would act on
+    every one of them.
+    """
+    from backend.models.db import InboxEmail, ProcessedEmail
+    from sqlalchemy import select
+
+    drafted_subq = select(Draft.gmail_message_id)
+    return (
+        db.query(ProcessedEmail)
+        .join(InboxEmail, InboxEmail.gmail_message_id == ProcessedEmail.gmail_message_id)
+        .filter(
+            ProcessedEmail.score == 3,
+            ProcessedEmail.status != "archived",
+            ProcessedEmail.gmail_message_id.not_in(drafted_subq),
+            InboxEmail.label_ids.like("%INBOX%"),
+        )
+    )
+
+
 @router.get("/orphaned")
 def list_orphaned_emails(
     talent_key: Optional[str] = Query(None),
@@ -212,15 +236,7 @@ def list_orphaned_emails(
     db: Session = Depends(get_db),
 ):
     """Score-3 emails that have no draft — real deals that fell through the cracks."""
-    from backend.models.db import ProcessedEmail
-    from sqlalchemy import select
-
-    drafted_subq = select(Draft.gmail_message_id)
-    q = db.query(ProcessedEmail).filter(
-        ProcessedEmail.score == 3,
-        ProcessedEmail.status != "archived",
-        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
-    )
+    q = _orphaned_query(db)
     if talent_key:
         q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
     rows = q.order_by(ProcessedEmail.processed_at.desc()).limit(limit).all()
@@ -246,15 +262,7 @@ def trash_all_orphaned(
     db: Session = Depends(get_db),
 ):
     """Trash all orphaned score-3 emails in Gmail and mark them archived in DB."""
-    from backend.models.db import ProcessedEmail
-    from sqlalchemy import select
-
-    drafted_subq = select(Draft.gmail_message_id)
-    q = db.query(ProcessedEmail).filter(
-        ProcessedEmail.score == 3,
-        ProcessedEmail.status != "archived",
-        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
-    )
+    q = _orphaned_query(db)
     if talent_key:
         q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
     rows = q.all()
@@ -283,15 +291,7 @@ def regenerate_all_orphaned(
     db: Session = Depends(get_db),
 ):
     """Bulk-regenerate drafts for all orphaned Score-3 emails with no draft. Clears any stale Draft record so the draft-queue worker recreates it within 20 seconds."""
-    from backend.models.db import ProcessedEmail
-    from sqlalchemy import select
-
-    drafted_subq = select(Draft.gmail_message_id)
-    q = db.query(ProcessedEmail).filter(
-        ProcessedEmail.score == 3,
-        ProcessedEmail.status != "archived",
-        ProcessedEmail.gmail_message_id.not_in(drafted_subq),
-    )
+    q = _orphaned_query(db)
     if talent_key:
         q = q.filter(ProcessedEmail.talent_key.ilike(talent_key))
     orphans = q.all()
