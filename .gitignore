@@ -42,3 +42,7 @@ Thumbs.db
 
 # Railway / Render build artifacts
 .nixpacks/
+
+# local-only analytics exports (never commit)
+exports/
+brand_inquiry_export_out/
