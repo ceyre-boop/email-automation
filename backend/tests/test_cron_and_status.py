@@ -114,3 +114,26 @@ def test_cron_poll_no_tokens_returns_empty_summary(mock_poll, client):
 ])
 def test_one_off_test_and_n8n_endpoints_are_gone(client, method, path):
     assert getattr(client, method)(path).status_code in (404, 405)
+
+
+def test_health_exposes_ai_enabled(client, monkeypatch):
+    """The dashboard banner reads ai_enabled from /health (public, boolean only)."""
+    import backend.routers.cron as cron_mod
+
+    monkeypatch.setattr(cron_mod, "is_ai_enabled", lambda: False)
+    assert client.get("/health").json()["ai_enabled"] is False
+
+    monkeypatch.setattr(cron_mod, "is_ai_enabled", lambda: True)
+    assert client.get("/health").json()["ai_enabled"] is True
+
+
+def test_health_ai_enabled_never_breaks_health(client, monkeypatch):
+    import backend.routers.cron as cron_mod
+
+    def boom():
+        raise RuntimeError("app_state unreachable")
+
+    monkeypatch.setattr(cron_mod, "is_ai_enabled", boom)
+    resp = client.get("/health")
+    assert resp.status_code == 200
+    assert resp.json()["ai_enabled"] is None
