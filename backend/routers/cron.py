@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import logging
 import os
-import threading
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
@@ -18,6 +17,7 @@ from sqlalchemy.orm import Session
 from backend.core.config import get_settings
 from backend.models.db import Draft, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
+from backend.services.locks import locked_job
 from backend.services.oauth import proactive_refresh_all_tokens
 from backend.services.poller import poll_all_inboxes
 
@@ -25,10 +25,11 @@ from backend.services.poller import poll_all_inboxes
 router = APIRouter(tags=["internal"])
 logger = logging.getLogger(__name__)
 
-# Mutex preventing draft_queue and backlog_blaster from overlapping.
-# Both jobs run 50-worker thread pools against the same NOT-IN subquery —
-# without this lock they race to create duplicate Gmail drafts.
-_draft_queue_lock = threading.Lock()
+# Every job below is wrapped in @locked_job(<name>): a Postgres advisory lock
+# (services/locks.py) that excludes the same job in ANY process — a second web
+# instance during a deploy, the Render cron hitting /cron/poll-inboxes, or an admin
+# endpoint. A caller that does not get the lock skips with an INFO log. The draft
+# queue in particular races itself into duplicate Gmail drafts if it overlaps.
 
 # Oldest email the automation may draft a reply for. See the AGE GUARD comment in
 # _run_draft_queue_inner: this is what stops a missing draft row from being read as
@@ -225,6 +226,7 @@ def health():
     }
 
 
+@locked_job("poll")
 def _run_poll():
     """Run the poll in a background thread with its own DB session."""
     from backend.models.db import get_session_factory
@@ -239,20 +241,17 @@ def _run_poll():
         db.close()
 
 
+@locked_job("draft_queue")
 def _run_draft_queue(batch_size: int = 60):
     """
-    Continuous drafting worker — finds Score-3 emails with no draft and processes them.
-    Uses a subquery to avoid full table scans, 50 parallel workers per run.
-    Runs every 20s normally; when backlog > 0 it re-queues itself immediately.
-    Protected by _draft_queue_lock so backlog_blaster can never overlap this job.
+    The one drafting job — finds Score-3 emails with no draft and processes them.
+    Uses a NOT EXISTS anti-join to avoid full table scans, 5 parallel workers per run.
+    Runs every 60s on the scheduler; /api/admin/blast-backlog calls it with a larger
+    batch. Previously a second scheduler job (backlog_blaster) ran the same code with
+    batch_size=300 behind a process-local lock; two jobs on one queue only ever
+    meant two chances to double-draft, so there is one job and one cross-process lock.
     """
-    if not _draft_queue_lock.acquire(blocking=False):
-        logger.info("Draft queue skipped — already running")
-        return
-    try:
-        _run_draft_queue_inner(batch_size)
-    finally:
-        _draft_queue_lock.release()
+    _run_draft_queue_inner(batch_size)
 
 
 def _run_draft_queue_inner(batch_size: int = 60):
@@ -429,14 +428,7 @@ def _run_draft_queue_inner(batch_size: int = 60):
         db.close()
 
 
-def _run_backlog_blaster():
-    """
-    Runs every 30s. Processes up to 300 backlogged emails per cycle — no cap on
-    total backlog; each scheduler tick just keeps biting chunks until it's empty.
-    """
-    _run_draft_queue(batch_size=300)
-
-
+@locked_job("claim_reaper")
 def _run_claim_reaper():
     """Resolve expired send claims against Gmail — runs every 5 minutes.
 
@@ -456,6 +448,7 @@ def _run_claim_reaper():
         db.close()
 
 
+@locked_job("retention")
 def _run_retention():
     """Purge terminal drafts, stale inbox cache rows, and old poll_health rows.
 
@@ -478,6 +471,7 @@ def _run_retention():
         db.close()
 
 
+@locked_job("stall_alarm")
 def _run_stall_alarm():
     """Pipeline stall watchdog — runs every 5 minutes.
 
@@ -497,6 +491,7 @@ def _run_stall_alarm():
         db.close()
 
 
+@locked_job("guardian")
 def _run_guardian():
     """Guardian self-healing watchdog — runs every 60 seconds."""
     from backend.models.db import get_session_factory
@@ -542,6 +537,7 @@ def _run_guardian():
         db.close()
 
 
+@locked_job("token_refresh")
 def _run_proactive_refresh():
     """Proactively refresh tokens expiring within 30 minutes. Runs every 10 min."""
     from backend.models.db import get_session_factory
@@ -557,6 +553,7 @@ def _run_proactive_refresh():
         db.close()
 
 
+@locked_job("reconcile_drafts")
 def _run_reconcile():
     """Reconcile pending drafts against Gmail every 5 minutes."""
     from backend.models.db import get_session_factory, Draft, DraftStatus, ProcessedEmail, TalentToken, EmailStatus
@@ -627,6 +624,7 @@ def _run_reconcile():
         db.close()
 
 
+@locked_job("inbox_reconcile")
 def _run_inbox_reconcile():
     """
     Compare InboxEmail DB rows against actual Gmail INBOX contents for each talent.
@@ -690,6 +688,7 @@ def _run_full_reconcile():
     _run_inbox_reconcile()
 
 
+@locked_job("poll_health_retention")
 def _run_poll_health_retention(retain_days: int = 7) -> None:
     """
     Delete poll_health rows older than `retain_days` days.
@@ -724,6 +723,7 @@ def _run_poll_health_retention(retain_days: int = 7) -> None:
         db.close()
 
 
+@locked_job("auto_send")
 def _run_auto_send():
     """Auto-send qualifying pending drafts after the configured hold period."""
     from backend.models.db import get_session_factory

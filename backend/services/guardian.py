@@ -75,7 +75,6 @@ class GuardianWatchdog:
             triggers += self._check_per_talent_caps(db, cfg)
             triggers += self._check_draft_email_ratio(db, cfg)
             self._check_stuck_processing(db, cfg)
-            self._check_backlog_blaster_safety(velocity_total)
             self.maybe_schedule_recovery(db, cfg)
 
             for t in triggers:
@@ -282,23 +281,6 @@ class GuardianWatchdog:
         _log_audit(db, "clear_stuck_processing", reason=f"Cleared {count} stuck processing rows older than {threshold}min",
                    detail=json.dumps({"count": count, "threshold_minutes": threshold}))
         return count
-
-    def _check_backlog_blaster_safety(self, velocity_total: int) -> None:
-        if self._scheduler is None:
-            return
-        try:
-            job = self._scheduler.get_job("backlog_blaster")
-            if job is None:
-                return
-            paused = job.next_run_time is None
-            if velocity_total > 20 and not paused:
-                self._scheduler.pause_job("backlog_blaster")
-                logger.warning("Guardian: paused backlog_blaster (velocity=%d)", velocity_total)
-            elif velocity_total <= 10 and paused:
-                self._scheduler.resume_job("backlog_blaster")
-                logger.info("Guardian: resumed backlog_blaster (velocity=%d)", velocity_total)
-        except Exception as exc:
-            logger.warning("Guardian: backlog_blaster safety check failed: %s", exc)
 
     def maybe_schedule_recovery(self, db: Session, cfg: dict) -> None:
         disabled_at_str = _get_state(db, _KEY_DISABLED_AT)

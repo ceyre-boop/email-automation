@@ -551,14 +551,17 @@ def _startup_work():
         logger.warning("Startup cross-check (token vs sop.md) failed (non-fatal).", exc_info=True)
 
     # Auto-poll + proactive token refresh + draft queue, etc.
-    # Staggered start_date offsets so the 7 jobs don't all fire on the same tick
+    # Every job function is wrapped in @locked_job (Postgres advisory lock, see
+    # services/locks.py), so a second process running the same scheduler skips
+    # instead of duplicating work.
+    # Staggered start_date offsets so the jobs don't all fire on the same tick
     # at boot, and per-job `jitter` keeps them drifting apart over time —
     # prevents the single Uvicorn worker from getting bursted into 15s dashboard
     # fetch timeouts when several jobs and a UI poll land simultaneously.
     try:
         from datetime import datetime, timedelta
         from apscheduler.schedulers.background import BackgroundScheduler
-        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_backlog_blaster, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send, _run_poll_health_retention, _run_stall_alarm, _run_claim_reaper, _run_retention
+        from backend.routers.cron import _run_poll, _run_proactive_refresh, _run_draft_queue, _run_guardian, _run_reconcile, _run_inbox_reconcile, _run_auto_send, _run_poll_health_retention, _run_stall_alarm, _run_claim_reaper, _run_retention
         _scheduler = BackgroundScheduler(daemon=True)
         now = datetime.now()
         _scheduler.add_job(_run_poll, "interval", seconds=90, jitter=20,
@@ -567,9 +570,6 @@ def _startup_work():
         _scheduler.add_job(_run_draft_queue, "interval", seconds=60, jitter=10,
             next_run_time=now + timedelta(seconds=90),  # was 12s — now waits for first poll to complete
             id="draft_queue", replace_existing=True, max_instances=1)
-        _scheduler.add_job(_run_backlog_blaster, "interval", seconds=180, jitter=20,
-            next_run_time=now + timedelta(seconds=120),  # was 22s — staggered after draft_queue
-            id="backlog_blaster", replace_existing=True, max_instances=1)
         _scheduler.add_job(_run_guardian, "interval", seconds=60, jitter=15,
             next_run_time=now + timedelta(seconds=35),
             id="guardian", replace_existing=True, max_instances=1)
@@ -598,6 +598,6 @@ def _startup_work():
             next_run_time=now + timedelta(minutes=25),
             id="retention", replace_existing=True, max_instances=1)
         _scheduler.start()
-        logger.info("Scheduler started — poll 90s±20, draft queue 60s±10, backlog blaster 180s±20, guardian 60s±15, auto_send 60s±10, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr, poll_health retention 1hr, stall alarm 5min, claim reaper 5min, retention 6hr±5min. Cadence cut 2026-09-07: the old 45s/20s/30s loops were the query-volume multiplier behind the DB hitting 100% CPU.")
+        logger.info("Scheduler started — poll 90s±20, draft queue 60s±10 (single drafting job; was draft_queue + backlog_blaster), guardian 60s±15, auto_send 60s±10, reconcile 5min±30, token refresh 10min±60, inbox reconcile 1hr, poll_health retention 1hr, stall alarm 5min, claim reaper 5min, retention 6hr±5min. Cadence cut 2026-09-07: the old 45s/20s/30s loops were the query-volume multiplier behind the DB hitting 100% CPU.")
     except Exception:
         logger.warning("Could not start scheduler — polls must be triggered manually.")

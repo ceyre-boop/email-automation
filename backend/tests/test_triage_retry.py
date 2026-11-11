@@ -250,8 +250,6 @@ def _run_poller_sweep(db_session):
             poller._poll_one_talent(1, profile, True)
         except _Stop:
             pass
-        finally:
-            poller._poll_locks.pop("Sylvia", None)
     db_session.expire_all()
 
 

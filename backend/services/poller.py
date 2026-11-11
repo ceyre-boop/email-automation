@@ -42,6 +42,7 @@ from backend.services.inbox_routing import (
     shared_inbox_email,
 )
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
+from backend.services.locks import advisory_lock
 from backend.services.oauth import TokenRefreshError
 from backend.services.sop_parser import TalentProfile, get_active_profiles
 
@@ -58,8 +59,15 @@ BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle
 MAX_CONCURRENT_EMAILS = int(os.getenv("MAX_CONCURRENT_EMAILS", "3"))
 MAX_TALENT_WORKERS = int(os.getenv("MAX_TALENT_WORKERS", "4"))
 
-# Per-talent poll lock — prevents a slow poll from overlapping the next cycle
-_poll_locks: dict[str, bool] = {}
+# Per-talent and shared-inbox poll locks are Postgres advisory locks (services/locks.py)
+# — a slow poll must not overlap the next cycle in ANY process. This replaced a
+# module-level dict[str, bool]: a check-then-set that two threads (or two instances)
+# could both pass, and that a crashed worker could leave set forever.
+SHARED_INBOX_POLL_LOCK = "poll:shared-inbox"
+
+
+def _talent_poll_lock_name(talent_key: str) -> str:
+    return f"poll:talent:{talent_key.lower()}"
 
 # Module-level session factory — created once and reused by all worker threads.
 # Avoids the cost of building a fresh SQLAlchemy engine on every _process_message_in_thread call.
@@ -309,8 +317,15 @@ def poll_all_inboxes(db: Session) -> dict:
             f"Single inbox not connected ({shared_inbox_email(settings)})", 0,
         )
     else:
-        logger.info("Single-inbox poll starting — inbox=%s", shared_token.email)
-        _poll_single_inbox(shared_token, alias_map, talent_map, draft_mode, db, summary)
+        with advisory_lock(SHARED_INBOX_POLL_LOCK) as got_shared:
+            if not got_shared:
+                logger.info(
+                    "Single-inbox poll still running elsewhere (lock %s held) — skipping this cycle",
+                    SHARED_INBOX_POLL_LOCK,
+                )
+            else:
+                logger.info("Single-inbox poll starting — inbox=%s", shared_token.email)
+                _poll_single_inbox(shared_token, alias_map, talent_map, draft_mode, db, summary)
 
     # ── Phase 2: per-token talents (Partnerships) ─────────────────────────────
     _poll_individual_tokens(db, settings, talent_map, draft_mode, summary)
@@ -664,16 +679,23 @@ def _process_shared_inbox_message(
 
 
 def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool) -> dict:
-    """Process one talent's inbox in its own DB session. Returns per-talent summary."""
-    talent_key = profile.key
+    """Process one talent's inbox in its own DB session. Returns per-talent summary.
 
-    if _poll_locks.get(talent_key):
-        logger.info("Poll still running for %s — skipping cycle", talent_key)
-        return {}
+    Guarded by a per-talent advisory lock: if another poll (this process or any
+    other) is still working this inbox, skip the cycle.
+    """
+    with advisory_lock(_talent_poll_lock_name(profile.key)) as got:
+        if not got:
+            logger.info("Poll still running for %s — skipping cycle", profile.key)
+            return {}
+        return _poll_one_talent_locked(token_row_id, profile, draft_mode)
+
+
+def _poll_one_talent_locked(token_row_id: int, profile: TalentProfile, draft_mode: bool) -> dict:
+    talent_key = profile.key
 
     Session = _get_session_factory()
     db = Session()
-    _poll_locks[talent_key] = True
     poll_start = time.monotonic()
     emails_found = 0
     emails_processed_count = 0
@@ -815,7 +837,6 @@ def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool
                             int((time.monotonic() - poll_start) * 1000))
         return summary
     finally:
-        _poll_locks[talent_key] = False
         db.close()
 
 
