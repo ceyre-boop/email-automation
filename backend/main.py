@@ -354,6 +354,17 @@ def _startup_work():
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
 
+    # ── Step 1b: Load runtime switches (ai_enabled, talent pauses) ────────────
+    # Synchronous, with retries. Until a read succeeds is_ai_enabled() is False,
+    # so a guardian kill in app_state can't be overridden by a file default of True
+    # during a cold boot with a flaky pooler.
+    if settings.database_url:
+        try:
+            from backend.services.runtime_state import warm_start
+            warm_start()
+        except Exception:
+            logger.error("Runtime switch warm start failed (AI stays disabled until readable)", exc_info=True)
+
     # ── Step 2: Restore active SOP from DB → sheets/sop.md ───────────────────
     # Each Render deploy starts with a fresh filesystem (only repo files).
     # If an admin uploaded a new SOP docx since the last git push, the DB has

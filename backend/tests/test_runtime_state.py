@@ -163,3 +163,59 @@ def test_disable_and_enable_ai_routes(client, rt):
     assert client.get("/api/admin/guardian/status").json()["ai_enabled"] is False
     assert client.post("/api/admin/guardian/enable-ai", json={"reason": "t"}).status_code == 200
     assert runtime_state.is_ai_enabled() is True
+
+
+# ── cold boot ────────────────────────────────────────────────────────────────
+
+def test_ai_is_disabled_until_the_first_successful_read(rt, monkeypatch):
+    runtime_state._last_good.update(ai=None, paused={}, loaded=False)
+    runtime_state.invalidate_cache()
+
+    def boom():
+        raise RuntimeError("pooler down")
+
+    monkeypatch.setattr(runtime_state, "_open_session", boom)
+    assert runtime_state.is_ai_enabled() is False, "file default must not apply before a read succeeds"
+
+
+def test_ai_follows_file_default_once_a_read_succeeds_with_no_row(rt):
+    runtime_state._last_good.update(ai=None, paused={}, loaded=False)
+    runtime_state.invalidate_cache()
+    assert runtime_state.is_ai_enabled() is True  # DB readable, no row -> file default
+    assert runtime_state._last_good["loaded"] is True
+
+
+def test_warm_start_retries_then_succeeds(rt, monkeypatch):
+    runtime_state.set_ai_enabled(rt, False)
+    runtime_state._last_good.update(ai=None, paused={}, loaded=False)
+    runtime_state.invalidate_cache()
+    real = runtime_state._open_session
+    calls = {"n": 0}
+
+    def flaky():
+        calls["n"] += 1
+        if calls["n"] < 3:
+            raise RuntimeError("pooler down")
+        return real()
+
+    monkeypatch.setattr(runtime_state, "_open_session", flaky)
+    monkeypatch.setattr(runtime_state.time, "sleep", lambda s: None)
+    assert runtime_state.warm_start(attempts=5, delay_seconds=0) is True
+    assert calls["n"] == 3
+    assert runtime_state.is_ai_enabled() is False  # the stored kill is honoured
+
+
+def test_warm_start_gives_up_and_keeps_ai_disabled(rt, monkeypatch, caplog):
+    import logging
+    runtime_state._last_good.update(ai=None, paused={}, loaded=False)
+    runtime_state.invalidate_cache()
+
+    def boom():
+        raise RuntimeError("pooler down")
+
+    monkeypatch.setattr(runtime_state, "_open_session", boom)
+    monkeypatch.setattr(runtime_state.time, "sleep", lambda s: None)
+    with caplog.at_level(logging.ERROR, logger="backend.services.runtime_state"):
+        assert runtime_state.warm_start(attempts=3, delay_seconds=0) is False
+    assert runtime_state.is_ai_enabled() is False
+    assert any(r.levelno == logging.ERROR for r in caplog.records)

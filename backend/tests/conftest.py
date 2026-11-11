@@ -42,7 +42,8 @@ def _reset_runtime_state():
 
     def _clear():
         runtime_state.invalidate_cache()
-        runtime_state._last_good.update(ai=None, paused={})
+        # loaded=True: tests are not a cold boot. Cold-boot tests set it False.
+        runtime_state._last_good.update(ai=None, paused={}, loaded=True)
 
     _clear()
     yield

@@ -21,8 +21,11 @@ sop.md). Nothing here ever writes to a file.
 
 Reads are cached for a few seconds (they sit on hot paths: every triage call, every
 ``Settings.talent_profiles`` access) and invalidated immediately on a local write.
-If the database cannot be read the last known value is used; before any successful
-read the file default applies.
+If the database cannot be read the last known value is used. Before the FIRST
+successful read (cold boot with the DB unreachable) ``is_ai_enabled()`` returns False:
+a guardian kill stored in app_state must not be silently overridden by a file default
+of True just because the pooler was down for the first seconds after a restart.
+``warm_start()`` does a synchronous load, with retries, at startup.
 """
 from __future__ import annotations
 
@@ -41,7 +44,7 @@ CACHE_TTL_SECONDS = 5.0
 
 _cache_lock = threading.Lock()
 _cache: dict | None = None          # {"at": monotonic, "ai": bool|None, "paused": {key: bool}}
-_last_good: dict = {"ai": None, "paused": {}}
+_last_good: dict = {"ai": None, "paused": {}, "loaded": False}
 _warned_at = 0.0
 
 
@@ -67,18 +70,11 @@ def _parse_bool(value: str | None) -> bool | None:
     return None
 
 
-def _load() -> dict:
-    """Return {"ai": bool|None, "paused": {key_lower: bool}} (cached, never raises)."""
-    global _cache, _warned_at
-    now = time.monotonic()
-    with _cache_lock:
-        if _cache is not None and now - _cache["at"] < CACHE_TTL_SECONDS:
-            return _cache
-    snap = {"at": now, "ai": _last_good["ai"], "paused": dict(_last_good["paused"])}
-    session = None
+def _read_db() -> tuple[bool | None, dict[str, bool]]:
+    """Read (ai, paused) from app_state. Raises on any DB failure."""
+    from backend.models.db import AppState
+    session = _open_session()
     try:
-        from backend.models.db import AppState
-        session = _open_session()
         rows = (
             session.query(AppState.key, AppState.value_text)
             .filter(
@@ -87,34 +83,76 @@ def _load() -> dict:
             )
             .all()
         )
-        ai = None
-        paused: dict[str, bool] = {}
-        for key, value in rows:
-            parsed = _parse_bool(value)
-            if parsed is None:
-                continue
-            if key == KEY_AI_ENABLED:
-                ai = parsed
-            else:
-                paused[key[len(KEY_TALENT_PAUSED_PREFIX):].lower()] = parsed
-        snap.update(ai=ai, paused=paused)
-        _last_good.update(ai=ai, paused=dict(paused))
+    finally:
+        try:
+            session.close()
+        except Exception:  # noqa: BLE001
+            pass
+    ai = None
+    paused: dict[str, bool] = {}
+    for key, value in rows:
+        parsed = _parse_bool(value)
+        if parsed is None:
+            continue
+        if key == KEY_AI_ENABLED:
+            ai = parsed
+        else:
+            paused[key[len(KEY_TALENT_PAUSED_PREFIX):].lower()] = parsed
+    return ai, paused
+
+
+def _load() -> dict:
+    """Return {"ai": bool|None, "paused": {key_lower: bool}, "loaded": bool}
+    (cached, never raises). ``loaded`` is False until a read has succeeded."""
+    global _cache, _warned_at
+    now = time.monotonic()
+    with _cache_lock:
+        if _cache is not None and now - _cache["at"] < CACHE_TTL_SECONDS:
+            return _cache
+    snap = {
+        "at": now, "ai": _last_good["ai"], "paused": dict(_last_good["paused"]),
+        "loaded": _last_good["loaded"],
+    }
+    try:
+        ai, paused = _read_db()
+        snap.update(ai=ai, paused=paused, loaded=True)
+        _last_good.update(ai=ai, paused=dict(paused), loaded=True)
     except Exception as exc:  # noqa: BLE001
         if now - _warned_at > 60:
             _warned_at = now
             logger.warning(
                 "runtime_state: could not read switches from app_state (%s) — using last "
-                "known values / file defaults", exc,
+                "known values%s", exc,
+                "" if snap["loaded"] else "; NEVER loaded since boot, so AI is treated as DISABLED",
             )
-    finally:
-        if session is not None:
-            try:
-                session.close()
-            except Exception:  # noqa: BLE001
-                pass
     with _cache_lock:
         _cache = snap
     return snap
+
+
+def warm_start(attempts: int = 5, delay_seconds: float = 2.0) -> bool:
+    """Synchronously load the switches at startup, retrying a few times.
+
+    Returns True once a read succeeded. If every attempt fails the process keeps
+    running with ``is_ai_enabled()`` False until a later read succeeds.
+    """
+    for attempt in range(1, max(1, attempts) + 1):
+        try:
+            ai, paused = _read_db()
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("runtime_state: startup load attempt %d/%d failed: %s", attempt, attempts, exc)
+            if attempt < attempts:
+                time.sleep(delay_seconds)
+            continue
+        _last_good.update(ai=ai, paused=dict(paused), loaded=True)
+        invalidate_cache()
+        logger.info("runtime_state: startup load ok (ai_enabled=%s, pause overrides=%d)", ai, len(paused))
+        return True
+    logger.error(
+        "runtime_state: could not load switches from app_state after %d attempts — "
+        "AI stays DISABLED until the DB is readable", attempts,
+    )
+    return False
 
 
 # ── ai_enabled ───────────────────────────────────────────────────────────────
@@ -125,8 +163,14 @@ def _file_ai_default() -> bool:
 
 
 def is_ai_enabled() -> bool:
-    """DB value if one has been set, otherwise config/settings.json (default True)."""
-    value = _load()["ai"]
+    """DB value if one has been set, otherwise config/settings.json (default True).
+
+    False until the first successful read of app_state (fail safe on a cold boot).
+    """
+    snap = _load()
+    if not snap["loaded"]:
+        return False
+    value = snap["ai"]
     return _file_ai_default() if value is None else value
 
 
@@ -134,6 +178,7 @@ def set_ai_enabled(db, enabled: bool) -> None:
     """Persist the switch. Raises on DB failure — callers must not pretend it worked."""
     _set_state(db, KEY_AI_ENABLED, "true" if enabled else "false")
     _last_good["ai"] = enabled
+    _last_good["loaded"] = True
     invalidate_cache()
     logger.warning("runtime_state: ai_enabled set to %s (stored in app_state)", enabled)
 
