@@ -455,7 +455,50 @@ a { color: var(--blue); }
 }
 .stat-card:hover { border-color: var(--border-2); }
 .stat-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--s-2); }
-.stat-value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); font-family: var(--mono); line-height: 1.1; }
+.stat-value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); font-family: var(--sans); font-variant-numeric: tabular-nums; letter-spacing: -0.02em; line-height: 1.1; }
+.stat-value .unit { font-size: var(--fs-sm); font-weight: 500; color: var(--text-3); letter-spacing: 0; margin-left: 3px; }
+#analytics-load-strip .stat-card { padding: var(--s-3) var(--s-4); }
+#analytics-load-strip .stat-label { margin-bottom: var(--s-1); }
+
+/* Analytics section: shared heading + rhythm */
+.an-section { margin-top: var(--s-6); }
+.an-section > .section-head, .an-section .panel-head { margin-bottom: var(--s-3); }
+.an-caption { font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; text-transform: none; letter-spacing: 0; font-weight: 400; }
+
+/* Scenario table */
+.sc-row { display: grid; grid-template-columns: minmax(0, 1.5fr) 48px minmax(40px, 1fr) 64px 72px; align-items: center; column-gap: var(--s-3); padding: 7px 0; border-bottom: 1px solid var(--border); font-size: var(--fs-sm); color: var(--text-2); font-variant-numeric: tabular-nums; }
+.sc-row.sc-head { padding-top: 0; font-size: var(--fs-xs); font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.sc-row .num { text-align: right; color: var(--text-3); white-space: nowrap; }
+.sc-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sc-track { background: var(--surface-3); border-radius: 3px; height: 6px; overflow: hidden; }
+.sc-fill { height: 100%; background: var(--blue); border-radius: 3px; }
+
+/* Daily volume chart */
+.vol-chart { position: relative; display: flex; align-items: stretch; gap: 6px; height: 160px; padding-left: 30px; }
+.vol-grid { position: absolute; left: 0; right: 0; top: 0; bottom: 18px; pointer-events: none; }
+.vol-grid span { position: absolute; left: 0; right: 0; border-top: 1px dashed var(--border); font-size: 10px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.vol-grid span i { position: absolute; left: 0; top: -7px; font-style: normal; background: var(--bg); padding-right: 4px; }
+.vol-col { position: relative; flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+.vol-bar-wrap { flex: 1; width: 100%; display: flex; flex-direction: column; justify-content: flex-end; align-items: center; }
+.vol-val { font-size: 10px; color: var(--text-3); font-variant-numeric: tabular-nums; margin-bottom: 2px; }
+.vol-bar { width: 70%; max-width: 44px; background: var(--blue); opacity: 0.55; border-radius: 4px 4px 0 0; }
+.vol-col.today .vol-bar { opacity: 1; }
+.vol-col.today .vol-val { color: var(--text); font-weight: 700; }
+.vol-lbl { height: 18px; line-height: 18px; font-size: 10px; color: var(--text-3); }
+.vol-col.today .vol-lbl { color: var(--text); font-weight: 600; }
+
+/* Insights */
+.ins-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s-3) var(--s-4); display: flex; gap: var(--s-3); align-items: flex-start; }
+.ins-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 6px; background: var(--text-3); }
+.ins-dot.critical { background: var(--red); } .ins-dot.warning { background: var(--amber); } .ins-dot.info { background: var(--green); }
+.ins-body { flex: 1; min-width: 0; font-size: var(--fs-sm); color: var(--text); line-height: 1.5; }
+.ins-meta { margin-top: 6px; display: flex; gap: var(--s-3); flex-wrap: wrap; font-size: var(--fs-xs); color: var(--text-3); }
+.ins-tag { background: var(--surface-3); padding: 1px 7px; border-radius: 4px; }
+.ins-x { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 17px; line-height: 1; padding: 0 2px; }
+.ins-x:hover { color: var(--text); }
+#insights-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+#insights-list > div:empty { display: none; }
+#analytics-anomalies, #marco-messages { display: contents; }
 .stat-card.s-red .stat-value { color: var(--red); }
 .stat-card.s-green .stat-value { color: var(--green); }
 .stat-card.s-amber .stat-value { color: var(--amber); }
@@ -634,6 +677,7 @@ a { color: var(--blue); }
   display: flex; align-items: center; justify-content: center;
   transition: opacity 0.2s, background 0.2s, color 0.2s; z-index: 999; opacity: 0.8;
 }
+#jump-bottom.at-bottom { opacity: 0; pointer-events: none; }
 #jump-bottom:hover { background: var(--surface-2); color: var(--text); opacity: 1; }
 
 /* Generic helper for the long row headers: let them wrap instead of overflowing */
@@ -699,7 +743,11 @@ a { color: var(--blue); }
   #talent-list, #reconnect-list { padding-left: var(--s-3); padding-right: var(--s-3); }
 
   /* Inline-styled grids from the analytics blocks */
-  #analytics-scenarios > div { grid-template-columns: minmax(0, 1.4fr) 36px minmax(0, 1fr) auto !important; }
+  .sc-row { grid-template-columns: minmax(0, 1fr) 36px 66px 58px; column-gap: var(--s-2); }
+  .sc-row.sc-head { font-size: 10px; letter-spacing: 0.02em; }
+  .sc-row .sc-track, .sc-row .sc-bar-h { display: none; }
+  #insights-list { grid-template-columns: minmax(0, 1fr); }
+  .vol-chart { padding-left: 26px; gap: 4px; }
 }
 
 @media (pointer: coarse) {
@@ -1224,41 +1272,40 @@ a { color: var(--blue); }
       </div>
     </div>
 
-    <!-- ── Operational stats + Anomalies ──────────────────────────────────── -->
-    <div class="fade-up" style="margin-top:28px;">
+    <!-- ── Operations: KPIs, scenarios, volume, insights ─────────────────── -->
+    <div class="fade-up an-section">
       <div class="grid-4" id="analytics-load-strip"></div>
-      <div class="grid-2" style="margin-bottom:28px;">
+      <div class="grid-2 an-section" style="margin-top:var(--s-6);">
         <div>
-          <div class="section-head" style="margin-bottom:12px;">Scenario Performance</div>
-          <div id="analytics-scenarios" style="display:flex; flex-direction:column; gap:0;"></div>
+          <div class="section-head">Scenario Performance</div>
+          <div id="analytics-scenarios"></div>
         </div>
         <div>
-          <div class="section-head" style="margin-bottom:12px;">Anomaly Detection</div>
-          <div id="analytics-anomalies" style="display:flex; flex-direction:column; gap:8px;"></div>
+          <div class="section-head">Daily Email Volume</div>
+          <div id="analytics-daily" class="vol-chart"></div>
         </div>
-      </div>
-      <div style="margin-bottom:32px;">
-        <div class="section-head" style="margin-bottom:12px;">Daily Email Volume</div>
-        <div id="analytics-daily" style="display:flex; align-items:flex-end; gap:3px; height:96px;"></div>
       </div>
     </div>
 
-    <!-- ── Marco section ───────────────────────────────────────────────── -->
-    <div class="fade-up" style="padding-top:28px; border-top:1px solid var(--border); margin-bottom:40px;">
-      <div class="wrap-row" style="margin-bottom:20px;">
+    <!-- ── Insights (anomaly detection + AI analyst) ──────────────────────── -->
+    <div class="fade-up an-section" style="padding-top:var(--s-5); border-top:1px solid var(--border); margin-bottom:var(--s-6);">
+      <div class="panel-head">
         <div>
-          <div style="font-size:var(--fs-md); font-weight:800; letter-spacing:-0.01em;">Marco</div>
-          <div style="font-size:var(--fs-xs); color:var(--text-3); margin-top:2px;">AI analyst · messages reference 7-day data, not today's counts</div>
+          <div class="section-head">Insights</div>
+          <div class="an-caption">AI analyst · messages reference 7-day data, not today's counts</div>
         </div>
         <div class="panel-actions">
-          <button class="btn btn-ghost" onclick="loadMarco()" style="font-size:var(--fs-xs);">↻ Refresh</button>
-          <button class="btn btn-ghost" onclick="dismissAllMarco()" style="font-size:var(--fs-xs);">✕ Dismiss All</button>
-          <button class="btn btn-primary" onclick="generateMarco()" id="btn-marco-gen" style="font-size:var(--fs-xs);">✦ Generate Now</button>
+          <button class="btn btn-ghost" onclick="loadAnalytics(); loadMarco()" style="font-size:var(--fs-xs);">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="dismissAllMarco()" style="font-size:var(--fs-xs);">✕ Dismiss all</button>
+          <button class="btn btn-ghost" onclick="generateMarco()" id="btn-marco-gen" style="font-size:var(--fs-xs); border-color:var(--border-2); color:var(--text);">✦ Generate now</button>
         </div>
       </div>
-      <div id="marco-messages" class="grid-2"></div>
-      <div id="marco-empty" style="display:none; text-align:center; padding:48px 0; color:var(--text-3); font-size:var(--fs-base);">
-        No messages yet — click "Generate Now" to let Marco analyze the system.
+      <div id="insights-list">
+        <div id="analytics-anomalies"></div>
+        <div id="marco-messages"></div>
+      </div>
+      <div id="marco-empty" style="display:none; text-align:center; padding:var(--s-5) 0; color:var(--text-3); font-size:var(--fs-sm);">
+        No AI analyst messages yet — click "Generate now" to analyze the system.
       </div>
     </div>
   </div>
@@ -3188,13 +3235,13 @@ async function loadAnalytics() {
     const minSaved = load.estimated_minutes_saved || 0;
     strip.innerHTML = [
       ['Emails Processed', load.total_emails, ''],
-      ['Automation Rate', ((load.automation_rate || 0) * 100).toFixed(1) + '%', ''],
-      ['Est. Time Saved', minSaved >= 60 ? (minSaved / 60).toFixed(1) + ' hrs' : minSaved + ' min', ''],
+      ['Automation Rate', ((load.automation_rate || 0) * 100).toFixed(1), '%'],
+      ['Est. Time Saved', minSaved >= 60 ? (minSaved / 60).toFixed(1) : minSaved, minSaved >= 60 ? 'hrs' : 'min'],
       ['Human Overrides', load.human_overrides, ''],
-    ].map(([label, val, _]) => `
+    ].map(([label, val, unit]) => `
       <div class="stat-card">
         <div class="stat-label">${label}</div>
-        <div class="stat-value">${val}</div>
+        <div class="stat-value">${val}${unit ? `<span class="unit">${unit}</span>` : ''}</div>
       </div>`).join('');
 
     // Talent health — dots style: deals / review / spam / risk
@@ -3225,47 +3272,55 @@ async function loadAnalytics() {
       </div>`;
     }).join('') || '<div style="color:var(--text-3); font-size:var(--fs-sm); padding:12px 0;">No data yet.</div>';
 
-    // Anomalies
+    // Anomalies (rendered as Insights cards)
     const an = document.getElementById('analytics-anomalies');
-    const severityColor = { critical: 'var(--red)', warning: 'var(--amber)', info: 'var(--text-3)' };
     an.innerHTML = (anomalies.anomalies || []).map(a => `
-      <div style="background:var(--surface-2); border:1px solid var(--border); border-left:3px solid ${severityColor[a.severity] || 'var(--text-3)'}; border-radius:8px; padding:10px 12px; font-size:var(--fs-sm); color:var(--text-2); line-height:1.5;">
-        ${a.talent_key ? `<strong>${a.talent_key}:</strong> ` : ''}${a.message}
-      </div>`).join('') || '<div style="color:var(--text-3); font-size:var(--fs-sm);">No anomalies detected.</div>';
+      <div class="ins-card">
+        <span class="ins-dot ${['critical','warning','info'].includes(a.severity) ? a.severity : ''}"></span>
+        <div class="ins-body">
+          ${a.talent_key ? `<strong>${a.talent_key}:</strong> ` : ''}${a.message}
+          <div class="ins-meta"><span class="ins-tag">anomaly</span></div>
+        </div>
+      </div>`).join('');
 
-    // Scenarios — bar fill = share of total volume; right side shows deal% + avg rate
+    // Scenarios — bar = share of the largest scenario's volume
     const sc = document.getElementById('analytics-scenarios');
     const scList = (scenarios || []).slice(0, 12);
     const scMax = scList.length ? Math.max(...scList.map(s => s.count), 1) : 1;
-    sc.innerHTML = scList.map(s => {
+    sc.innerHTML = scList.length ? `<div class="sc-row sc-head"><span>Scenario</span><span class="num">Emails</span><span class="sc-bar-h">Share</span><span class="num">Reply rate</span><span class="num">Est. value</span></div>` + scList.map(s => {
       const barW = Math.max(2, Math.round((s.count / scMax) * 100));
       const dealPct = Math.round((s.score3_pct || 0) * 100);
-      const rateStr = s.avg_rate_usd >= 1 ? ` · $${Math.round(s.avg_rate_usd).toLocaleString()}` : '';
-      const dealColor = dealPct >= 30 ? 'var(--green)' : dealPct >= 10 ? 'var(--amber)' : 'var(--text-3)';
-      return `<div style="display:grid; grid-template-columns:130px 40px 1fr 80px; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border);">
-        <span style="font-size:var(--fs-sm); color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${s.offer_type}">${s.offer_type}</span>
-        <span style="font-size:var(--fs-xs); color:var(--text-3); text-align:right;">${s.count}</span>
-        <div style="background:var(--surface-3); border-radius:3px; height:5px; overflow:hidden;">
-          <div style="width:${barW}%; height:100%; background:var(--green); opacity:0.7; border-radius:3px;"></div>
-        </div>
-        <span style="font-size:var(--fs-xs); color:${dealColor}; text-align:right; white-space:nowrap;">${dealPct}%${rateStr}</span>
+      const val = s.avg_rate_usd >= 1 ? '$' + Math.round(s.avg_rate_usd).toLocaleString() : '—';
+      return `<div class="sc-row">
+        <span class="nm" title="${s.offer_type}">${s.offer_type}</span>
+        <span class="num">${s.count}</span>
+        <div class="sc-track"><div class="sc-fill" style="width:${barW}%;"></div></div>
+        <span class="num">${dealPct}%</span>
+        <span class="num">${val}</span>
       </div>`;
-    }).join('') || '<div style="color:var(--text-3); font-size:var(--fs-sm); padding:12px 0;">No data yet.</div>';
+    }).join('') : '<div style="color:var(--text-3); font-size:var(--fs-sm); padding:12px 0;">No data yet.</div>';
 
-    // Daily chart
+    // Daily chart — y-scale from zero, bar heights proportional to the axis max
     const daily = load.daily_volume || [];
+    const dc = document.getElementById('analytics-daily');
     if (daily.length) {
-      const maxVol = Math.max(...daily.map(d => d.count), 1);
-      const dc = document.getElementById('analytics-daily');
-      dc.innerHTML = daily.map(d => {
-        const h = Math.max(4, Math.round((d.count / maxVol) * 76));
-        const label = d.date.slice(5); // MM-DD
-        return `<div style="display:flex; flex-direction:column; align-items:center; gap:3px; flex:1;">
-          <span style="font-size:var(--fs-xs); color:var(--text-3);">${d.count}</span>
-          <div style="width:100%; height:${h}px; background:var(--red-dim); border:1px solid var(--red-line); border-radius:3px 3px 0 0;"></div>
-          <span style="font-size:var(--fs-xs); color:var(--text-3);">${label}</span>
-        </div>`;
-      }).join('');
+      const rawMax = Math.max(...daily.map(d => d.count), 1);
+      const step = Math.pow(10, Math.floor(Math.log10(rawMax)));
+      const axisMax = Math.ceil(rawMax / (step / 2)) * (step / 2);
+      const todayStr = new Date().toLocaleDateString('en-CA');
+      const ticks = [axisMax, axisMax / 2, 0];
+      dc.innerHTML = `<div class="vol-grid">${ticks.map(t => `<span style="top:${(1 - t / axisMax) * 100}%;"><i>${Math.round(t)}</i></span>`).join('')}</div>` +
+        daily.map(d => {
+          const pct = (d.count / axisMax) * 100;
+          const isToday = d.date === todayStr || d.date === daily[daily.length - 1].date;
+          return `<div class="vol-col${isToday ? ' today' : ''}">
+            <div class="vol-bar-wrap">
+              <span class="vol-val">${d.count}</span>
+              <div class="vol-bar" style="height:${pct}%;" title="${d.date}: ${d.count}"></div>
+            </div>
+            <span class="vol-lbl">${d.date.slice(5)}</span>
+          </div>`;
+        }).join('');
     }
   } catch(e) {
     showToast('Analytics load failed: ' + e.message);
@@ -3284,20 +3339,18 @@ async function loadMarco() {
       return;
     }
     empty.style.display = 'none';
-    const sevColor = { critical: 'var(--red)', warning: 'var(--amber)', info: 'var(--green)' };
-    const sevIcon  = { critical: '🔴', warning: '🟡', info: '🟢' };
     el.innerHTML = msgs.map(m => `
-      <div style="background:var(--surface-2); border:1px solid var(--border); border-left:3px solid ${sevColor[m.severity] || 'var(--border)'}; border-radius:10px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start;">
-        <span style="font-size:var(--fs-md); flex-shrink:0;">${sevIcon[m.severity] || '⚪'}</span>
-        <div style="flex:1;">
-          <div style="font-size:var(--fs-base); color:var(--text); line-height:1.5;">${m.message}</div>
-          <div style="margin-top:6px; display:flex; gap:10px; font-size:var(--fs-xs); color:var(--text-3);">
-            <span style="background:var(--surface-3); padding:2px 7px; border-radius:4px;">${m.category}</span>
+      <div class="ins-card">
+        <span class="ins-dot ${['critical','warning','info'].includes(m.severity) ? m.severity : ''}"></span>
+        <div class="ins-body">
+          <div>${m.message}</div>
+          <div class="ins-meta">
+            <span class="ins-tag">${m.category}</span>
             ${m.talent_key ? `<span>${m.talent_key}</span>` : ''}
             <span>${new Date(m.created_at.endsWith('Z') ? m.created_at : m.created_at + 'Z').toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span>
           </div>
         </div>
-        <button onclick="dismissMarco(${m.id}, this)" style="background:none; border:none; color:var(--text-3); cursor:pointer; font-size:17px; line-height:1; padding:0 2px;" title="Dismiss">&times;</button>
+        <button class="ins-x" onclick="dismissMarco(${m.id}, this)" title="Dismiss">&times;</button>
       </div>`).join('');
   } catch(e) {
     showToast('Marco load failed: ' + e.message);
@@ -3328,7 +3381,7 @@ async function generateMarco() {
 async function dismissMarco(id, btn) {
   try {
     await api('POST', `/api/analytics/marco/${id}/dismiss`);
-    btn.closest('div[style]').remove();
+    btn.closest('.ins-card').remove();
     const remaining = document.getElementById('marco-messages').children.length;
     if (!remaining) {
       document.getElementById('marco-empty').style.display = '';
@@ -3510,5 +3563,6 @@ bootstrap();
 </script>
 
 <button id="jump-bottom" onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'instant'})" title="Jump to bottom" aria-label="Jump to bottom">↓</button>
+<script>(function(){var b=document.getElementById('jump-bottom');function u(){b.classList.toggle('at-bottom',window.innerHeight+window.scrollY>=document.body.scrollHeight-160);}window.addEventListener('scroll',u,{passive:true});window.addEventListener('resize',u);setInterval(u,1000);u();})();</script>
 </body>
 </html>
