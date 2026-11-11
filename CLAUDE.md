@@ -25,8 +25,8 @@ FastAPI backend deployed on Render. Each talent connects their Gmail via OAuth. 
 - **A code change that adds a DB column is not live until the migration actually runs.** See "DB migrations" below — this got missed once already and broke production for ~25 minutes.
 
 **Where secrets actually live — read before you "fix" anything here:**
-- All real secrets (`DATABASE_URL`, `OPENAI_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `GOOGLE_SHEETS_REFRESH_TOKEN`, `AGENCY_SECRET_KEY`, `API_KEY`) live **only** as Render environment variables on the `manager-email-automation` service (`srv-d7lb7oe47okc738vjkg0`). They are never committed to git (`.env` is gitignored) and `config/settings.json`/`render.yaml` only ever reference them by name (`sync: false`), never by value.
-- **`render.yaml` is NOT a faithful snapshot of the live service.** The production service was created before/outside this Blueprint and has drifted: env vars set via dashboard/API don't appear in the file, and editing `render.yaml` does not reconfigure the existing service. Treat the Render API (`GET /v1/services/{id}`, `/env-vars`, `/deploys`) as the only source of truth for what production actually runs.
+- All real secrets (`DATABASE_URL`, `OPENAI_API_KEY`, `GOOGLE_CLIENT_ID/SECRET`, `AGENCY_SECRET_KEY`, `API_KEY`; optional `ALERT_WEBHOOK_URL`, `HEARTBEAT_URL`) live **only** as Render environment variables on the `manager-email-automation` service (`srv-d7lb7oe47okc738vjkg0`). They are never committed to git (`.env` is gitignored) and `config/settings.json`/`render.yaml` only ever reference them by name (`sync: false`), never by value.
+- **`render.yaml` is NOT a faithful snapshot of the live service.** The production service was created before/outside this Blueprint and has drifted: env vars set via dashboard/API don't appear in the file, and editing `render.yaml` does not reconfigure the existing service. It now declares the intended shape (`manager-email-automation`, plan `starter`, `autoDeploy: true`) — confirm the live service actually matches (it had `autoDeployTrigger: "off"`) before assuming a push deploys. Treat the Render API (`GET /v1/services/{id}`, `/env-vars`, `/deploys`) as the only source of truth for what production actually runs.
 - **Render's env-var API does not let you read back a value once it's gone, and `PUT /v1/services/{id}/env-vars` (bulk, no key in the URL) REPLACES THE ENTIRE SET — it does not merge.** Wiping every secret on the live service with one malformed call is exactly what happened in the incident below. **Always use the per-key endpoint** — `PUT /v1/services/{id}/env-vars/{KEY}` — to change or add a single value. Never call the bulk endpoint unless you are deliberately writing the complete, correct set of every key at once.
 - A local backup of every secret (as of 2026-08-03) was generated and handed directly to Colin — it is NOT in this repo. If you are an agent and need a value you don't have, **ask Colin for the backup file or the specific value** — do not try to reconstruct or guess a secret, and do not regenerate/rotate a credential (e.g. Google OAuth client secret, DB password) without his explicit go-ahead, since rotating breaks whatever still has the old value cached.
 - There is a second, older Render service in the same account (`email-automation`, `srv-d7jdjfjbc2fs73c0apc0`, https://email-automation-qp2v.onrender.com) that shares the same Supabase DB and Google OAuth client as production but may have **stale** secret values (its `GOOGLE_CLIENT_SECRET` was already out of date as of this writing). It is not a sanctioned backup — treat anything pulled from it as unverified until cross-checked against a current source (e.g. Google Cloud Console, Supabase dashboard).
@@ -39,11 +39,11 @@ FastAPI backend deployed on Render. Each talent connects their Gmail via OAuth. 
 # Dev server
 cd backend && uvicorn backend.main:app --reload --port 8000
 
-# Tests
-cd backend && python -m pytest tests/
+# Tests (from repo root; SQLite in-memory, no secrets needed)
+PYTHONPATH=. python -m pytest -q backend/tests tests
 
 # Single test file
-cd backend && python -m pytest tests/test_triage.py -v
+PYTHONPATH=. python -m pytest backend/tests/test_triage.py -v
 
 # Apply DB schema — LOCAL/DEV ONLY. Production does NOT run this on startup
 # (SKIP_MIGRATIONS=true — see "DB migrations" section before touching schema)
@@ -56,16 +56,28 @@ cd backend && python -c "from backend.models.db import create_tables; create_tab
 
 ### Polling loop
 ```
-Render cron → GET /cron/poll-inboxes (every 5 min, + APScheduler every 3 min)
+APScheduler (in each web process, every 90s) ─┐
+Render cron → GET /cron/poll-inboxes (5 min) ─┴→ _run_poll  [lock job:poll]
   → services/poller.py
-  → for each connected TalentToken:
+      shared inbox (lock poll:shared-inbox) + each per-token talent (lock poll:talent:<key>)
       fetch unread Gmail
       → triage.py (GPT-4o-mini) → score 1/2/3
           score 1: archive (junk)
           score 2: flag for review
           score 3: generate draft reply (GPT-4o) → save to DB
-      → log to Google Sheets
+          transient OpenAI failure: status=retry_pending, re-triaged after triage_next_retry_at
+  → success: ping HEARTBEAT_URL      failure: ERROR + traceback + PollHealth row ("poll-cycle")
 ```
+There is no Google Sheets logging — state lives only in Supabase Postgres.
+
+### Concurrency — Postgres advisory locks
+Every scheduled job in `routers/cron.py` is `@locked_job("<name>")` and the pollers use `advisory_lock(...)` (`services/locks.py`, `pg_try_advisory_lock`, one key per name). A caller that does not get the lock skips with an INFO log, so two instances / the cron / an admin click can never run the same job at once. Locks use their own session-mode connection (port 5432 of the pooler — the app engine is transaction-mode 6543, where session locks are unsafe). If the lock DB is unreachable, jobs fall back to an in-process lock with an ERROR log. There is ONE drafting job (`draft_queue`); `backlog_blaster` no longer exists. New scheduled work must be lock-wrapped.
+
+### Runtime switches live in the DB, not files
+`ai_enabled` and talent pause/unpause are rows in `app_state` (`runtime_ai_enabled`, `runtime_talent_paused:<key>`), via `services/runtime_state.py`. A DB row wins; `config/settings.json` `ai_enabled` and the `Paused:` field in `sop.md` are only defaults. `Settings.talent_profiles` applies the pause overrides, so every `.paused` reader sees the DB value. Guardian kill/pause and the admin pause/unpause routes write only the DB — never `settings.json` or `sop.md` (Render's disk is wiped on deploy). Read `ai_enabled` with `is_ai_enabled()`, not `app_config`.
+
+### Alerting and liveness
+Guardian and stall-alarm alerts go to email AND, if `ALERT_WEBHOOK_URL` is set, a Slack-compatible webhook (works even when every Gmail token is dead; unset = one warning logged). `HEARTBEAT_URL` is pinged only after a poll cycle finishes without raising. A Gmail token is auto-deactivated only after 3 consecutive auth rejections (`oauth.record_token_failure`; reason in `last_error`, time in `deactivated_at`); dead tokens show in `/health` `pipeline.dead_tokens` / `dead_token_details` and as a dashboard banner. `/health` also reports `schema_ok` (false = live DB is missing something the models need).
 
 ### Frontend
 Single-file SPA at `backend/static/dashboard.html` (~1650 lines). Vanilla JS, no framework, no build step. All state in a `state` object; renders are synchronous DOM mutations triggered by API responses.
@@ -80,8 +92,10 @@ No Alembic. New columns are added via `ALTER TABLE ... ADD COLUMN IF NOT EXISTS`
 
 The consequence: **adding a new column to a model in code does nothing to the live database by itself.** `verify_schema_matches_models()` (also in `db.py`) runs read-only on every boot and logs any mismatch, but does not fix it. This has already caused one production outage (see Incident Log) when a new column (`drafts.send_claimed_at`) was added in code, deployed, and never actually created in Postgres — every query touching that column crashed with `UndefinedColumn`.
 
+**Exception — `REQUIRED_MIGRATIONS`:** a short list in `db.py` of the additive statements current code cannot run without (`emailstatus` value `retry_pending`, `processed_emails.triage_retry_count` / `triage_next_retry_at`, `talents.deactivated_at`). `apply_required_migrations()` applies them at EVERY boot, even with `SKIP_MIGRATIONS` set: check-first (no lock taken when already applied), idempotent DDL, `lock_timeout=5s`, failures logged at ERROR. `verify_schema_matches_models()` (tables, columns, Postgres enum values) logs ERROR on any mismatch and `/health` shows `schema_ok: false`.
+
 **Correct procedure any time you add a column:**
-1. Add it to the SQLAlchemy model AND to the `_MIGRATION_STMTS` list in `create_tables()` (additive, `IF NOT EXISTS`, no destructive statements — same as always).
+1. Add it to the SQLAlchemy model AND to the `_MIGRATION_STMTS` list in `create_tables()` (additive, `IF NOT EXISTS`, no destructive statements — same as always). If live code breaks without it, also add it to `REQUIRED_MIGRATIONS` so it self-applies on the next boot and steps 2-3 become a fallback.
 2. Before or immediately after deploying that code, temporarily unset `SKIP_MIGRATIONS` on the Render service (`DELETE /v1/services/{id}/env-vars/SKIP_MIGRATIONS`), trigger one deploy so `create_tables()` runs and applies the new statement, confirm via logs / `verify_schema_matches_models()` that it worked, then set `SKIP_MIGRATIONS=true` back (`PUT` the single key, value `"true"`).
 3. Never leave `SKIP_MIGRATIONS` unset/false on a deploy you're not actively watching — it re-runs the entire statement list, including the ones with real lock risk.
 
@@ -92,7 +106,7 @@ Each talent has a row in the `talents` table (`TalentToken`) with their own Gmai
 `prompts/triage.md` and `prompts/reply.md` use `## SYSTEM PROMPT` and `## USER PROMPT TEMPLATE` heading markers. `_parse_prompt_sections()` in each service splits on these. Template variables are `{{TALENT_NAME}}`, `{{EMAIL_BODY}}`, etc.
 
 ### Settings
-`config/settings.json` holds talent roster and model config (not env vars). `core/config.py::get_settings()` is LRU-cached — call `get_settings.cache_clear()` in tests if you mutate config.
+`config/settings.json` holds model names, thresholds, guardian / stall-alarm / retry tuning and `single_inbox.alias_map` — **no talent roster** (there is no `talents[]`). `core/config.py::get_settings()` is LRU-cached — call `get_settings.cache_clear()` in tests if you mutate config; `app_config` itself re-reads the file on each access.
 
 ---
 
@@ -106,32 +120,29 @@ Each talent has a row in the `talents` table (`TalentToken`) with their own Gmai
 | `backend/services/gmail.py` | All Gmail API calls (read, archive, draft, send) |
 | `backend/routers/dashboard.py` | Dashboard API + backfill endpoints |
 | `backend/routers/cron.py` | `/cron/poll-inboxes` + `/api/status` |
-| `backend/models/db.py` | SQLAlchemy models + `create_tables()` |
+| `backend/models/db.py` | SQLAlchemy models, `create_tables()`, `REQUIRED_MIGRATIONS`, schema verifier |
+| `backend/services/locks.py` | Postgres advisory locks (`advisory_lock`, `@locked_job`) |
+| `backend/services/runtime_state.py` | DB-backed `ai_enabled` + talent pause |
+| `backend/services/alerts.py` | `ALERT_WEBHOOK_URL` post + `HEARTBEAT_URL` ping |
 | `backend/static/dashboard.html` | Entire frontend SPA |
-| `config/settings.json` | Talent roster, model names, rate minimums |
+| `config/settings.json` | Model names, thresholds, guardian/stall-alarm/retry tuning, alias map (no talents) |
 | `config/confidence_policy.json` | Score routing + special talent routing rules |
 | `prompts/triage.md` | GPT triage prompt (system + user template) |
 | `prompts/reply.md` | GPT reply prompt (system + user template) |
 
 ---
 
-## Talent Config
+## Talent Config and the SOP
 
-Defined in `config/settings.json` under `"talents"`. Each talent has: `key`, `full_name`, `minimum_rate_usd`, `rate_unit` (`"per video"` or `"per hour"`), `manager`.
-
-`key` is case-sensitive in config and lowercased in DB queries. Special routing rules per talent live in `triage.py::_apply_special_routing()`, driven by `config/confidence_policy.json`.
+Talents are NOT in `settings.json`. The SOP is the single source of truth: the active `SopVersion` row in the database (`doc_type='sop'`) is restored over `sheets/sop.md` at every boot (Render's disk is rebuilt per deploy), and `sop.md` → `sop_parser.TalentProfile` feeds every consumer (key, full name, manager, `minimum_rate_usd`, `rate_unit`, `auto_send`, `paused`, approved response). `reply.py` drafts from `sop.md`; `sheets/sop_data.json` is generated at startup and only drives the approval gate. Edit via the SOP admin (it writes a new `SopVersion`), then clear both caches (`get_settings.cache_clear()` and `clear_sop_cache()`); `docs/ADDING_A_TALENT.md` is the onboarding checklist. `key` is lower-cased in DB queries. Special routing per talent: `triage.py::_apply_special_routing()`, driven by `config/confidence_policy.json`.
 
 ---
 
 ## Key Env Vars
 
-`OPENAI_API_KEY`, `DATABASE_URL` (Supabase Postgres), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `GOOGLE_SHEETS_REFRESH_TOKEN`, `API_KEY` (x-api-key header for protected endpoints), `APP_BASE_URL`
-
----
-
-## Per-Talent SOP Files
-
-`sheets/talent_sops/` — one CSV per talent defining their specific routing rules, rate floors, and communication preferences. These feed into the reply prompt context.
+`OPENAI_API_KEY`, `DATABASE_URL` (Supabase Postgres), `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`, `API_KEY` (x-api-key header for protected endpoints), `AGENCY_SECRET_KEY`, `APP_BASE_URL`.
+Optional: `ALERT_WEBHOOK_URL` (Slack-compatible alert webhook), `HEARTBEAT_URL` (healthchecks.io-style, pinged after each good poll), `SKIP_MIGRATIONS` (production: `true`), `DB_POOLER_MODE=session`, `DB_POOL_SIZE` / `DB_MAX_OVERFLOW`, `MAX_TALENT_WORKERS` / `MAX_CONCURRENT_EMAILS`, `DRAFT_MAX_AGE_DAYS`.
+`GOOGLE_SHEETS_REFRESH_TOKEN` is unused (no Sheets logging) — safe to delete from Render.
 
 ---
 
