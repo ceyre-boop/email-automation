@@ -55,6 +55,16 @@ def test_alarms_when_unread_mail_sits_and_nothing_is_processed(db_session):
     assert "NOTHING PROCESSED" in result["reason"]
 
 
+def test_unread_but_already_processed_mail_does_not_alarm(db_session):
+    """2026-10-24: 1657 unread, all already triaged — a lull in inbound, not a stall."""
+    _unread(db_session, gmail_message_id="done1")
+    _processed(db_session, minutes_ago=120, score=1, gmail_message_id="done1")
+    result = check_pipeline_stall(db_session)
+    assert result["stalled"] is False
+    assert result["unread_waiting"] == 1
+    assert result["unprocessed_unread"] == 0
+
+
 def test_alarms_when_score3_produces_no_drafts(db_session):
     _processed(db_session, minutes_ago=5, score=3)
     result = check_pipeline_stall(db_session)

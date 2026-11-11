@@ -16,8 +16,8 @@ the scheduler still logged success).
 
 Two independent conditions, either of which trips the alarm:
 
-  A. NOTHING PROCESSED — no ProcessedEmail rows for `stall_minutes` while unread
-     mail is sitting in the inbox cache. Triage/polling is down.
+  A. NOTHING PROCESSED — no ProcessedEmail rows for `stall_minutes` while UNPROCESSED
+     unread mail is sitting in the inbox cache. Triage/polling is down.
   B. NOTHING DRAFTED — triage scored at least one Score 3 in the window but no
      Draft row was created. Triage works, drafting is broken.
 
@@ -64,6 +64,17 @@ def check_pipeline_stall(db: Session) -> dict:
             db.query(ProcessedEmail).filter(ProcessedEmail.processed_at >= since).count()
         )
         unread_waiting = db.query(InboxEmail).filter(InboxEmail.is_unread.is_(True)).count()
+        # Unread in Gmail != waiting on us. Handled mail routinely stays unread
+        # (archived junk, replies sent from Gmail), so on 2026-10-24 the poller
+        # logged "1657 unread, 0 new to process" while this alarm paged "polling
+        # is down" over a 40-minute lull in inbound. Only unread mail with no
+        # ProcessedEmail row is work the pipeline owes.
+        unprocessed_unread = (
+            db.query(InboxEmail)
+            .outerjoin(ProcessedEmail, ProcessedEmail.gmail_message_id == InboxEmail.gmail_message_id)
+            .filter(InboxEmail.is_unread.is_(True), ProcessedEmail.id.is_(None))
+            .count()
+        )
         score3_last_hour = (
             db.query(ProcessedEmail)
             .filter(ProcessedEmail.processed_at >= hour_ago, ProcessedEmail.score == 3)
@@ -179,6 +190,7 @@ def check_pipeline_stall(db: Session) -> dict:
         "window_minutes": stall_minutes,
         "processed_in_window": processed_in_window,
         "unread_waiting": unread_waiting,
+        "unprocessed_unread": unprocessed_unread,
         "score3_last_hour": score3_last_hour,
         "drafts_last_hour": drafts_last_hour,
         "sends_last_hour": sends_last_hour,
@@ -191,10 +203,11 @@ def check_pipeline_stall(db: Session) -> dict:
     }
 
     reason = None
-    if processed_in_window == 0 and unread_waiting > 0:
+    if processed_in_window == 0 and unprocessed_unread > 0:
         reason = (
             f"NOTHING PROCESSED — 0 emails triaged in {stall_minutes} min "
-            f"while {unread_waiting} unread sit in the inbox. Polling or triage is down."
+            f"while {unprocessed_unread} unprocessed unread sit in the inbox "
+            f"({unread_waiting} unread total). Polling or triage is down."
         )
     elif score3_last_hour > 0 and drafts_last_hour == 0:
         reason = (

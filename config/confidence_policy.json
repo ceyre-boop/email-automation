@@ -6,8 +6,8 @@
   "global_score_routing": {
     "score_1": {
       "label": "trash",
-      "action": "Archive email in Gmail (move to Trash label). Write log entry. No reply. No human notification.",
-      "recovery": "Score 1 emails are archived — NOT permanently deleted. Recoverable from Gmail Trash for 30 days. If supervisor suspects a misclassification, search Gmail Trash for the sender domain."
+      "action": "Archive email in Gmail (remove INBOX/UNREAD and category labels; it is NOT trashed and NOT marked spam). Write log entry. No reply. No human notification.",
+      "recovery": "Score 1 emails are archived — NOT deleted and NOT in Trash. They stay in the talent mailbox under All Mail indefinitely. If supervisor suspects a misclassification, search All Mail for the sender domain."
     },
     "score_2": {
       "label": "uncertain",

@@ -3033,6 +3033,28 @@ def recover_no_draft_emails(
     }
 
 
+@router.get("/reply-queue")
+def reply_queue(
+    days: int = 14,
+    manager: Optional[str] = None,
+    format: str = "json",
+    db: Session = Depends(get_db),
+):
+    """Brand replies still waiting on a human, grouped by manager (read-only).
+
+    ``format=text`` returns a plain-text report a manager can read directly.
+    See services/reply_queue.py for what counts as waiting.
+    """
+    from fastapi.responses import PlainTextResponse
+
+    from backend.services.reply_queue import build_reply_queue, render_text
+
+    queue = build_reply_queue(db, days=max(1, min(days, 90)), manager=manager)
+    if format == "text":
+        return PlainTextResponse(render_text(queue))
+    return queue
+
+
 @router.get("/debug/routing-headers", dependencies=[Depends(verify_api_key)])
 def debug_routing_headers(limit: int = 3, db: Session = Depends(get_db)):
     """Return the raw routing headers of recently *unrouted* shared-inbox emails.

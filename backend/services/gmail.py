@@ -387,6 +387,29 @@ def list_unread_inbox_messages(token_row, db=None, max_results: int = 500) -> li
     return messages
 
 
+def list_inbox_message_ids(token_row, db=None, service=None, max_results: int = 10000) -> set[str]:
+    """Ids of every message currently in the INBOX, read or unread.
+
+    Raises on a Gmail error, and when the inbox is larger than ``max_results``,
+    rather than returning a partial set: a caller that treats "not in this set"
+    as "already handled" would silently hide the oldest (longest-waiting) mail.
+    """
+    service = service or _gmail_service(token_row, db)
+    ids: set[str] = set()
+    page_token = None
+    while True:
+        kwargs: dict = {"userId": "me", "labelIds": ["INBOX"], "maxResults": 500}
+        if page_token:
+            kwargs["pageToken"] = page_token
+        result = service.users().messages().list(**kwargs).execute()
+        ids.update(m["id"] for m in result.get("messages", []))
+        page_token = result.get("nextPageToken")
+        if not page_token:
+            return ids
+        if len(ids) >= max_results:
+            raise RuntimeError(f"INBOX listing exceeded {max_results} messages; refusing a partial set")
+
+
 def list_spam_messages(token_row, db=None, max_results: int = 50) -> list[dict]:
     """Return messages currently in the SPAM folder. No UNREAD filter — spam items may already be read."""
     service = _gmail_service(token_row, db)
