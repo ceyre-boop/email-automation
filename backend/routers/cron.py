@@ -191,11 +191,27 @@ def _pool_block() -> dict:
         return {"error": str(exc)[:200]}
 
 
+def _schema_block() -> dict:
+    """Schema drift for /health. schema_ok is None until the boot check has run."""
+    try:
+        from backend.models.db import get_schema_status
+        st = get_schema_status()
+        return {
+            "schema_ok": st["ok"],
+            "schema": {k: st[k] for k in (
+                "checked_at", "missing_tables", "missing_columns", "missing_enum_values", "error",
+            )},
+        }
+    except Exception as exc:  # noqa: BLE001
+        return {"schema_ok": None, "schema": {"error": str(exc)[:200]}}
+
+
 @router.get("/health")
 def health():
     sop_hash, talent_count, warnings, parse_ts = _sop_stats()
     return {
         "status": "ok",
+        **_schema_block(),
         "deployed_at": _DEPLOY_TIME,
         "sop_hash": sop_hash,
         "talent_count": talent_count,

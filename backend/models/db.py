@@ -77,6 +77,10 @@ class TalentToken(Base):
     last_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     consecutive_failures: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # When the token was auto-deactivated after repeated auth failures (None if it
+    # was never auto-deactivated). last_error holds the reason. Surfaced on /health
+    # and the dashboard so a dead inbox is loud instead of silently excluded.
+    deactivated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
 
 class ProcessedEmail(Base):
@@ -546,6 +550,102 @@ def get_session_factory():
     return _session_factory
 
 
+# ── Required migrations ──────────────────────────────────────────────────────
+#
+# The few additive statements that CURRENT CODE cannot run without. They are applied
+# at every boot, including when SKIP_MIGRATIONS is set: the full _MIGRATION_STMTS list
+# below is deliberately skipped on Render (it re-runs ~60 statements, some with real
+# lock risk, on every deploy) but that skip meant the retry-logic columns/enum value
+# were never created and every query touching them would have failed.
+#
+# Each entry is (label, "already applied?" SQL, DDL). The check runs first and the DDL
+# only runs when it comes back empty, so a healthy boot takes no table lock at all.
+# The DDL is itself idempotent (IF NOT EXISTS) as a second line of defence. Additive
+# only — never add a drop/rename/type change here.
+def _column_exists_sql(table: str, column: str) -> str:
+    return (
+        "SELECT 1 FROM information_schema.columns "
+        f"WHERE table_schema = current_schema() AND table_name = '{table}' "
+        f"AND column_name = '{column}'"
+    )
+
+
+def _enum_label_exists_sql(enum_type: str, label: str) -> str:
+    return (
+        "SELECT 1 FROM pg_enum e JOIN pg_type t ON t.oid = e.enumtypid "
+        f"WHERE t.typname = '{enum_type}' AND e.enumlabel = '{label}'"
+    )
+
+
+REQUIRED_MIGRATIONS: list[tuple[str, str, str]] = [
+    (
+        "emailstatus.retry_pending",
+        _enum_label_exists_sql("emailstatus", "retry_pending"),
+        "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'retry_pending'",
+    ),
+    (
+        "processed_emails.triage_retry_count",
+        _column_exists_sql("processed_emails", "triage_retry_count"),
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS triage_retry_count INTEGER NOT NULL DEFAULT 0",
+    ),
+    (
+        "processed_emails.triage_next_retry_at",
+        _column_exists_sql("processed_emails", "triage_next_retry_at"),
+        "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS triage_next_retry_at TIMESTAMP",
+    ),
+    (
+        "talents.deactivated_at",
+        _column_exists_sql("talents", "deactivated_at"),
+        "ALTER TABLE talents ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP",
+    ),
+]
+
+
+def apply_required_migrations() -> dict:
+    """Apply REQUIRED_MIGRATIONS idempotently. Never raises.
+
+    Safe to run on every boot, with or without SKIP_MIGRATIONS. Uses a dedicated
+    NullPool engine in AUTOCOMMIT (ALTER TYPE ... ADD VALUE cannot run inside a
+    transaction block on older Postgres) with a short lock_timeout, so if a
+    long-running query holds processed_emails the DDL fails fast and is retried on
+    the next boot instead of queueing behind it and blocking every other query.
+
+    Returns {"applied": [labels], "already": [labels], "failed": [(label, error)]}.
+    """
+    report: dict = {"applied": [], "already": [], "failed": []}
+    settings = get_settings()
+    mig_url = (settings.database_url or "").replace("postgres://", "postgresql://", 1)
+    if not mig_url or mig_url.startswith("sqlite"):
+        return report  # Base.metadata.create_all already built the schema (tests/dev)
+
+    eng = create_engine(
+        mig_url,
+        poolclass=NullPool,
+        connect_args={"options": "-c statement_timeout=25000 -c lock_timeout=5000"},
+    )
+    try:
+        with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            for label, check_sql, ddl in REQUIRED_MIGRATIONS:
+                try:
+                    if conn.execute(text(check_sql)).first() is not None:
+                        report["already"].append(label)
+                        continue
+                    logger.warning("Required migration %s is missing — applying: %s", label, ddl)
+                    conn.execute(text(ddl))
+                    report["applied"].append(label)
+                except Exception as exc:  # noqa: BLE001
+                    report["failed"].append((label, str(exc)[:300]))
+                    logger.error("Required migration %s FAILED: %s", label, exc)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Required migrations could not run — database unreachable: %s", exc)
+        report["failed"].append(("connect", str(exc)[:300]))
+    finally:
+        eng.dispose()
+    if report["applied"]:
+        logger.warning("Required migrations applied at startup: %s", ", ".join(report["applied"]))
+    return report
+
+
 def create_tables():
     """Create all tables and run additive column migrations (idempotent)."""
     engine = _make_engine()
@@ -603,6 +703,7 @@ def create_tables():
         "ALTER TYPE emailstatus ADD VALUE IF NOT EXISTS 'retry_pending'",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS triage_retry_count INTEGER NOT NULL DEFAULT 0",
         "ALTER TABLE processed_emails ADD COLUMN IF NOT EXISTS triage_next_retry_at TIMESTAMP",
+        "ALTER TABLE talents ADD COLUMN IF NOT EXISTS deactivated_at TIMESTAMP",
         """CREATE TABLE IF NOT EXISTS sop_versions (
             id SERIAL PRIMARY KEY,
             version_label VARCHAR(256) NOT NULL DEFAULT '',
@@ -689,38 +790,71 @@ def create_tables():
         _mig_engine.dispose()
 
 
+# Result of the most recent verify_schema_matches_models() run, exposed on /health.
+# ok is None until the first check has completed (boot work runs on a background thread).
+_schema_status: dict = {"ok": None, "checked_at": None, "missing_tables": [],
+                        "missing_columns": [], "missing_enum_values": [], "error": None}
+
+
+def get_schema_status() -> dict:
+    """Snapshot of the last schema verification, for /health. Never raises."""
+    return dict(_schema_status)
+
+
 def verify_schema_matches_models() -> dict:
     """Compare the live schema against the ORM models. Read-only — runs no DDL.
 
-    Render sets SKIP_MIGRATIONS=true, so create_tables() never runs and a new
-    table or column silently fails to appear. That is not hypothetical: the
-    sop_versions table was missing for its entire life, and every version-history
-    request returned 500 UndefinedTable until it was noticed by hand.
+    Render sets SKIP_MIGRATIONS=true, so the full create_tables() list never runs
+    and a new table, column or enum value silently fails to appear. That is not
+    hypothetical: the sop_versions table was missing for its entire life, and
+    every version-history request returned 500 UndefinedTable until it was
+    noticed by hand.
 
-    This surfaces the gap at boot instead. It logs one CRITICAL line per missing
-    table/column together with the exact ADD COLUMN / CREATE TABLE statement to
-    run, so the fix is a copy-paste into the Supabase SQL editor rather than an
-    investigation. It deliberately does NOT execute anything: applying DDL
-    automatically is what SKIP_MIGRATIONS exists to prevent.
+    This surfaces the gap at boot instead. It logs one ERROR line per missing
+    table/column/enum value together with the exact statement to run, and records
+    the result so /health can report `schema_ok: false`. It deliberately does NOT
+    execute anything itself (see apply_required_migrations for the small set of
+    statements that ARE applied automatically).
 
-    Returns {"missing_tables": [...], "missing_columns": [("table", "col"), ...]}.
+    Returns {"ok", "missing_tables": [...], "missing_columns": [("table", "col"), ...],
+    "missing_enum_values": [("type", "label"), ...]}.
     """
-    from sqlalchemy import inspect as _inspect
+    from sqlalchemy import Enum as _SAEnum, inspect as _inspect
+    from datetime import datetime as _dt
 
-    report: dict = {"missing_tables": [], "missing_columns": []}
+    report: dict = {"ok": True, "missing_tables": [], "missing_columns": [],
+                    "missing_enum_values": []}
+
+    def _publish(error: str | None = None) -> dict:
+        report["ok"] = (
+            error is None
+            and not report["missing_tables"]
+            and not report["missing_columns"]
+            and not report["missing_enum_values"]
+        )
+        _schema_status.update(
+            ok=None if error else report["ok"],
+            checked_at=_dt.utcnow().isoformat(),
+            missing_tables=list(report["missing_tables"]),
+            missing_columns=[list(c) for c in report["missing_columns"]],
+            missing_enum_values=[list(c) for c in report["missing_enum_values"]],
+            error=error,
+        )
+        return report
+
     try:
         engine = get_engine()
         inspector = _inspect(engine)
         live_tables = set(inspector.get_table_names())
-    except Exception:
-        logger.warning("Schema check skipped — could not inspect the database.", exc_info=True)
-        return report
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Schema check could not inspect the database: %s", exc, exc_info=True)
+        return _publish(error=str(exc)[:300])
 
     for table_name in sorted(Base.metadata.tables):
         table = Base.metadata.tables[table_name]
         if table_name not in live_tables:
             report["missing_tables"].append(table_name)
-            logger.critical(
+            logger.error(
                 "SCHEMA DRIFT: table '%s' is defined in the models but does NOT exist in the "
                 "database. Every query against it will fail. Create it in the Supabase SQL "
                 "editor.", table_name,
@@ -732,13 +866,60 @@ def verify_schema_matches_models() -> dict:
             if column.name in live_cols:
                 continue
             report["missing_columns"].append((table_name, column.name))
-            logger.critical(
+            logger.error(
                 "SCHEMA DRIFT: %s.%s is in the models but missing from the database. "
                 "Run:  ALTER TABLE %s ADD COLUMN IF NOT EXISTS %s %s;",
                 table_name, column.name, table_name, column.name,
                 column.type.compile(engine.dialect),
             )
 
-    if not report["missing_tables"] and not report["missing_columns"]:
+    # Postgres enum types are separate catalog objects: a new Python enum member is
+    # not a valid value until `ALTER TYPE ... ADD VALUE` runs. The retry_pending
+    # status needed exactly this. SQLite stores enums as VARCHAR, so skip there.
+    if engine.dialect.name == "postgresql":
+        try:
+            with engine.connect() as conn:
+                seen: set[str] = set()
+                for table in Base.metadata.tables.values():
+                    for column in table.columns:
+                        if not isinstance(column.type, _SAEnum) or not column.type.name:
+                            continue
+                        type_name = column.type.name
+                        if type_name in seen:
+                            continue
+                        seen.add(type_name)
+                        live_labels = {
+                            r[0] for r in conn.execute(
+                                text(
+                                    "SELECT e.enumlabel FROM pg_enum e "
+                                    "JOIN pg_type t ON t.oid = e.enumtypid "
+                                    "WHERE t.typname = :n"
+                                ),
+                                {"n": type_name},
+                            )
+                        }
+                        if not live_labels:
+                            continue  # type absent: reported as a missing table/column already
+                        for label in column.type.enums:
+                            if label in live_labels:
+                                continue
+                            report["missing_enum_values"].append((type_name, label))
+                            logger.error(
+                                "SCHEMA DRIFT: enum %s has no value '%s' in the database. "
+                                "Run:  ALTER TYPE %s ADD VALUE IF NOT EXISTS '%s';",
+                                type_name, label, type_name, label,
+                            )
+        except Exception as exc:  # noqa: BLE001
+            logger.error("Schema check could not read enum values: %s", exc, exc_info=True)
+            return _publish(error=str(exc)[:300])
+
+    _publish()
+    if report["ok"]:
         logger.info("Schema check: database matches all %d models.", len(Base.metadata.tables))
+    else:
+        logger.error(
+            "SCHEMA MISMATCH: missing_tables=%s missing_columns=%s missing_enum_values=%s — "
+            "/health reports schema_ok=false until this is fixed.",
+            report["missing_tables"], report["missing_columns"], report["missing_enum_values"],
+        )
     return report

@@ -319,7 +319,20 @@ def _startup_work():
     # to load the active version from DB below.
     if settings.database_url:
         if os.getenv("SKIP_MIGRATIONS"):
-            logger.warning("SKIP_MIGRATIONS=true — skipping create_tables(). DB schema must already be current.")
+            # The full migration list stays skipped (lock risk / R10 boot timeouts), but
+            # the handful of additive statements current code depends on are applied
+            # anyway — idempotently, check-first, with a short lock_timeout.
+            logger.warning(
+                "SKIP_MIGRATIONS set — skipping the full create_tables() list; "
+                "applying only the required additive migrations."
+            )
+            try:
+                from backend.models.db import apply_required_migrations
+                _mig = apply_required_migrations()
+                if _mig["failed"]:
+                    logger.error("Required migrations FAILED: %s", _mig["failed"])
+            except Exception:
+                logger.exception("Could not apply required migrations")
         else:
             logger.info("Creating database tables if they don't exist…")
             try:
@@ -331,12 +344,13 @@ def _startup_work():
         # Always verify, even when migrations are skipped — especially then.
         # With SKIP_MIGRATIONS=true a new table or column never appears and the
         # only symptom is a 500 at the first query (sop_versions did exactly
-        # that). This is read-only: it logs the required DDL, never runs it.
+        # that). This is read-only: it logs the required DDL, never runs it, and
+        # publishes the result as `schema_ok` on /health.
         try:
             from backend.models.db import verify_schema_matches_models
-            verify_schema_matches_models()
+            verify_schema_matches_models()  # logs ERROR on mismatch; result shown on /health
         except Exception:
-            logger.warning("Schema verification failed (non-fatal).", exc_info=True)
+            logger.error("Schema verification failed (non-fatal).", exc_info=True)
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
 

@@ -247,7 +247,10 @@ def test_schema_check_is_clean_when_db_matches(db_engine, monkeypatch):
 
     monkeypatch.setattr(m, "get_engine", lambda: db_engine)
     report = m.verify_schema_matches_models()
-    assert report == {"missing_tables": [], "missing_columns": []}
+    assert report["ok"] is True
+    assert report["missing_tables"] == []
+    assert report["missing_columns"] == []
+    assert report["missing_enum_values"] == []
 
 
 def test_schema_check_runs_no_ddl(db_engine, monkeypatch):
