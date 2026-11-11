@@ -31,11 +31,12 @@ def test_unrouted_volume_is_reported_even_when_the_pipeline_looks_healthy(db_ses
 
 
 def test_unrouted_spike_trips_the_alarm(db_session):
-    _unrouted(db_session, 20)
+    # Must exceed config/settings.json stall_alarm.unrouted_warn_per_24h (25).
+    _unrouted(db_session, 30)
     result = check_pipeline_stall(db_session)
     assert result["stalled"] is True
     assert "ROUTING REGRESSION" in result["reason"]
-    assert "20" in result["reason"]
+    assert "30" in result["reason"]
 
 
 def test_old_unrouted_mail_outside_the_24h_window_does_not_count(db_session):
