@@ -4,260 +4,196 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>TABOOST · Inbox Manager</title>
+<meta name="color-scheme" content="dark light">
+<script>
+// Apply a pinned theme before first paint (avoids a dark/light flash). 'auto'
+// (no attribute) follows prefers-color-scheme.
+try { var _tm = localStorage.getItem('inbox_theme_mode'); if (_tm === 'light' || _tm === 'dark') document.documentElement.setAttribute('data-theme', _tm); } catch (e) {}
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
+/* ═══════════════════════════════════════════════════════════════════════════
+   Design tokens
+   Dark is the default. Light follows prefers-color-scheme unless the user has
+   pinned a theme with the sidebar toggle (html[data-theme="light|dark"]).
+   ═══════════════════════════════════════════════════════════════════════════ */
 :root {
-  --bg:          #080809;
-  --surface:     #101013;
-  --surface-2:   #17171c;
-  --surface-3:   #1e1e25;
-  --border:      rgba(255,255,255,0.07);
-  --border-2:    rgba(255,255,255,0.12);
-  --red:         #e31c25;
-  --red-dim:     rgba(227,28,37,0.18);
+  color-scheme: dark;
+
+  /* surfaces */
+  --bg:          #0b0b0e;
+  --surface:     #121217;
+  --surface-2:   #1a1a21;
+  --surface-3:   #23232c;
+  --border:      rgba(255,255,255,0.08);
+  --border-2:    rgba(255,255,255,0.15);
+  --overlay:     rgba(0,0,0,0.65);
+  --shadow:      0 8px 28px rgba(0,0,0,0.5);
+
+  /* text */
+  --text:        #f3f3f5;
+  --text-2:      #c4c4d0;
+  --text-3:      #9494a4;
+
+  /* brand + status (text-safe values; --brand is the fill colour) */
+  --brand:       #e31c25;
+  --red:         #ff5a61;
+  --red-dim:     rgba(255,90,97,0.14);
   --red-glow:    rgba(227,28,37,0.35);
-  --red-line:    rgba(227,28,37,0.5);
-  --text:        #f2f2f3;
-  --text-2:      #c0c0cc;
-  --text-3:      #888896;
-  --green:       #00d68f;
-  --green-dim:   rgba(0,214,143,0.12);
-  --amber:       #ffb300;
-  --amber-dim:   rgba(255,179,0,0.12);
-  --sans:        'Inter', system-ui, sans-serif;
-  --mono:        'JetBrains Mono', monospace;
-  --r:           0.2s cubic-bezier(0.4,0,0.2,1);
-  --sidebar-w:   248px;
+  --red-line:    rgba(255,90,97,0.45);
+  --green:       #2ee6a6;
+  --green-dim:   rgba(46,230,166,0.12);
+  --green-line:  rgba(46,230,166,0.3);
+  --on-green:    #04130c;
+  --amber:       #ffb81c;
+  --amber-dim:   rgba(255,184,28,0.13);
+  --amber-line:  rgba(255,184,28,0.35);
+  --blue:        #6aa9ff;
+  --blue-dim:    rgba(106,169,255,0.13);
+  --blue-line:   rgba(106,169,255,0.35);
+  --purple:      #c084fc;
+  --purple-dim:  rgba(192,132,252,0.13);
+  --purple-line: rgba(192,132,252,0.35);
+
+  /* type */
+  --sans:        'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --mono:        'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+  --fs-xs:   11px;   /* badges, captions          */
+  --fs-sm:   12px;   /* secondary text, buttons   */
+  --fs-base: 14px;   /* body                      */
+  --fs-md:   16px;   /* card titles               */
+  --fs-lg:   20px;   /* view titles               */
+  --fs-xl:   28px;   /* stat figures              */
+  --lh-tight: 1.3;
+  --lh-body:  1.55;
+
+  /* spacing (4px grid) */
+  --s-1: 4px;
+  --s-2: 8px;
+  --s-3: 12px;
+  --s-4: 16px;
+  --s-5: 24px;
+  --s-6: 32px;
+
+  /* shape + motion + layout */
+  --radius-sm: 6px;
+  --radius:    10px;
+  --radius-lg: 14px;
+  --r:         0.18s cubic-bezier(0.4,0,0.2,1);
+  --sidebar-w: 256px;
+  --tap:       40px;   /* minimum touch target */
 }
 
-/* ─── Light mode (scoped to #main only — sidebar always stays dark) ─────── */
-#main[data-theme="light"] {
-  --bg:        #ffffff;
-  --surface:   #f6f6f8;
-  --surface-2: #eeeef1;
-  --surface-3: #e2e2e6;
-  --border:    rgba(0,0,0,0.08);
-  --border-2:  rgba(0,0,0,0.15);
-  --text:      #111114;
-  --text-2:    #55555f;
-  --text-3:    #9a9aa8;
-  --green-dim: rgba(0,180,120,0.12);
-  --amber-dim: rgba(200,140,0,0.12);
-  background: var(--bg);
-  color: var(--text);
+/* Light palette — applied by OS preference unless the user pinned dark… */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --bg:          #f5f5f8;
+    --surface:     #ffffff;
+    --surface-2:   #f0f0f4;
+    --surface-3:   #e5e5ec;
+    --border:      rgba(0,0,0,0.09);
+    --border-2:    rgba(0,0,0,0.18);
+    --overlay:     rgba(20,20,30,0.45);
+    --shadow:      0 8px 28px rgba(20,20,40,0.16);
+    --text:        #15151a;
+    --text-2:      #464653;
+    --text-3:      #66667a;
+    --red:         #c81a22;
+    --red-dim:     rgba(200,26,34,0.09);
+    --red-line:    rgba(200,26,34,0.4);
+    --green:       #0a7f54;
+    --green-dim:   rgba(10,127,84,0.1);
+    --green-line:  rgba(10,127,84,0.32);
+    --on-green:    #ffffff;
+    --amber:       #8f5f00;
+    --amber-dim:   rgba(190,125,0,0.12);
+    --amber-line:  rgba(190,125,0,0.38);
+    --blue:        #1d5fd1;
+    --blue-dim:    rgba(29,95,209,0.09);
+    --blue-line:   rgba(29,95,209,0.35);
+    --purple:      #7e22ce;
+    --purple-dim:  rgba(126,34,206,0.09);
+    --purple-line: rgba(126,34,206,0.32);
+  }
+}
+/* …or by explicit choice. */
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg:          #f5f5f8;
+  --surface:     #ffffff;
+  --surface-2:   #f0f0f4;
+  --surface-3:   #e5e5ec;
+  --border:      rgba(0,0,0,0.09);
+  --border-2:    rgba(0,0,0,0.18);
+  --overlay:     rgba(20,20,30,0.45);
+  --shadow:      0 8px 28px rgba(20,20,40,0.16);
+  --text:        #15151a;
+  --text-2:      #464653;
+  --text-3:      #66667a;
+  --red:         #c81a22;
+  --red-dim:     rgba(200,26,34,0.09);
+  --red-line:    rgba(200,26,34,0.4);
+  --green:       #0a7f54;
+  --green-dim:   rgba(10,127,84,0.1);
+  --green-line:  rgba(10,127,84,0.32);
+  --on-green:    #ffffff;
+  --amber:       #8f5f00;
+  --amber-dim:   rgba(190,125,0,0.12);
+  --amber-line:  rgba(190,125,0,0.38);
+  --blue:        #1d5fd1;
+  --blue-dim:    rgba(29,95,209,0.09);
+  --blue-line:   rgba(29,95,209,0.35);
+  --purple:      #7e22ce;
+  --purple-dim:  rgba(126,34,206,0.09);
+  --purple-line: rgba(126,34,206,0.32);
 }
 
-/* Fix elements with hardcoded #fff text that appear in the inbox reading pane */
-#main[data-theme="light"] .thread-subject,
-#main[data-theme="light"] .msg-from,
-#main[data-theme="light"] .gmail-talent-id { color: var(--text); }
-
-#main[data-theme="light"] .msg-av { color: var(--text-2); }
-
-#main[data-theme="light"] .topbar-search {
-  background: var(--surface-2);
-  color: var(--text);
-}
-#main[data-theme="light"] .topbar-search::placeholder { color: var(--text-3); }
-
-/* ─── Theme toggle button ───────────────────────────────────────────────── */
-.btn-theme {
-  display: flex; align-items: center; gap: 6px;
-  padding: 7px 12px; border-radius: 8px;
-  background: var(--surface-2); border: 1px solid var(--border-2);
-  color: var(--text-2); font-family: var(--sans); font-size: 12px;
-  font-weight: 600; cursor: pointer; transition: var(--r);
-  white-space: nowrap;
-}
-.btn-theme:hover { background: var(--surface-3); color: var(--text); }
-.btn-theme .theme-icon { font-size: 13px; line-height: 1; }
-
-/* Sidebar theme toggle */
-.sidebar-theme-row {
-  padding: 0 0 8px;
-  display: flex;
-}
-.sidebar-theme-row .btn-theme {
-  width: 100%; justify-content: center;
-  background: var(--surface-2); border-color: var(--border-2);
-  color: var(--text-2);
-}
-
+/* ═══════════════════════════════════════════════════════════════════════════
+   Base
+   ═══════════════════════════════════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { max-width: 100%; overflow-x: hidden; -webkit-text-size-adjust: 100%; }
 
 body {
   font-family: var(--sans);
+  font-size: var(--fs-base);
+  line-height: var(--lh-body);
   background: var(--bg);
   color: var(--text);
   height: 100vh;
+  height: 100dvh;
+  max-width: 100%;
   display: flex;
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
-/* ─── Scrollbar ─────────────────────────────────────────────────────────── */
-::-webkit-scrollbar { width: 4px; }
+button { font-family: var(--sans); color: inherit; }
+button, select { min-width: 0; }
+select {
+  font-family: var(--sans); font-size: var(--fs-sm);
+  background: var(--surface-2); color: var(--text);
+  border: 1px solid var(--border-2); border-radius: var(--radius-sm);
+  padding: var(--s-2) var(--s-3);
+}
+a { color: var(--blue); }
+
+:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: var(--surface-3); border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--text-3); }
 
-/* ─── Sidebar ───────────────────────────────────────────────────────────── */
-#sidebar {
-  width: var(--sidebar-w);
-  background: var(--surface);
-  border-right: 1px solid var(--border);
-  display: flex;
-  flex-direction: column;
-  flex-shrink: 0;
-  z-index: 10;
-}
-
-.sidebar-brand {
-  padding: 24px 20px 20px;
-  border-bottom: 1px solid var(--border);
-  display: flex;
-  align-items: center;
-  gap: 11px;
-}
-
-.brand-mark {
-  width: 30px; height: 30px;
-  background: var(--red);
-  border-radius: 8px;
-  display: flex; align-items: center; justify-content: center;
-  flex-shrink: 0;
-  box-shadow: 0 0 18px var(--red-glow);
-}
-
-.brand-mark svg { width: 16px; height: 16px; fill: #fff; }
-
-.brand-text { display: flex; flex-direction: column; gap: 1px; }
-.brand-name {
-  font-size: 13px; font-weight: 800;
-  letter-spacing: 0.08em; text-transform: uppercase; color: #fff;
-}
-.brand-sub { font-size: 10px; color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; }
-
-.sidebar-nav { padding: 12px 10px 0; }
-
-.nav-btn {
-  display: flex; align-items: center; gap: 10px;
-  width: 100%; padding: 9px 12px;
-  border-radius: 8px; border: none; background: none;
-  font-family: var(--sans); font-size: 13px; font-weight: 500;
-  color: var(--text-2); cursor: pointer;
-  transition: var(--r); margin-bottom: 2px; text-align: left;
-}
-.nav-btn:hover { background: var(--surface-2); color: var(--text); }
-.nav-btn.active { background: var(--red-dim); color: var(--red); border: 1px solid var(--red-line); }
-.nav-btn .nb-icon { font-size: 15px; width: 18px; text-align: center; flex-shrink: 0; }
-
-.sidebar-divider { height: 1px; background: var(--border); margin: 12px 10px; }
-
-.sidebar-section-label {
-  padding: 4px 12px 6px;
-  font-size: 10px; font-weight: 700; color: var(--text-3);
-  text-transform: uppercase; letter-spacing: 0.06em;
-}
-
-#talent-list { flex: 1; overflow-y: auto; padding: 2px 10px; min-height: 0; }
-
-.talent-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 7px 12px; border-radius: 8px;
-  font-size: 13px; font-weight: 500; color: var(--text-2);
-  cursor: pointer; transition: var(--r); margin-bottom: 1px;
-  border: 1px solid transparent;
-}
-.talent-item:hover { background: var(--surface-2); color: var(--text); }
-.talent-item.active { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
-
-.t-avatar {
-  width: 22px; height: 22px; border-radius: 50%;
-  background: var(--surface-3); border: 1px solid var(--border-2);
-  display: flex; align-items: center; justify-content: center;
-  font-size: 10px; font-weight: 700; flex-shrink: 0;
-  color: var(--text-2);
-}
-.talent-item.active .t-avatar { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
-
-.t-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
-.t-dot {
-  width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0;
-}
-.t-dot.online    { background: var(--green);  box-shadow: 0 0 6px var(--green); }
-.t-dot.drafting  { background: #f4b400;       box-shadow: 0 0 6px #f4b400; }
-.t-dot.offline   { background: var(--red); box-shadow: 0 0 6px var(--red); }
-
-/* Reconnect section — same row shape as .talent-item so the sidebar reads as
-   one list. Lives below Talent Inboxes; rows are links, not click handlers. */
-#reconnect-block {
-  flex: 0 0 auto;
-  max-height: 160px;
-  overflow-y: auto;
-}
-#reconnect-list { padding: 2px 10px 0; }
-
-.reconnect-item {
-  display: flex; align-items: center; gap: 9px;
-  padding: 7px 12px; border-radius: 8px;
-  font-size: 13px; font-weight: 500; color: var(--text-3);
-  text-decoration: none; transition: var(--r); margin-bottom: 1px;
-  border: 1px solid transparent;
-}
-.reconnect-item:hover {
-  background: var(--amber-dim); color: var(--amber);
-  border-color: rgba(255,179,0,0.25);
-}
-.reconnect-item .t-avatar { opacity: 0.55; }
-.reconnect-item:hover .t-avatar { opacity: 1; }
-.reconnect-action {
-  font-size: 10px; font-weight: 700; letter-spacing: 0.04em;
-  text-transform: uppercase; color: var(--amber);
-  flex-shrink: 0; opacity: 0.75;
-}
-.reconnect-item:hover .reconnect-action { opacity: 1; }
-
-.t-badge {
-  background: var(--red); color: #fff;
-  font-size: 9px; font-weight: 700;
-  padding: 2px 5px; border-radius: 8px;
-  flex-shrink: 0;
-}
-
-.talent-item-offline {
-  opacity: 0.55;
-}
-.talent-item-offline:hover {
-  opacity: 0.85;
-  background: rgba(227,28,37,0.06);
-  color: var(--text-3);
-  border-color: rgba(227,28,37,0.15);
-}
-
-.sidebar-footer {
-  padding: 14px 10px;
-  border-top: 1px solid var(--border);
-}
-
-.btn-sync {
-  width: 100%; padding: 9px;
-  background: var(--surface-2); border: 1px solid var(--border-2);
-  border-radius: 8px; color: var(--text-2);
-  font-family: var(--sans); font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: var(--r);
-  display: flex; align-items: center; justify-content: center; gap: 8px;
-}
-.btn-sync:hover { background: var(--surface-3); color: var(--text); }
-
-/* ─── Main shell ────────────────────────────────────────────────────────── */
-#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
-
-/* ─── Animations ────────────────────────────────────────────────────────── */
 @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:translateY(0); } }
-.fade-up { animation: fadeUp 0.28s ease-out forwards; }
+.fade-up { animation: fadeUp 0.28s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .fade-up, #toast { animation: none; }
+  * { transition: none !important; }
+}
 
 @keyframes spin { to { transform:rotate(360deg); } }
 .spinner {
@@ -266,133 +202,513 @@ body {
   border-radius: 50%; animation: spin 0.65s linear infinite; flex-shrink: 0;
 }
 
-/* ─── Overview view ─────────────────────────────────────────────────────── */
-/* Base: scrollable Activity Hub landing page */
-#view-overview {
-  flex: 1;
-  overflow-y: auto;
-  min-height: 0;
-  padding: 32px 40px 48px;
-  max-height: 100%;
+/* ═══════════════════════════════════════════════════════════════════════════
+   Buttons
+   ═══════════════════════════════════════════════════════════════════════════ */
+.btn {
+  padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); font-weight: 600; line-height: 1.2;
+  cursor: pointer; transition: var(--r); border: 1px solid transparent;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  white-space: nowrap;
+}
+.btn:hover { opacity: 0.88; }
+.btn-ghost { background: var(--surface-2); border-color: var(--border-2); color: var(--text-2); }
+.btn-ghost:hover { color: var(--text); background: var(--surface-3); opacity: 1; }
+.btn-primary { background: var(--brand); color: #fff; }
+.btn:disabled, .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.btn-secondary {
+  padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm);
+  font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer; transition: var(--r);
+  background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text-2);
+  display: inline-flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.btn-secondary:hover { color: var(--text); background: var(--surface-3); }
+
+.icon-btn {
+  width: var(--tap); height: var(--tap); flex-shrink: 0;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm); color: var(--text); font-size: 18px; cursor: pointer;
 }
 
-/* When JS adds .reader class, switch to grid layout for the reading pane
-   (overrides overflow-y:auto above; .reader rule is more specific) */
-#view-overview.reader {
-  flex: 1;
-  display: grid;
-  grid-template-rows: auto 1fr;
-  height: 100vh;
-  background: var(--bg);
-  overflow: hidden;
+/* Theme toggle */
+.btn-theme {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  width: 100%; padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm);
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  color: var(--text-2); font-size: var(--fs-sm); font-weight: 600;
+  cursor: pointer; transition: var(--r); white-space: nowrap;
 }
+.btn-theme:hover { background: var(--surface-3); color: var(--text); }
+.sidebar-theme-row { padding: 0 0 var(--s-2); display: flex; }
 
-.reader-header {
-  padding: 20px 40px;
-  border-bottom: 1px solid var(--border);
-  background: var(--bg);
-  z-index: 10;
-}
-
-.reader-content {
-  overflow-y: auto !important;
-  padding: 40px;
-  -webkit-overflow-scrolling: touch;
-}
-
-/* Wraps the message body inside .reader-content. Referenced in markup with no
-   rule at all, so the body sat flush against the pane with no surface of its
-   own — this restores the card the layout assumes. */
-.email-card {
-  background: var(--surface-2);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 20px 22px;
-  font-size: 13px;
-  line-height: 1.65;
-  color: var(--text-2);
-  overflow-wrap: anywhere;
-}
-
-.ov-header {
-  display: flex; align-items: baseline; justify-content: space-between;
-  margin-bottom: 28px;
-}
-.ov-title { font-size: 22px; font-weight: 700; color: #fff; }
-.ov-date { font-size: 12px; color: var(--text-3); font-family: var(--mono); }
-
-.stat-row { display: flex; gap: 16px; margin-bottom: 36px; }
-.stat-card {
-  flex: 1; padding: 20px 22px;
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sidebar
+   ═══════════════════════════════════════════════════════════════════════════ */
+#sidebar {
+  width: var(--sidebar-w);
   background: var(--surface);
-  border: 1px solid var(--border);
-  border-radius: 12px; transition: var(--r);
+  border-right: 1px solid var(--border);
+  display: flex; flex-direction: column;
+  flex-shrink: 0; z-index: 10; min-height: 0;
 }
-.stat-card:hover { border-color: var(--border-2); transform: translateY(-1px); }
-.stat-label { font-size: 11px; font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
-.stat-value { font-size: 30px; font-weight: 700; color: #fff; font-family: var(--mono); }
+
+.sidebar-brand {
+  padding: var(--s-5) var(--s-4) var(--s-4);
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: var(--s-3);
+}
+.brand-mark {
+  width: 32px; height: 32px; background: var(--brand);
+  border-radius: 9px; display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; box-shadow: 0 0 18px var(--red-glow);
+}
+.brand-mark svg { width: 16px; height: 16px; fill: #fff; }
+.brand-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
+.brand-name { font-size: var(--fs-base); font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--text); }
+.brand-sub { font-size: var(--fs-xs); color: var(--text-3); letter-spacing: 0.04em; text-transform: uppercase; }
+
+.sidebar-status {
+  margin: var(--s-3) var(--s-4) 0;
+  display: flex; align-items: center; justify-content: space-between; gap: var(--s-2);
+}
+#deploy-pill {
+  font-size: var(--fs-xs); color: var(--text-3);
+  background: var(--surface-2); border-radius: 100px;
+  padding: 3px 10px; display: inline-block; font-family: var(--mono);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+#ai-status-dot {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: var(--fs-xs); font-weight: 600; color: var(--text-3); flex-shrink: 0;
+}
+#ai-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text-3); display: inline-block; flex-shrink: 0; }
+
+.sidebar-nav { padding: var(--s-3) var(--s-3) 0; }
+.nav-btn {
+  display: flex; align-items: center; gap: var(--s-3);
+  width: 100%; min-height: 38px; padding: var(--s-2) var(--s-3);
+  border-radius: var(--radius-sm); border: 1px solid transparent; background: none;
+  font-size: var(--fs-base); font-weight: 500;
+  color: var(--text-2); cursor: pointer;
+  transition: var(--r); margin-bottom: 2px; text-align: left;
+}
+.nav-btn:hover { background: var(--surface-2); color: var(--text); }
+.nav-btn.active { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
+.nav-btn .nb-icon { font-size: var(--fs-md); width: 20px; text-align: center; flex-shrink: 0; }
+
+.sidebar-divider { height: 1px; background: var(--border); margin: var(--s-3) var(--s-3); }
+.sidebar-section-label {
+  padding: var(--s-1) var(--s-4) var(--s-2);
+  font-size: var(--fs-xs); font-weight: 700; color: var(--text-3);
+  text-transform: uppercase; letter-spacing: 0.07em;
+}
+
+#talent-list { flex: 1; overflow-y: auto; padding: 2px var(--s-3); min-height: 0; list-style: none; }
+
+.talent-item {
+  display: flex; align-items: center; gap: var(--s-2);
+  min-height: 38px; padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm);
+  font-size: var(--fs-base); font-weight: 500; color: var(--text-2);
+  cursor: pointer; transition: var(--r); margin-bottom: 1px;
+  border: 1px solid transparent;
+}
+.talent-item:hover { background: var(--surface-2); color: var(--text); }
+.talent-item.active { background: var(--red-dim); color: var(--red); border-color: var(--red-line); }
+.talent-item-offline { opacity: 0.6; }
+.talent-item-offline:hover { opacity: 0.9; }
+
+.t-avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--surface-3); border: 1px solid var(--border-2);
+  display: flex; align-items: center; justify-content: center;
+  font-size: var(--fs-xs); font-weight: 700; flex-shrink: 0; color: var(--text-2);
+}
+.t-name { flex: 1; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.t-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.t-dot.online   { background: var(--green); box-shadow: 0 0 6px var(--green); }
+.t-dot.drafting { background: var(--amber); box-shadow: 0 0 6px var(--amber); }
+.t-dot.offline  { background: var(--red);   box-shadow: 0 0 6px var(--red); }
+
+/* Pending-drafts count next to each talent */
+.t-badge {
+  min-width: 22px; height: 20px; padding: 0 7px;
+  display: inline-flex; align-items: center; justify-content: center;
+  background: var(--brand); color: #fff;
+  font-size: var(--fs-xs); font-weight: 700; line-height: 1;
+  border-radius: 10px; flex-shrink: 0; font-variant-numeric: tabular-nums;
+}
+
+/* Reconnect section */
+#reconnect-block { flex: 0 0 auto; max-height: 168px; overflow-y: auto; }
+#reconnect-list { padding: 2px var(--s-3) 0; list-style: none; }
+.reconnect-item {
+  display: flex; align-items: center; gap: var(--s-2);
+  min-height: 38px; padding: var(--s-2) var(--s-3); border-radius: var(--radius-sm);
+  font-size: var(--fs-base); font-weight: 500; color: var(--text-3);
+  text-decoration: none; transition: var(--r); margin-bottom: 1px;
+  border: 1px solid transparent;
+}
+.reconnect-item:hover { background: var(--amber-dim); color: var(--amber); border-color: var(--amber-line); }
+.reconnect-item .t-avatar { opacity: 0.6; }
+.reconnect-item:hover .t-avatar { opacity: 1; }
+.reconnect-action {
+  font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.04em;
+  text-transform: uppercase; color: var(--amber); flex-shrink: 0;
+}
+
+.sidebar-footer { padding: var(--s-3); border-top: 1px solid var(--border); }
+.btn-sync {
+  width: 100%; padding: var(--s-2) var(--s-3);
+  background: var(--surface-2); border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm); color: var(--text-2);
+  font-size: var(--fs-sm); font-weight: 600; cursor: pointer; transition: var(--r);
+  display: flex; align-items: center; justify-content: center; gap: var(--s-2);
+}
+.btn-sync:hover { background: var(--surface-3); color: var(--text); }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Main shell, mobile bar, drawer
+   ═══════════════════════════════════════════════════════════════════════════ */
+#main { flex: 1; min-width: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--bg); color: var(--text); }
+
+#mobile-bar {
+  display: none; align-items: center; gap: var(--s-3);
+  padding: var(--s-2) var(--s-4); flex-shrink: 0;
+  background: var(--surface); border-bottom: 1px solid var(--border);
+}
+#mobile-bar .mb-title { flex: 1; min-width: 0; font-size: var(--fs-base); font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#mb-health { width: 12px; height: 12px; border-radius: 50%; background: var(--text-3); flex-shrink: 0; }
+#mb-health.ok   { background: var(--green); }
+#mb-health.warn { background: var(--amber); }
+#mb-health.crit { background: var(--red); }
+
+#drawer-backdrop { display: none; position: fixed; inset: 0; background: var(--overlay); z-index: 900; }
+
+/* Views */
+#view-overview, #view-feed, #view-sent { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; }
+#view-overview { padding: var(--s-6) 40px 48px; }
+#view-feed, #view-sent { flex-direction: column; }
+#view-feed { display: flex; }
+
+.view-head {
+  padding: var(--s-5) var(--s-5) var(--s-3);
+  border-bottom: 1px solid var(--border);
+  background: var(--bg); position: sticky; top: 0; z-index: 10;
+}
+.view-head-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+.view-title { font-size: var(--fs-lg); font-weight: 800; letter-spacing: -0.02em; color: var(--text); line-height: var(--lh-tight); }
+.view-sub { font-size: var(--fs-sm); color: var(--text-3); margin-top: 2px; }
+.view-actions { display: flex; gap: var(--s-2); align-items: center; flex-wrap: wrap; }
+.view-body { padding: var(--s-3) var(--s-5) var(--s-6); flex: 1; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   System-health banner
+   ═══════════════════════════════════════════════════════════════════════════ */
+.sys-banner {
+  flex-shrink: 0; display: flex; align-items: flex-start; gap: var(--s-3);
+  padding: var(--s-2) var(--s-5); font-size: var(--fs-sm);
+  border-bottom: 1px solid var(--border);
+  background: var(--green-dim); --sys: var(--green);
+}
+.sys-banner.warn { background: var(--amber-dim); --sys: var(--amber); }
+.sys-banner.crit { background: var(--red-dim);   --sys: var(--red); }
+.sys-banner[hidden] { display: none; }
+.sys-dot { width: 10px; height: 10px; border-radius: 50%; background: var(--sys); margin-top: 4px; flex-shrink: 0; box-shadow: 0 0 8px var(--sys); }
+.sys-body { flex: 1; min-width: 0; }
+.sys-summary { font-weight: 700; color: var(--sys); }
+.sys-meta { color: var(--text-3); font-weight: 400; margin-left: var(--s-2); }
+.sys-list { list-style: none; margin-top: var(--s-1); display: flex; flex-direction: column; gap: var(--s-1); }
+.sys-list li { color: var(--text); line-height: 1.45; overflow-wrap: anywhere; }
+.sys-list .sev { font-weight: 700; margin-right: var(--s-2); }
+.sys-list li.crit .sev { color: var(--red); }
+.sys-list li.warn .sev { color: var(--amber); }
+.sys-list a { color: var(--text); font-weight: 600; }
+
+.invalid-banner {
+  display: none; align-items: center; gap: var(--s-3); flex-shrink: 0; flex-wrap: wrap;
+  padding: var(--s-2) var(--s-5); font-size: var(--fs-sm);
+  background: var(--red-dim); border-bottom: 1px solid var(--red-line); color: var(--red);
+}
+.invalid-banner #invalid-banner-msg { flex: 1 1 200px; min-width: 0; }
+.invalid-banner button {
+  margin-left: auto; background: var(--red-dim); border: 1px solid var(--red-line);
+  color: var(--red); border-radius: var(--radius-sm); padding: var(--s-1) var(--s-3);
+  font-size: var(--fs-sm); cursor: pointer;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Overview
+   ═══════════════════════════════════════════════════════════════════════════ */
+.ov-header { display: flex; align-items: baseline; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-5); }
+.ov-title { font-size: var(--fs-lg); font-weight: 800; letter-spacing: -0.02em; color: var(--text); }
+.ov-date { font-size: var(--fs-sm); color: var(--text-3); font-family: var(--mono); }
+
+.stat-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-4); margin-bottom: var(--s-5); }
+.stat-card {
+  padding: var(--s-4) var(--s-5); min-width: 0;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius-lg); transition: var(--r);
+}
+.stat-card:hover { border-color: var(--border-2); }
+.stat-label { font-size: var(--fs-xs); font-weight: 600; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: var(--s-2); }
+.stat-value { font-size: var(--fs-xl); font-weight: 700; color: var(--text); font-family: var(--mono); line-height: 1.1; }
 .stat-card.s-red .stat-value { color: var(--red); }
 .stat-card.s-green .stat-value { color: var(--green); }
 .stat-card.s-amber .stat-value { color: var(--amber); }
-.stat-card.s-blue .stat-value { color: #60a5fa; }
+.stat-card.s-blue .stat-value { color: var(--blue); }
 
-.ov-grid { display: grid; grid-template-columns: 1fr 340px; gap: 28px; max-width: 1400px; }
+.ov-grid { display: grid; grid-template-columns: minmax(0, 1fr) 340px; gap: var(--s-5); max-width: 1400px; }
+.grid-4 { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--s-3); margin-bottom: var(--s-5); }
+.grid-2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-4); }
 
-.section-head { font-size: 13px; font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+.section-head { font-size: var(--fs-sm); font-weight: 700; color: var(--text); text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: var(--s-3); }
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; margin-bottom: var(--s-3); }
+.panel-head .ph-left { display: flex; align-items: center; gap: var(--s-3); flex-wrap: wrap; min-width: 0; }
+.panel-head .section-head { margin-bottom: 0; }
+.panel-actions { display: flex; gap: var(--s-2); flex-wrap: wrap; }
+.panel-hint { font-size: var(--fs-xs); color: var(--text-3); }
+.card-block { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--s-4) var(--s-5); }
 
-#talent-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px,1fr)); gap: 14px; }
-
-.talent-card {
-  padding: 20px;
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 12px; cursor: pointer; transition: var(--r);
+.count-chip {
+  background: var(--red-dim); color: var(--red); border: 1px solid var(--red-line);
+  border-radius: 12px; font-size: var(--fs-xs); font-weight: 700; padding: 2px 9px;
 }
+.count-chip.purple { background: var(--purple-dim); color: var(--purple); border-color: var(--purple-line); }
+
+#talent-cards-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(290px, 100%), 1fr)); gap: var(--s-4); }
+.talent-card { padding: var(--s-5); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); cursor: pointer; transition: var(--r); }
 .talent-card:hover { background: var(--surface-2); border-color: var(--border-2); }
+.tc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--s-3); }
+.tc-name { font-size: var(--fs-md); font-weight: 600; color: var(--text); }
+.tc-manager { font-size: var(--fs-xs); color: var(--text-3); margin-top: 2px; }
+.tc-av { width: 32px; height: 32px; border-radius: 50%; background: var(--red-dim); border: 1px solid var(--red-line); display: flex; align-items: center; justify-content: center; font-size: var(--fs-sm); font-weight: 700; color: var(--red); flex-shrink: 0; }
+.tc-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: var(--s-3); }
+.tc-deal { font-size: var(--fs-xs); color: var(--text-2); }
+.tc-deal strong { color: var(--text); }
 
-.tc-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-.tc-name { font-size: 14px; font-weight: 600; color: #fff; }
-.tc-manager { font-size: 11px; color: var(--text-3); margin-top: 2px; }
-.tc-av { width: 32px; height: 32px; border-radius: 50%; background: var(--red-dim); border: 1px solid var(--red-line); display: flex; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; color: var(--red); flex-shrink: 0; }
-
-.tc-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
-
-.pill { padding: 3px 9px; border-radius: 100px; font-size: 10px; font-weight: 700; letter-spacing: 0.02em; }
+.pill { padding: 3px 9px; border-radius: 100px; font-size: var(--fs-xs); font-weight: 700; letter-spacing: 0.02em; display: inline-block; }
 .pill.good  { background: var(--green-dim); color: var(--green); }
 .pill.misc  { background: var(--amber-dim); color: var(--amber); }
-.pill.filtered { background: rgba(255,255,255,0.05); color: var(--text-3); }
+.pill.filtered { background: var(--surface-3); color: var(--text-3); }
 .pill.red   { background: var(--red-dim); color: var(--red); border: 1px solid var(--red-line); }
 
-.tc-deal { font-size: 11px; color: var(--text-2); }
-.tc-deal strong { color: #fff; }
-
-/* ─── Context / instructions panel ─────────────────────────────────────── */
-.ctx-panel { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-
-.ctx-item {
-  padding: 12px; background: var(--surface-2);
-  border: 1px solid var(--border); border-radius: 10px;
-  font-size: 12px; line-height: 1.5; color: var(--text);
-  margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start;
+/* Chips used in rows */
+.chip {
+  display: inline-flex; align-items: center; font-size: var(--fs-xs); font-weight: 700;
+  padding: 1px 7px; border-radius: 4px; border: 1px solid var(--border-2);
+  color: var(--text-2); background: var(--surface-3); white-space: nowrap; letter-spacing: 0.02em;
 }
+.chip.green  { color: var(--green);  background: var(--green-dim);  border-color: var(--green-line); }
+.chip.amber  { color: var(--amber);  background: var(--amber-dim);  border-color: var(--amber-line); }
+.chip.red    { color: var(--red);    background: var(--red-dim);    border-color: var(--red-line); }
+.chip.blue   { color: var(--blue);   background: var(--blue-dim);   border-color: var(--blue-line); }
+.chip.purple { color: var(--purple); background: var(--purple-dim); border-color: var(--purple-line); }
+.chip.round  { border-radius: 99px; }
+
+.avatar {
+  width: 32px; height: 32px; border-radius: 50%; flex-shrink: 0;
+  background: var(--red-dim); border: 1px solid var(--red-line); color: var(--red);
+  font-size: var(--fs-sm); font-weight: 700; display: flex; align-items: center; justify-content: center;
+}
+
+/* Small action buttons inside rows */
+.act-btn {
+  border-radius: var(--radius-sm); padding: 6px 12px;
+  font-size: var(--fs-sm); font-weight: 700; cursor: pointer; white-space: nowrap;
+  border: 1px solid var(--border-2); background: var(--surface-3); color: var(--text-2);
+  transition: var(--r);
+}
+.act-btn:hover:not(:disabled) { filter: brightness(1.12); }
+.act-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.act-btn.green { background: var(--green-dim); border-color: var(--green-line); color: var(--green); }
+.act-btn.blue  { background: var(--blue-dim);  border-color: var(--blue-line);  color: var(--blue); }
+.act-btn.red   { background: var(--red-dim);   border-color: var(--red-line);   color: var(--red); }
+.act-btn.amber { background: var(--amber-dim); border-color: var(--amber-line); color: var(--amber); }
+.act-btn.solid-green { background: var(--green); border-color: var(--green); color: #04130c; }
+
+/* ── Draft queue rows + one-click approve ─────────────────────────────── */
+.draft-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.draft-row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); cursor: pointer; }
+.draft-main { flex: 1; min-width: 0; }
+.draft-top { display: flex; align-items: center; gap: var(--s-2); flex-wrap: wrap; margin-bottom: 2px; }
+.draft-talent { font-size: var(--fs-sm); font-weight: 700; color: var(--text); }
+.draft-brand { font-size: var(--fs-xs); color: var(--green); }
+.draft-time { margin-left: auto; font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+.draft-subject { font-size: var(--fs-sm); color: var(--text-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.draft-reason { font-size: var(--fs-xs); color: var(--text-3); margin-top: 3px; line-height: 1.45; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.draft-actions { display: flex; align-items: center; gap: var(--s-2); flex-shrink: 0; flex-wrap: wrap; justify-content: flex-end; }
+.draft-body { border-top: 1px solid var(--border); padding: var(--s-4); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--mono); background: var(--surface-3); }
+.rate-chip { background: var(--green-dim); border: 1px solid var(--green-line); color: var(--green); border-radius: var(--radius-sm); font-size: var(--fs-xs); font-weight: 800; padding: 4px 8px; }
+
+.approve-slot { display: inline-flex; align-items: center; }
+.confirm-inline {
+  display: inline-flex; align-items: center; gap: var(--s-2); flex-wrap: wrap;
+  padding: 3px 3px 3px var(--s-3); border-radius: var(--radius-sm);
+  background: var(--amber-dim); border: 1px solid var(--amber-line);
+}
+.confirm-inline .confirm-q { font-size: var(--fs-sm); font-weight: 600; color: var(--text); }
+
+/* ── Inbox feed rows ───────────────────────────────────────────────────── */
+.feed-cols, .feed-row { display: flex; align-items: center; gap: var(--s-3); }
+.feed-cols { padding: var(--s-3) var(--s-3) 0; font-size: var(--fs-xs); font-weight: 700; color: var(--text-3); text-transform: uppercase; letter-spacing: 0.06em; }
+.feed-row { padding: var(--s-2) var(--s-3); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); }
+.feed-row .c-talent  { min-width: 72px; width: 72px; flex-shrink: 0; text-align: center; }
+.feed-row .c-status  { min-width: 70px; width: 70px; flex-shrink: 0; text-align: center; }
+.feed-row .c-sender  { min-width: 120px; width: 120px; flex-shrink: 0; color: var(--text-2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-row .c-subject { flex: 1; min-width: 0; color: var(--text); font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.feed-row .c-reason  { max-width: 240px; color: var(--text-3); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: var(--fs-xs); font-style: italic; flex-shrink: 1; }
+.feed-row .c-actions { display: flex; gap: var(--s-1); align-items: center; flex-shrink: 0; min-width: 100px; justify-content: flex-end; }
+.feed-row .chip { justify-content: center; }
+.feed-cols .c-talent { min-width: 72px; width: 72px; }
+.feed-cols .c-status { min-width: 70px; width: 70px; }
+.feed-cols .c-sender { min-width: 120px; width: 120px; }
+.feed-cols .c-subject { flex: 1; }
+.feed-cols .c-reason { max-width: 240px; flex: 0 1 240px; }
+.feed-cols .c-actions { min-width: 100px; text-align: right; }
+
+/* ── Sent rows ─────────────────────────────────────────────────────────── */
+.sent-card { background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+.sent-row { display: flex; align-items: center; gap: var(--s-3); padding: var(--s-3) var(--s-4); cursor: pointer; width: 100%; background: none; border: none; text-align: left; color: inherit; min-height: 52px; }
+.sent-row:hover { background: var(--surface-3); }
+.sent-main { flex: 1; min-width: 0; }
+.sent-subject { font-size: var(--fs-base); font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sent-to { font-size: var(--fs-xs); color: var(--text-3); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sent-side { display: flex; align-items: center; gap: var(--s-2); flex-shrink: 0; }
+.sent-time { font-size: var(--fs-xs); color: var(--text-3); white-space: nowrap; }
+.sent-body { border-top: 1px solid var(--border); padding: var(--s-4); font-size: var(--fs-sm); color: var(--text-2); line-height: 1.7; white-space: pre-wrap; overflow-wrap: anywhere; background: var(--surface-3); }
+.empty-note { text-align: center; padding: var(--s-6) var(--s-4); color: var(--text-3); font-size: var(--fs-sm); }
+
+/* ── Context / instructions panel (legacy overview widget) ─────────────── */
+.ctx-panel { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: var(--s-5); }
+.ctx-item { padding: var(--s-3); background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius); font-size: var(--fs-sm); line-height: 1.5; color: var(--text); margin-bottom: var(--s-3); display: flex; gap: var(--s-3); align-items: flex-start; }
 .ctx-item-text { flex: 1; }
-.ctx-item-meta { font-size: 10px; color: var(--text-3); margin-top: 6px; }
-.ctx-del {
-  background: none; border: none; color: var(--text-3); cursor: pointer; font-size: 16px;
-  padding: 0 4px; line-height: 1; transition: var(--r); flex-shrink: 0;
-}
+.ctx-item-meta { font-size: var(--fs-xs); color: var(--text-3); margin-top: 6px; }
+.ctx-del { background: none; border: none; color: var(--text-3); cursor: pointer; font-size: var(--fs-md); padding: 0 var(--s-1); line-height: 1; transition: var(--r); flex-shrink: 0; }
 .ctx-del:hover { color: var(--red); }
-
-.ctx-add-area { margin-top: 16px; }
-.ctx-textarea {
-  width: 100%; padding: 11px 14px;
-  background: var(--bg); border: 1px solid var(--border);
-  border-radius: 10px; color: var(--text);
-  font-family: var(--sans); font-size: 13px; line-height: 1.5;
-  outline: none; resize: none;
-  transition: border-color var(--r);
-}
+.ctx-add-area { margin-top: var(--s-4); }
+.ctx-textarea { width: 100%; padding: var(--s-3) var(--s-4); background: var(--bg); border: 1px solid var(--border); border-radius: var(--radius); color: var(--text); font-family: var(--sans); font-size: var(--fs-base); line-height: 1.5; outline: none; resize: none; transition: border-color var(--r); }
 .ctx-textarea:focus { border-color: var(--red-line); }
 
+.empty-state { display: flex; flex-direction: column; align-items: center; justify-content: center; padding: 60px var(--s-5); color: var(--text-3); text-align: center; gap: var(--s-3); }
+.empty-state .es-icon { font-size: 36px; opacity: 0.4; }
+.empty-state .es-text { font-size: var(--fs-base); line-height: 1.5; max-width: 260px; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Toast, overlays, modals
+   ═══════════════════════════════════════════════════════════════════════════ */
+#toast {
+  position: fixed; bottom: var(--s-5); right: var(--s-5);
+  max-width: min(420px, calc(100vw - 2 * var(--s-4)));
+  padding: var(--s-3) var(--s-5); border-radius: var(--radius);
+  background: var(--surface-3); border: 1px solid var(--border-2);
+  color: var(--text); font-size: var(--fs-base); font-weight: 500;
+  box-shadow: var(--shadow); z-index: 2000; display: none;
+  animation: fadeUp 0.25s ease-out; overflow-wrap: anywhere;
+}
+#toast.show { display: block; }
+#toast.error { background: #dc2626; color: #fff; border-color: #b91c1c; }
+
+#api-key-overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(6px); align-items: center; justify-content: center; z-index: 9999; display: none; padding: var(--s-4); }
+.api-box { background: var(--surface); border: 1px solid var(--border-2); border-radius: 16px; padding: var(--s-6); width: min(380px, 100%); text-align: center; box-shadow: var(--shadow); }
+.api-box-logo { width: 48px; height: 48px; background: var(--brand); border-radius: 12px; margin: 0 auto var(--s-5); display: flex; align-items: center; justify-content: center; box-shadow: 0 0 24px var(--red-glow); }
+.api-box-logo svg { width: 24px; height: 24px; fill: #fff; }
+.api-box h2 { font-size: var(--fs-lg); font-weight: 700; color: var(--text); margin-bottom: var(--s-2); }
+.api-box p { font-size: var(--fs-base); color: var(--text-2); margin-bottom: var(--s-5); }
+.api-input { width: 100%; padding: var(--s-3) var(--s-4); background: var(--bg); border: 1px solid var(--border-2); border-radius: var(--radius); color: var(--text); font-family: var(--mono); font-size: var(--fs-base); text-align: center; outline: none; margin-bottom: var(--s-3); transition: border-color var(--r); min-height: 44px; }
+.api-input:focus { border-color: var(--red-line); }
+
+#loading-overlay { display: none; position: fixed; inset: 0; z-index: 600; background: var(--overlay); backdrop-filter: blur(3px); align-items: center; justify-content: center; }
+#loading-overlay.active { display: flex; }
+#loading-overlay-msg { background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius-lg); padding: var(--s-4) var(--s-6); font-size: var(--fs-base); font-weight: 600; color: var(--text); }
+
+#sop-modal-content { position: relative; z-index: 1; background: var(--surface); border: 1px solid var(--border-2); border-radius: var(--radius-lg); width: min(860px, 94vw); max-height: 88vh; display: flex; flex-direction: column; overflow: hidden; box-shadow: var(--shadow); }
+
+#jump-bottom {
+  position: fixed; bottom: var(--s-5); right: var(--s-5); width: var(--tap); height: var(--tap);
+  border-radius: 50%; background: var(--surface-3); border: 1px solid var(--border-2);
+  color: var(--text-3); font-size: var(--fs-md); line-height: 1; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: opacity 0.2s, background 0.2s, color 0.2s; z-index: 999; opacity: 0.8;
+}
+#jump-bottom:hover { background: var(--surface-2); color: var(--text); opacity: 1; }
+
+/* Generic helper for the long row headers: let them wrap instead of overflowing */
+.wrap-row { display: flex; align-items: center; justify-content: space-between; gap: var(--s-3); flex-wrap: wrap; }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Responsive
+   ═══════════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1100px) {
+  .ov-grid { grid-template-columns: minmax(0, 1fr); }
+  .stat-row, .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  #view-overview { padding: var(--s-5) var(--s-5) var(--s-6); }
+}
+
+@media (max-width: 767px) {
+  /* Sidebar becomes an off-canvas drawer */
+  #sidebar {
+    position: fixed; top: 0; bottom: 0; left: 0;
+    width: min(86vw, 320px);
+    transform: translateX(-100%); visibility: hidden;
+    transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), visibility 0s linear 0.25s;
+    z-index: 1000; box-shadow: var(--shadow);
+  }
+  body.drawer-open #sidebar { transform: none; visibility: visible; transition: transform 0.25s cubic-bezier(0.4,0,0.2,1), visibility 0s; }
+  body.drawer-open #drawer-backdrop { display: block; }
+  #mobile-bar { display: flex; }
+
+  #view-overview { padding: var(--s-4) var(--s-4) var(--s-6); }
+  .view-head { padding: var(--s-4) var(--s-4) var(--s-3); position: static; }
+  .view-body { padding: var(--s-3) var(--s-4) var(--s-6); }
+  .sys-banner, .invalid-banner { padding: var(--s-2) var(--s-4); }
+
+  .stat-row, .grid-4, .grid-2 { grid-template-columns: minmax(0, 1fr); }
+  .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--s-3); }
+  .stat-card { padding: var(--s-3) var(--s-4); }
+  .stat-value { font-size: var(--fs-lg); }
+  .grid-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .ov-title, .view-title { font-size: var(--fs-md); }
+
+  /* Rows stack instead of squeezing */
+  .draft-row { flex-wrap: wrap; align-items: flex-start; }
+  .draft-main { flex-basis: calc(100% - 48px); }
+  .draft-actions { flex-basis: 100%; justify-content: flex-start; }
+  .draft-time { margin-left: 0; }
+  .feed-cols { display: none; }
+  .feed-row { flex-wrap: wrap; row-gap: var(--s-2); }
+  .feed-row .c-talent, .feed-row .c-status { width: auto; min-width: 0; padding: 2px 10px; }
+  .feed-row .c-sender { width: auto; min-width: 0; flex: 1 1 120px; }
+  .feed-row .c-subject { flex-basis: 100%; white-space: normal; order: 5; }
+  .feed-row .c-reason { max-width: 100%; flex-basis: 100%; white-space: normal; order: 6; }
+  .feed-row .c-actions { flex-basis: 100%; justify-content: flex-start; order: 7; gap: var(--s-2); }
+  .sent-row { flex-wrap: wrap; }
+  .sent-side { flex-basis: 100%; }
+
+  /* Touch targets: every control is at least 40px */
+  button, select, .btn, .btn-secondary, .act-btn, .nav-btn, .talent-item, .reconnect-item, .btn-sync, .btn-theme, .icon-btn, input:not([type="checkbox"]) {
+    min-height: var(--tap);
+  }
+  .act-btn, .btn, .btn-secondary, button[onclick] { min-width: var(--tap); }
+  .drawer-close, .ctx-del { min-width: var(--tap); min-height: var(--tap); }
+  #toast { left: var(--s-4); right: var(--s-4); bottom: var(--s-4); max-width: none; }
+  #jump-bottom { bottom: var(--s-4); right: var(--s-4); }
+  #talent-list, #reconnect-list { padding-left: var(--s-3); padding-right: var(--s-3); }
+
+  /* Inline-styled grids from the analytics blocks */
+  #analytics-scenarios > div { grid-template-columns: minmax(0, 1.4fr) 36px minmax(0, 1fr) auto !important; }
+}
+
+@media (pointer: coarse) {
+  button, select, .nav-btn, .talent-item, .reconnect-item { min-height: var(--tap); }
+}
+
+/* Legacy talent-inbox reader + AI settings drawer. Not mounted in the current
+   markup (the in-app Gmail portal was removed) but kept, tokenised, because the
+   functions that drive them still exist below. */
 /* ─── Gmail view ────────────────────────────────────────────────────────── */
 #view-gmail { flex:1; display:flex; flex-direction:column; background: var(--bg); min-height: 0; overflow: hidden; }
 
@@ -415,7 +731,7 @@ body {
 
 .gmail-talent-id {
   display: flex; align-items: center; gap: 9px;
-  font-size: 13px; font-weight: 600; color: #fff;
+  font-size: 13px; font-weight: 600; color: var(--text);
   white-space: nowrap;
 }
 .gmail-av {
@@ -436,26 +752,6 @@ body {
 .topbar-search::placeholder { color: var(--text-3); }
 
 .topbar-actions { display: flex; gap: 6px; margin-left: auto; flex-shrink: 0; }
-
-.btn { padding: 7px 13px; border-radius: 8px; font-family: var(--sans); font-size: 12px; font-weight: 600; cursor: pointer; transition: var(--r); border: none; display: flex; align-items: center; gap: 5px; white-space: nowrap; }
-.btn:hover { opacity: 0.85; }
-.btn-ghost { background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text-2); }
-.btn-ghost:hover { color: var(--text); background: var(--surface-3); }
-.btn-primary { background: var(--red); color: #fff; box-shadow: 0 0 14px rgba(227,28,37,0.3); }
-.btn:disabled { opacity: 0.45; cursor: not-allowed; }
-
-/* Applied on its own (not alongside .btn) by the email reader's Archive button,
-   so it carries the full button shape rather than acting as a modifier.
-   Was referenced in markup with no rule at all — rendered as a raw UA button. */
-.btn-secondary {
-  padding: 7px 13px; border-radius: 8px;
-  font-family: var(--sans); font-size: 12px; font-weight: 600;
-  cursor: pointer; transition: var(--r);
-  background: var(--surface-2); border: 1px solid var(--border-2); color: var(--text-2);
-  display: inline-flex; align-items: center; gap: 5px; white-space: nowrap;
-}
-.btn-secondary:hover { color: var(--text); background: var(--surface-3); }
-.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
 
 /* ─── Split layout ──────────────────────────────────────────────────────── */
 .gmail-split { flex: 1; display: flex; overflow: hidden; min-height: 0; }
@@ -539,7 +835,7 @@ body {
 }
 .draft-badge.trash {
   color: var(--text-3);
-  border-color: rgba(255,255,255,0.15);
+  border-color: var(--border-2);
 }
 
 .empty-state {
@@ -565,7 +861,7 @@ body {
 .reading-placeholder .rp-text { font-size: 13px; }
 
 .thread-head { margin-bottom: 24px; }
-.thread-subject { font-size: 20px; font-weight: 700; color: #fff; line-height: 1.3; margin-bottom: 14px; }
+.thread-subject { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1.3; margin-bottom: 14px; }
 .thread-actions { display: flex; gap: 8px; }
 
 .msg-card {
@@ -578,7 +874,7 @@ body {
   border: 1px solid var(--border-2); display: flex; align-items: center;
   justify-content: center; font-size: 14px; font-weight: 700; flex-shrink: 0;
 }
-.msg-from { font-size: 14px; font-weight: 600; color: #fff; }
+.msg-from { font-size: 14px; font-weight: 600; color: var(--text); }
 .msg-addr { font-size: 11px; color: var(--text-3); margin-top: 1px; }
 .msg-score-pill { margin-left: auto; }
 
@@ -629,63 +925,12 @@ body {
 
 .draft-pending-hint {
   margin-top: 20px; padding: 20px;
-  border: 1px dashed rgba(255,255,255,0.1); border-radius: 12px;
+  border: 1px dashed var(--border-2); border-radius: 12px;
   text-align: center; font-size: 12px; color: var(--text-3);
 }
-
-/* ─── Toast ─────────────────────────────────────────────────────────────── */
-#toast {
-  position: fixed; bottom: 28px; right: 28px;
-  padding: 12px 20px; border-radius: 10px;
-  background: var(--surface-3); border: 1px solid var(--border-2);
-  color: var(--text); font-size: 13px; font-weight: 500;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.5);
-  z-index: 2000; display: none;
-  animation: fadeUp 0.25s ease-out;
-}
-#toast.show { display: block; }
-#toast.error { background: #dc2626; color: #fff; border-color: #b91c1c; }
-
-/* ─── API key overlay ───────────────────────────────────────────────────── */
-#api-key-overlay {
-  position: fixed; inset: 0; background: rgba(8,8,9,0.95);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 9999; display: none;
-}
-.api-box {
-  background: var(--surface); border: 1px solid var(--border-2);
-  border-radius: 16px; padding: 40px; width: 380px; text-align: center;
-}
-.api-box-logo {
-  width: 48px; height: 48px; background: var(--red);
-  border-radius: 12px; margin: 0 auto 24px;
-  display: flex; align-items: center; justify-content: center;
-  box-shadow: 0 0 24px var(--red-glow);
-}
-.api-box-logo svg { width: 24px; height: 24px; fill: #fff; }
-.api-box h2 { font-size: 18px; font-weight: 700; color: #fff; margin-bottom: 8px; }
-.api-box p { font-size: 13px; color: var(--text-2); margin-bottom: 24px; }
-.api-input {
-  width: 100%; padding: 13px 16px;
-  background: var(--bg); border: 1px solid var(--border-2);
-  border-radius: 10px; color: var(--text);
-  font-family: var(--mono); font-size: 14px; text-align: center;
-  outline: none; margin-bottom: 14px;
-  transition: border-color var(--r);
-}
-.api-input:focus { border-color: var(--red-line); }
-
-/* deploy pill */
-#deploy-pill {
-  font-size: 10px; color: var(--text-3); margin-top: 6px;
-  background: var(--surface-2); border-radius: 100px;
-  padding: 3px 10px; display: inline-block;
-  font-family: var(--mono);
-}
-
 /* ─── Settings drawer ───────────────────────────────────────────────────── */
 #settings-overlay {
-  position: fixed; inset: 0; background: rgba(8,8,9,0.6);
+  position: fixed; inset: 0; background: rgba(0,0,0,0.55);
   z-index: 500; display: none;
 }
 #settings-overlay.open { display: block; }
@@ -703,7 +948,7 @@ body {
   padding: 22px 24px 18px; border-bottom: 1px solid var(--border);
   display: flex; align-items: center; justify-content: space-between; flex-shrink: 0;
 }
-.drawer-title { font-size: 15px; font-weight: 700; color: #fff; }
+.drawer-title { font-size: 15px; font-weight: 700; color: var(--text); }
 .drawer-sub { font-size: 12px; color: var(--text-3); margin-top: 2px; }
 .drawer-close {
   background: none; border: none; color: var(--text-3); cursor: pointer;
@@ -741,18 +986,6 @@ body {
   padding: 16px 24px; border-top: 1px solid var(--border); flex-shrink: 0;
   display: flex; gap: 10px; justify-content: flex-end;
 }
-#loading-overlay {
-  display: none; position: fixed; inset: 0; z-index: 600;
-  background: rgba(0,0,0,0.45); backdrop-filter: blur(3px);
-  align-items: center; justify-content: center;
-}
-#loading-overlay.active { display: flex; }
-#loading-overlay-msg {
-  background: var(--surface, #111); border: 1px solid var(--border, #333);
-  border-radius: 12px; padding: 18px 32px;
-  font-size: 14px; font-weight: 600; color: var(--text, #f8fafc);
-  letter-spacing: 0.01em;
-}
 </style>
 </head>
 <body>
@@ -766,12 +999,15 @@ body {
     <h2>TABOOST Command Center</h2>
     <p>Enter your management console key</p>
     <input type="password" id="api-key-input" class="api-input" placeholder="••••••••••••••••">
-    <button class="btn btn-primary" id="btn-api-submit" style="width:100%; justify-content:center; padding:13px;">Authorize Access</button>
+    <button class="btn btn-primary" id="btn-api-submit" style="width:100%; min-height:44px;">Authorize Access</button>
   </div>
 </div>
 
-<!-- Sidebar -->
-<aside id="sidebar">
+<!-- Mobile drawer backdrop -->
+<div id="drawer-backdrop" onclick="setDrawer(false)"></div>
+
+<!-- Sidebar (a drawer under 768px) -->
+<aside id="sidebar" aria-label="Navigation">
   <div class="sidebar-brand">
     <div class="brand-mark">
       <svg viewBox="0 0 20 20"><path d="M10 2L2 7v6l8 5 8-5V7L10 2zm0 2.5l5.5 3.25L10 11 4.5 7.75 10 4.5zM3.5 9.2l5.5 3.3V17l-5.5-3.5V9.2zm7 3.3l5.5-3.3v4.3L10.5 17V12.5z"/></svg>
@@ -782,10 +1018,10 @@ body {
     </div>
   </div>
 
-  <div style="margin:10px 16px 0; display:flex; align-items:center; justify-content:space-between;">
+  <div class="sidebar-status">
     <div id="deploy-pill">● Live</div>
-    <span id="ai-status-dot" style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:600;color:var(--text-3);">
-      <span id="ai-dot" style="width:8px;height:8px;border-radius:50%;background:#555;display:inline-block;flex-shrink:0;"></span>
+    <span id="ai-status-dot">
+      <span id="ai-dot"></span>
       <span id="ai-label">AI</span>
     </span>
   </div>
@@ -797,24 +1033,27 @@ body {
     <button class="nav-btn" id="nav-feed" onclick="showView('feed')">
       <span class="nb-icon">📬</span> Inbox Feed
     </button>
+    <button class="nav-btn" id="nav-sent" onclick="showView('sent')">
+      <span class="nb-icon">✉️</span> Sent
+    </button>
   </div>
 
   <div class="sidebar-divider"></div>
   <div class="sidebar-section-label">Talent Inboxes</div>
 
-  <ul id="talent-list" style="list-style:none;"></ul>
+  <ul id="talent-list" aria-label="Talent inboxes"></ul>
 
   <div id="reconnect-block" hidden>
     <div class="sidebar-divider"></div>
     <div class="sidebar-section-label">Reconnect Gmail</div>
-    <ul id="reconnect-list" style="list-style:none;"></ul>
+    <ul id="reconnect-list"></ul>
   </div>
 
   <div class="sidebar-footer">
     <div class="sidebar-theme-row">
       <button class="btn-theme" id="sidebar-theme-toggle">
-        <span class="theme-icon" id="sidebar-theme-icon">☀️</span>
-        <span id="sidebar-theme-label">Light Mode</span>
+        <span class="theme-icon" id="sidebar-theme-icon">🖥️</span>
+        <span id="sidebar-theme-label">Theme: Auto</span>
       </button>
     </div>
     <button class="btn-sync" id="btn-refresh">↻ &nbsp;Synchronize</button>
@@ -824,17 +1063,25 @@ body {
 <!-- Main -->
 <main id="main">
 
-<!-- DEAD TOKEN banner — shown when a Gmail token was deactivated after repeated failures -->
-<div id="dead-token-banner" style="display:none; background:rgba(239,68,68,0.15); border-bottom:1px solid rgba(239,68,68,0.4); padding:10px 24px; align-items:flex-start; gap:12px; font-size:13px; color:#ef4444; position:sticky; top:0; z-index:51;">
-  <span style="font-size:16px;">🔌</span>
-  <span id="dead-token-banner-msg"></span>
+<!-- Mobile top bar (hidden on desktop) -->
+<header id="mobile-bar">
+  <button class="icon-btn" id="btn-drawer" aria-label="Open menu" aria-controls="sidebar" aria-expanded="false" onclick="setDrawer(!document.body.classList.contains('drawer-open'))">☰</button>
+  <span class="mb-title">Taboost · Inbox Manager</span>
+  <span id="mb-health" title="System health" aria-hidden="true"></span>
+</header>
+
+<!-- SYSTEM HEALTH banner — one banner for everything /health reports: dead Gmail tokens
+     (merged with /api/dashboard/health/tokens), stalled pipeline, schema drift, AI off. -->
+<div id="sys-banner" class="sys-banner" role="status" aria-live="polite" hidden>
+  <span class="sys-dot" aria-hidden="true"></span>
+  <div class="sys-body" id="sys-banner-body"></div>
 </div>
 
 <!-- INVALID draft banner — shown when validation_failed drafts exist -->
-<div id="invalid-banner" style="display:none; background:rgba(239,68,68,0.12); border-bottom:1px solid rgba(239,68,68,0.3); padding:10px 24px; display:none; align-items:center; gap:12px; font-size:13px; color:#ef4444; position:sticky; top:0; z-index:50;">
-  <span style="font-size:16px;">⚠️</span>
+<div id="invalid-banner" class="invalid-banner" role="status">
+  <span aria-hidden="true">⚠️</span>
   <span id="invalid-banner-msg"></span>
-  <button onclick="revalidateDrafts(this)" style="margin-left:auto; background:rgba(239,68,68,0.2); border:1px solid rgba(239,68,68,0.4); color:#ef4444; border-radius:6px; padding:4px 12px; font-size:12px; cursor:pointer;">Re-validate INVALID</button>
+  <button onclick="revalidateDrafts(this)">Re-validate INVALID</button>
 </div>
 
   <!-- ── Overview ─────────────────────────────────────────────────────── -->
@@ -864,27 +1111,27 @@ body {
     </div>
 
     <!-- ── Daily Deal Value ────────────────────────────────────────────────── -->
-    <div class="fade-up" style="margin-bottom:24px; background:var(--surface-2); border:1px solid rgba(0,214,143,0.2); border-radius:10px; padding:16px 22px; display:flex; align-items:center; justify-content:space-between;">
+    <div class="fade-up" style="margin-bottom:24px; background:var(--surface-2); border:1px solid rgba(0,214,143,0.2); border-radius:10px; padding:16px 22px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap;">
       <div>
-        <div style="font-size:11px; font-weight:600; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;">Est. Daily Deal Value</div>
-        <div id="daily-deal-value" style="font-size:28px; font-weight:800; color:var(--green); letter-spacing:-0.02em;">$—</div>
+        <div style="font-size:var(--fs-xs); font-weight:600; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:4px;">Est. Daily Deal Value</div>
+        <div id="daily-deal-value" style="font-size:var(--fs-xl); font-weight:800; color:var(--green); letter-spacing:-0.02em;">$—</div>
       </div>
-      <div style="font-size:11px; color:var(--text-3); text-align:right; line-height:1.6;">
+      <div style="font-size:var(--fs-xs); color:var(--text-3); text-align:right; line-height:1.6;">
         Sum of proposed rates<br>on Score 3 emails today
       </div>
     </div>
 
     <!-- ── Draft Review Queue ────────────────────────────────────────────── -->
     <div class="fade-up" style="margin-bottom:24px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div class="section-head" style="margin-bottom:0;">Pending Drafts</div>
-          <span id="draft-queue-count" style="background:var(--red-dim); color:var(--red); border:1px solid var(--red-line); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
+      <div class="panel-head">
+        <div class="ph-left">
+          <div class="section-head">Pending Drafts</div>
+          <span id="draft-queue-count" class="count-chip">—</span>
         </div>
-        <div style="display:flex; gap:6px;">
-          <button class="btn btn-ghost" onclick="loadDraftQueue()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
-          <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; padding:4px 10px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
-          <button class="btn btn-ghost" onclick="clearStaleDrafts(this)" style="font-size:11px; padding:4px 10px; border-color:rgba(245,158,11,0.4); color:#f59e0b;" title="Discard drafts whose email is older than 3 days — the automation can no longer send those">🧹 Clear old</button>
+        <div class="panel-actions">
+          <button class="btn btn-ghost" onclick="loadDraftQueue()" style="font-size:var(--fs-xs); padding:4px 10px;">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:var(--fs-xs); padding:4px 10px; border-color:rgba(59,130,246,0.4); color:var(--blue);">🔄 Sync Gmail</button>
+          <button class="btn btn-ghost" onclick="clearStaleDrafts(this)" style="font-size:var(--fs-xs); padding:4px 10px; border-color:rgba(245,158,11,0.4); color:var(--amber);" title="Discard drafts whose email is older than 3 days — the automation can no longer send those">🧹 Clear old</button>
         </div>
       </div>
       <div id="draft-queue-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -892,15 +1139,15 @@ body {
 
     <!-- ── Orphaned Emails (Draft Recovery) ─────────────────────────────── -->
     <div class="fade-up" style="margin-bottom:24px;" id="orphaned-section">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div class="section-head" style="margin-bottom:0;">Lost Drafts</div>
-          <span id="orphaned-count" style="background:var(--red-dim); color:var(--red); border:1px solid var(--red-line); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
-          <span style="font-size:11px; color:var(--text-3);">Score 3 emails with no draft — click Regenerate to recover</span>
+      <div class="panel-head">
+        <div class="ph-left">
+          <div class="section-head">Lost Drafts</div>
+          <span id="orphaned-count" class="count-chip">—</span>
+          <span class="panel-hint">Score 3 emails with no draft — click Regenerate to recover</span>
         </div>
-        <div style="display:flex;gap:8px;">
-          <button class="btn btn-ghost" onclick="loadOrphaned()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
-          <button id="trash-all-btn" class="btn" onclick="trashAllOrphaned(this)" style="font-size:11px; padding:4px 10px; background:var(--red); color:#fff; border:none;">🗑 Trash All</button>
+        <div class="panel-actions">
+          <button class="btn btn-ghost" onclick="loadOrphaned()" style="font-size:var(--fs-xs); padding:4px 10px;">↻ Refresh</button>
+          <button id="trash-all-btn" class="btn" onclick="trashAllOrphaned(this)" style="font-size:var(--fs-xs); padding:4px 10px; background:var(--brand); color:#fff; border:none;">🗑 Trash All</button>
         </div>
       </div>
       <div id="orphaned-list" style="display:flex; flex-direction:column; gap:8px;"></div>
@@ -908,44 +1155,44 @@ body {
 
     <!-- ── External Channel Review ──────────────────────────────────────── -->
     <div class="fade-up" style="margin-bottom:24px; display:none;" id="extreview-section">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <div style="display:flex; align-items:center; gap:10px;">
-          <div class="section-head" style="margin-bottom:0;">External Channel Review</div>
-          <span id="extreview-count" style="background:rgba(168,85,247,0.12); color:#a855f7; border:1px solid rgba(168,85,247,0.3); border-radius:12px; font-size:11px; font-weight:700; padding:2px 9px;">—</span>
-          <span style="font-size:11px; color:var(--text-3);">Sender asked to continue via WhatsApp / Discord — review, then dismiss with ✕</span>
+      <div class="panel-head">
+        <div class="ph-left">
+          <div class="section-head">External Channel Review</div>
+          <span id="extreview-count" class="count-chip purple">—</span>
+          <span class="panel-hint">Sender asked to continue via WhatsApp / Discord — review, then dismiss with ✕</span>
         </div>
-        <button class="btn btn-ghost" onclick="loadExtReview()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+        <button class="btn btn-ghost" onclick="loadExtReview()" style="font-size:var(--fs-xs); padding:4px 10px;">↻ Refresh</button>
       </div>
       <div id="extreview-list" style="display:flex; flex-direction:column; gap:8px;"></div>
     </div>
 
     <!-- ── Recently Sent ─────────────────────────────────────────────────── -->
     <div class="fade-up" style="margin-bottom:20px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:16px 20px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-        <div class="section-head" style="margin-bottom:0;">Recently Sent</div>
-        <button class="btn btn-ghost" onclick="loadRecentlySent()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+      <div class="panel-head">
+        <div class="section-head">Recently Sent</div>
+        <button class="btn btn-ghost" onclick="loadRecentlySent()" style="font-size:var(--fs-xs); padding:4px 10px;">↻ Refresh</button>
       </div>
       <div id="recently-sent-list" style="display:flex; flex-direction:column; gap:4px;"></div>
-      <div id="recently-sent-empty" style="display:none; text-align:center; padding:24px 0; color:var(--text-3); font-size:12px;">No sent drafts yet.</div>
+      <div id="recently-sent-empty" style="display:none; text-align:center; padding:24px 0; color:var(--text-3); font-size:var(--fs-sm);">No sent drafts yet.</div>
     </div>
 
     <!-- ── System Health ──────────────────────────────────────────────────── -->
     <div id="system-health-bar" class="fade-up" style="margin-bottom:20px; background:var(--surface-2); border:1px solid var(--border); border-radius:10px; padding:14px 20px; display:flex; align-items:center; gap:20px; flex-wrap:wrap;">
       <div style="display:flex; align-items:center; gap:10px; flex-shrink:0;">
         <div id="health-dot" style="width:12px; height:12px; border-radius:50%; background:var(--surface-3);"></div>
-        <span style="font-size:13px; font-weight:700;" id="health-status">Loading…</span>
-        <span style="font-size:22px; font-weight:800; color:var(--text);" id="health-score"></span>
+        <span style="font-size:var(--fs-base); font-weight:700;" id="health-status">Loading…</span>
+        <span style="font-size:var(--fs-lg); font-weight:800; color:var(--text);" id="health-score"></span>
       </div>
       <div id="health-components" style="display:flex; gap:16px; flex-wrap:wrap; flex:1;"></div>
-      <div id="health-issues" style="font-size:11px; color:var(--amber); line-height:1.5; flex-basis:100%;"></div>
+      <div id="health-issues" style="font-size:var(--fs-xs); color:var(--amber); line-height:1.5; flex-basis:100%;"></div>
     </div>
 
     <!-- ── Main grid: Talent Health (primary) + SOP panel ────────────────── -->
     <div class="ov-grid fade-up">
       <div>
-        <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-          <div class="section-head" style="margin-bottom:0;">Talent Health</div>
-          <button class="btn btn-ghost" onclick="loadAnalytics()" style="font-size:11px; padding:4px 10px;">↻ Refresh</button>
+        <div class="panel-head">
+          <div class="section-head">Talent Health</div>
+          <button class="btn btn-ghost" onclick="loadAnalytics()" style="font-size:var(--fs-xs); padding:4px 10px;">↻ Refresh</button>
         </div>
         <div id="analytics-talent-health" style="display:flex; flex-direction:column; gap:8px;"></div>
       </div>
@@ -954,33 +1201,33 @@ body {
 
         <!-- Score breakdown today -->
         <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:10px;">
-          <div style="font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Today's Decisions</div>
+          <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Today's Decisions</div>
           <div id="triage-score-breakdown" style="display:flex; gap:12px; flex-wrap:wrap;">
-            <span style="font-size:12px; color:var(--text-3);">Loading…</span>
+            <span style="font-size:var(--fs-sm); color:var(--text-3);">Loading…</span>
           </div>
         </div>
 
         <!-- Top Score 2 reasons -->
         <div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:12px 14px; margin-bottom:10px;">
-          <div style="font-size:10px; font-weight:700; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Why Emails Aren't Being Drafted</div>
-          <div id="triage-score2-reasons" style="font-size:11px; color:var(--text-2); line-height:1.6;">Loading…</div>
+          <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:8px;">Why Emails Aren't Being Drafted</div>
+          <div id="triage-score2-reasons" style="font-size:var(--fs-xs); color:var(--text-2); line-height:1.6;">Loading…</div>
         </div>
 
         <!-- Actions -->
         <div style="display:flex; flex-direction:column; gap:6px;">
-          <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; font-size:11px;">📄 SOP Document</button>
-          <button class="btn btn-primary" id="btn-blast" onclick="blastBacklog()" style="width:100%; justify-content:center; font-size:11px; background:var(--green); margin-bottom:6px;">🚀 Blast Backlog Now</button>
-          <button class="btn btn-ghost" id="btn-recover" onclick="recoverFallbacks()" style="width:100%; justify-content:center; font-size:11px; border-color:rgba(255,179,0,0.4); color:var(--amber);">⚡ Re-triage Failed Emails</button>
-          <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; font-size:11px;">↺ Reset Badge Counts</button>
-          <button class="btn btn-ghost" id="btn-purge-stale" onclick="purgeStaleDrafts()" style="width:100%; justify-content:center; font-size:11px; border-color:rgba(239,68,68,0.4); color:#ef4444;">🗑 Purge Stale Drafts</button>
+          <button class="btn btn-primary" onclick="openSopModal()" style="width:100%; justify-content:center; font-size:var(--fs-xs);">📄 SOP Document</button>
+          <button class="btn btn-primary" id="btn-blast" onclick="blastBacklog()" style="width:100%; justify-content:center; font-size:var(--fs-xs); background:var(--green); color:var(--on-green); margin-bottom:6px;">🚀 Blast Backlog Now</button>
+          <button class="btn btn-ghost" id="btn-recover" onclick="recoverFallbacks()" style="width:100%; justify-content:center; font-size:var(--fs-xs); border-color:rgba(255,179,0,0.4); color:var(--amber);">⚡ Re-triage Failed Emails</button>
+          <button class="btn btn-ghost" onclick="resetAllBadges()" style="width:100%; justify-content:center; font-size:var(--fs-xs);">↺ Reset Badge Counts</button>
+          <button class="btn btn-ghost" id="btn-purge-stale" onclick="purgeStaleDrafts()" style="width:100%; justify-content:center; font-size:var(--fs-xs); border-color:rgba(239,68,68,0.4); color:var(--red);">🗑 Purge Stale Drafts</button>
         </div>
       </div>
     </div>
 
     <!-- ── Operational stats + Anomalies ──────────────────────────────────── -->
     <div class="fade-up" style="margin-top:28px;">
-      <div style="display:grid; grid-template-columns:repeat(4,1fr); gap:12px; margin-bottom:24px;" id="analytics-load-strip"></div>
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:28px;">
+      <div class="grid-4" id="analytics-load-strip"></div>
+      <div class="grid-2" style="margin-bottom:28px;">
         <div>
           <div class="section-head" style="margin-bottom:12px;">Scenario Performance</div>
           <div id="analytics-scenarios" style="display:flex; flex-direction:column; gap:0;"></div>
@@ -998,57 +1245,78 @@ body {
 
     <!-- ── Marco section ───────────────────────────────────────────────── -->
     <div class="fade-up" style="padding-top:28px; border-top:1px solid var(--border); margin-bottom:40px;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:20px;">
+      <div class="wrap-row" style="margin-bottom:20px;">
         <div>
-          <div style="font-size:18px; font-weight:800; letter-spacing:-0.01em;">Marco</div>
-          <div style="font-size:11px; color:var(--text-3); margin-top:2px;">AI analyst · messages reference 7-day data, not today's counts</div>
+          <div style="font-size:var(--fs-md); font-weight:800; letter-spacing:-0.01em;">Marco</div>
+          <div style="font-size:var(--fs-xs); color:var(--text-3); margin-top:2px;">AI analyst · messages reference 7-day data, not today's counts</div>
         </div>
-        <div style="display:flex; gap:8px;">
-          <button class="btn btn-ghost" onclick="loadMarco()" style="font-size:11px;">↻ Refresh</button>
-          <button class="btn btn-ghost" onclick="dismissAllMarco()" style="font-size:11px;">✕ Dismiss All</button>
-          <button class="btn btn-primary" onclick="generateMarco()" id="btn-marco-gen" style="font-size:11px;">✦ Generate Now</button>
+        <div class="panel-actions">
+          <button class="btn btn-ghost" onclick="loadMarco()" style="font-size:var(--fs-xs);">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="dismissAllMarco()" style="font-size:var(--fs-xs);">✕ Dismiss All</button>
+          <button class="btn btn-primary" onclick="generateMarco()" id="btn-marco-gen" style="font-size:var(--fs-xs);">✦ Generate Now</button>
         </div>
       </div>
-      <div id="marco-messages" style="display:grid; grid-template-columns:1fr 1fr; gap:10px;"></div>
-      <div id="marco-empty" style="display:none; text-align:center; padding:48px 0; color:var(--text-3); font-size:13px;">
+      <div id="marco-messages" class="grid-2"></div>
+      <div id="marco-empty" style="display:none; text-align:center; padding:48px 0; color:var(--text-3); font-size:var(--fs-base);">
         No messages yet — click "Generate Now" to let Marco analyze the system.
       </div>
     </div>
   </div>
 
   <!-- ── Inbox Feed view ─────────────────────────────────────────────────── -->
-  <div id="view-feed" style="display:none; flex:1; overflow-y:auto; display:flex; flex-direction:column;">
+  <div id="view-feed" style="display:none;">
     <!-- Feed header — sticky so actions always visible -->
-    <div style="padding:20px 24px 14px; border-bottom:1px solid var(--border); background:var(--bg); position:sticky; top:0; z-index:10;">
-      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+    <div class="view-head">
+      <div class="view-head-row" style="margin-bottom:var(--s-3);">
         <div>
-          <div style="font-size:20px; font-weight:800; letter-spacing:-0.02em; color:var(--text);">Inbox Feed</div>
-          <div style="font-size:12px; color:var(--text-3); margin-top:2px;">All processed emails · sorted newest first · use A/B/C to act on each row</div>
+          <div class="view-title">Inbox Feed</div>
+          <div class="view-sub">All processed emails · sorted newest first · use A/B/C to act on each row</div>
         </div>
-        <div style="display:flex; gap:6px; align-items:center;">
-          <button class="btn btn-ghost" onclick="loadEmailFeed()" style="font-size:11px;">↻ Refresh</button>
-          <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="font-size:11px; border-color:rgba(59,130,246,0.4); color:#60a5fa;">🔄 Sync Gmail</button>
-          <button class="btn btn-ghost" onclick="retriageBackfill()" style="font-size:11px; border-color:rgba(251,191,36,0.5); color:#f59e0b;">⟳ Re-triage</button>
-          <button class="btn btn-ghost" onclick="revalidateDrafts(this)" style="font-size:11px; border-color:rgba(239,68,68,0.5); color:#ef4444;" title="Clear INVALID flags on drafts that now pass validation">✓ Re-validate</button>
+        <div class="view-actions">
+          <button class="btn btn-ghost" onclick="loadEmailFeed()">↻ Refresh</button>
+          <button class="btn btn-ghost" onclick="syncWithGmail(this)" style="border-color:var(--blue-line); color:var(--blue);">🔄 Sync Gmail</button>
+          <button class="btn btn-ghost" onclick="retriageBackfill()" style="border-color:var(--amber-line); color:var(--amber);">⟳ Re-triage</button>
+          <button class="btn btn-ghost" onclick="revalidateDrafts(this)" style="border-color:var(--red-line); color:var(--red);" title="Clear INVALID flags on drafts that now pass validation">✓ Re-validate</button>
         </div>
       </div>
       <!-- Column headers -->
-      <div style="display:flex; align-items:center; gap:10px; padding:0 10px; font-size:10px; font-weight:700; color:var(--text-3); text-transform:uppercase; letter-spacing:0.06em;">
-        <span style="min-width:70px;">Talent</span>
-        <span style="min-width:68px;">Status</span>
-        <span style="min-width:120px;">Sender</span>
-        <span style="flex:1;">Subject</span>
-        <span style="max-width:240px; white-space:nowrap; overflow:hidden;">Triage Reason</span>
-        <span style="min-width:88px; text-align:right;">Actions</span>
+      <div class="feed-cols" aria-hidden="true">
+        <span class="c-talent">Talent</span>
+        <span class="c-status">Status</span>
+        <span class="c-sender">Sender</span>
+        <span class="c-subject">Subject</span>
+        <span class="c-reason">Triage Reason</span>
+        <span class="c-actions">Actions</span>
       </div>
     </div>
     <!-- Feed body -->
-    <div style="padding:12px 24px; flex:1;">
-      <div id="email-feed-list" style="display:flex; flex-direction:column; gap:4px;"></div>
-      <div id="email-feed-empty" style="display:none; text-align:center; padding:60px 0; color:var(--text-3); font-size:13px;">
+    <div class="view-body">
+      <div id="email-feed-list" style="display:flex; flex-direction:column; gap:var(--s-1);"></div>
+      <div id="email-feed-empty" style="display:none; text-align:center; padding:60px 0; color:var(--text-3); font-size:var(--fs-base);">
         <div style="font-size:36px; opacity:0.3; margin-bottom:12px;">📬</div>
         No emails to show — the inbox is clear.
       </div>
+    </div>
+  </div>
+
+  <!-- ── Sent view ───────────────────────────────────────────────────────── -->
+  <div id="view-sent" style="display:none;">
+    <div class="view-head">
+      <div class="view-head-row">
+        <div>
+          <div class="view-title">Sent</div>
+          <div class="view-sub" id="sent-sub">Replies that went out from the talents' Gmail · newest first · read-only</div>
+        </div>
+        <div class="view-actions">
+          <label for="sent-talent-filter" class="panel-hint">Talent</label>
+          <select id="sent-talent-filter" onchange="renderSent()"><option value="">All talents</option></select>
+          <button class="btn btn-ghost" onclick="loadSent()">↻ Refresh</button>
+        </div>
+      </div>
+    </div>
+    <div class="view-body">
+      <div id="sent-list" style="display:flex; flex-direction:column; gap:var(--s-2);"></div>
+      <div id="sent-empty" class="empty-note" style="display:none;">No sent replies yet.</div>
     </div>
   </div>
 
@@ -1060,21 +1328,16 @@ body {
 <!-- SOP Modal -->
 <div id="sop-modal" style="display:none; position:fixed; inset:0; z-index:200; align-items:center; justify-content:center;">
   <div id="sop-modal-overlay" onclick="closeSopModal()"
-       style="position:absolute; inset:0; background:rgba(0,0,0,0.75);"></div>
-  <div id="sop-modal-content" style="
-    position:relative; z-index:1;
-    background:var(--surface); border:1px solid var(--border-2);
-    border-radius:14px; width:min(860px,94vw); max-height:88vh;
-    display:flex; flex-direction:column; overflow:hidden;
-    box-shadow:0 24px 80px rgba(0,0,0,0.5);">
+       style="position:absolute; inset:0; background:var(--overlay);"></div>
+  <div id="sop-modal-content">
     <div style="display:flex; align-items:center; justify-content:space-between;
                 padding:18px 22px; border-bottom:1px solid var(--border); flex-shrink:0;">
       <span style="font-size:15px; font-weight:700; color:var(--text);">📄 Standard Operating Procedures</span>
       <button onclick="closeSopModal()" style="background:none; border:none; color:var(--text-2);
-              font-size:22px; cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
+              font-size:var(--fs-lg); cursor:pointer; line-height:1; padding:0 4px;">&times;</button>
     </div>
     <div id="sop-modal-body" style="overflow-y:auto; padding:24px 28px; color:var(--text);
-         font-size:13px; line-height:1.7;">Loading…</div>
+         font-size:var(--fs-base); line-height:1.7;">Loading…</div>
   </div>
 </div>
 
@@ -1100,58 +1363,43 @@ const state = {
 };
 
 // ── Theme ──────────────────────────────────────────────────────────────────
-// 'auto': inbox→light, overview→dark  |  'light': always light  |  'dark': always dark
+// 'auto' follows the OS (prefers-color-scheme); 'light' / 'dark' pin it. The
+// pinned value lives on <html data-theme>, set early in <head> to avoid a flash.
 const THEME_MODE_KEY = 'inbox_theme_mode';
 let _themeMode = localStorage.getItem(THEME_MODE_KEY) || 'auto';
+const THEME_UI = {
+  auto:  ['🖥️', 'Theme: Auto'],
+  light: ['☀️', 'Theme: Light'],
+  dark:  ['🌙', 'Theme: Dark'],
+};
 
-function _updateThemeButtons(isLight) {
-  const icon  = isLight ? '🌙' : '☀️';
-  const label = isLight ? 'Dark Mode' : 'Light Mode';
+function applyTheme() {
+  if (!THEME_UI[_themeMode]) _themeMode = 'auto';
+  const root = document.documentElement;
+  if (_themeMode === 'auto') root.removeAttribute('data-theme');
+  else root.setAttribute('data-theme', _themeMode);
+  const [icon, label] = THEME_UI[_themeMode];
   const si = document.getElementById('sidebar-theme-icon');
   const sl = document.getElementById('sidebar-theme-label');
-  const ti = document.getElementById('topbar-theme-icon');
   if (si) si.textContent = icon;
   if (sl) sl.textContent = label;
-  if (ti) ti.textContent = icon;
-}
-
-function setMainTheme(mode) {
-  const main = document.getElementById('main');
-  const isLight = mode === 'light';
-  if (isLight) {
-    main.setAttribute('data-theme', 'light');
-  } else {
-    main.removeAttribute('data-theme');
-  }
-  _updateThemeButtons(isLight);
-}
-
-function autoTheme(viewName) {
-  if (_themeMode === 'light') { setMainTheme('light'); return; }
-  if (_themeMode === 'dark')  { setMainTheme('dark');  return; }
-  // auto: inbox = light, overview = dark
-  setMainTheme(viewName === 'gmail' ? 'light' : 'dark');
 }
 
 function _handleThemeToggle() {
-  const main = document.getElementById('main');
-  const isLight = main.getAttribute('data-theme') === 'light';
-  // Cycle: light → dark → auto (which then applies the view-based default)
-  if (_themeMode === 'light') {
-    _themeMode = 'dark';
-  } else if (_themeMode === 'dark') {
-    _themeMode = 'auto';
-  } else {
-    // auto → force opposite of current view default
-    _themeMode = isLight ? 'dark' : 'light';
-  }
+  _themeMode = { auto: 'light', light: 'dark', dark: 'auto' }[_themeMode] || 'auto';
   localStorage.setItem(THEME_MODE_KEY, _themeMode);
-  autoTheme(state.view);
+  applyTheme();
 }
 
 document.getElementById('sidebar-theme-toggle').addEventListener('click', _handleThemeToggle);
-const _topbarThemeToggle = document.getElementById('topbar-theme-toggle');
-if (_topbarThemeToggle) _topbarThemeToggle.addEventListener('click', _handleThemeToggle);
+
+// ── Mobile drawer ──────────────────────────────────────────────────────────
+function setDrawer(open) {
+  document.body.classList.toggle('drawer-open', !!open);
+  const b = document.getElementById('btn-drawer');
+  if (b) b.setAttribute('aria-expanded', open ? 'true' : 'false');
+}
+window.addEventListener('resize', () => { if (window.innerWidth >= 768) setDrawer(false); });
 
 // ── API ────────────────────────────────────────────────────────────────────
 async function api(method, path, body = null) {
@@ -1309,32 +1557,162 @@ async function refreshData() {
       await loadTalentData(state.selectedTalent, true);
     } else if (state.view === 'overview') {
       await loadOverview({ silent: true });
+    } else if (state.view === 'sent') {
+      await loadSent();
     }
   } finally {
     isRefreshing = false;
   }
 }
 
-// Dead Gmail tokens are switched off (no polling, triage or drafting for that inbox)
-// until someone reconnects them — say so loudly, with the reason and when it died.
-function updateDeadTokenBanner(dead) {
-  const banner = document.getElementById('dead-token-banner');
-  const msg = document.getElementById('dead-token-banner-msg');
-  if (!banner || !msg) return;
-  if (!dead || dead.length === 0) {
-    banner.style.display = 'none';
+// ── System-health banner ───────────────────────────────────────────────────
+// One banner for everything /health reports. Dead Gmail tokens come from
+// /health (pipeline.dead_token_details) and are merged with the authenticated
+// /api/dashboard/health/tokens rows, so a token is listed once however it was found.
+state.health = null;        // last good /health payload
+state.healthError = null;   // message when /health could not be fetched
+state.healthAt = null;
+state.deadTokens = [];      // rows from /api/dashboard/health/tokens where dead
+
+function parseUtc(iso) {
+  if (!iso) return null;
+  const d = new Date(/(Z|[+-]\d\d:\d\d)$/.test(iso) ? iso : iso + 'Z');
+  return isNaN(d) ? null : d;
+}
+function fmtSince(iso) {
+  const d = parseUtc(iso);
+  if (!d) return '';
+  const mins = Math.max(0, Math.round((Date.now() - d) / 60000));
+  const rel = mins < 1 ? 'just now' : mins < 60 ? mins + ' min ago'
+            : mins < 1440 ? Math.round(mins / 60) + ' h ago' : Math.round(mins / 1440) + ' d ago';
+  return d.toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) + ' (' + rel + ')';
+}
+
+function collectDeadTokens() {
+  const byKey = new Map();
+  const add = (key, patch) => {
+    if (!key) return;
+    const k = String(key).toLowerCase();
+    const cur = byKey.get(k) || { talent_key: key };
+    for (const [f, v] of Object.entries(patch)) if (v && !cur[f]) cur[f] = v;
+    byKey.set(k, cur);
+  };
+  const pipe = state.health?.pipeline || {};
+  (pipe.dead_token_details || []).forEach(r => add(r.talent_key, { reason: r.reason, since: r.deactivated_at }));
+  (pipe.dead_tokens || []).forEach(k => add(k, {}));
+  (state.deadTokens || []).forEach(r => add(r.talent_key, { reason: r.last_error, since: r.deactivated_at }));
+  return [...byKey.values()];
+}
+
+function buildSysIssues() {
+  const issues = [];   // { sev: 'crit'|'warn', label, html }
+  if (state.healthError) {
+    issues.push({ sev: 'crit', label: 'Health check unreachable',
+      html: 'The server did not answer /health (' + esc(state.healthError) + '). Showing the last known state.' });
+  }
+  const h = state.health;
+  const dead = collectDeadTokens();
+  const MAX_DEAD = 6;
+  dead.slice(0, MAX_DEAD).forEach(r => {
+    const t = (state.talents || []).find(x => x.key.toLowerCase() === String(r.talent_key).toLowerCase());
+    const name = t?.full_name || r.talent_key;
+    const since = r.since ? ' since ' + esc(fmtSince(r.since)) : '';
+    const why = r.reason ? ' — ' + esc(String(r.reason).slice(0, 140)) : '';
+    issues.push({ sev: 'crit', label: 'Gmail disconnected',
+      html: '<a href="/auth/connect?talent_key=' + encodeURIComponent(r.talent_key) +
+            '" target="_blank" rel="noopener" title="Reconnect Gmail">' + esc(name) + '</a>' + since +
+            ' — not polled, triaged or drafted until reconnected' + why });
+  });
+  if (dead.length > MAX_DEAD) {
+    issues.push({ sev: 'crit', label: 'Gmail disconnected', html: '+ ' + (dead.length - MAX_DEAD) + ' more inboxes' });
+  }
+  if (h) {
+    const p = h.pipeline || {};
+    if (p.stalled === true) {
+      const reason = String(p.reason || 'no reason given');
+      // The "TALENT INBOX DOWN" stall reason just restates the dead tokens listed above.
+      const dupOfDead = dead.length > 0 && /^TALENT INBOX DOWN/i.test(reason);
+      if (!dupOfDead) {
+        const hard = /^(NOTHING|ROUTING|TALENT INBOX)/i.test(reason);
+        issues.push({ sev: hard ? 'crit' : 'warn', label: 'Pipeline stalled', html: esc(reason) });
+      }
+    } else if (p.stalled === null && p.reason) {
+      issues.push({ sev: 'warn', label: 'Pipeline status unknown', html: esc(String(p.reason)) });
+    }
+    if (h.schema_ok === false) {
+      const sc = h.schema || {};
+      const bits = [];
+      if ((sc.missing_tables || []).length) bits.push('tables: ' + sc.missing_tables.join(', '));
+      if ((sc.missing_columns || []).length) bits.push('columns: ' + sc.missing_columns.slice(0, 5).join(', ') + (sc.missing_columns.length > 5 ? '…' : ''));
+      if ((sc.missing_enum_values || []).length) bits.push('enum values: ' + sc.missing_enum_values.slice(0, 5).join(', '));
+      if (sc.error) bits.push(String(sc.error).slice(0, 120));
+      issues.push({ sev: 'crit', label: 'Database schema out of date',
+        html: 'Run the pending migration before relying on the dashboard' + (bits.length ? ' — ' + esc(bits.join(' · ')) : '') });
+    }
+    if (h.ai_enabled === false) {
+      issues.push({ sev: 'warn', label: 'AI is off',
+        html: 'Inboxes still sync, but emails are not triaged and no drafts are written until AI is switched back on.' });
+    }
+  }
+  return issues;
+}
+
+function renderSysBanner() {
+  const banner = document.getElementById('sys-banner');
+  const body = document.getElementById('sys-banner-body');
+  const mb = document.getElementById('mb-health');
+  if (!banner || !body) return;
+  if (!state.health && !state.healthError) { banner.hidden = true; return; }
+  const issues = buildSysIssues();
+  const level = issues.some(i => i.sev === 'crit') ? 'crit' : issues.length ? 'warn' : 'ok';
+  banner.className = 'sys-banner ' + (level === 'ok' ? '' : level);
+  banner.hidden = false;
+  if (mb) { mb.className = level; mb.title = level === 'ok' ? 'All systems operational' : issues.length + ' issue(s)'; }
+  const checked = state.healthAt ? 'checked ' + state.healthAt.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }) : '';
+  if (level === 'ok') {
+    body.innerHTML = '<span class="sys-summary">All systems operational</span><span class="sys-meta">' + esc(checked) + '</span>';
     return;
   }
-  msg.innerHTML = '<strong>' + dead.length + ' Gmail inbox' + (dead.length > 1 ? 'es are' : ' is') +
-    ' DOWN</strong> — not being polled or drafted. Reconnect: ' +
-    dead.map(r => {
-      const when = r.deactivated_at ? ' (since ' + esc(r.deactivated_at.slice(0, 16).replace('T', ' ')) + ' UTC)' : '';
-      const why = r.last_error ? ' — ' + esc(String(r.last_error).slice(0, 120)) : '';
-      return '<a href="/auth/connect?talent_key=' + encodeURIComponent(r.talent_key) +
-        '" target="_blank" rel="noopener" style="color:#ef4444;text-decoration:underline;">' +
-        esc(r.talent_key) + '</a>' + when + why;
-    }).join('; ');
-  banner.style.display = 'flex';
+  const head = level === 'crit' ? 'Action needed' : 'Attention';
+  body.innerHTML =
+    '<span class="sys-summary">' + head + ' — ' + issues.length + ' issue' + (issues.length > 1 ? 's' : '') + '</span>' +
+    '<span class="sys-meta">' + esc(checked) + '</span>' +
+    '<ul class="sys-list">' + issues.map(i =>
+      '<li class="' + i.sev + '"><span class="sev">' + esc(i.label) + '</span>' + i.html + '</li>').join('') + '</ul>';
+}
+
+let _knownDeploy = null;
+async function pollHealth() {
+  const controller = new AbortController();
+  const tid = setTimeout(() => controller.abort(), 15000);
+  try {
+    // /health is public (same unauthenticated call the deploy watcher always made).
+    const res = await fetch('/health', { cache: 'no-store', signal: controller.signal });
+    if (!res.ok) throw new Error('HTTP ' + res.status);
+    state.health = await res.json();
+    state.healthError = null;
+    state.healthAt = new Date();
+    if (state.health.ai_enabled != null) setAiIndicator(state.health.ai_enabled);
+    noteDeploy(state.health.deployed_at);
+  } catch (e) {
+    state.healthError = e.name === 'AbortError' ? 'timed out' : (e.message || 'network error');
+  } finally {
+    clearTimeout(tid);
+  }
+  renderSysBanner();
+}
+
+function noteDeploy(t) {
+  if (!t) return;
+  const pill = document.getElementById('deploy-pill');
+  const label = '● v' + t.slice(0, 16).replace('T', ' ');
+  if (!_knownDeploy) {
+    _knownDeploy = t;
+  } else if (t !== _knownDeploy) {
+    _knownDeploy = t;
+    showToast('New version deployed — reload for the latest.');
+  }
+  if (pill) pill.textContent = label;
 }
 
 async function loadTokenHealth() {
@@ -1344,26 +1722,25 @@ async function loadTokenHealth() {
     for (const row of data) {
       state.tokenHealth[row.talent_key.toLowerCase()] = row;
     }
-    updateDeadTokenBanner(data.filter(r => r.dead));
+    state.deadTokens = data.filter(r => r.dead);
+    renderSysBanner();
     renderSidebar();
   } catch (_) {}
+}
+
+function setAiIndicator(enabled) {
+  const dot = document.getElementById('ai-dot');
+  const lbl = document.getElementById('ai-label');
+  if (!dot || !lbl) return;
+  dot.style.background = enabled ? 'var(--green)' : 'var(--red)';
+  lbl.textContent = enabled ? 'AI On' : 'AI Off';
+  lbl.style.color = enabled ? 'var(--green)' : 'var(--red)';
 }
 
 async function pollGuardianStatus() {
   try {
     const s = await api('GET', '/api/admin/guardian/status');
-    const dot = document.getElementById('ai-dot');
-    const lbl = document.getElementById('ai-label');
-    if (!dot) return;
-    if (s.ai_enabled) {
-      dot.style.background = 'var(--green)';
-      lbl.textContent = 'AI On';
-      lbl.style.color = 'var(--green)';
-    } else {
-      dot.style.background = 'var(--red)';
-      lbl.textContent = 'AI Off';
-      lbl.style.color = 'var(--red)';
-    }
+    setAiIndicator(!!s.ai_enabled);
   } catch (_) {}
 }
 
@@ -1419,10 +1796,13 @@ function showView(name) {
   state.view = name;
   document.getElementById('view-overview').style.display = name === 'overview' ? '' : 'none';
   document.getElementById('view-feed').style.display = name === 'feed' ? '' : 'none';
+  document.getElementById('view-sent').style.display = name === 'sent' ? '' : 'none';
   document.getElementById('nav-overview').classList.toggle('active', name === 'overview');
   document.getElementById('nav-feed').classList.toggle('active', name === 'feed');
+  document.getElementById('nav-sent').classList.toggle('active', name === 'sent');
   if (name === 'feed') loadEmailFeed({ silent: true }).catch(() => {});
-  autoTheme(name);
+  if (name === 'sent') loadSent().catch(() => {});
+  setDrawer(false);
 }
 
 // ── SOP Modal ──────────────────────────────────────────────────────────────
@@ -1600,7 +1980,7 @@ async function resetTalentBadges(talentKey, btn) {
 function closeSopModal() {
   document.getElementById('sop-modal').style.display = 'none';
 }
-document.addEventListener('keydown', e => { if (e.key === 'Escape') closeSopModal(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') { closeSopModal(); setDrawer(false); } });
 
 // ── Dot state: green = auto-send active, yellow = draft-only, red = no active token
 function dotClass(t) {
@@ -1621,7 +2001,10 @@ function renderSidebar() {
     const li = document.createElement('li');
     li.className = 'talent-item' + (!t.connected ? ' talent-item-offline' : '');
     li.dataset.key = t.key;
-    const badge = pending > 0 ? `<span class="t-badge">${pending}</span>` : '';
+    // Pending-drafts count from /api/dashboard/report (already loaded) — no extra request.
+    const badge = pending > 0
+      ? `<span class="t-badge" title="${pending} pending draft${pending > 1 ? 's' : ''}" aria-label="${pending} pending draft${pending > 1 ? 's' : ''}">${pending > 99 ? '99+' : pending}</span>`
+      : '';
     li.innerHTML = `
       <div class="t-avatar">${initial(t.full_name)}</div>
       <span class="t-name">${esc(t.full_name)}</span>
@@ -1742,7 +2125,7 @@ function renderTalentCards() {
       <div class="tc-deal">Top: ${bestDeal}</div>
       ${(card.pending_real_drafts ?? card.pending_drafts) > 0 && !state.talents.find(t=>t.key===card.talent_key)?.draft_mode ? `
       <div style="margin-top:10px;">
-        <button class="btn btn-primary tc-send-all" data-key="${esc(card.talent_key)}" style="width:100%;justify-content:center;font-size:11px;background:var(--green);">
+        <button class="btn btn-primary tc-send-all" data-key="${esc(card.talent_key)}" style="width:100%;justify-content:center;font-size:var(--fs-xs);background:var(--green);color:var(--on-green);">
           ▶ Send All (${card.pending_real_drafts ?? card.pending_drafts})
         </button>
       </div>` : ''}
@@ -1761,7 +2144,7 @@ function renderContextPanel() {
   const list = document.getElementById('context-list');
   list.innerHTML = '';
   if (state.context.length === 0) {
-    list.innerHTML = '<div style="font-size:12px;color:var(--text-3);font-style:italic;margin-bottom:12px;">No instructions yet.</div>';
+    list.innerHTML = '<div style="font-size:var(--fs-sm);color:var(--text-3);font-style:italic;margin-bottom:12px;">No instructions yet.</div>';
     return;
   }
   state.context.forEach(entry => {
@@ -1874,9 +2257,9 @@ async function loadTalentData(talent, silent = false) {
       document.getElementById('email-rows').innerHTML = `
         <div class="empty-state" style="gap:16px;padding:60px 24px;">
           <div class="es-icon">📭</div>
-          <div style="font-size:14px;font-weight:600;color:var(--text)">Gmail not connected</div>
+          <div style="font-size:var(--fs-base);font-weight:600;color:var(--text)">Gmail not connected</div>
           <div class="es-text">Connect ${esc(talent.full_name)}'s Gmail to start syncing and running AI triage.</div>
-          <a href="${url}" target="_blank" style="padding:9px 22px;background:var(--red);color:#fff;border-radius:8px;font-size:13px;font-weight:600;text-decoration:none;">Connect Gmail →</a>
+          <a href="${url}" target="_blank" style="padding:9px 22px;background:var(--brand);color:#fff;border-radius:8px;font-size:var(--fs-base);font-weight:600;text-decoration:none;">Connect Gmail →</a>
         </div>`;
     } else {
       document.getElementById('email-rows').innerHTML =
@@ -1915,7 +2298,7 @@ function renderEmailList() {
       div.innerHTML = `
         <div class="er-top">
           <span class="er-sender">To: ${esc(shortSender(draft.to || draft.sender || ''))}</span>
-          <span class="pill ${draft.is_escalate ? 'filtered' : 'red'}" style="font-size:9px;">${draft.is_escalate ? '⚠ Review' : 'AI DRAFT'}</span>
+          <span class="pill ${draft.is_escalate ? 'filtered' : 'red'}" style="font-size:var(--fs-xs);">${draft.is_escalate ? '⚠ Review' : 'AI DRAFT'}</span>
         </div>
         <div class="er-subject">${esc(draft.subject || '(no subject)')}</div>
         <div class="er-meta">${esc(draft.snippet || draft.brand_name || '')}</div>
@@ -1960,7 +2343,7 @@ function renderEmailList() {
     const html = `
       <div class="reader-header">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <div style="font-size:20px; font-weight:700; color:var(--text);">${email.subject || '(No Subject)'}</div>
+          <div style="font-size:var(--fs-lg); font-weight:700; color:var(--text);">${email.subject || '(No Subject)'}</div>
           <div style="display:flex; gap:12px;">
             <button class="btn-secondary" onclick="archiveEmail('${email.gmail_message_id}')">Archive</button>
           </div>
@@ -1988,12 +2371,12 @@ function renderDraftOnlyPane(draft) {
   pane.innerHTML = `
     <div class="thread-head fade-up">
       <div class="thread-subject">${esc(draft.subject || '(no subject)')}</div>
-      ${draft.triage_reason ? `<div style="margin-top:8px; font-size:12px; color:var(--text-3); line-height:1.55; max-width:760px;">${esc(draft.triage_reason)}</div>` : ''}
+      ${draft.triage_reason ? `<div style="margin-top:8px; font-size:var(--fs-sm); color:var(--text-3); line-height:1.55; max-width:760px;">${esc(draft.triage_reason)}</div>` : ''}
     </div>
     <div class="ai-composer fade-up">
       <div class="ai-head">
         <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT — LIVE GMAIL</div>
-        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
+        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:var(--fs-xs);">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
       </div>
       ${isEscalate ? `<div class="escalate-notice">⚠ ${esc(draft.escalate_reason || 'Manual review required before sending.')}</div>` : ''}
       <div class="ai-to">To: <span>${esc(draft.to || draft.sender || '')}</span></div>
@@ -2031,9 +2414,9 @@ async function fetchEmailBody(email) {
     const body = r.body || '';
     bodyEl.innerHTML = body.trim()
       ? `<div class="msg-body">${esc(body)}</div>`
-      : `<div style="color:var(--text-3);font-size:13px;font-style:italic;">No readable body content.</div>`;
+      : `<div style="color:var(--text-3);font-size:var(--fs-base);font-style:italic;">No readable body content.</div>`;
   } catch (_) {
-    bodyEl.innerHTML = `<div style="color:var(--text-3);font-size:13px;font-style:italic;">Could not load body.</div>`;
+    bodyEl.innerHTML = `<div style="color:var(--text-3);font-size:var(--fs-base);font-style:italic;">Could not load body.</div>`;
   }
 }
 
@@ -2054,7 +2437,7 @@ function renderReadingPane(email, draft) {
   pane.innerHTML = `
     <div class="thread-head fade-up">
       <div class="thread-subject">${esc(email.subject || '(no subject)')}</div>
-      ${triageSentence ? `<div style="margin-top:8px; font-size:12px; color:var(--text-3); line-height:1.55; max-width:760px;">${esc(triageSentence)}</div>` : ''}
+      ${triageSentence ? `<div style="margin-top:8px; font-size:var(--fs-sm); color:var(--text-3); line-height:1.55; max-width:760px;">${esc(triageSentence)}</div>` : ''}
       <div class="thread-actions">
         <button class="btn btn-ghost" onclick="archiveEmail('${email.gmail_message_id}')">Archive</button>
       </div>
@@ -2073,12 +2456,12 @@ function renderReadingPane(email, draft) {
       </div>
 
       <div class="msg-triage-block" style="margin:10px 0 14px; padding:10px 12px; background:var(--surface-3); border-radius:6px; border-left:3px solid var(--${email.score===3?'green':email.score===2?'amber':'text-3'});">
-        <div style="font-size:11px; font-weight:700; color:var(--text-2); margin-bottom:3px;">Score: ${email.score ?? '?'} · Offer: ${esc(email.offer_type || 'Unknown')}</div>
-        ${triageSentence ? `<div style="font-size:11px; color:var(--text-3); line-height:1.5;">${esc(triageSentence)}</div>` : ''}
+        <div style="font-size:var(--fs-xs); font-weight:700; color:var(--text-2); margin-bottom:3px;">Score: ${email.score ?? '?'} · Offer: ${esc(email.offer_type || 'Unknown')}</div>
+        ${triageSentence ? `<div style="font-size:var(--fs-xs); color:var(--text-3); line-height:1.5;">${esc(triageSentence)}</div>` : ''}
       </div>
 
       <div id="msg-body-${email.gmail_message_id}">
-        <div style="color:var(--text-3);font-size:13px;font-style:italic;">Loading…</div>
+        <div style="color:var(--text-3);font-size:var(--fs-base);font-style:italic;">Loading…</div>
       </div>
 
       <div class="msg-tags">
@@ -2101,7 +2484,7 @@ function renderReadingPane(email, draft) {
     document.getElementById('draft-compose-area').innerHTML = `
       <div class="draft-pending-hint" style="display:flex;flex-direction:column;gap:10px;align-items:flex-start;">
         <span>${esc(hint)}</span>
-        <button class="btn btn-ghost" style="font-size:12px;" onclick="forceDraftEmail('${esc(email.gmail_message_id)}')">✍ Draft This Email</button>
+        <button class="btn btn-ghost" style="font-size:var(--fs-sm);" onclick="forceDraftEmail('${esc(email.gmail_message_id)}')">✍ Draft This Email</button>
       </div>`;
   }
 }
@@ -2115,9 +2498,9 @@ function renderDraftCompose(draft, email) {
     <div class="ai-composer fade-up">
       <div class="ai-head">
         <div class="ai-label"><div class="ai-label-dot"></div>AI DRAFT COMPOSER</div>
-        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:9px;">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
+        <span class="pill ${isEscalate ? 'filtered' : 'red'}" style="font-size:var(--fs-xs);">${isEscalate ? 'ESCALATION REQUIRED' : 'READY TO SEND'}</span>
       </div>
-      ${triageSentence ? `<div style="margin:0 0 10px; font-size:12px; color:var(--text-3); line-height:1.55;">${esc(triageSentence)}</div>` : ''}
+      ${triageSentence ? `<div style="margin:0 0 10px; font-size:var(--fs-sm); color:var(--text-3); line-height:1.55;">${esc(triageSentence)}</div>` : ''}
       ${isEscalate ? `<div class="escalate-notice">⚠ ${esc(draft.escalate_reason || 'Manual review required.')}</div>` : ''}
       <div class="ai-to">Reply to: <span>${esc(draft.sender || email.sender)}</span></div>
       <textarea class="ai-textarea" id="draft-text-${draft.id}">${esc(draft.draft_text)}</textarea>
@@ -2276,12 +2659,12 @@ async function openSettings() {
 
   // Load SOP rules from sop_data endpoint (settings endpoint returns talent config)
   const sopEl = document.getElementById('drawer-sop-rules');
-  sopEl.innerHTML = '<div style="font-size:11px;color:var(--text-3);">Loading SOP rules…</div>';
+  sopEl.innerHTML = '<div style="font-size:var(--fs-xs);color:var(--text-3);">Loading SOP rules…</div>';
   try {
     const s = await api('GET', `/api/dashboard/talents/${t.key}/settings`);
     // SOP rules aren't returned by settings — fetch via a direct call
     // We'll just show a note pointing to the Excel
-    sopEl.innerHTML = '<div style="font-size:11px;color:var(--text-3);">Rules loaded from <strong style="color:var(--text-2);">sheets/sop_data.json</strong> — update the Excel and re-import to change these.</div>';
+    sopEl.innerHTML = '<div style="font-size:var(--fs-xs);color:var(--text-3);">Rules loaded from <strong style="color:var(--text-2);">sheets/sop_data.json</strong> — update the Excel and re-import to change these.</div>';
   } catch (_) { sopEl.innerHTML = ''; }
 
   document.getElementById('settings-overlay').classList.add('open');
@@ -2317,6 +2700,8 @@ async function saveSettings() {
 
 // ── Draft Review Queue ────────────────────────────────────────────────────
 let _draftQueueExpanded = {};
+const _draftsById = {};        // id -> draft, for the approve slot + sidebar counts
+const _approveTimers = {};     // id -> timeout that reverts an unanswered confirmation
 
 function updateInvalidBanner(invalidCount) {
   const banner = document.getElementById('invalid-banner');
@@ -2338,44 +2723,45 @@ async function loadDraftQueue() {
     updateInvalidBanner(drafts.filter(d => d.validation_failed).length);
 
     if (!drafts.length) {
-      list.innerHTML = `<div style="text-align:center; padding:28px; color:var(--text-3); font-size:12px;">No pending drafts — inbox is clear ✓</div>`;
+      list.innerHTML = `<div style="text-align:center; padding:28px; color:var(--text-3); font-size:var(--fs-sm);">No pending drafts — inbox is clear ✓</div>`;
       return;
     }
 
+    drafts.forEach(d => { _draftsById[d.id] = d; });
     list.innerHTML = drafts.map(d => {
       const expanded = _draftQueueExpanded[d.id];
       const initials = (d.talent_key || '?')[0].toUpperCase();
       const senderName = (d.sender || '').replace(/^"?([^"<]+)"?\s*<.*>$/, '$1').trim() || d.sender || 'Unknown';
       const rate = d.proposed_rate ? ` · $${d.proposed_rate.toLocaleString()}` : '';
-      const escalate = d.is_escalate ? `<span style="background:rgba(255,179,0,0.15);color:var(--amber);border:1px solid rgba(255,179,0,0.3);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;">ESCALATION</span>` : '';
-      const invalidBadge = d.validation_failed ? `<span style="background:rgba(239,68,68,0.12);color:#ef4444;border:1px solid rgba(239,68,68,0.25);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;" title="${(d.validation_error||'').replace(/"/g,'&quot;')}">INVALID</span>` : '';
+      const escalate = d.is_escalate ? `<span class="chip amber">ESCALATION</span>` : '';
+      const invalidBadge = d.validation_failed ? `<span class="chip red" title="${esc(d.validation_error || '')}">INVALID</span>` : '';
       return `
-      <div id="draft-card-${d.id}" style="background:var(--surface-2); border:1px solid var(--border); border-radius:10px; overflow:hidden;">
-        <div style="display:flex; align-items:center; gap:12px; padding:12px 16px; cursor:pointer;" onclick="toggleDraftExpand(${d.id})">
-          <div style="width:30px; height:30px; border-radius:50%; background:var(--red-dim); border:1px solid var(--red-line); color:var(--red); font-size:11px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0;">${initials}</div>
-          <div style="flex:1; min-width:0;">
-            <div style="display:flex; align-items:center; gap:8px; margin-bottom:2px;">
-              <span style="font-size:12px; font-weight:700; color:var(--text);">${esc(d.talent_key)}</span>
+      <div id="draft-card-${d.id}" class="draft-card">
+        <div class="draft-row" onclick="toggleDraftExpand(${d.id})">
+          <div class="avatar">${esc(initials)}</div>
+          <div class="draft-main">
+            <div class="draft-top">
+              <span class="draft-talent">${esc(d.talent_key)}</span>
               ${escalate}
               ${invalidBadge}
-              ${d.brand_name ? `<span style="font-size:11px; color:var(--green);">${esc(d.brand_name)}${rate}</span>` : ''}
-              ${d.created_at ? `<span style="margin-left:auto; font-size:11px; color:rgba(255,255,255,0.35); white-space:nowrap;">${fmtDraftTime(d.created_at)}</span>` : ''}
+              ${d.brand_name ? `<span class="draft-brand">${esc(d.brand_name)}${rate}</span>` : ''}
+              ${d.created_at ? `<span class="draft-time">${fmtDraftTime(d.created_at)}</span>` : ''}
             </div>
-            <div style="font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${esc(senderName)} — ${esc(d.subject || '(no subject)')}</div>
-            ${d.triage_reason ? `<div style="font-size:11px; color:var(--text-3); margin-top:3px; line-height:1.45; overflow:hidden; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${esc(d.triage_reason)}</div>` : ''}
+            <div class="draft-subject">${esc(senderName)} — ${esc(d.subject || '(no subject)')}</div>
+            ${d.triage_reason ? `<div class="draft-reason">${esc(d.triage_reason)}</div>` : ''}
           </div>
-          <div style="display:flex; align-items:center; gap:6px; flex-shrink:0;">
-            ${d.proposed_rate ? `<span style="background:rgba(0,214,143,0.12); border:1px solid rgba(0,214,143,0.25); color:var(--green); border-radius:6px; font-size:10px; font-weight:800; padding:3px 8px; letter-spacing:0.02em;">$${Number(d.proposed_rate).toLocaleString()}</span>` : ''}
-            <button onclick="event.stopPropagation(); ${d.is_escalate || d.validation_failed ? '' : `approveDraft(${d.id}, this)`}" ${d.is_escalate || d.validation_failed ? 'disabled' : ''} style="background:rgba(0,214,143,0.15); border:1px solid rgba(0,214,143,0.3); color:var(--green); border-radius:7px; padding:5px 14px; font-size:11px; font-weight:700; cursor:${d.is_escalate || d.validation_failed ? 'not-allowed' : 'pointer'}; font-family:var(--sans); opacity:${d.is_escalate || d.validation_failed ? '0.45' : '1'};">✓ Send</button>
-            <button onclick="event.stopPropagation(); moveToInbox(${d.id}, this)" style="background:rgba(59,130,246,0.15); border:1px solid rgba(59,130,246,0.3); color:#60a5fa; border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);" title="Return to Inbox Feed">↩ Inbox</button>
-            <button onclick="event.stopPropagation(); dismissDraft(${d.id}, this)" style="background:rgba(239,68,68,0.12); border:1px solid rgba(239,68,68,0.25); color:#f87171; border-radius:7px; padding:5px 10px; font-size:11px; font-weight:700; cursor:pointer; font-family:var(--sans);" title="Remove from dashboard (keeps Gmail draft)">✕</button>
+          <div class="draft-actions" onclick="event.stopPropagation()">
+            ${d.proposed_rate ? `<span class="rate-chip">$${Number(d.proposed_rate).toLocaleString()}</span>` : ''}
+            <span class="approve-slot" id="appr-${d.id}">${approveBtnHtml(d)}</span>
+            <button class="act-btn blue" onclick="moveToInbox(${d.id}, this)" title="Return to Inbox Feed">↩ Inbox</button>
+            <button class="act-btn red" onclick="dismissDraft(${d.id}, this)" title="Remove from dashboard (keeps Gmail draft)" aria-label="Dismiss draft">✕</button>
           </div>
         </div>
-        ${expanded ? `<div style="border-top:1px solid var(--border); padding:14px 16px; font-size:12px; color:var(--text-2); line-height:1.7; white-space:pre-wrap; font-family:var(--mono); background:var(--surface-3);">${esc(d.draft_text)}</div>` : ''}
+        ${expanded ? `<div class="draft-body">${esc(d.draft_text)}</div>` : ''}
       </div>`;
     }).join('');
   } catch(e) {
-    document.getElementById('draft-queue-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load drafts: ${esc(e.message)}</div>`;
+    document.getElementById('draft-queue-list').innerHTML = `<div style="color:var(--text-3);font-size:var(--fs-sm);padding:12px;">Failed to load drafts: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2396,17 +2782,87 @@ async function loadRecentlySent() {
       const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (d.talent_key || '?');
       const ts = d.reviewed_at ? fmtDateIso(d.reviewed_at) : (d.created_at ? fmtDateIso(d.created_at) : '');
       const autoBadge = d.triggered_by_job === 'auto_send'
-        ? `<span style="background:rgba(0,214,143,0.12);color:var(--green);border:1px solid rgba(0,214,143,0.25);border-radius:4px;font-size:9px;padding:1px 6px;font-weight:700;margin-left:4px;">AUTO</span>`
+        ? `<span style="background:rgba(0,214,143,0.12);color:var(--green);border:1px solid rgba(0,214,143,0.25);border-radius:4px;font-size:var(--fs-xs);padding:1px 6px;font-weight:700;margin-left:4px;">AUTO</span>`
         : '';
-      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:12px;background:var(--surface-3);">
-        <span style="background:var(--surface-2);color:var(--text-2);font-size:10px;font-weight:600;padding:1px 6px;border-radius:99px;white-space:nowrap;min-width:52px;text-align:center;">${esc(talentLabel)}</span>
-        <span style="flex:1;color:var(--text-1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(d.subject||'').replace(/"/g,'&quot;')}">${esc((d.subject||'(no subject)').slice(0,60))}</span>
-        <span style="color:var(--text-3);white-space:nowrap;font-size:11px;">${esc(ts)}${autoBadge}</span>
+      return `<div style="display:flex;align-items:center;gap:8px;padding:5px 8px;border-radius:6px;font-size:var(--fs-sm);background:var(--surface-3);">
+        <span style="background:var(--surface-2);color:var(--text-2);font-size:var(--fs-xs);font-weight:600;padding:1px 6px;border-radius:99px;white-space:nowrap;min-width:52px;text-align:center;">${esc(talentLabel)}</span>
+        <span style="flex:1;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${(d.subject||'').replace(/"/g,'&quot;')}">${esc((d.subject||'(no subject)').slice(0,60))}</span>
+        <span style="color:var(--text-3);white-space:nowrap;font-size:var(--fs-xs);">${esc(ts)}${autoBadge}</span>
       </div>`;
     }).join('');
   } catch(e) {
-    document.getElementById('recently-sent-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:8px;">Failed to load: ${esc(e.message)}</div>`;
+    document.getElementById('recently-sent-list').innerHTML = `<div style="color:var(--text-3);font-size:var(--fs-sm);padding:8px;">Failed to load: ${esc(e.message)}</div>`;
   }
+}
+
+// ── Sent tab ───────────────────────────────────────────────────────────────
+// Read-only: drafts with status 'sent' from GET /api/drafts?status=sent (same
+// endpoint as the Recently Sent panel, just a longer window + talent filter).
+state.sent = [];
+
+async function loadSent() {
+  const list = document.getElementById('sent-list');
+  try {
+    const rows = await api('GET', '/api/drafts?status=sent&limit=300');
+    state.sent = Array.isArray(rows) ? rows : [];
+    populateSentFilter();
+    renderSent();
+  } catch (e) {
+    list.innerHTML = `<div class="empty-note">Failed to load sent replies: ${esc(e.message)}</div>`;
+    document.getElementById('sent-empty').style.display = 'none';
+  }
+}
+
+function populateSentFilter() {
+  const sel = document.getElementById('sent-talent-filter');
+  const keep = sel.value;
+  const seen = new Map();
+  (state.talents || []).forEach(t => seen.set(t.key.toLowerCase(), t.full_name || t.key));
+  state.sent.forEach(d => { const k = (d.talent_key || '').toLowerCase(); if (k && !seen.has(k)) seen.set(k, d.talent_key); });
+  const opts = [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]));
+  sel.innerHTML = '<option value="">All talents</option>' +
+    opts.map(([k, label]) => `<option value="${esc(k)}">${esc(label)}</option>`).join('');
+  sel.value = opts.some(([k]) => k === keep) ? keep : '';
+}
+
+function renderSent() {
+  const list = document.getElementById('sent-list');
+  const empty = document.getElementById('sent-empty');
+  const filter = document.getElementById('sent-talent-filter').value;
+  const rows = filter ? state.sent.filter(d => (d.talent_key || '').toLowerCase() === filter) : state.sent;
+  document.getElementById('sent-sub').textContent =
+    rows.length + ' sent repl' + (rows.length === 1 ? 'y' : 'ies') + ' · newest first · read-only';
+  if (!rows.length) { list.innerHTML = ''; empty.style.display = ''; return; }
+  empty.style.display = 'none';
+  list.innerHTML = rows.map(d => {
+    const talentObj = (state.talents || []).find(t => t.key.toLowerCase() === (d.talent_key || '').toLowerCase());
+    const talentLabel = talentObj ? talentObj.full_name : (d.talent_key || '?');
+    const ts = fmtDraftTime(d.reviewed_at || d.created_at);
+    const senderName = (d.sender || '').replace(/^"?([^"<]+)"?\s*<.*>$/, '$1').trim() || d.sender || 'Unknown';
+    const meta = [d.brand_name, d.offer_type].filter(Boolean).join(' · ');
+    return `<div class="sent-card">
+      <button class="sent-row" aria-expanded="false" aria-controls="sent-body-${d.id}" onclick="toggleSent(${d.id}, this)">
+        <span class="avatar">${esc((talentLabel[0] || '?').toUpperCase())}</span>
+        <span class="sent-main">
+          <span class="sent-subject" style="display:block;">${esc(d.subject || '(no subject)')}</span>
+          <span class="sent-to" style="display:block;">${esc(talentLabel)} → ${esc(senderName)}${meta ? ' · ' + esc(meta) : ''}</span>
+        </span>
+        <span class="sent-side">
+          ${d.proposed_rate ? `<span class="rate-chip">$${Number(d.proposed_rate).toLocaleString()}</span>` : ''}
+          ${d.triggered_by_job === 'auto_send' ? '<span class="chip green">AUTO</span>' : ''}
+          <span class="sent-time">${esc(ts)}</span>
+        </span>
+      </button>
+      <div class="sent-body" id="sent-body-${d.id}" hidden>${esc(d.draft_text || '(no text stored)')}</div>
+    </div>`;
+  }).join('');
+}
+
+function toggleSent(id, btn) {
+  const body = document.getElementById(`sent-body-${id}`);
+  if (!body) return;
+  body.hidden = !body.hidden;
+  btn.setAttribute('aria-expanded', body.hidden ? 'false' : 'true');
 }
 
 // ── Orphaned / Lost Drafts ───────────────────────────────────────────────────
@@ -2417,28 +2873,28 @@ async function loadOrphaned() {
     const countEl = document.getElementById('orphaned-count');
     countEl.textContent = rows.length;
     if (!rows.length) {
-      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:12px;">No lost drafts — everything is accounted for ✓</div>`;
+      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:var(--fs-sm);">No lost drafts — everything is accounted for ✓</div>`;
       return;
     }
     list.innerHTML = rows.map(r => `
       <div style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;">
         <div style="flex:1;min-width:0;">
           <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
-            <span style="font-size:12px;font-weight:700;color:var(--text);">${esc(r.talent_key)}</span>
-            ${r.proposed_rate ? `<span style="background:rgba(0,214,143,0.12);border:1px solid rgba(0,214,143,0.25);color:var(--green);border-radius:6px;font-size:10px;font-weight:800;padding:2px 7px;">$${Number(r.proposed_rate).toLocaleString()}</span>` : ''}
-            ${r.brand_name ? `<span style="font-size:11px;color:var(--text-3);">${esc(r.brand_name)}</span>` : ''}
+            <span style="font-size:var(--fs-sm);font-weight:700;color:var(--text);">${esc(r.talent_key)}</span>
+            ${r.proposed_rate ? `<span style="background:rgba(0,214,143,0.12);border:1px solid rgba(0,214,143,0.25);color:var(--green);border-radius:6px;font-size:var(--fs-xs);font-weight:800;padding:2px 7px;">$${Number(r.proposed_rate).toLocaleString()}</span>` : ''}
+            ${r.brand_name ? `<span style="font-size:var(--fs-xs);color:var(--text-3);">${esc(r.brand_name)}</span>` : ''}
           </div>
-          <div style="font-size:12px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.subject || '(no subject)')}</div>
-          <div style="font-size:11px;color:var(--text-3);margin-top:2px;">${esc(r.triage_reason || '')}</div>
+          <div style="font-size:var(--fs-sm);color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(r.subject || '(no subject)')}</div>
+          <div style="font-size:var(--fs-xs);color:var(--text-3);margin-top:2px;">${esc(r.triage_reason || '')}</div>
         </div>
         <button id="regen-${esc(r.gmail_message_id)}" onclick="regenerateDraft('${esc(r.gmail_message_id)}', this)"
-          style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:var(--green);border-radius:7px;padding:6px 14px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);flex-shrink:0;">
+          style="background:rgba(0,214,143,0.15);border:1px solid rgba(0,214,143,0.3);color:var(--green);border-radius:7px;padding:6px 14px;font-size:var(--fs-xs);font-weight:700;cursor:pointer;font-family:var(--sans);flex-shrink:0;">
           ↺ Regenerate
         </button>
       </div>`
     ).join('');
   } catch(e) {
-    document.getElementById('orphaned-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load: ${esc(e.message)}</div>`;
+    document.getElementById('orphaned-list').innerHTML = `<div style="color:var(--text-3);font-size:var(--fs-sm);padding:12px;">Failed to load: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2513,7 +2969,7 @@ async function loadExtReview() {
     const countEl = document.getElementById('extreview-count');
     countEl.textContent = rows.length;
     if (!rows.length) {
-      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:12px;">No external channel requests to review ✓</div>`;
+      list.innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:var(--fs-sm);">No external channel requests to review ✓</div>`;
       return;
     }
     list.innerHTML = rows.map(r => {
@@ -2521,28 +2977,28 @@ async function loadExtReview() {
       const chan = r.channel_requested || 'Unknown';
       const contact = extReviewContact(r);
       const contactHtml = contact
-        ? `<span style="font-size:12px;font-weight:700;color:#a855f7;white-space:nowrap;">${contact.icon} ${esc(contact.val)}</span>`
-        : `<span style="font-size:11px;color:var(--text-3);">${esc(chan)} requested</span>`;
+        ? `<span style="font-size:var(--fs-sm);font-weight:700;color:var(--purple);white-space:nowrap;">${contact.icon} ${esc(contact.val)}</span>`
+        : `<span style="font-size:var(--fs-xs);color:var(--text-3);">${esc(chan)} requested</span>`;
       return `
       <div id="extreview-row-${id}" style="background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:10px 14px;">
         <div style="display:flex;align-items:center;gap:10px;">
           <div onclick="toggleExtReview('${id}')" style="flex:1;min-width:0;cursor:pointer;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-            <span id="extreview-caret-${id}" style="color:var(--text-3);font-size:10px;width:9px;flex-shrink:0;">▸</span>
-            <span style="font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;">${esc(r.talent_key || '')}</span>
-            <span style="background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.3);color:#a855f7;border-radius:6px;font-size:10px;font-weight:800;padding:1px 6px;white-space:nowrap;">${esc(chan)}</span>
-            <span style="font-size:12px;color:var(--text);font-weight:600;white-space:nowrap;">${esc(extReviewSenderName(r))}</span>
-            <span style="font-size:11px;color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;">${esc(r.subject || '(no subject)')}</span>
+            <span id="extreview-caret-${id}" style="color:var(--text-3);font-size:var(--fs-xs);width:9px;flex-shrink:0;">▸</span>
+            <span style="font-size:var(--fs-sm);font-weight:700;color:var(--text);white-space:nowrap;">${esc(r.talent_key || '')}</span>
+            <span style="background:rgba(168,85,247,0.14);border:1px solid rgba(168,85,247,0.3);color:var(--purple);border-radius:6px;font-size:var(--fs-xs);font-weight:800;padding:1px 6px;white-space:nowrap;">${esc(chan)}</span>
+            <span style="font-size:var(--fs-sm);color:var(--text);font-weight:600;white-space:nowrap;">${esc(extReviewSenderName(r))}</span>
+            <span style="font-size:var(--fs-xs);color:var(--text-3);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1;">${esc(r.subject || '(no subject)')}</span>
           </div>
           ${contactHtml}
           <button onclick="dismissExtReview('${id}', this)"
-            style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:#f87171;border-radius:7px;padding:4px 9px;font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);flex-shrink:0;line-height:1;"
+            style="background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.25);color:var(--red);border-radius:7px;padding:4px 9px;font-size:var(--fs-base);font-weight:700;cursor:pointer;font-family:var(--sans);flex-shrink:0;line-height:1;"
             title="Remove from dashboard">&times;</button>
         </div>
-        <div id="extreview-body-${id}" style="display:none;margin-top:10px;font-size:12px;color:var(--text-2);line-height:1.5;white-space:pre-wrap;max-height:320px;overflow-y:auto;background:var(--surface-3,#1a1a1a);border-radius:8px;padding:10px 12px;">${esc(r.body_text || '(no body)')}</div>
+        <div id="extreview-body-${id}" style="display:none;margin-top:10px;font-size:var(--fs-sm);color:var(--text-2);line-height:1.5;white-space:pre-wrap;max-height:320px;overflow-y:auto;background:var(--surface-3,#1a1a1a);border-radius:8px;padding:10px 12px;">${esc(r.body_text || '(no body)')}</div>
       </div>`;
     }).join('');
   } catch(e) {
-    document.getElementById('extreview-list').innerHTML = `<div style="color:var(--text-3);font-size:12px;padding:12px;">Failed to load: ${esc(e.message)}</div>`;
+    document.getElementById('extreview-list').innerHTML = `<div style="color:var(--text-3);font-size:var(--fs-sm);padding:12px;">Failed to load: ${esc(e.message)}</div>`;
   }
 }
 
@@ -2564,7 +3020,7 @@ async function dismissExtReview(msgId, btn) {
     const n = Math.max(0, (parseInt(countEl.textContent) || 1) - 1);
     countEl.textContent = n;
     if (n === 0) {
-      document.getElementById('extreview-list').innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:12px;">No external channel requests to review ✓</div>`;
+      document.getElementById('extreview-list').innerHTML = `<div style="text-align:center;padding:20px;color:var(--text-3);font-size:var(--fs-sm);">No external channel requests to review ✓</div>`;
     }
   } catch(e) {
     btn.disabled = false;
@@ -2572,19 +3028,64 @@ async function dismissExtReview(msgId, btn) {
   }
 }
 
+// ── One-click approve ───────────────────────────────────────────────────────
+// The row button swaps to an inline "Send now? Yes / Cancel" (no window.confirm);
+// "Yes" calls the same POST /api/drafts/{id}/approve the draft detail view uses.
+function approveBtnHtml(d) {
+  const blocked = d.is_escalate || d.validation_failed;
+  const why = d.validation_failed ? 'Failed validation — re-validate before sending'
+    : d.is_escalate ? 'Escalation — needs a human-written reply'
+    : "Approve and send this reply from the talent's Gmail";
+  return `<button class="act-btn green" ${blocked ? 'disabled' : ''} title="${esc(why)}" aria-label="Approve and send reply for ${esc(d.talent_key || 'talent')}" onclick="askApprove(${d.id})">✓ Approve</button>`;
+}
+
+function askApprove(id) {
+  const slot = document.getElementById(`appr-${id}`);
+  if (!slot) return;
+  clearTimeout(_approveTimers[id]);
+  slot.innerHTML = `<span class="confirm-inline" role="group" aria-label="Confirm send">
+      <span class="confirm-q">Send now?</span>
+      <button class="act-btn solid-green" onclick="approveDraft(${id}, this)">Yes, send</button>
+      <button class="act-btn" id="appr-cancel-${id}" onclick="cancelApprove(${id})">Cancel</button>
+    </span>`;
+  document.getElementById(`appr-cancel-${id}`)?.focus();
+  _approveTimers[id] = setTimeout(() => cancelApprove(id), 8000);
+}
+
+function cancelApprove(id) {
+  clearTimeout(_approveTimers[id]);
+  const slot = document.getElementById(`appr-${id}`);
+  if (slot && _draftsById[id]) slot.innerHTML = approveBtnHtml(_draftsById[id]);
+}
+
+// Keep the sidebar badge honest without re-fetching the whole report.
+function bumpPending(talentKey, delta) {
+  const card = (state.report?.talents || []).find(c => String(c.talent_key).toLowerCase() === String(talentKey || '').toLowerCase());
+  if (!card) return;
+  if (card.pending_real_drafts != null) card.pending_real_drafts = Math.max(0, card.pending_real_drafts + delta);
+  if (card.pending_drafts != null) card.pending_drafts = Math.max(0, card.pending_drafts + delta);
+  renderSidebar();
+}
+
 async function approveDraft(id, btn) {
-  if (!confirm('Send this draft now via Gmail?')) return;
-  const orig = btn.innerHTML;
+  clearTimeout(_approveTimers[id]);
   btn.innerHTML = '<span class="spinner"></span>';
   btn.disabled = true;
+  const cancelBtn = document.getElementById(`appr-cancel-${id}`);
+  if (cancelBtn) cancelBtn.disabled = true;
   try {
     await api('POST', `/api/drafts/${id}/approve`, {reviewed_by: 'dashboard'});
     showToast('✓ Draft sent.');
     document.getElementById(`draft-card-${id}`)?.remove();
-    renderSidebar();
+    const d = _draftsById[id];
+    if (d) bumpPending(d.talent_key, -1);
+    delete _draftsById[id];
+    const left = document.querySelectorAll('#draft-queue-list .draft-card').length;
+    document.getElementById('draft-queue-count').textContent = left;
+    if (!left) document.getElementById('draft-queue-list').innerHTML = `<div class="empty-note">No pending drafts — inbox is clear ✓</div>`;
+    loadRecentlySent().catch(() => {});
   } catch(e) {
-    btn.innerHTML = orig;
-    btn.disabled = false;
+    cancelApprove(id);
   }
 }
 
@@ -2637,8 +3138,8 @@ async function loadHealthScore() {
     componentsEl.innerHTML = Object.entries(h.components || {}).map(([k, v]) => {
       const c = v >= 0.9 ? 'var(--green)' : v >= 0.6 ? 'var(--amber)' : 'var(--red)';
       return `<div style="text-align:center;">
-        <div style="font-size:10px; color:var(--text-3); margin-bottom:2px;">${labels[k] || k}</div>
-        <div style="font-size:13px; font-weight:700; color:${c};">${(v * 100).toFixed(0)}%</div>
+        <div style="font-size:var(--fs-xs); color:var(--text-3); margin-bottom:2px;">${labels[k] || k}</div>
+        <div style="font-size:var(--fs-base); font-weight:700; color:${c};">${(v * 100).toFixed(0)}%</div>
       </div>`;
     }).join('');
 
@@ -2707,14 +3208,14 @@ async function loadAnalytics() {
       const pending = pendingByKey[t.talent_key.toLowerCase()] || 0;
       const globalDraftMode = state.report?.talents?.[0]?.draft_mode ?? true;
       const sendAllBtn = (pending > 0 && !globalDraftMode)
-        ? `<button onclick="sendAllForTalent('${esc(t.talent_key)}', this)" style="margin-top:8px; width:100%; padding:5px 0; font-size:11px; font-weight:600; background:var(--green); color:#fff; border:none; border-radius:6px; cursor:pointer;">▶ Send All (${pending})</button>`
+        ? `<button onclick="sendAllForTalent('${esc(t.talent_key)}', this)" style="margin-top:8px; width:100%; padding:5px 0; font-size:var(--fs-xs); font-weight:600; background:var(--green); color:var(--on-green); border:none; border-radius:6px; cursor:pointer;">▶ Send All (${pending})</button>`
         : '';
       return `<div style="background:var(--surface-2); border:1px solid var(--border); border-radius:8px; padding:10px 14px;">
         <div style="display:flex; justify-content:space-between; align-items:center;">
-          <span style="font-size:13px; font-weight:600;">${esc(t.full_name)}</span>
-          <span style="font-size:11px; color:var(--text-3);">${t.total_emails} emails</span>
+          <span style="font-size:var(--fs-base); font-weight:600;">${esc(t.full_name)}</span>
+          <span style="font-size:var(--fs-xs); color:var(--text-3);">${t.total_emails} emails</span>
         </div>
-        <div style="display:flex; gap:14px; margin-top:6px; font-size:12px;">
+        <div style="display:flex; gap:14px; margin-top:6px; font-size:var(--fs-sm);">
           <span style="color:var(--green);">● ${t.score3_deals} deals</span>
           <span style="color:var(--amber);">● ${t.score2_review} review</span>
           <span style="color:var(--red);">● ${t.score1_spam} spam</span>
@@ -2722,15 +3223,15 @@ async function loadAnalytics() {
         </div>
         ${sendAllBtn}
       </div>`;
-    }).join('') || '<div style="color:var(--text-3); font-size:12px; padding:12px 0;">No data yet.</div>';
+    }).join('') || '<div style="color:var(--text-3); font-size:var(--fs-sm); padding:12px 0;">No data yet.</div>';
 
     // Anomalies
     const an = document.getElementById('analytics-anomalies');
     const severityColor = { critical: 'var(--red)', warning: 'var(--amber)', info: 'var(--text-3)' };
     an.innerHTML = (anomalies.anomalies || []).map(a => `
-      <div style="background:var(--surface-2); border:1px solid var(--border); border-left:3px solid ${severityColor[a.severity] || 'var(--text-3)'}; border-radius:8px; padding:10px 12px; font-size:12px; color:var(--text-2); line-height:1.5;">
+      <div style="background:var(--surface-2); border:1px solid var(--border); border-left:3px solid ${severityColor[a.severity] || 'var(--text-3)'}; border-radius:8px; padding:10px 12px; font-size:var(--fs-sm); color:var(--text-2); line-height:1.5;">
         ${a.talent_key ? `<strong>${a.talent_key}:</strong> ` : ''}${a.message}
-      </div>`).join('') || '<div style="color:var(--text-3); font-size:12px;">No anomalies detected.</div>';
+      </div>`).join('') || '<div style="color:var(--text-3); font-size:var(--fs-sm);">No anomalies detected.</div>';
 
     // Scenarios — bar fill = share of total volume; right side shows deal% + avg rate
     const sc = document.getElementById('analytics-scenarios');
@@ -2742,14 +3243,14 @@ async function loadAnalytics() {
       const rateStr = s.avg_rate_usd >= 1 ? ` · $${Math.round(s.avg_rate_usd).toLocaleString()}` : '';
       const dealColor = dealPct >= 30 ? 'var(--green)' : dealPct >= 10 ? 'var(--amber)' : 'var(--text-3)';
       return `<div style="display:grid; grid-template-columns:130px 40px 1fr 80px; align-items:center; gap:8px; padding:5px 0; border-bottom:1px solid var(--border);">
-        <span style="font-size:12px; color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${s.offer_type}">${s.offer_type}</span>
-        <span style="font-size:11px; color:var(--text-3); text-align:right;">${s.count}</span>
+        <span style="font-size:var(--fs-sm); color:var(--text-2); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${s.offer_type}">${s.offer_type}</span>
+        <span style="font-size:var(--fs-xs); color:var(--text-3); text-align:right;">${s.count}</span>
         <div style="background:var(--surface-3); border-radius:3px; height:5px; overflow:hidden;">
           <div style="width:${barW}%; height:100%; background:var(--green); opacity:0.7; border-radius:3px;"></div>
         </div>
-        <span style="font-size:11px; color:${dealColor}; text-align:right; white-space:nowrap;">${dealPct}%${rateStr}</span>
+        <span style="font-size:var(--fs-xs); color:${dealColor}; text-align:right; white-space:nowrap;">${dealPct}%${rateStr}</span>
       </div>`;
-    }).join('') || '<div style="color:var(--text-3); font-size:12px; padding:12px 0;">No data yet.</div>';
+    }).join('') || '<div style="color:var(--text-3); font-size:var(--fs-sm); padding:12px 0;">No data yet.</div>';
 
     // Daily chart
     const daily = load.daily_volume || [];
@@ -2760,9 +3261,9 @@ async function loadAnalytics() {
         const h = Math.max(4, Math.round((d.count / maxVol) * 76));
         const label = d.date.slice(5); // MM-DD
         return `<div style="display:flex; flex-direction:column; align-items:center; gap:3px; flex:1;">
-          <span style="font-size:9px; color:var(--text-3);">${d.count}</span>
+          <span style="font-size:var(--fs-xs); color:var(--text-3);">${d.count}</span>
           <div style="width:100%; height:${h}px; background:var(--red-dim); border:1px solid var(--red-line); border-radius:3px 3px 0 0;"></div>
-          <span style="font-size:9px; color:var(--text-3);">${label}</span>
+          <span style="font-size:var(--fs-xs); color:var(--text-3);">${label}</span>
         </div>`;
       }).join('');
     }
@@ -2787,10 +3288,10 @@ async function loadMarco() {
     const sevIcon  = { critical: '🔴', warning: '🟡', info: '🟢' };
     el.innerHTML = msgs.map(m => `
       <div style="background:var(--surface-2); border:1px solid var(--border); border-left:3px solid ${sevColor[m.severity] || 'var(--border)'}; border-radius:10px; padding:14px 16px; display:flex; gap:12px; align-items:flex-start;">
-        <span style="font-size:16px; flex-shrink:0;">${sevIcon[m.severity] || '⚪'}</span>
+        <span style="font-size:var(--fs-md); flex-shrink:0;">${sevIcon[m.severity] || '⚪'}</span>
         <div style="flex:1;">
-          <div style="font-size:13px; color:var(--text); line-height:1.5;">${m.message}</div>
-          <div style="margin-top:6px; display:flex; gap:10px; font-size:11px; color:var(--text-3);">
+          <div style="font-size:var(--fs-base); color:var(--text); line-height:1.5;">${m.message}</div>
+          <div style="margin-top:6px; display:flex; gap:10px; font-size:var(--fs-xs); color:var(--text-3);">
             <span style="background:var(--surface-3); padding:2px 7px; border-radius:4px;">${m.category}</span>
             ${m.talent_key ? `<span>${m.talent_key}</span>` : ''}
             <span>${new Date(m.created_at.endsWith('Z') ? m.created_at : m.created_at + 'Z').toLocaleString('en-US', {month:'short',day:'numeric',hour:'numeric',minute:'2-digit'})}</span>
@@ -2839,15 +3340,15 @@ async function dismissMarco(id, btn) {
 
 // ── Inbox Feed ─────────────────────────────────────────────────────────────
 function feedBadge(r) {
-  if (r.is_lost) return { color: '#ef4444', label: 'LOST' };
+  if (r.is_lost) return { cls: 'red', label: 'LOST' };
   const score = r.score;
   const subject = r.subject;
-  if (score === 1) return { color: '#6b7280', label: 'SPAM' };
+  if (score === 1) return { cls: '', label: 'SPAM' };
   if (score === 2) {
     const isReply = /^re:/i.test((subject || '').trim());
-    return isReply ? { color: '#f59e0b', label: 'REVIEW' } : { color: '#ef4444', label: 'MISSED' };
+    return isReply ? { cls: 'amber', label: 'REVIEW' } : { cls: 'red', label: 'MISSED' };
   }
-  return { color: '#6b7280', label: String(score) };
+  return { cls: '', label: String(score) };
 }
 
 async function loadEmailFeed({ silent = false } = {}) {
@@ -2863,28 +3364,25 @@ async function loadEmailFeed({ silent = false } = {}) {
     }
     empty.style.display = 'none';
     list.innerHTML = rows.map(r => {
-      const { color, label } = feedBadge(r);
+      const { cls, label } = feedBadge(r);
       const reason = (r.triage_reason || '').slice(0, 100);
       const sender = (r.sender || '').replace(/<.*>/, '').trim().replace(/"/g, '').slice(0, 28);
       const subject = (r.subject || '(no subject)').slice(0, 55);
       const talentObj = (state.talents || []).find(t => t.key === r.talent_key);
       const talentLabel = talentObj ? talentObj.full_name.split(' ')[0] : (r.talent_key || '?');
-      return `<div id="feed-row-${r.gmail_message_id}" style="display:flex; align-items:center; gap:10px; padding:7px 10px; background:var(--surface-2); border:1px solid var(--border); border-radius:8px; font-size:12px; transition:background 0.15s;">
-        <span style="background:var(--surface-3); color:var(--text-2); font-size:10px; font-weight:600; padding:2px 7px; border-radius:99px; white-space:nowrap; min-width:68px; text-align:center; flex-shrink:0;">${esc(talentLabel)}</span>
-        <span style="background:${color}1a; color:${color}; border:1px solid ${color}33; font-weight:700; font-size:10px; padding:2px 8px; border-radius:99px; white-space:nowrap; min-width:66px; text-align:center; flex-shrink:0; letter-spacing:0.02em;">${label}</span>
-        <span style="color:var(--text-2); min-width:120px; max-width:120px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0;" title="${esc(r.sender || '')}">${esc(sender)}</span>
-        <span style="flex:1; color:var(--text); font-weight:500; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${esc(r.subject || '')}">${esc(subject)}</span>
-        <span style="color:var(--text-3); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:240px; font-size:11px; font-style:italic; flex-shrink:0;" title="${esc(reason)}">${esc(reason)}</span>
-        <div style="display:flex; gap:4px; align-items:center; flex-shrink:0; min-width:88px; justify-content:flex-end;">
-          <button onclick="feedActionA('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
-            style="background:rgba(0,214,143,0.12);border:1px solid rgba(0,214,143,0.3);color:#00d68f;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);"
-            title="Force-draft → Activity Hub">A</button>
-          <button onclick="feedActionB('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
-            style="background:rgba(251,191,36,0.12);border:1px solid rgba(251,191,36,0.3);color:#fbbf24;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);"
-            title="Keep in inbox for human review">B</button>
-          <button onclick="feedActionC('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
-            style="background:rgba(239,68,68,0.10);border:1px solid rgba(239,68,68,0.3);color:#f87171;border-radius:6px;padding:3px 10px;font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);"
-            title="Archive as spam">C</button>
+      return `<div id="feed-row-${r.gmail_message_id}" class="feed-row">
+        <span class="chip round c-talent">${esc(talentLabel)}</span>
+        <span class="chip round ${cls} c-status">${label}</span>
+        <span class="c-sender" title="${esc(r.sender || '')}">${esc(sender)}</span>
+        <span class="c-subject" title="${esc(r.subject || '')}">${esc(subject)}</span>
+        <span class="c-reason" title="${esc(reason)}">${esc(reason)}</span>
+        <div class="c-actions">
+          <button class="act-btn green" onclick="feedActionA('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
+            title="Force-draft → Activity Hub" aria-label="Force draft">A</button>
+          <button class="act-btn amber" onclick="feedActionB('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
+            title="Keep in inbox for human review" aria-label="Keep in inbox">B</button>
+          <button class="act-btn red" onclick="feedActionC('${esc(r.talent_key)}','${esc(r.gmail_message_id)}',this)"
+            title="Archive as spam" aria-label="Archive as spam">C</button>
         </div>
       </div>`;
     }).join('');
@@ -2903,6 +3401,9 @@ async function dismissDraft(id, btn) {
   btn.innerHTML = '…'; btn.disabled = true;
   try {
     await api('POST', `/api/drafts/${id}/dismiss`);
+    const d = _draftsById[id];
+    if (d) bumpPending(d.talent_key, -1);
+    delete _draftsById[id];
     await loadDraftQueue();
     renderSidebar();
   } catch(e) {
@@ -2918,6 +3419,9 @@ async function moveToInbox(id, btn) {
     await api('POST', `/api/drafts/${id}/move-to-inbox`, { reviewed_by: 'dashboard' });
     showToast('Email returned to Inbox Feed.');
     document.getElementById(`draft-card-${id}`)?.remove();
+    const d = _draftsById[id];
+    if (d) bumpPending(d.talent_key, -1);
+    delete _draftsById[id];
     renderSidebar();
     loadEmailFeed({ silent: true }).catch(() => {});
   } catch(e) { showToast('Move failed: ' + e.message); btn.innerHTML = orig; btn.disabled = false; }
@@ -2993,43 +3497,18 @@ async function dismissAllMarco() {
   } finally { hideOverlay(); }
 }
 
-// ── Deploy watcher ─────────────────────────────────────────────────────────
-let _knownDeploy = null;
-async function checkDeploy() {
-  try {
-    const data = await fetch('/health').then(r => r.json());
-    const t = data.deployed_at;
-    const pill = document.getElementById('deploy-pill');
-    if (!_knownDeploy) {
-      _knownDeploy = t;
-      if (pill) pill.textContent = '● v' + t.slice(0,16).replace('T',' ');
-    } else if (t !== _knownDeploy) {
-      _knownDeploy = t;
-      if (pill) pill.textContent = '● v' + t.slice(0,16).replace('T',' ');
-      showToast('New version deployed — reload for the latest.');
-    }
-  } catch (_) {}
-}
-checkDeploy();
-setInterval(checkDeploy, 120000);
+// ── Health poller (system banner + deploy watcher) ────────────────────────
+// /health is public. Polled every 60s; it also feeds the deploy pill.
+pollHealth();
+setInterval(pollHealth, 60000);
 setInterval(() => { if (state.view === 'overview') loadHealthScore().catch(() => {}); }, 120000);
 
 // ── Init ───────────────────────────────────────────────────────────────────
-// Apply initial theme before first render (default: overview → dark)
-autoTheme('overview');
+// Apply the saved theme choice before first render (default: follow the OS)
+applyTheme();
 bootstrap();
 </script>
 
-<button id="jump-bottom" onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'instant'})"
-  title="Jump to bottom"
-  style="position:fixed; bottom:24px; right:24px; width:36px; height:36px; border-radius:50%;
-         background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.1);
-         color:rgba(255,255,255,0.35); font-size:16px; line-height:1; cursor:pointer;
-         display:flex; align-items:center; justify-content:center;
-         transition:opacity 0.2s, background 0.2s; z-index:999; backdrop-filter:blur(4px);"
-  onmouseover="this.style.background='rgba(255,255,255,0.12)';this.style.color='rgba(255,255,255,0.7)'"
-  onmouseout="this.style.background='rgba(255,255,255,0.06)';this.style.color='rgba(255,255,255,0.35)'">
-  ↓
-</button>
+<button id="jump-bottom" onclick="window.scrollTo({top:document.body.scrollHeight,behavior:'instant'})" title="Jump to bottom" aria-label="Jump to bottom">↓</button>
 </body>
 </html>
