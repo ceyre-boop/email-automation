@@ -134,6 +134,11 @@ def check_pipeline_stall(db: Session) -> dict:
             .filter(ProcessedEmail.processed_at >= day_ago, ProcessedEmail.talent_key == "UNROUTED")
             .count()
         )
+        # retry_pending rows the poller will never re-claim (due > 15 min ago, or out
+        # of retries). The claim_reaper sweep should clear these every 5 minutes; a
+        # non-zero count here means it is not.
+        from backend.services.retry_sweep import OVERDUE_MINUTES, count_overdue
+        retry_pending_overdue = count_overdue(db, now)
     except Exception as exc:  # noqa: BLE001
         logger.warning("stall_alarm: metric query failed: %s", exc)
         # Dead tokens are independent of the metric queries above — report them anyway
@@ -224,6 +229,7 @@ def check_pipeline_stall(db: Session) -> dict:
         "drafts_last_hour": drafts_last_hour,
         "sends_last_hour": sends_last_hour,
         "unrouted_last_24h": unrouted_last_24h,
+        "retry_pending_overdue": retry_pending_overdue,
         "dead_tokens": dead_tokens,
         "dead_token_details": dead_token_details,
         "paused_talents": [{"talent_key": k, "minutes_paused": round(m)} for k, m in paused_talents],
@@ -243,6 +249,14 @@ def check_pipeline_stall(db: Session) -> dict:
         reason = (
             f"NOTHING DRAFTED — {score3_last_hour} Score 3 email(s) in the last hour "
             f"produced 0 drafts. Triage is working, draft creation is not."
+        )
+    elif retry_pending_overdue > 0:
+        reason = (
+            f"STRANDED RETRIES — {retry_pending_overdue} email(s) are stuck in retry_pending, "
+            f"due more than {OVERDUE_MINUTES} min ago or out of retries. The claim_reaper sweep "
+            "should re-process these every 5 minutes; it is not (AI disabled, Gmail token "
+            "dead, or the sweep is failing). Those brand emails are neither triaged nor "
+            "flagged for a human."
         )
     elif unrouted_last_24h > unrouted_warn:
         reason = (

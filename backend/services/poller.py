@@ -1206,6 +1206,11 @@ def _process_one_message(
 
     score = triage_result["score"]
     reason = triage_result["reason"]
+    if triage_result.get("retryable"):
+        # Reached the terminal path although the failure was transient: retries are
+        # exhausted (or parking failed). Keep the 'Triage fallback' prefix (the health
+        # metric keys on it) and say why this is final.
+        reason = f"{reason} (retries exhausted — human review required)"
 
     offer_type = triage_result["offer_type"]
     proposed_rate = triage_result["proposed_rate_usd"]

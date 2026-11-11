@@ -482,6 +482,7 @@ def _run_draft_queue_inner(batch_size: int = 60):
 @locked_job("claim_reaper")
 def _run_claim_reaper():
     """Resolve expired send claims against Gmail — runs every 5 minutes.
+    Also sweeps stranded ``retry_pending`` rows (see services/retry_sweep.py).
 
     Does not blindly clear claims: a worker may have died after Gmail accepted
     the send, so it asks Gmail what happened and only acts when the answer is
@@ -495,6 +496,13 @@ def _run_claim_reaper():
         reap_stale_claims(db)
     except Exception as exc:  # noqa: BLE001
         logger.error("Claim reaper job failed: %s", exc)
+    try:
+        # Rides on this job: re-process retry_pending rows the poller will never
+        # re-claim (message left the INBOX+UNREAD listing). See services/retry_sweep.py.
+        from backend.services.retry_sweep import sweep_stranded_retries
+        sweep_stranded_retries(db)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Stranded-retry sweep failed: %s", exc)
     finally:
         db.close()
 
