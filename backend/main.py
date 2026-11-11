@@ -550,21 +550,6 @@ def _startup_work():
     except Exception:
         logger.warning("Startup cross-check (token vs sop.md) failed (non-fatal).", exc_info=True)
 
-    # ── Step 6: One-time data fix ─────────────────────────────────────────────
-    # Reset drafts blocked by the now-removed markdown link check.
-    try:
-        from sqlalchemy import text as _text
-        from backend.models.db import get_engine
-        with get_engine().connect() as _conn:
-            result = _conn.execute(_text(
-                "UPDATE drafts SET validation_failed = false, validation_error = null "
-                "WHERE validation_failed = true AND status = 'pending'"
-            ))
-            _conn.commit()
-            logger.info("Startup data fix: reset %d validation_failed drafts to pending.", result.rowcount)
-    except Exception:
-        logger.warning("Startup data fix failed (non-fatal).", exc_info=True)
-
     # Auto-poll + proactive token refresh + draft queue, etc.
     # Staggered start_date offsets so the 7 jobs don't all fire on the same tick
     # at boot, and per-job `jitter` keeps them drifting apart over time —
