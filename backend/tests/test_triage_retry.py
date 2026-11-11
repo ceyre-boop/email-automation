@@ -106,6 +106,56 @@ def test_park_honours_settings_max_retries(db_session):
         assert poller._park_for_triage_retry(db_session, "m1") is False
 
 
+def test_park_write_failure_returns_false_and_rolls_back(db_session, caplog):
+    import logging
+    row = _row(db_session)
+    real_commit = db_session.commit
+    calls = {"n": 0}
+
+    def failing_commit():
+        calls["n"] += 1
+        raise RuntimeError("invalid input value for enum emailstatus: retry_pending")
+
+    db_session.commit = failing_commit
+    try:
+        with caplog.at_level(logging.ERROR, logger="backend.services.poller"):
+            assert poller._park_for_triage_retry(db_session, "m1") is False
+    finally:
+        db_session.commit = real_commit
+    db_session.refresh(row)
+    assert row.status == EmailStatus.processing
+    assert any(r.levelno == logging.ERROR for r in caplog.records)
+
+
+def test_process_falls_through_to_score2_when_park_write_fails(db_session):
+    _row(db_session, "m1", EmailStatus.retry_pending, 1, datetime.utcnow() - timedelta(minutes=1))
+    real_commit = db_session.commit
+    state = {"fail": False}
+
+    def commit():
+        if state["fail"]:
+            state["fail"] = False
+            raise RuntimeError("enum migration missing")
+        return real_commit()
+
+    orig_park = poller._park_for_triage_retry
+
+    def park(db, mid, now=None):
+        state["fail"] = True
+        return orig_park(db, mid, now)
+
+    db_session.commit = commit
+    try:
+        with patch("backend.services.poller._park_for_triage_retry", side_effect=park):
+            s = _run_process(db_session, triage_svc._fallback("Sylvia", "API error", retryable=True))
+    finally:
+        db_session.commit = real_commit
+    db_session.expire_all()
+    row = db_session.query(ProcessedEmail).filter_by(gmail_message_id="m1").one()
+    assert row.status == EmailStatus.flagged and row.score == 2
+    assert s["flagged"] == 1
+
+
 def test_default_retry_config():
     assert poller._triage_retry_config() == (25, 30)
 

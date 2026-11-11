@@ -142,24 +142,40 @@ def _park_for_triage_retry(db: Session, message_id: str, now: datetime | None = 
 
     Updates the claim row to retry_pending, increments triage_retry_count and sets
     triage_next_retry_at. Returns False (row untouched) when the row has already used
-    max_retries, so the caller finalizes it as the terminal score-2 fallback.
+    max_retries, or when writing retry_pending fails (rolled back, ERROR logged), so
+    the caller finalizes it as the terminal score-2 fallback.
     """
-    row = db.query(ProcessedEmail).filter(ProcessedEmail.gmail_message_id == message_id).first()
-    if row is None:
+    try:
+        row = db.query(ProcessedEmail).filter(ProcessedEmail.gmail_message_id == message_id).first()
+        if row is None:
+            return False
+        max_retries, cap = _triage_retry_config()
+        count = row.triage_retry_count or 0
+        if count >= max_retries:
+            return False
+        count += 1
+        row.triage_retry_count = count
+        row.triage_next_retry_at = (now or datetime.utcnow()) + timedelta(
+            minutes=_triage_backoff_minutes(count, cap)
+        )
+        row.status = EmailStatus.retry_pending
+        db.add(row)
+        db.commit()
+        return True
+    except Exception:  # noqa: BLE001
+        # Most likely the retry_pending enum value / retry columns are not migrated yet.
+        # Returning False sends the caller down the terminal score-2 path, so the row
+        # leaves 'processing' instead of failing the same way on every cycle.
+        logger.error(
+            "Could not park %s as retry_pending — finalizing as the terminal score-2 "
+            "fallback instead (is the retry_pending migration applied?)",
+            message_id, exc_info=True,
+        )
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
         return False
-    max_retries, cap = _triage_retry_config()
-    count = row.triage_retry_count or 0
-    if count >= max_retries:
-        return False
-    count += 1
-    row.triage_retry_count = count
-    row.triage_next_retry_at = (now or datetime.utcnow()) + timedelta(
-        minutes=_triage_backoff_minutes(count, cap)
-    )
-    row.status = EmailStatus.retry_pending
-    db.add(row)
-    db.commit()
-    return True
 
 
 def _reclaim_due_retry(db: Session, message_id: str, now: datetime | None = None) -> bool:
