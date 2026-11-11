@@ -1,5 +1,7 @@
 # Go-Live Setup Checklist — Talent Inbox Automation
 
+> **Historical document.** This describes the retired Make.com / Google Sheets build. Its assets (`make/` blueprints, `scripts/preflight_validator.js`, `config/rollout_controls.json`, `sheets/talent_sops/`) were removed in the reliability rebuild. The running system is the FastAPI app described in `CLAUDE.md`.
+
 Complete these steps **in order** before activating any scenario in Make.
 
 ---

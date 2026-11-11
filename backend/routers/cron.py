@@ -1,7 +1,7 @@
 """
 Cron + status routes.
 
-GET  /cron/poll-inboxes   → triggered by Railway cron every 5 minutes
+GET  /cron/poll-inboxes   → triggered by the Render cron every 5 minutes (shares the "job:poll" lock)
 GET  /health              → health check
 GET  /api/status          → talent connection status overview
 """
@@ -11,7 +11,7 @@ import logging
 import os
 from datetime import datetime, timedelta
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends
 from sqlalchemy.orm import Session
 
 from backend.core.config import get_settings
@@ -921,130 +921,3 @@ def get_status(db: Session = Depends(get_db)):
         "pending_drafts": pending_count,
         "invalid_draft_count": invalid_count,
     }
-
-
-@router.get("/api/n8n/new-escalations", dependencies=[Depends(verify_api_key)])
-def new_escalations(since_minutes: int = 5, db: Session = Depends(get_db)):
-    """
-    Returns escalations created in the last N minutes.
-    n8n polls this after each poll cycle to detect new escalations needing manager attention.
-    """
-    since = datetime.utcnow() - timedelta(minutes=since_minutes)
-    rows = (
-        db.query(Draft)
-        .filter(Draft.is_escalate == True, Draft.created_at >= since)  # noqa: E712
-        .order_by(Draft.created_at.desc())
-        .all()
-    )
-    return {
-        "count": len(rows),
-        "escalations": [
-            {
-                "id": r.id,
-                "talent_key": r.talent_key,
-                "sender": r.sender,
-                "subject": r.subject,
-                "escalate_reason": r.escalate_reason,
-                "brand_name": r.brand_name,
-                "proposed_rate": r.proposed_rate,
-                "created_at": r.created_at.isoformat(),
-            }
-            for r in rows
-        ],
-    }
-
-
-@router.post("/api/test/gpt-demo-reply", dependencies=[Depends(verify_api_key)])
-def gpt_demo_reply(db: Session = Depends(get_db)):
-    """
-    Demo: GPT drafts a reply as Katrina to a fake low-ball offer, sends to colineyre222@gmail.com.
-    Bypasses ai_enabled — this is an explicit one-off test only.
-    """
-    from openai import OpenAI
-    from backend.services import gmail as gmail_svc
-
-    token_row = db.query(TalentToken).filter(
-        TalentToken.talent_key.ilike("katrina"),
-        TalentToken.active == True,  # noqa: E712
-    ).first()
-    if not token_row:
-        raise HTTPException(status_code=503, detail="Katrina's Gmail not connected")
-
-    settings = get_settings()
-    client = OpenAI(api_key=settings.openai_api_key)
-
-    response = client.chat.completions.create(
-        model="gpt-4o",
-        messages=[
-            {
-                "role": "system",
-                "content": (
-                    "You are Katrina, a fashion content creator managed by TABOOST talent agency. "
-                    "You write short, warm, conversational emails — never stiff or corporate. "
-                    "Your minimum rate is $300 per video. When a brand low-balls you, you decline "
-                    "the rate politely but leave the door open for them to come back with a real offer. "
-                    "2-4 sentences max. Sign off as just 'Katrina'."
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    "Reply to this email from a brand:\n\n"
-                    "From: partnerships@budgetbeauty.com\n"
-                    "Subject: Collab opportunity!\n\n"
-                    "Hey Katrina! Huge fan of your content — your style is exactly what we're "
-                    "looking for. We'd love to send you our new skincare line and pay $50 per video. "
-                    "Let us know if you're in!\n\n"
-                    "— BudgetBeauty team"
-                ),
-            },
-        ],
-        max_tokens=250,
-        temperature=0.5,
-    )
-
-    draft_text = response.choices[0].message.content.strip()
-
-    success = gmail_svc.send_standalone_message(
-        token_row,
-        to="colineyre222@gmail.com",
-        subject="Re: Collab opportunity! (BudgetBeauty)",
-        body=draft_text,
-        db=db,
-    )
-    if not success:
-        raise HTTPException(status_code=500, detail="Gmail send failed — check logs")
-
-    return {"ok": True, "sent_from": "katrina@taboost.me", "draft_text": draft_text}
-
-
-@router.post("/api/test/send-test-email", dependencies=[Depends(verify_api_key)])
-def send_test_email(db: Session = Depends(get_db)):
-    """
-    Send a test email to colineyre222@gmail.com using the first active talent token.
-    Verifies that Gmail OAuth + sending is fully wired up.
-    """
-    from backend.services import gmail as gmail_svc
-
-    token_row = db.query(TalentToken).filter(TalentToken.active == True).first()  # noqa: E712
-    if not token_row:
-        raise HTTPException(status_code=503, detail="No active talent tokens — connect a Gmail account first")
-
-    success = gmail_svc.send_standalone_message(
-        token_row,
-        to="colineyre222@gmail.com",
-        subject="TABOOST System Test — Email Sending Works",
-        body=(
-            "This is a test email from the TABOOST email automation system.\n\n"
-            f"Sent from: {token_row.talent_key} inbox ({token_row.email})\n"
-            "System status: Gmail OAuth connected and sending operational\n\n"
-            "You can safely delete this email."
-        ),
-        db=db,
-    )
-    if not success:
-        raise HTTPException(status_code=500, detail="Email send failed — check server logs for Gmail API error")
-
-    return {"ok": True, "sent_from": token_row.talent_key, "sent_from_email": token_row.email, "sent_to": "colineyre222@gmail.com"}
-
-

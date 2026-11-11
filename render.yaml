@@ -1,9 +1,10 @@
 services:
   - type: web
-    name: email-automation
+    name: manager-email-automation
     env: python
     region: oregon
-    plan: free
+    plan: starter
+    autoDeploy: true
     buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
     startCommand: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
@@ -24,6 +25,10 @@ services:
       - key: AGENCY_SECRET_KEY
         sync: false
       - key: API_KEY
+        sync: false
+      - key: ALERT_WEBHOOK_URL   # optional — Slack-compatible alert webhook
+        sync: false
+      - key: HEARTBEAT_URL       # optional — healthchecks.io-style ping after each good poll
         sync: false
       - key: ALLOWED_ORIGINS
         value: "*"

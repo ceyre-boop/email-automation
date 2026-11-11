@@ -103,3 +103,14 @@ def test_cron_poll_no_tokens_returns_empty_summary(mock_poll, client):
     resp = client.get("/cron/poll-inboxes")
     assert resp.status_code == 200
     assert resp.json()["ok"] is True
+
+
+# ── Removed endpoints ────────────────────────────────────────────────────────
+
+@pytest.mark.parametrize("method,path", [
+    ("post", "/api/test/gpt-demo-reply"),
+    ("post", "/api/test/send-test-email"),
+    ("get", "/api/n8n/new-escalations"),
+])
+def test_one_off_test_and_n8n_endpoints_are_gone(client, method, path):
+    assert getattr(client, method)(path).status_code in (404, 405)

@@ -193,7 +193,7 @@ This log must be retained per the retention policy in Section 2.1. It provides a
 
 If there is a compliance incident (PII leak, bad reply sent to a high-profile brand, unauthorized system access), follow this process:
 
-1. **Contain:** Pause all Make scenarios immediately (see `config/rollout_controls.json → kill_switches → pause_all_inboxes`).
+1. **Contain:** Stop the automation immediately: `POST /api/admin/guardian/disable-ai` (stored in the DB, survives restarts).
 2. **Assess:** Determine what data was exposed or what action was taken incorrectly.
 3. **Notify:** If personal data was exposed, notify affected parties per applicable law. If a brand received a bad reply, contact them directly (see `docs/failure_playbooks.md → Playbook 4`).
 4. **Fix:** Address the root cause before reactivating the system.

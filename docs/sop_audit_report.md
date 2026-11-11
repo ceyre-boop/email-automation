@@ -1,4 +1,7 @@
 # SOP Audit Report — Talent Inbox Automation
+
+> **Historical document.** This describes the retired Make.com / Google Sheets build. Its assets (`make/` blueprints, `scripts/preflight_validator.js`, `config/rollout_controls.json`, `sheets/talent_sops/`) were removed in the reliability rebuild. The running system is the FastAPI app described in `CLAUDE.md`.
+
 <!-- Generated from sheets/sop_data.json + config/settings.json -->
 <!-- Run this audit with Britney BEFORE Phase 2 full rollout -->
 <!-- Last reviewed: pre-deployment (update date when completed) -->
