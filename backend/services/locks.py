@@ -25,10 +25,17 @@ dies the connection drops and Postgres releases the lock on its own.
 
 Failure policy
 --------------
-If the lock database cannot be reached, jobs still run, guarded by an in-process
-lock, with an ERROR log. Failing closed would turn a pooler hiccup into a silent
-total outage of polling and drafting, which is the failure mode this change exists
-to prevent. On SQLite (tests, local dev) only the in-process lock is used.
+If the lock database cannot be reached, most jobs still run, guarded by an
+in-process lock, with an ERROR log: failing closed would turn a pooler hiccup into
+a silent total outage of polling. The exceptions are jobs where a double run causes
+a duplicate customer-visible side effect (``auto_send`` sends email, ``draft_queue``
+creates Gmail drafts): those use ``fail_closed=True`` and SKIP the run, with an
+ERROR log, when the lock connection cannot be acquired. On SQLite (tests, local
+dev) only the in-process lock is used.
+
+Pool budget: every held lock pins one session-mode connection for the whole job.
+Only the ``job:<name>`` locks exist; do not add nested per-inbox locks, they
+exhaust the session pooler's small pool.
 """
 from __future__ import annotations
 
@@ -126,8 +133,11 @@ def _local_lock(name: str) -> Iterator[bool]:
 
 
 @contextmanager
-def advisory_lock(name: str) -> Iterator[bool]:
+def advisory_lock(name: str, fail_closed: bool = False) -> Iterator[bool]:
     """Try to take the cluster-wide lock ``name``. Yields True if held, else False.
+
+    With ``fail_closed`` a lock-DB connection failure yields False (ERROR log)
+    instead of falling back to an in-process lock.
 
     Never blocks. The lock is released when the ``with`` block exits (and, if the
     process dies, when Postgres notices the connection is gone).
@@ -144,15 +154,22 @@ def advisory_lock(name: str) -> Iterator[bool]:
         conn = _get_lock_engine().connect().execution_options(isolation_level="AUTOCOMMIT")
         got = bool(conn.execute(text("SELECT pg_try_advisory_lock(:k)"), {"k": key}).scalar())
     except Exception as exc:  # noqa: BLE001
-        logger.error(
-            "Advisory lock %r unavailable (%s) — falling back to an in-process lock; "
-            "cross-process exclusion is NOT in effect for this run.", name, exc,
-        )
         if conn is not None:
             try:
                 conn.close()
             except Exception:  # noqa: BLE001
                 pass
+        if fail_closed:
+            logger.error(
+                "Advisory lock %r unavailable (%s) — failing CLOSED: this run is skipped "
+                "because a duplicate run could double-send/double-draft.", name, exc,
+            )
+            yield False
+            return
+        logger.error(
+            "Advisory lock %r unavailable (%s) — falling back to an in-process lock; "
+            "cross-process exclusion is NOT in effect for this run.", name, exc,
+        )
         with _local_lock(name) as local_got:
             yield local_got
         return
@@ -177,19 +194,20 @@ def advisory_lock(name: str) -> Iterator[bool]:
                 pass
 
 
-def locked_job(name: str) -> Callable:
+def locked_job(name: str, fail_closed: bool = False) -> Callable:
     """Decorator: run the job only if the advisory lock ``job:<name>`` is free.
 
     A skipped run returns None and logs at INFO. Apply to every scheduled job and
     to the manual endpoints' entry points so a scheduler tick, the Render cron and
-    an admin click can never overlap.
+    an admin click can never overlap. ``fail_closed=True`` skips the run (ERROR log)
+    when the lock database is unreachable instead of using the in-process fallback.
     """
     lock_name = f"job:{name}"
 
     def decorator(fn: Callable) -> Callable:
         @functools.wraps(fn)
         def wrapper(*args, **kwargs):
-            with advisory_lock(lock_name) as got:
+            with advisory_lock(lock_name, fail_closed=fail_closed) as got:
                 if not got:
                     logger.info("Job %s skipped — lock %s is held by another run", name, lock_name)
                     return None

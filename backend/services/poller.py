@@ -42,7 +42,6 @@ from backend.services.inbox_routing import (
     shared_inbox_email,
 )
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
-from backend.services.locks import advisory_lock
 from backend.services.runtime_state import is_ai_enabled
 from backend.services.oauth import TokenRefreshError, record_token_failure
 from backend.services.sop_parser import TalentProfile, get_active_profiles
@@ -60,15 +59,18 @@ BODY_FETCH_BATCH = 50       # max body-fetch pending rows per cycle
 MAX_CONCURRENT_EMAILS = int(os.getenv("MAX_CONCURRENT_EMAILS", "3"))
 MAX_TALENT_WORKERS = int(os.getenv("MAX_TALENT_WORKERS", "4"))
 
-# Per-talent and shared-inbox poll locks are Postgres advisory locks (services/locks.py)
-# — a slow poll must not overlap the next cycle in ANY process. This replaced a
-# module-level dict[str, bool]: a check-then-set that two threads (or two instances)
-# could both pass, and that a crashed worker could leave set forever.
-SHARED_INBOX_POLL_LOCK = "poll:shared-inbox"
+# Cross-process exclusion for a poll cycle is the single ``job:poll`` advisory lock
+# (cron._run_poll, services/locks.py). Nested per-inbox advisory locks were removed:
+# each pins a session-mode pooler connection for the whole poll and exhausted the pool.
+# Within this process, a plain non-blocking threading lock per talent keeps one
+# talent's inbox from being worked by two threads at once.
+_talent_thread_locks: dict[str, threading.Lock] = {}
+_talent_thread_locks_guard = threading.Lock()
 
 
-def _talent_poll_lock_name(talent_key: str) -> str:
-    return f"poll:talent:{talent_key.lower()}"
+def _talent_thread_lock(talent_key: str) -> threading.Lock:
+    with _talent_thread_locks_guard:
+        return _talent_thread_locks.setdefault(talent_key.lower(), threading.Lock())
 
 # Module-level session factory — created once and reused by all worker threads.
 # Avoids the cost of building a fresh SQLAlchemy engine on every _process_message_in_thread call.
@@ -318,15 +320,8 @@ def poll_all_inboxes(db: Session) -> dict:
             f"Single inbox not connected ({shared_inbox_email(settings)})", 0,
         )
     else:
-        with advisory_lock(SHARED_INBOX_POLL_LOCK) as got_shared:
-            if not got_shared:
-                logger.info(
-                    "Single-inbox poll still running elsewhere (lock %s held) — skipping this cycle",
-                    SHARED_INBOX_POLL_LOCK,
-                )
-            else:
-                logger.info("Single-inbox poll starting — inbox=%s", shared_token.email)
-                _poll_single_inbox(shared_token, alias_map, talent_map, draft_mode, db, summary)
+        logger.info("Single-inbox poll starting — inbox=%s", shared_token.email)
+        _poll_single_inbox(shared_token, alias_map, talent_map, draft_mode, db, summary)
 
     # ── Phase 2: per-token talents (Partnerships) ─────────────────────────────
     _poll_individual_tokens(db, settings, talent_map, draft_mode, summary)
@@ -676,14 +671,17 @@ def _process_shared_inbox_message(
 def _poll_one_talent(token_row_id: int, profile: TalentProfile, draft_mode: bool) -> dict:
     """Process one talent's inbox in its own DB session. Returns per-talent summary.
 
-    Guarded by a per-talent advisory lock: if another poll (this process or any
-    other) is still working this inbox, skip the cycle.
+    Guarded by an in-process per-talent lock (cross-process exclusion is the
+    ``job:poll`` advisory lock): if this inbox is still being worked, skip.
     """
-    with advisory_lock(_talent_poll_lock_name(profile.key)) as got:
-        if not got:
-            logger.info("Poll still running for %s — skipping cycle", profile.key)
-            return {}
+    lock = _talent_thread_lock(profile.key)
+    if not lock.acquire(blocking=False):
+        logger.info("Poll still running for %s — skipping cycle", profile.key)
+        return {}
+    try:
         return _poll_one_talent_locked(token_row_id, profile, draft_mode)
+    finally:
+        lock.release()
 
 
 def _poll_one_talent_locked(token_row_id: int, profile: TalentProfile, draft_mode: bool) -> dict:

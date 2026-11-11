@@ -208,12 +208,26 @@ def _schema_block() -> dict:
         return {"schema_ok": None, "schema": {"error": str(exc)[:200]}}
 
 
+def _ai_block() -> dict:
+    """AI kill-switch for /health so the dashboard banner can show "AI is off".
+
+    Never raises: /health must keep answering when the DB or app_state cannot.
+    ai_enabled is None when the state could not be read.
+    """
+    try:
+        return {"ai_enabled": bool(is_ai_enabled())}
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("Could not read ai_enabled for /health: %s", exc)
+        return {"ai_enabled": None}
+
+
 @router.get("/health")
 def health():
     sop_hash, talent_count, warnings, parse_ts = _sop_stats()
     return {
         "status": "ok",
         **_schema_block(),
+        **_ai_block(),
         "deployed_at": _DEPLOY_TIME,
         "sop_hash": sop_hash,
         "talent_count": talent_count,
@@ -278,7 +292,7 @@ def _run_poll():
         db.close()
 
 
-@locked_job("draft_queue")
+@locked_job("draft_queue", fail_closed=True)
 def _run_draft_queue(batch_size: int = 60):
     """
     The one drafting job — finds Score-3 emails with no draft and processes them.
@@ -760,7 +774,7 @@ def _run_poll_health_retention(retain_days: int = 7) -> None:
         db.close()
 
 
-@locked_job("auto_send")
+@locked_job("auto_send", fail_closed=True)
 def _run_auto_send():
     """Auto-send qualifying pending drafts after the configured hold period."""
     from backend.models.db import get_session_factory

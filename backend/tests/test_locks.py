@@ -178,29 +178,67 @@ def test_scheduler_registers_one_drafting_job_and_no_backlog_blaster(db_engine, 
     assert len(ids) == len(set(ids))
 
 
-def test_shared_inbox_poll_is_skipped_when_lock_is_held():
+def test_poll_all_inboxes_takes_no_nested_advisory_locks():
+    """job:poll serializes the cycle; nested per-inbox locks exhausted the pooler."""
     from backend.services import poller
 
     shared = MagicMock(email="talent-mgmt@taboost.me")
     with patch.object(poller, "get_shared_inbox_token", return_value=shared), \
          patch.object(poller, "_poll_single_inbox") as single, \
-         patch.object(poller, "_poll_individual_tokens") as individual:
-        with advisory_lock(poller.SHARED_INBOX_POLL_LOCK):
-            poller.poll_all_inboxes(MagicMock())
-        single.assert_not_called()
-        individual.assert_called_once()  # the per-token phase has its own per-talent locks
-
+         patch.object(poller, "_poll_individual_tokens") as individual, \
+         patch.object(locks, "advisory_lock") as adv:
         poller.poll_all_inboxes(MagicMock())
-        single.assert_called_once()
+    single.assert_called_once()
+    individual.assert_called_once()
+    adv.assert_not_called()
+    assert not hasattr(poller, "advisory_lock")
 
 
-def test_per_talent_poll_skipped_when_lock_held():
+def test_per_talent_poll_skipped_when_in_process_lock_held():
     from backend.services import poller
 
     profile = MagicMock(key="Sylvia")
     with patch.object(poller, "_poll_one_talent_locked") as inner:
-        with advisory_lock(poller._talent_poll_lock_name("Sylvia")):
+        lock = poller._talent_thread_lock("sylvia")
+        assert lock.acquire(blocking=False)
+        try:
             assert poller._poll_one_talent(1, profile, True) == {}
-        inner.assert_not_called()
+            inner.assert_not_called()
+        finally:
+            lock.release()
         poller._poll_one_talent(1, profile, True)
         inner.assert_called_once()
+        assert lock.acquire(blocking=False), "lock must be released after the poll"
+        lock.release()
+
+
+def test_fail_closed_skips_when_lock_db_unreachable(monkeypatch, caplog):
+    _pg(monkeypatch, raises=RuntimeError("pooler down"))
+    with caplog.at_level(logging.ERROR, logger="backend.services.locks"):
+        with advisory_lock("job:auto_send", fail_closed=True) as got:
+            assert got is False
+    assert any(r.levelno == logging.ERROR and "CLOSED" in r.getMessage() for r in caplog.records)
+
+
+def test_fail_closed_jobs_do_not_run_when_lock_db_unreachable(monkeypatch):
+    from backend.routers import cron
+
+    _pg(monkeypatch, raises=RuntimeError("pooler down"))
+    for fn in (cron._run_auto_send, cron._run_draft_queue):
+        with patch("backend.services.auto_send.run_auto_send") as send, \
+             patch.object(cron, "_run_draft_queue_inner") as inner:
+            assert fn() is None
+            send.assert_not_called()
+            inner.assert_not_called()
+
+
+def test_other_jobs_keep_in_process_fallback(monkeypatch):
+    _pg(monkeypatch, raises=RuntimeError("pooler down"))
+    calls = []
+
+    @locked_job("tolerant")
+    def job():
+        calls.append(1)
+
+    job()
+    assert calls == [1]
