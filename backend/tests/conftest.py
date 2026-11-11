@@ -35,6 +35,21 @@ _FIXTURE_SOPmd = pathlib.Path(__file__).parent / "fixtures" / "test_talents_sop.
 
 
 @pytest.fixture(autouse=True)
+def _reset_runtime_state():
+    """Runtime switches (ai_enabled, talent pause) are cached in-process; never leak
+    one test's DB overrides into the next."""
+    from backend.services import runtime_state
+
+    def _clear():
+        runtime_state.invalidate_cache()
+        runtime_state._last_good.update(ai=None, paused={})
+
+    _clear()
+    yield
+    _clear()
+
+
+@pytest.fixture(autouse=True)
 def _patch_sop_md_path(tmp_path):
     """Redirect _SOP_MD_PATH to a merged file (real sop.md + test fixtures).
 

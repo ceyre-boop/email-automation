@@ -458,8 +458,9 @@ def draft_reply(
     # internal to reply generation.
     proposed_rate = proposed_rate if proposed_rate is not None else 0.0
     settings = get_settings()
-    if not settings.app_config.get("ai_enabled", True):
-        raise RuntimeError("AI is disabled (ai_enabled=false in settings.json) — reply drafting skipped")
+    from backend.services.runtime_state import is_ai_enabled
+    if not is_ai_enabled():
+        raise RuntimeError("AI is disabled (ai_enabled=false) — reply drafting skipped")
     cfg = settings.app_config.get("openai", {})
 
     # ── SOP status gate — never draft for a talent without an approved SOP ──────

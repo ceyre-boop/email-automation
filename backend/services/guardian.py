@@ -12,19 +12,14 @@ import hmac
 import json
 import logging
 import os
-import re
 import time
 from datetime import datetime, timedelta
-from pathlib import Path
 from typing import Any
 
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)
-
-_CONFIG_PATH = Path(__file__).resolve().parents[2] / "config" / "settings.json"
-_SOP_PATH = Path(__file__).resolve().parents[2] / "sheets" / "sop.md"
 
 # AppState keys used by guardian
 _KEY_DISABLED_AT = "guardian_ai_disabled_at"
@@ -298,7 +293,7 @@ class GuardianWatchdog:
         health = compute_health_score(db)
         threshold = cfg.get("recovery_health_threshold", 0.7)
         if health["score"] >= threshold:
-            self._set_ai_enabled(True)
+            self._set_ai_enabled(True, db=db)
             _log_audit(db, "re_enable_ai",
                        reason=f"Auto-recovery: health={health['score']:.2f} after {minutes_elapsed:.0f}min pause",
                        detail=json.dumps({"health_score": health["score"], "minutes_paused": round(minutes_elapsed)}))
@@ -315,7 +310,7 @@ class GuardianWatchdog:
         detail = trigger.get("detail", {})
 
         if t == "global_kill":
-            self._set_ai_enabled(False)
+            self._set_ai_enabled(False, db=db)
             _set_state(db, _KEY_DISABLED_AT, datetime.utcnow().isoformat())
             _log_audit(db, "disable_ai", reason=reason, talent_key=None,
                        detail=json.dumps(detail))
@@ -323,7 +318,7 @@ class GuardianWatchdog:
             self._send_guardian_alert(db, f"ALERT: Global AI kill triggered — {reason}", None, detail, cfg)
 
         elif t == "talent_pause":
-            # Idempotency: if talent is already paused in sop.md, skip entirely.
+            # Idempotency: if talent is already paused (DB override or sop.md), skip entirely.
             # Without this, the guardian fires _log_marco every 60s indefinitely
             # because the velocity window still shows the breach after pause.
             try:
@@ -339,8 +334,7 @@ class GuardianWatchdog:
             except Exception as exc:
                 logger.warning("Guardian: could not check pause state for %s: %s", talent_key, exc)
 
-            # Per-talent pause cooldown — defense-in-depth for the race window
-            # between settings.json write and the next guardian cycle read.
+            # Per-talent pause cooldown — defense-in-depth against 60s re-fire loops.
             pause_key = f"guardian_pause_sent_at_{talent_key or 'global'}"
             last_pause_str = _get_state(db, pause_key)
             if last_pause_str:
@@ -352,7 +346,7 @@ class GuardianWatchdog:
                 except ValueError:
                     pass
             # Set cooldown key BEFORE the pause action — if _pause_talent fails
-            # (settings write error), the cooldown still prevents 60s re-fire loops.
+            # (DB write error), the cooldown still prevents 60s re-fire loops.
             _set_state(db, pause_key, datetime.utcnow().isoformat())
 
             self._pause_talent(talent_key, reason, db=db)
@@ -379,67 +373,63 @@ class GuardianWatchdog:
 
     # ── Remediation ───────────────────────────────────────────────────────────
 
-    def _set_ai_enabled(self, enabled: bool) -> None:
-        try:
-            data = json.loads(_CONFIG_PATH.read_text())
-            data["ai_enabled"] = enabled
-            _CONFIG_PATH.write_text(json.dumps(data, indent=2))
-            # Clear the LRU cache so the new ai_enabled value takes effect immediately.
-            from backend.core.config import get_settings
-            get_settings.cache_clear()
-            logger.warning("Guardian: ai_enabled set to %s", enabled)
-        except Exception as exc:
-            logger.error("Guardian: failed to set ai_enabled=%s: %s", enabled, exc)
+    def _set_ai_enabled(self, enabled: bool, db: "Session | None" = None) -> bool:
+        """Flip the global AI switch in the DB (app_state). Returns True if persisted.
 
-    def _pause_talent(self, talent_key: str, reason: str, db: "Session | None" = None) -> None:
+        This used to rewrite config/settings.json on disk, which the next deploy
+        wiped — a guardian kill silently reverted on restart. Never touches files.
+        """
+        from backend.services.runtime_state import set_ai_enabled
+        _db = db
+        opened = False
         try:
-            from backend.core.config import get_settings
-            sop_text = _SOP_PATH.read_text()
-            # Replace "Paused: no" in the talent's section (Key: <key> ... Paused: no)
-            pattern = re.compile(
-                r"(Key:\s+" + re.escape(talent_key) + r".*?Paused:\s*)no",
-                re.IGNORECASE | re.DOTALL,
-            )
-            new_text, count = pattern.subn(r"\1yes", sop_text, count=1)
-            if count == 0:
-                logger.error(
-                    "Guardian: could not find 'Paused: no' for talent '%s' in sop.md", talent_key
-                )
-                return
-            _SOP_PATH.write_text(new_text)
-            get_settings.cache_clear()
-            logger.warning("Guardian: paused talent %s in sop.md — reason: %s", talent_key, reason)
-            # Persist to sop_versions DB so the pause survives a Render restart
-            # (on_startup restores from the active DB version, so sop.md-only writes
-            # are wiped every redeploy without this DB save).
-            try:
-                from backend.models.db import SopVersion, get_session_factory
-                from backend.services.sop_parser import parse_sop_md
-                _db = db or get_session_factory()()
-                _close = db is None  # only close if we opened it
-                try:
-                    _db.query(SopVersion).filter(SopVersion.is_active == True).update(  # noqa: E712
-                        {"is_active": False}
-                    )
-                    profiles = parse_sop_md(new_text)
-                    ver = SopVersion(
-                        version_label=f"guardian: paused {talent_key}",
-                        raw_content=new_text,
-                        talent_count=len(profiles),
-                        is_active=True,
-                    )
-                    _db.add(ver)
-                    _db.commit()
-                finally:
-                    if _close:
-                        _db.close()
-            except Exception as db_exc:
-                logger.warning(
-                    "Guardian: sop.md pause saved to disk but DB version save failed — "
-                    "change may be lost on restart: %s", db_exc
-                )
+            if _db is None:
+                from backend.models.db import get_session_factory
+                _db = get_session_factory()()
+                opened = True
+            set_ai_enabled(_db, enabled)
+            return True
         except Exception as exc:
-            logger.error("Guardian: failed to pause talent %s: %s", talent_key, exc)
+            logger.error("Guardian: FAILED to persist ai_enabled=%s: %s", enabled, exc)
+            return False
+        finally:
+            if opened and _db is not None:
+                _db.close()
+
+    def _pause_talent(self, talent_key: str, reason: str, db: "Session | None" = None) -> bool:
+        """Pause a talent via the DB (app_state). Returns True if persisted."""
+        return self._set_talent_paused(talent_key, True, reason, db)
+
+    def _unpause_talent(self, talent_key: str, reason: str, db: "Session | None" = None) -> bool:
+        """Clear a pause via the DB (app_state). Returns True if persisted."""
+        return self._set_talent_paused(talent_key, False, reason, db)
+
+    def _set_talent_paused(
+        self, talent_key: str, paused: bool, reason: str, db: "Session | None" = None
+    ) -> bool:
+        from backend.services.runtime_state import set_talent_paused
+        _db = db
+        opened = False
+        try:
+            if _db is None:
+                from backend.models.db import get_session_factory
+                _db = get_session_factory()()
+                opened = True
+            set_talent_paused(_db, talent_key, paused)
+            logger.warning(
+                "Guardian: %s talent %s — reason: %s",
+                "paused" if paused else "unpaused", talent_key, reason,
+            )
+            return True
+        except Exception as exc:
+            logger.error(
+                "Guardian: FAILED to persist %s for talent %s: %s",
+                "pause" if paused else "unpause", talent_key, exc,
+            )
+            return False
+        finally:
+            if opened and _db is not None:
+                _db.close()
 
     def _send_guardian_alert(
         self, db: Session, subject: str, talent_key: str | None, detail: dict[str, Any], cfg: dict

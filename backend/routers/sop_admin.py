@@ -241,6 +241,18 @@ class TalentUpdateRequest(BaseModel):
     manager: str | None = None
 
 
+def _sync_pause_override(talent_key: str, paused: bool) -> None:
+    from backend.models.db import get_session_factory
+    from backend.services.runtime_state import set_talent_paused
+    db = get_session_factory()()
+    try:
+        set_talent_paused(db, talent_key, paused)
+    except Exception:  # noqa: BLE001
+        logger.error("Could not record pause override for %s in app_state", talent_key, exc_info=True)
+    finally:
+        db.close()
+
+
 @router.put("/api/talents/{talent_key}", dependencies=[Depends(verify_api_key)])
 def update_talent(talent_key: str, body: TalentUpdateRequest):
     profile = _resolve_profile(talent_key)
@@ -284,6 +296,11 @@ def update_talent(talent_key: str, body: TalentUpdateRequest):
     version_id = _persist_active_sop_version(
         sop_text, f"Live edit — {profile.key} — {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}"
     )
+    if body.paused is not None:
+        # The sop.md "Paused:" field is only the default; a runtime override in the DB
+        # wins. Record the admin's explicit choice there too, or an earlier guardian
+        # pause would shadow this edit.
+        _sync_pause_override(profile.key, body.paused)
     return {"status": "ok", "key": profile.key, "version_id": version_id}
 
 

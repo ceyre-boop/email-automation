@@ -18,6 +18,7 @@ from backend.core.config import get_settings
 from backend.models.db import Draft, DraftStatus, TalentToken
 from backend.routers.deps import get_db, verify_api_key
 from backend.services.locks import locked_job
+from backend.services.runtime_state import is_ai_enabled
 from backend.services.oauth import proactive_refresh_all_tokens
 from backend.services.poller import poll_all_inboxes
 
@@ -268,7 +269,7 @@ def _run_draft_queue_inner(batch_size: int = 60):
     drafted_count = 0
     try:
         settings = _gs()
-        if not settings.app_config.get("ai_enabled", True):
+        if not is_ai_enabled():
             return
         draft_mode: bool = settings.app_config.get("reply", {}).get("draft_mode", True)
 

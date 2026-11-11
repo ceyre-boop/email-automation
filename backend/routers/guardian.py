@@ -3,7 +3,6 @@ Guardian admin endpoints — manual overrides, status, audit log, and HMAC kill 
 """
 from __future__ import annotations
 
-import json
 import logging
 from datetime import datetime, timedelta
 
@@ -34,25 +33,33 @@ class ReasonBody(BaseModel):
 
 @router.post("/api/admin/guardian/disable-ai")
 def disable_ai(body: ReasonBody, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
-    from backend.core.config import get_settings
-    if not get_settings().app_config.get("ai_enabled", True):
+    from backend.services.runtime_state import is_ai_enabled
+    if not is_ai_enabled():
         return {"ok": True, "message": "ai_enabled was already false"}
-    watcher = GuardianWatchdog()
-    watcher._set_ai_enabled(False)
-    from backend.models.db import AppState
+    if not GuardianWatchdog()._set_ai_enabled(False, db=db):
+        raise HTTPException(status_code=500, detail="Could not persist ai_enabled=false — see logs")
     _log_audit(db, "disable_ai", reason=body.reason, triggered_by="manual")
     return {"ok": True, "message": "ai_enabled set to false"}
 
 
 @router.post("/api/admin/guardian/enable-ai")
 def enable_ai(body: ReasonBody, db: Session = Depends(get_db), _: str = Depends(verify_api_key)):
-    watcher = GuardianWatchdog()
-    watcher._set_ai_enabled(True)
+    if not GuardianWatchdog()._set_ai_enabled(True, db=db):
+        raise HTTPException(status_code=500, detail="Could not persist ai_enabled=true — see logs")
     # Clear the guardian disabled-at marker so recovery loop doesn't re-disable
     from backend.services.guardian import _set_state, _KEY_DISABLED_AT
     _set_state(db, _KEY_DISABLED_AT, "")
     _log_audit(db, "re_enable_ai", reason=body.reason, triggered_by="manual")
     return {"ok": True, "message": "ai_enabled set to true"}
+
+
+def _resolve_talent_key(talent_key: str) -> str:
+    """Canonical key from sop.md (case-insensitive) or 404."""
+    from backend.core.config import get_settings
+    for key in get_settings().talent_profiles:
+        if key.lower() == talent_key.strip().lower():
+            return key
+    raise HTTPException(status_code=404, detail=f"Unknown talent: {talent_key}")
 
 
 @router.post("/api/admin/guardian/pause-talent/{talent_key}")
@@ -62,10 +69,11 @@ def pause_talent(
     db: Session = Depends(get_db),
     _: str = Depends(verify_api_key),
 ):
-    watcher = GuardianWatchdog()
-    watcher._pause_talent(talent_key, body.reason)
-    _log_audit(db, "pause_talent", reason=body.reason, talent_key=talent_key, triggered_by="manual")
-    return {"ok": True, "message": f"{talent_key} paused"}
+    key = _resolve_talent_key(talent_key)
+    if not GuardianWatchdog()._pause_talent(key, body.reason, db=db):
+        raise HTTPException(status_code=500, detail=f"Could not persist pause for {key} — see logs")
+    _log_audit(db, "pause_talent", reason=body.reason, talent_key=key, triggered_by="manual")
+    return {"ok": True, "message": f"{key} paused"}
 
 
 @router.post("/api/admin/guardian/unpause-talent/{talent_key}")
@@ -75,19 +83,14 @@ def unpause_talent(
     db: Session = Depends(get_db),
     _: str = Depends(verify_api_key),
 ):
-    try:
-        from backend.services.guardian import _CONFIG_PATH
-        data = json.loads(_CONFIG_PATH.read_text())
-        for t in data.get("talents", []):
-            if t.get("key", "").lower() == talent_key.lower():
-                t["paused"] = False
-                t.pop("_guardian_paused_reason", None)
-                t.pop("_guardian_paused_at", None)
-        _CONFIG_PATH.write_text(json.dumps(data, indent=2))
-    except Exception as exc:
-        raise HTTPException(status_code=500, detail=str(exc))
-    _log_audit(db, "unpause_talent", reason=body.reason, talent_key=talent_key, triggered_by="manual")
-    return {"ok": True, "message": f"{talent_key} unpaused"}
+    """Clear a pause. Stored as an explicit paused=false override in app_state, so it
+    also beats a ``Paused: yes`` left in sop.md. (This route used to edit a
+    ``talents[]`` array in settings.json that no longer exists — it did nothing.)"""
+    key = _resolve_talent_key(talent_key)
+    if not GuardianWatchdog()._unpause_talent(key, body.reason, db=db):
+        raise HTTPException(status_code=500, detail=f"Could not persist unpause for {key} — see logs")
+    _log_audit(db, "unpause_talent", reason=body.reason, talent_key=key, triggered_by="manual")
+    return {"ok": True, "message": f"{key} unpaused"}
 
 
 # ── Status & audit ────────────────────────────────────────────────────────────
@@ -97,7 +100,8 @@ def guardian_status(db: Session = Depends(get_db), _: str = Depends(verify_api_k
     from backend.core.config import get_settings
     settings = get_settings()
     cfg = settings.app_config.get("guardian", {})
-    ai_enabled = settings.app_config.get("ai_enabled", True)
+    from backend.services.runtime_state import is_ai_enabled
+    ai_enabled = is_ai_enabled()
     now = datetime.utcnow()
     window_minutes = cfg.get("velocity_window_minutes", 10)
     since_window = now - timedelta(minutes=window_minutes)
@@ -185,7 +189,12 @@ def kill_switch(token: str = Query(...), db: Session = Depends(get_db)):
             status_code=403,
         )
     watcher = GuardianWatchdog()
-    watcher._set_ai_enabled(False)
+    if not watcher._set_ai_enabled(False, db=db):
+        return HTMLResponse(
+            "<h1>Kill FAILED</h1><p>The switch could not be saved to the database, so AI is "
+            "still ENABLED. Use <code>POST /api/admin/guardian/disable-ai</code> or check the logs.</p>",
+            status_code=500,
+        )
     from backend.services.guardian import _set_state, _KEY_DISABLED_AT
     _set_state(db, _KEY_DISABLED_AT, datetime.utcnow().isoformat())
     _log_audit(db, "disable_ai", reason="One-click kill link from alert email", triggered_by="kill_link")

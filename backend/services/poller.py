@@ -43,6 +43,7 @@ from backend.services.inbox_routing import (
 )
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
 from backend.services.locks import advisory_lock
+from backend.services.runtime_state import is_ai_enabled
 from backend.services.oauth import TokenRefreshError
 from backend.services.sop_parser import TalentProfile, get_active_profiles
 
@@ -439,7 +440,7 @@ def _poll_single_inbox(
         summary["errors"] += 1
         return summary
 
-    if not get_settings().app_config.get("ai_enabled", True):
+    if not is_ai_enabled():
         logger.info("AI disabled — shared inbox synced but triage skipped (ai_enabled=false)")
         token_row.last_poll_at = datetime.utcnow()
         db.add(token_row)
@@ -772,7 +773,7 @@ def _poll_one_talent_locked(token_row_id: int, profile: TalentProfile, draft_mod
 
         emails_found = len(messages)
 
-        if not get_settings().app_config.get("ai_enabled", True):
+        if not is_ai_enabled():
             logger.info("AI disabled — inbox synced for %s but triage skipped (ai_enabled=false)", talent_key)
         else:
             # Batch dedup: one IN query instead of N individual queries

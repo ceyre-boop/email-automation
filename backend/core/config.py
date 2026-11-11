@@ -73,10 +73,17 @@ class Settings(BaseSettings):
 
     @property
     def talent_profiles(self) -> "dict[str, object]":
-        """Return parsed talent profiles from sheets/sop.md — single source of truth."""
+        """Return parsed talent profiles from sheets/sop.md — single source of truth.
+
+        ``paused`` is the EFFECTIVE value: the sop.md ``Paused:`` field is only the
+        default, and a runtime pause/unpause stored in the DB (app_state, see
+        services/runtime_state.py) overrides it. Every reader of ``.paused`` goes
+        through here, so they all see the DB value.
+        """
         from backend.services.sop_parser import parse_sop_md
         from backend.services.reply import _load_sop_md
-        return parse_sop_md(_load_sop_md())
+        from backend.services.runtime_state import apply_pause_overrides
+        return apply_pause_overrides(parse_sop_md(_load_sop_md()))
 
     @property
     def talent_list(self) -> "list[dict]":
