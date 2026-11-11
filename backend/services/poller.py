@@ -44,7 +44,7 @@ from backend.services.inbox_routing import (
 from backend.services.inbox_sync import fetch_pending_bodies, sync_inbox_for_talent
 from backend.services.locks import advisory_lock
 from backend.services.runtime_state import is_ai_enabled
-from backend.services.oauth import TokenRefreshError
+from backend.services.oauth import TokenRefreshError, record_token_failure
 from backend.services.sop_parser import TalentProfile, get_active_profiles
 
 logger = logging.getLogger(__name__)
@@ -423,20 +423,14 @@ def _poll_single_inbox(
     try:
         messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
     except TokenRefreshError as exc:
-        logger.error("Token refresh rejected for shared inbox — marking inactive: %s", exc)
-        token_row.active = False
-        token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
-        token_row.last_error = str(exc)
-        db.add(token_row)
-        db.commit()
+        # Deactivates only on the 3rd consecutive rejection (services/oauth.py).
+        logger.error("Token refresh rejected for shared inbox: %s", exc)
+        record_token_failure(db, token_row, exc, auth_rejected=True)
         summary["errors"] += 1
         return summary
     except Exception as exc:  # noqa: BLE001
         logger.error("Gmail list failed for shared inbox: %s", exc)
-        token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
-        token_row.last_error = str(exc)
-        db.add(token_row)
-        db.commit()
+        record_token_failure(db, token_row, exc, auth_rejected=False)
         summary["errors"] += 1
         return summary
 
@@ -752,21 +746,15 @@ def _poll_one_talent_locked(token_row_id: int, profile: TalentProfile, draft_mod
         try:
             messages = gmail_svc.list_unread_inbox_messages(token_row, db=db)
         except TokenRefreshError as exc:
-            logger.error("Token refresh rejected for %s — marking inactive: %s", talent_key, exc)
-            token_row.active = False
-            token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
-            token_row.last_error = str(exc)
-            db.add(token_row)
-            db.commit()
+            # Deactivates only on the 3rd consecutive rejection (services/oauth.py).
+            logger.error("Token refresh rejected for %s: %s", talent_key, exc)
+            record_token_failure(db, token_row, exc, auth_rejected=True)
             summary["errors"] += 1
             _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
             return summary
         except Exception as exc:  # noqa: BLE001
             logger.error("Gmail list failed for %s: %s", talent_key, exc)
-            token_row.consecutive_failures = (token_row.consecutive_failures or 0) + 1
-            token_row.last_error = str(exc)
-            db.add(token_row)
-            db.commit()
+            record_token_failure(db, token_row, exc, auth_rejected=False)
             summary["errors"] += 1
             _record_poll_health(db, talent_key, 0, 0, str(exc), int((time.monotonic() - poll_start) * 1000))
             return summary

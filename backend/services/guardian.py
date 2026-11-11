@@ -467,6 +467,18 @@ class GuardianWatchdog:
                 f"with header: x-api-key: <your-api-key>\n"
             )
 
+            delivered = []
+
+            # 1. Webhook — independent of any talent's Gmail token. The kill link is
+            #    deliberately NOT included (it is a bearer credential; keep it in email).
+            from backend.services.alerts import post_alert_webhook
+            if post_alert_webhook(
+                f"GUARDIAN: {subject}",
+                f"Talent: {talent_key or 'ALL (global)'}\nDashboard: {dashboard_url}",
+            ):
+                delivered.append("webhook")
+
+            # 2. Email, through the configured (or first active) talent token.
             from backend.models.db import TalentToken
             sender_key = cfg.get("sender_talent_key", "")
             if sender_key:
@@ -478,13 +490,21 @@ class GuardianWatchdog:
             else:
                 token_row = db.query(TalentToken).filter(TalentToken.active == True).first()  # noqa: E712
             if token_row:
-                from backend.services.gmail import send_standalone_message
-                send_standalone_message(token_row, to=alert_email, subject=subject, body=body, db=db)
-                _set_state(db, _KEY_ALERT_SENT_AT, datetime.utcnow().isoformat())
-                _log_audit(db, "send_alert", reason=subject, talent_key=talent_key,
-                           detail=json.dumps({"to": alert_email}))
+                try:
+                    from backend.services.gmail import send_standalone_message
+                    send_standalone_message(token_row, to=alert_email, subject=subject, body=body, db=db)
+                    delivered.append(f"email:{alert_email}")
+                except Exception as exc:
+                    logger.error("Guardian: alert email failed: %s", exc)
             else:
                 logger.warning("Guardian: no active token to send alert email")
+
+            if delivered:
+                _set_state(db, _KEY_ALERT_SENT_AT, datetime.utcnow().isoformat())
+                _log_audit(db, "send_alert", reason=subject, talent_key=talent_key,
+                           detail=json.dumps({"to": alert_email, "channels": delivered}))
+            else:
+                logger.error("Guardian: alert '%s' NOT delivered on any channel", subject)
         except Exception as exc:
             logger.error("Guardian: alert send failed: %s", exc)
 

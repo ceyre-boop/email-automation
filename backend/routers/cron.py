@@ -227,17 +227,53 @@ def health():
     }
 
 
+# talent_key used for poll-cycle level PollHealth rows (as opposed to per-talent rows).
+POLL_CYCLE_KEY = "poll-cycle"
+
+
 @locked_job("poll")
 def _run_poll():
-    """Run the poll in a background thread with its own DB session."""
-    from backend.models.db import get_session_factory
+    """Run one poll cycle with its own DB session.
+
+    This is the single entry point for polling: the APScheduler job, the Render cron
+    (GET /cron/poll-inboxes) and any admin trigger all land here, serialised by the
+    "job:poll" advisory lock.
+
+    A failure is never swallowed: it is logged at ERROR with the traceback and recorded
+    as a PollHealth row (talent_key "poll-cycle"), which feeds the health score, the
+    dashboard error counts and Marco. The HEARTBEAT_URL ping is sent only when the cycle
+    finishes without raising, so a crashing poller stops pinging and the external
+    dead-man's switch fires.
+    """
+    import time
+    import traceback
+    from backend.models.db import PollHealth, get_session_factory
+    from backend.services.alerts import ping_heartbeat
+
     SessionLocal = get_session_factory()
     db = SessionLocal()
+    started = time.monotonic()
     try:
         summary = poll_all_inboxes(db)
-        logger.info("Background poll complete: %s", summary)
     except Exception as exc:  # noqa: BLE001
-        logger.error("Background poll failed: %s", exc)
+        logger.error("Poll cycle FAILED: %s", exc, exc_info=True)
+        try:
+            db.rollback()
+            db.add(PollHealth(
+                talent_key=POLL_CYCLE_KEY,
+                emails_found=0,
+                emails_processed=0,
+                error_message=f"{type(exc).__name__}: {exc}\n{traceback.format_exc()}"[:4000],
+                duration_ms=int((time.monotonic() - started) * 1000),
+            ))
+            db.commit()
+        except Exception:  # noqa: BLE001
+            logger.error("Could not record the poll-cycle failure in poll_health", exc_info=True)
+        return None
+    else:
+        logger.info("Background poll complete: %s", summary)
+        ping_heartbeat()
+        return summary
     finally:
         db.close()
 

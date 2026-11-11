@@ -48,6 +48,43 @@ def _cfg() -> dict:
     return get_settings().app_config.get("stall_alarm", {}) or {}
 
 
+def _dead_tokens(db: Session) -> tuple[list[str], list[dict]]:
+    """Gmail tokens that were switched off after failing — never raises.
+
+    A dead token is inactive AND carries evidence of failure: deactivated_at (set by
+    oauth.record_token_failure), consecutive_failures > 0, or a recorded last_error.
+    The 13 shared-inbox talents are also active=False, but deliberately so — never
+    polled individually, zero failures, no error — and must not trip this.
+
+    Returns (keys, details); details carry the reason and when it died.
+    """
+    try:
+        rows = (
+            db.query(TalentToken)
+            .filter(
+                TalentToken.active.is_(False),
+                (TalentToken.deactivated_at.isnot(None))
+                | (TalentToken.consecutive_failures > 0)
+                | (TalentToken.last_error.isnot(None)),
+            )
+            .all()
+        )
+    except Exception as exc:  # noqa: BLE001
+        logger.warning("stall_alarm: dead-token query failed: %s", exc)
+        return [], []
+    details = [
+        {
+            "talent_key": t.talent_key,
+            "email": t.email,
+            "reason": t.last_error,
+            "deactivated_at": t.deactivated_at.isoformat() if t.deactivated_at else None,
+            "consecutive_failures": t.consecutive_failures or 0,
+        }
+        for t in rows
+    ]
+    return [t.talent_key for t in rows], details
+
+
 def check_pipeline_stall(db: Session) -> dict:
     """Return the pipeline liveness picture. Never raises."""
     now = datetime.utcnow()
@@ -99,21 +136,13 @@ def check_pipeline_stall(db: Session) -> dict:
         )
     except Exception as exc:  # noqa: BLE001
         logger.warning("stall_alarm: metric query failed: %s", exc)
-        return {"stalled": False, "reason": None, "error": str(exc)[:200]}
+        # Dead tokens are independent of the metric queries above — report them anyway
+        # so /health never silently loses them just because one count query failed.
+        dead_keys, dead_details = _dead_tokens(db)
+        return {"stalled": False, "reason": None, "error": str(exc)[:200],
+                "dead_tokens": dead_keys, "dead_token_details": dead_details}
 
-    # Dead-token detection: a REFRESH FAILURE deactivation (oauth.py) leaves
-    # consecutive_failures > 0 or a recorded last_error. The 13 shared-inbox
-    # talents are also active=False, but deliberately so — never polled
-    # individually, zero failures, no error — and must not trip this.
-    dead_tokens = [
-        t.talent_key for t in
-        db.query(TalentToken)
-        .filter(
-            TalentToken.active.is_(False),
-            (TalentToken.consecutive_failures > 0) | (TalentToken.last_error.isnot(None)),
-        )
-        .all()
-    ]
+    dead_tokens, dead_token_details = _dead_tokens(db)
 
     # Guardian-paused talents: mail isn't even ingested while paused (poller.py
     # skips the Gmail account outright), so nothing about a stuck pause shows up
@@ -196,6 +225,7 @@ def check_pipeline_stall(db: Session) -> dict:
         "sends_last_hour": sends_last_hour,
         "unrouted_last_24h": unrouted_last_24h,
         "dead_tokens": dead_tokens,
+        "dead_token_details": dead_token_details,
         "paused_talents": [{"talent_key": k, "minutes_paused": round(m)} for k, m in paused_talents],
         "stale_escalations": stale_escalations,
         "score2_backlog_total": score2_total,
@@ -274,7 +304,13 @@ def run_stall_alarm(db: Session) -> dict:
 
 
 def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
-    """Email the alarm, at most once per cooldown. Never raises."""
+    """Alert on the stall, at most once per cooldown. Never raises.
+
+    Channels: ALERT_WEBHOOK_URL (independent of any Gmail token) and email. The
+    cooldown only starts once at least one channel delivered, so a total delivery
+    failure is retried on the next 5-minute run instead of being suppressed for an hour.
+    """
+    from backend.services.alerts import post_alert_webhook
     from backend.services.guardian import _get_state, _set_state
 
     try:
@@ -284,7 +320,7 @@ def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
             try:
                 last_sent = datetime.fromisoformat(last_sent_str)
                 if (datetime.utcnow() - last_sent).total_seconds() < cooldown * 60:
-                    logger.info("stall_alarm: email suppressed (cooldown active)")
+                    logger.info("stall_alarm: alert suppressed (cooldown active)")
                     return
             except ValueError:
                 pass
@@ -311,17 +347,34 @@ def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
             f"Health:    {base_url}/health\n"
         )
 
+        delivered = []
+
+        # 1. Webhook — works even when every Gmail token is dead.
+        if post_alert_webhook(
+            "ALERT: email automation pipeline stalled",
+            f"{result['reason']}\nHealth: {base_url}/health",
+        ):
+            delivered.append("webhook")
+
+        # 2. Email, through the first active talent token.
         token_row = db.query(TalentToken).filter(TalentToken.active.is_(True)).first()
         if not token_row:
             logger.warning("stall_alarm: no active token to send alert email")
-            return
+        else:
+            try:
+                from backend.services.gmail import send_standalone_message
+                send_standalone_message(
+                    token_row, to=alert_email,
+                    subject="ALERT: email automation pipeline stalled", body=body, db=db,
+                )
+                delivered.append(f"email:{alert_email}")
+            except Exception as exc:  # noqa: BLE001
+                logger.error("stall_alarm: alert email failed: %s", exc)
 
-        from backend.services.gmail import send_standalone_message
-        send_standalone_message(
-            token_row, to=alert_email,
-            subject="ALERT: email automation pipeline stalled", body=body, db=db,
-        )
-        _set_state(db, _KEY_ALARM_SENT_AT, datetime.utcnow().isoformat())
-        logger.info("stall_alarm: alert emailed to %s", alert_email)
+        if delivered:
+            _set_state(db, _KEY_ALARM_SENT_AT, datetime.utcnow().isoformat())
+            logger.info("stall_alarm: alert sent via %s", ", ".join(delivered))
+        else:
+            logger.error("stall_alarm: alert NOT delivered on any channel (no webhook, no active token)")
     except Exception as exc:  # noqa: BLE001
         logger.error("stall_alarm: alert send failed: %s", exc)

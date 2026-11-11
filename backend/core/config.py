@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     # Polling
     poll_interval_minutes: int = 5
 
+    # Optional out-of-band alerting (see services/alerts.py). Both default to off.
+    #   ALERT_WEBHOOK_URL — Slack-compatible webhook for guardian / stall-alarm alerts
+    #   HEARTBEAT_URL     — healthchecks.io-style URL pinged after each successful poll
+    alert_webhook_url: str = ""
+    heartbeat_url: str = ""
+
     # Render deploy hook (POST to this URL to trigger a redeploy)
     # Set RENDER_DEPLOY_HOOK_URL in Render → Environment Variables
     render_deploy_hook_url: str = ""

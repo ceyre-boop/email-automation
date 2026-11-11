@@ -988,6 +988,11 @@ def token_health(db: Session = Depends(get_db)):
             "active": r.active,
             "consecutive_failures": r.consecutive_failures or 0,
             "last_error": r.last_error,
+            "deactivated_at": r.deactivated_at.isoformat() if r.deactivated_at else None,
+            # Dead = switched off after failing (not a deliberately-inactive shared-inbox talent).
+            "dead": (not r.active) and bool(
+                r.deactivated_at or (r.consecutive_failures or 0) > 0 or r.last_error
+            ),
             "last_poll_at": r.last_poll_at.isoformat() if r.last_poll_at else None,
             "token_expiry": r.token_expiry.isoformat() if r.token_expiry else None,
         }

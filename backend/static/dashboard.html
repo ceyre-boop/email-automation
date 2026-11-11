@@ -824,6 +824,12 @@ body {
 <!-- Main -->
 <main id="main">
 
+<!-- DEAD TOKEN banner — shown when a Gmail token was deactivated after repeated failures -->
+<div id="dead-token-banner" style="display:none; background:rgba(239,68,68,0.15); border-bottom:1px solid rgba(239,68,68,0.4); padding:10px 24px; align-items:flex-start; gap:12px; font-size:13px; color:#ef4444; position:sticky; top:0; z-index:51;">
+  <span style="font-size:16px;">🔌</span>
+  <span id="dead-token-banner-msg"></span>
+</div>
+
 <!-- INVALID draft banner — shown when validation_failed drafts exist -->
 <div id="invalid-banner" style="display:none; background:rgba(239,68,68,0.12); border-bottom:1px solid rgba(239,68,68,0.3); padding:10px 24px; display:none; align-items:center; gap:12px; font-size:13px; color:#ef4444; position:sticky; top:0; z-index:50;">
   <span style="font-size:16px;">⚠️</span>
@@ -1309,6 +1315,28 @@ async function refreshData() {
   }
 }
 
+// Dead Gmail tokens are switched off (no polling, triage or drafting for that inbox)
+// until someone reconnects them — say so loudly, with the reason and when it died.
+function updateDeadTokenBanner(dead) {
+  const banner = document.getElementById('dead-token-banner');
+  const msg = document.getElementById('dead-token-banner-msg');
+  if (!banner || !msg) return;
+  if (!dead || dead.length === 0) {
+    banner.style.display = 'none';
+    return;
+  }
+  msg.innerHTML = '<strong>' + dead.length + ' Gmail inbox' + (dead.length > 1 ? 'es are' : ' is') +
+    ' DOWN</strong> — not being polled or drafted. Reconnect: ' +
+    dead.map(r => {
+      const when = r.deactivated_at ? ' (since ' + esc(r.deactivated_at.slice(0, 16).replace('T', ' ')) + ' UTC)' : '';
+      const why = r.last_error ? ' — ' + esc(String(r.last_error).slice(0, 120)) : '';
+      return '<a href="/auth/connect?talent_key=' + encodeURIComponent(r.talent_key) +
+        '" target="_blank" rel="noopener" style="color:#ef4444;text-decoration:underline;">' +
+        esc(r.talent_key) + '</a>' + when + why;
+    }).join('; ');
+  banner.style.display = 'flex';
+}
+
 async function loadTokenHealth() {
   try {
     const data = await api('GET', '/api/dashboard/health/tokens');
@@ -1316,6 +1344,7 @@ async function loadTokenHealth() {
     for (const row of data) {
       state.tokenHealth[row.talent_key.toLowerCase()] = row;
     }
+    updateDeadTokenBanner(data.filter(r => r.dead));
     renderSidebar();
   } catch (_) {}
 }
