@@ -1,9 +1,9 @@
 services:
   - type: web
-    name: manager-email-automation
+    name: email-automation
     env: python
     region: oregon
-    plan: starter
+    plan: free
     autoDeploy: true
     buildCommand: pip install --upgrade pip && pip install -r backend/requirements.txt
     startCommand: python -m uvicorn backend.main:app --host 0.0.0.0 --port $PORT
