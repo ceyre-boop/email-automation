@@ -11,12 +11,13 @@ no longer exists, so it did nothing at all.
 Now the switches live in the existing ``app_state`` table:
 
   runtime_ai_enabled              "true" | "false"
-  runtime_talent_paused:<key>     "true" | "false"   (key lower-cased)
+  runtime_talent_paused:<key>     "true"             (key lower-cased)
 
 A row, when present, WINS. When there is no row the file value is the default:
 ``ai_enabled`` from config/settings.json, ``Paused:`` from the talent's sop.md block.
-An explicit "false" therefore un-pauses a talent whose sop.md still says
-``Paused: yes``. Nothing here ever writes to a file.
+Pausing writes "true". Unpausing DELETES the row, so sop.md governs again (a talent
+whose sop.md says ``Paused: yes`` stays paused; an operator who wants it live edits
+sop.md). Nothing here ever writes to a file.
 
 Reads are cached for a few seconds (they sit on hot paths: every triage call, every
 ``Settings.talent_profiles`` access) and invalidated immediately on a local write.
@@ -145,10 +146,17 @@ def talent_pause_overrides() -> dict[str, bool]:
 
 
 def set_talent_paused(db, talent_key: str, paused: bool) -> None:
-    """Persist a pause/unpause. Raises on DB failure."""
+    """Persist a pause, or clear it. Raises on DB failure.
+
+    Pause writes "true". Unpause DELETES the row so sop.md governs again.
+    """
     key = talent_key.strip().lower()
-    _set_state(db, KEY_TALENT_PAUSED_PREFIX + key, "true" if paused else "false")
-    _last_good["paused"][key] = paused
+    if paused:
+        _set_state(db, KEY_TALENT_PAUSED_PREFIX + key, "true")
+        _last_good["paused"][key] = True
+    else:
+        _delete_state(db, KEY_TALENT_PAUSED_PREFIX + key)
+        _last_good["paused"].pop(key, None)
     invalidate_cache()
     logger.warning("runtime_state: talent %s %s (stored in app_state)", key, "PAUSED" if paused else "UNPAUSED")
 
@@ -163,6 +171,16 @@ def apply_pause_overrides(profiles: dict) -> dict:
         override = overrides.get(str(key).lower())
         out[key] = profile if override is None or override == profile.paused else replace(profile, paused=override)
     return out
+
+
+def _delete_state(db, key: str) -> None:
+    from backend.models.db import AppState
+    try:
+        db.query(AppState).filter(AppState.key == key).delete(synchronize_session=False)
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise
 
 
 def _set_state(db, key: str, value: str) -> None:

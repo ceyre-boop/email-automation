@@ -108,12 +108,28 @@ def test_pause_override_flows_into_every_profile_reader(rt):
     assert row["paused"] is True
 
 
-def test_explicit_unpause_beats_paused_yes_in_sop_md(rt):
+def test_unpause_deletes_the_row_so_sop_md_governs_again(rt):
     key = _a_talent_key()
+    sop_value = get_settings().talent_profiles[key].paused
+    runtime_state.set_talent_paused(rt, key, True)
+    row_key = runtime_state.KEY_TALENT_PAUSED_PREFIX + key.lower()
+    assert rt.get(AppState, row_key).value_text == "true"
+    assert get_settings().talent_profiles[key].paused is True
+    runtime_state.set_talent_paused(rt, key, False)
+    rt.expire_all()
+    assert rt.get(AppState, row_key) is None, "unpause must delete the row, not write 'false'"
+    assert get_settings().talent_profiles[key].paused is sop_value
+
+
+def test_unpause_does_not_override_paused_yes_in_sop_md(rt, monkeypatch):
+    from dataclasses import replace
+    key = _a_talent_key()
+    base = get_settings().talent_profiles[key]
     runtime_state.set_talent_paused(rt, key, True)
     runtime_state.set_talent_paused(rt, key, False)
-    assert get_settings().talent_profiles[key].paused is False
-    assert key in get_active_profiles(get_settings().talent_profiles)
+    # With no override row, apply_pause_overrides leaves the sop.md value untouched.
+    assert runtime_state.apply_pause_overrides({key: replace(base, paused=True)})[key].paused is True
+    assert runtime_state.apply_pause_overrides({key: replace(base, paused=False)})[key].paused is False
 
 
 def test_pause_and_unpause_routes_round_trip_via_db(client, rt):
