@@ -471,12 +471,11 @@ class GuardianWatchdog:
 
             # 1. Webhook — independent of any talent's Gmail token. The kill link is
             #    deliberately NOT included (it is a bearer credential; keep it in email).
-            from backend.services.alerts import post_alert_webhook
-            if post_alert_webhook(
+            from backend.services.alerts import send_out_of_band_alert
+            delivered.extend(send_out_of_band_alert(
                 f"GUARDIAN: {subject}",
                 f"Talent: {talent_key or 'ALL (global)'}\nDashboard: {dashboard_url}",
-            ):
-                delivered.append("webhook")
+            ))
 
             # 2. Email, through the configured (or first active) talent token.
             from backend.models.db import TalentToken

@@ -28,6 +28,10 @@ services:
         sync: false
       - key: ALERT_WEBHOOK_URL   # optional — Slack-compatible alert webhook
         sync: false
+      - key: TELEGRAM_BOT_TOKEN  # optional — Telegram bot alerts (needs TELEGRAM_CHAT_ID too)
+        sync: false
+      - key: TELEGRAM_CHAT_ID    # optional — Telegram chat to alert
+        sync: false
       - key: HEARTBEAT_URL       # optional — healthchecks.io-style ping after each good poll
         sync: false
       - key: ALLOWED_ORIGINS

@@ -29,6 +29,23 @@ class ReasonBody(BaseModel):
     reason: str = "Manual action"
 
 
+# ── Alert channel test ────────────────────────────────────────────────────────
+
+@router.post("/api/admin/alerts/test")
+def test_alerts(_: str = Depends(verify_api_key)):
+    """Send a test message to every configured out-of-band channel (webhook, Telegram)."""
+    from backend.services import alerts
+    results = {
+        "webhook": alerts.post_alert_webhook("Test alert", "Alert channel test from the admin endpoint."),
+        "telegram": alerts.post_alert_telegram("Test alert", "Alert channel test from the admin endpoint."),
+    }
+    return {
+        "results": results,
+        "succeeded": [k for k, v in results.items() if v],
+        "failed_or_unconfigured": [k for k, v in results.items() if not v],
+    }
+
+
 # ── Manual kill switches ──────────────────────────────────────────────────────
 
 @router.post("/api/admin/guardian/disable-ai")

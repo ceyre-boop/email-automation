@@ -308,6 +308,7 @@ def run_stall_alarm(db: Session) -> dict:
 
     result = check_pipeline_stall(db)
     if not result.get("stalled"):
+        _maybe_send_recovery(db)
         return result
 
     logger.error("STALL ALARM: %s | metrics=%s", result["reason"], json.dumps(
@@ -317,14 +318,33 @@ def run_stall_alarm(db: Session) -> dict:
     return result
 
 
+def _maybe_send_recovery(db: Session) -> None:
+    """If a stall alert was sent and the pipeline is healthy again, say so once. Never raises.
+
+    The transition marker is the stall-alarm "last sent" state: set when a stall alert
+    delivered, blanked here so recovery fires once per incident.
+    """
+    try:
+        from backend.services.alerts import send_out_of_band_alert
+        from backend.services.guardian import _get_state, _set_state
+
+        if not _get_state(db, _KEY_ALARM_SENT_AT):
+            return
+        _set_state(db, _KEY_ALARM_SENT_AT, "")
+        channels = send_out_of_band_alert("✅ Pipeline recovered", "The stall alarm has cleared.")
+        logger.info("stall_alarm: recovery notice sent via %s", ", ".join(channels) or "no channel")
+    except Exception as exc:  # noqa: BLE001
+        logger.error("stall_alarm: recovery notice failed: %s", exc)
+
+
 def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
     """Alert on the stall, at most once per cooldown. Never raises.
 
-    Channels: ALERT_WEBHOOK_URL (independent of any Gmail token) and email. The
+    Channels: ALERT_WEBHOOK_URL and Telegram (independent of any Gmail token) and email. The
     cooldown only starts once at least one channel delivered, so a total delivery
     failure is retried on the next 5-minute run instead of being suppressed for an hour.
     """
-    from backend.services.alerts import post_alert_webhook
+    from backend.services.alerts import send_out_of_band_alert
     from backend.services.guardian import _get_state, _set_state
 
     try:
@@ -364,11 +384,10 @@ def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
         delivered = []
 
         # 1. Webhook — works even when every Gmail token is dead.
-        if post_alert_webhook(
+        delivered.extend(send_out_of_band_alert(
             "ALERT: email automation pipeline stalled",
             f"{result['reason']}\nHealth: {base_url}/health",
-        ):
-            delivered.append("webhook")
+        ))
 
         # 2. Email, through the first active talent token.
         token_row = db.query(TalentToken).filter(TalentToken.active.is_(True)).first()
@@ -389,6 +408,6 @@ def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
             _set_state(db, _KEY_ALARM_SENT_AT, datetime.utcnow().isoformat())
             logger.info("stall_alarm: alert sent via %s", ", ".join(delivered))
         else:
-            logger.error("stall_alarm: alert NOT delivered on any channel (no webhook, no active token)")
+            logger.error("stall_alarm: alert NOT delivered on any channel (no webhook/telegram, no active token)")
     except Exception as exc:  # noqa: BLE001
         logger.error("stall_alarm: alert send failed: %s", exc)

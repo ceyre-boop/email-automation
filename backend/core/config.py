@@ -49,6 +49,9 @@ class Settings(BaseSettings):
     #   HEARTBEAT_URL     — healthchecks.io-style URL pinged after each successful poll
     alert_webhook_url: str = ""
     heartbeat_url: str = ""
+    # Telegram bot alerts — both must be set (TELEGRAM_BOT_TOKEN, TELEGRAM_CHAT_ID)
+    telegram_bot_token: str = ""
+    telegram_chat_id: str = ""
 
     # Render deploy hook (POST to this URL to trigger a redeploy)
     # Set RENDER_DEPLOY_HOOK_URL in Render → Environment Variables

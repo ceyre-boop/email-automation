@@ -137,8 +137,8 @@ def record_token_failure(db, row, exc: Exception, *, auth_rejected: bool = True)
     db.commit()
     if deactivated:
         try:
-            from backend.services.alerts import post_alert_webhook
-            post_alert_webhook(
+            from backend.services.alerts import send_out_of_band_alert
+            send_out_of_band_alert(
                 f"Gmail token deactivated: {row.talent_key}",
                 f"{row.email} failed {row.consecutive_failures} times in a row. "
                 f"Polling, triage and drafting are OFF for this inbox until it is reconnected.\n"
