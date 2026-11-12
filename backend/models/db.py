@@ -661,9 +661,34 @@ REQUIRED_INDEXES: list[tuple[str, str]] = [
     ("idx_processed_emails_processed_at",
      "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_processed_emails_processed_at "
      "ON processed_emails (processed_at)"),
-    ("idx_inbox_emails_unread_msg",
-     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_inbox_emails_unread_msg "
-     "ON inbox_emails (gmail_message_id) WHERE is_unread"),
+    # (No partial unread index on inbox_emails: load-tested 2026-11-12 at 5x scale it
+    # pushed the stall-alarm anti-join off a parallel hash join, 127 ms -> 643 ms.)
+    # Every-minute guardian / retry-sweep / stall-alarm scans of in-flight rows.
+    # processed_emails is never pruned, so a range on processed_at alone can't
+    # narrow "older than 10 min"; the in-flight slice is tiny, so index just it.
+    ("idx_processed_emails_inflight",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_processed_emails_inflight "
+     "ON processed_emails (processed_at) WHERE status IN ('processing', 'retry_pending')"),
+    # stall_alarm score-2 backlog counts (score=2 AND status='flagged').
+    ("idx_processed_emails_score_status",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_processed_emails_score_status "
+     "ON processed_emails (score, status)"),
+    # Hourly poll_health retention DELETE (polled_at < cutoff) had no index.
+    ("idx_poll_health_polled_at",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_poll_health_polled_at ON poll_health (polled_at)"),
+    # These existed only in _MIGRATION_STMTS, which production skips
+    # (SKIP_MIGRATIONS=true), so whether they are live was unknown. Same names,
+    # so this is a no-op where they already exist. auto_send's per-talent ILIKE
+    # eligibility query depends on them (the 2026-09-03 three-hour stall).
+    ("idx_drafts_pending_eligible",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_drafts_pending_eligible ON drafts (created_at) "
+     "WHERE status = 'pending' AND dismissed = false AND human_edited = false"),
+    ("idx_drafts_talent_key_trgm",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_drafts_talent_key_trgm "
+     "ON drafts USING gin (talent_key gin_trgm_ops)"),
+    ("idx_processed_emails_talent_key_trgm",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_processed_emails_talent_key_trgm "
+     "ON processed_emails USING gin (talent_key gin_trgm_ops)"),
 ]
 
 
@@ -695,6 +720,10 @@ def apply_required_indexes() -> dict:
     )
     try:
         with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            try:  # the trigram indexes need it; already present on Supabase normally
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("pg_trgm extension unavailable (trigram indexes will fail): %s", exc)
             for name, ddl in REQUIRED_INDEXES:
                 try:
                     row = conn.execute(text(
@@ -722,6 +751,16 @@ def apply_required_indexes() -> dict:
                 except Exception as exc:  # noqa: BLE001
                     report["failed"].append((name, str(exc)[:300]))
                     logger.error("Index %s FAILED: %s", name, exc)
+        # Fresh planner stats right after a build: load-tested 2026-11-12, stale stats
+        # made the planner pick the new indexes badly (some queries 5-10x slower)
+        # until autovacuum got round to analyzing.
+        if report["built"]:
+            with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+                for tbl in ("processed_emails", "drafts", "poll_health"):
+                    try:
+                        conn.execute(text(f"ANALYZE {tbl}"))
+                    except Exception as exc:  # noqa: BLE001
+                        logger.warning("ANALYZE %s failed: %s", tbl, exc)
     except Exception as exc:  # noqa: BLE001
         logger.error("Required indexes could not run — database unreachable: %s", exc)
         report["failed"].append(("connect", str(exc)[:300]))
