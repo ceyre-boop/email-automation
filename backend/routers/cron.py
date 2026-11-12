@@ -147,7 +147,8 @@ def _pipeline_block() -> dict:
             db.close()
     except Exception as exc:  # noqa: BLE001
         logger.warning("Could not compute pipeline block for /health: %s", exc)
-        payload = {"stalled": None, "reason": None, "error": str(exc)[:200]}
+        payload = {"stalled": None, "reason": "pipeline metrics unavailable — database query failed",
+                   "error": str(exc)[:200]}
     _pipeline_cache = (now, payload)
     return payload
 
@@ -224,8 +225,17 @@ def _ai_block() -> dict:
 @router.get("/health")
 def health():
     sop_hash, talent_count, warnings, parse_ts = _sop_stats()
+    pipeline = _pipeline_block()
+    # HTTP stays 200 (Render's health check and the keepalive ping must not restart
+    # or flag a live process), but the body must not say "ok" while the pipeline is
+    # stalled or its metrics are failing — it did exactly that on 2026-11-12.
+    status = "ok"
+    if pipeline.get("stalled") is True:
+        status = "stalled"
+    elif pipeline.get("stalled") is None and (pipeline.get("error") or pipeline.get("reason")):
+        status = "degraded"
     return {
-        "status": "ok",
+        "status": status,
         **_schema_block(),
         **_ai_block(),
         "deployed_at": _DEPLOY_TIME,
@@ -235,7 +245,7 @@ def health():
         "any_warnings": len(warnings) > 0,
         "last_parse_timestamp": parse_ts,
         **_active_sop_version(),
-        "pipeline": _pipeline_block(),
+        "pipeline": pipeline,
         "db_pool": _pool_block(),
         "db_writes": _write_block(),
     }
