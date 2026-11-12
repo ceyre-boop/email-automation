@@ -130,13 +130,17 @@ def test_stall_alarm_quiet_when_nothing_stranded(db_session, talent_key):
     assert result["stalled"] is False
 
 
-def test_health_pipeline_block_exposes_retry_pending_overdue(db_session, db_engine, talent_key, monkeypatch):
-    from sqlalchemy.orm import sessionmaker
+def test_health_pipeline_block_exposes_retry_pending_overdue(db_session, talent_key, monkeypatch):
+    """Do not point the global get_session_factory at the shared in-memory SQLite engine:
+    a scheduler thread leaked by an earlier test would then use that connection from a
+    second thread and segfault. Patch the stall check to run on the test session instead."""
     from backend.routers import cron
+    from backend.services import stall_alarm
 
     _row(db_session, "old", talent_key, next_at=_ago(30))
-    factory = sessionmaker(autocommit=False, autoflush=False, bind=db_engine)
-    monkeypatch.setattr("backend.models.db.get_session_factory", lambda: factory)
+    real = stall_alarm.check_pipeline_stall
+    monkeypatch.setattr("backend.models.db.get_session_factory", lambda: (lambda: MagicMock()))
+    monkeypatch.setattr(stall_alarm, "check_pipeline_stall", lambda _db: real(db_session))
     monkeypatch.setattr(cron, "_pool_block", lambda: {})
     monkeypatch.setattr(cron, "_pipeline_cache", None)
     block = cron._pipeline_block()

@@ -192,7 +192,13 @@ def test_warm_start_retries_then_succeeds(rt, monkeypatch):
     real = runtime_state._open_session
     calls = {"n": 0}
 
+    import threading
+
     def flaky():
+        # Count only this thread: a scheduler thread leaked by an earlier test's
+        # TestClient also reads runtime_state while _open_session is patched.
+        if threading.current_thread() is not threading.main_thread():
+            return real()
         calls["n"] += 1
         if calls["n"] < 3:
             raise RuntimeError("pooler down")
