@@ -688,7 +688,10 @@ def apply_required_indexes() -> dict:
     eng = create_engine(
         url,
         poolclass=NullPool,
-        connect_args={"options": "-c statement_timeout=0 -c lock_timeout=10000"},
+        # lock_timeout=0: CONCURRENTLY waits for older transactions to finish, which
+        # on a slow DB can exceed any short timeout and would leave an INVALID index
+        # every boot. Waiting is safe — a CONCURRENTLY build does not block writers.
+        connect_args={"options": "-c statement_timeout=0 -c lock_timeout=0"},
     )
     try:
         with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
@@ -701,6 +704,15 @@ def apply_required_indexes() -> dict:
                         report["already"].append(name)
                         continue
                     if row is not None:
+                        # Invalid may mean "another instance is building it right now"
+                        # (e.g. overlapping deploys) — never drop a live build.
+                        busy = conn.execute(text(
+                            "SELECT 1 FROM pg_stat_progress_create_index p "
+                            "JOIN pg_class c ON c.oid = p.index_relid WHERE c.relname = :n"),
+                            {"n": name}).first()
+                        if busy:
+                            report["already"].append(name + " (build in progress elsewhere)")
+                            continue
                         logger.warning("Index %s is INVALID (interrupted build) — dropping and rebuilding", name)
                         conn.execute(text(f"DROP INDEX CONCURRENTLY IF EXISTS {name}"))
                     logger.warning("Building missing index %s (CONCURRENTLY): %s", name, ddl)

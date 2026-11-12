@@ -52,3 +52,15 @@ def test_health_status_stalled_when_pipeline_stalled():
     with patch.object(cron, "_pipeline_block", return_value={"stalled": True, "reason": "NOTHING PROCESSED"}):
         data = TestClient(app).get("/health").json()
     assert data["status"] == "stalled"
+
+
+def test_db_slow_alert_really_delivers_with_partial_metrics(db_session):
+    """Reviewer catch: the alert body read metric keys the unknown result lacks,
+    raised KeyError, and nothing was ever delivered."""
+    alert = {"stalled": True, "reason": "DATABASE TOO SLOW — x", "error": "statement timeout"}
+    with patch("backend.services.alerts.send_out_of_band_alert", return_value=["telegram"]) as oob:
+        sa._maybe_send_alert(db_session, alert, {}, cooldown_key=sa._KEY_DBSLOW_SENT_AT)
+    oob.assert_called_once()
+    from backend.services.guardian import _get_state
+    assert _get_state(db_session, sa._KEY_DBSLOW_SENT_AT)
+    assert not _get_state(db_session, sa._KEY_ALARM_SENT_AT)

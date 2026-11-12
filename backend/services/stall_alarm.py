@@ -313,6 +313,7 @@ METRICS_UNAVAILABLE_REASON = "DATABASE SLOW — pipeline metrics timed out, stat
 # Consecutive "unknown" checks (job runs every 5 min) before alerting: 3 ≈ 15 min.
 UNKNOWN_ALERT_AFTER = 3
 _unknown_streak = 0
+_KEY_DBSLOW_SENT_AT = "stall_alarm_dbslow_sent_at"
 
 
 def run_stall_alarm(db: Session) -> dict:
@@ -332,7 +333,12 @@ def run_stall_alarm(db: Session) -> dict:
                      "reason": f"DATABASE TOO SLOW — pipeline metrics failed {_unknown_streak} checks in a row: "
                                f"{result.get('error') or 'unknown error'}"}
             logger.error("STALL ALARM: %s", alert["reason"])
-            _maybe_send_alert(db, alert, cfg)
+            try:
+                db.rollback()  # the failed metric query may have left the session aborted
+            except Exception:  # noqa: BLE001
+                pass
+            # Own cooldown key, so a "DB slow" alert never silences a real stall alert.
+            _maybe_send_alert(db, alert, cfg, cooldown_key=_KEY_DBSLOW_SENT_AT)
         return result
     _unknown_streak = 0
     if not result.get("stalled"):
@@ -365,7 +371,7 @@ def _maybe_send_recovery(db: Session) -> None:
         logger.error("stall_alarm: recovery notice failed: %s", exc)
 
 
-def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
+def _maybe_send_alert(db: Session, result: dict, cfg: dict, cooldown_key: str = _KEY_ALARM_SENT_AT) -> None:
     """Alert on the stall, at most once per cooldown. Never raises.
 
     Channels: ALERT_WEBHOOK_URL and Telegram (independent of any Gmail token) and email. The
@@ -377,7 +383,11 @@ def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
 
     try:
         cooldown = int(cfg.get("cooldown_minutes", DEFAULT_COOLDOWN_MINUTES))
-        last_sent_str = _get_state(db, _KEY_ALARM_SENT_AT)
+        try:
+            last_sent_str = _get_state(db, cooldown_key)
+        except Exception:  # noqa: BLE001 — an unreadable cooldown must not block the alert
+            db.rollback()
+            last_sent_str = None
         if last_sent_str:
             try:
                 last_sent = datetime.fromisoformat(last_sent_str)
@@ -397,11 +407,11 @@ def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
             f"{result['reason']}\n\n"
             f"Time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M UTC')}\n\n"
             "Metrics:\n"
-            f"  emails triaged in last {result['window_minutes']} min: {result['processed_in_window']}\n"
-            f"  unread waiting in inbox:                {result['unread_waiting']}\n"
-            f"  Score 3 emails in last hour:            {result['score3_last_hour']}\n"
-            f"  drafts created in last hour:            {result['drafts_last_hour']}\n"
-            f"  replies sent in last hour:              {result['sends_last_hour']}\n\n"
+            f"  emails triaged in last {result.get('window_minutes', 'n/a')} min: {result.get('processed_in_window', 'n/a')}\n"
+            f"  unread waiting in inbox:                {result.get('unread_waiting', 'n/a')}\n"
+            f"  Score 3 emails in last hour:            {result.get('score3_last_hour', 'n/a')}\n"
+            f"  drafts created in last hour:            {result.get('drafts_last_hour', 'n/a')}\n"
+            f"  replies sent in last hour:              {result.get('sends_last_hour', 'n/a')}\n\n"
             "Note: the scheduler logs jobs as 'executed successfully' even when they\n"
             "throw, so Render logs will look normal. Check for QueryCanceled /\n"
             "OperationalError lines and the drafts-created-per-hour count instead.\n\n"
@@ -433,7 +443,7 @@ def _maybe_send_alert(db: Session, result: dict, cfg: dict) -> None:
                 logger.error("stall_alarm: alert email failed: %s", exc)
 
         if delivered:
-            _set_state(db, _KEY_ALARM_SENT_AT, datetime.utcnow().isoformat())
+            _set_state(db, cooldown_key, datetime.utcnow().isoformat())
             logger.info("stall_alarm: alert sent via %s", ", ".join(delivered))
         else:
             logger.error("stall_alarm: alert NOT delivered on any channel (no webhook/telegram, no active token)")
