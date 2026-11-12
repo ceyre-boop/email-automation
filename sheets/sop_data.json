@@ -35,6 +35,10 @@
     "full_name": "Audur Banks",
     "sop_status": "approved"
   },
+  "Lindsay": {
+    "full_name": "Lindsay Reisert",
+    "sop_status": "approved"
+  },
   "Skyler": {
     "full_name": "Skyler Clark",
     "sop_status": "approved"
@@ -79,5 +83,13 @@
     "full_name": "Trinity Blair",
     "sop_status": "approved"
   },
-  "_generated": "2026-08-03T14:10:43.180649"
+  "KatrinaD": {
+    "full_name": "Katrina D",
+    "sop_status": "approved"
+  },
+  "Sylvia": {
+    "full_name": "Sylvia",
+    "sop_status": "approved"
+  },
+  "_generated": "2026-11-12T22:23:27.172461"
 }

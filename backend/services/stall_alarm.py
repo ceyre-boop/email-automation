@@ -141,10 +141,19 @@ def check_pipeline_stall(db: Session) -> dict:
         retry_pending_overdue = count_overdue(db, now)
     except Exception as exc:  # noqa: BLE001
         logger.warning("stall_alarm: metric query failed: %s", exc)
+        # A failed query leaves the session's transaction aborted; without this
+        # rollback the dead-token query below fails too (InFailedSqlTransaction).
+        try:
+            db.rollback()
+        except Exception:  # noqa: BLE001
+            pass
         # Dead tokens are independent of the metric queries above — report them anyway
         # so /health never silently loses them just because one count query failed.
         dead_keys, dead_details = _dead_tokens(db)
-        return {"stalled": False, "reason": None, "error": str(exc)[:200],
+        # stalled is None ("unknown"), never False: on 2026-11-12 these queries hit
+        # statement_timeout every cycle while /health and the dashboard banner read
+        # "not stalled", so a crawling database looked perfectly healthy.
+        return {"stalled": None, "reason": METRICS_UNAVAILABLE_REASON, "error": str(exc)[:200],
                 "dead_tokens": dead_keys, "dead_token_details": dead_details}
 
     dead_tokens, dead_token_details = _dead_tokens(db)
@@ -300,13 +309,32 @@ def check_pipeline_stall(db: Session) -> dict:
     return {"stalled": reason is not None, "reason": reason, **metrics}
 
 
+METRICS_UNAVAILABLE_REASON = "DATABASE SLOW — pipeline metrics timed out, status unknown"
+# Consecutive "unknown" checks (job runs every 5 min) before alerting: 3 ≈ 15 min.
+UNKNOWN_ALERT_AFTER = 3
+_unknown_streak = 0
+
+
 def run_stall_alarm(db: Session) -> dict:
     """Scheduled entry point: check, log loudly, and email once per cooldown."""
     cfg = _cfg()
     if not cfg.get("enabled", True):
         return {"stalled": False, "reason": None, "disabled": True}
 
+    global _unknown_streak
     result = check_pipeline_stall(db)
+    if result.get("stalled") is None:
+        # Metrics unavailable (DB timing out). Never announce "recovered" on an
+        # unknown, and alert once it persists — a slow DB is itself an outage.
+        _unknown_streak += 1
+        if _unknown_streak >= UNKNOWN_ALERT_AFTER:
+            alert = {**result, "stalled": True,
+                     "reason": f"DATABASE TOO SLOW — pipeline metrics failed {_unknown_streak} checks in a row: "
+                               f"{result.get('error') or 'unknown error'}"}
+            logger.error("STALL ALARM: %s", alert["reason"])
+            _maybe_send_alert(db, alert, cfg)
+        return result
+    _unknown_streak = 0
     if not result.get("stalled"):
         _maybe_send_recovery(db)
         return result

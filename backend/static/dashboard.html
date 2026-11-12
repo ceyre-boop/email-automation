@@ -1683,8 +1683,12 @@ function buildSysIssues() {
         const hard = /^(NOTHING|ROUTING|TALENT INBOX)/i.test(reason);
         issues.push({ sev: hard ? 'crit' : 'warn', label: 'Pipeline stalled', html: esc(reason) });
       }
-    } else if (p.stalled === null && p.reason) {
-      issues.push({ sev: 'warn', label: 'Pipeline status unknown', html: esc(String(p.reason)) });
+    } else if (p.stalled === null && (p.reason || p.error)) {
+      // Metrics failing (e.g. DB statement timeouts) is an outage in its own right —
+      // on 2026-11-12 it was the outage, while this banner stayed green.
+      issues.push({ sev: p.error ? 'crit' : 'warn', label: 'Pipeline status unknown',
+        html: esc(String(p.reason || 'pipeline metrics unavailable')) +
+              (p.error ? ' <span class="sys-meta">' + esc(String(p.error).slice(0, 120)) + '</span>' : '') });
     }
     if (h.schema_ok === false) {
       const sc = h.schema || {};

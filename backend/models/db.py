@@ -646,6 +646,78 @@ def apply_required_migrations() -> dict:
     return report
 
 
+# Indexes the hot paths need, built at every boot (independent of SKIP_MIGRATIONS).
+# 2026-11-12: the poller's "earlier mail in this thread" lookups filter
+# processed_emails/drafts by thread_id, which had no index, so each one scanned the
+# whole table. As the tables grew they crossed the 20s statement_timeout, jobs
+# overlapped and were skipped, and drafting/sending crawled.
+# (index name, CREATE INDEX CONCURRENTLY statement)
+REQUIRED_INDEXES: list[tuple[str, str]] = [
+    ("idx_processed_emails_thread_id",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_processed_emails_thread_id "
+     "ON processed_emails (thread_id)"),
+    ("idx_drafts_thread_id",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_drafts_thread_id ON drafts (thread_id)"),
+    ("idx_processed_emails_processed_at",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_processed_emails_processed_at "
+     "ON processed_emails (processed_at)"),
+    ("idx_inbox_emails_unread_msg",
+     "CREATE INDEX CONCURRENTLY IF NOT EXISTS idx_inbox_emails_unread_msg "
+     "ON inbox_emails (gmail_message_id) WHERE is_unread"),
+]
+
+
+def apply_required_indexes() -> dict:
+    """Build REQUIRED_INDEXES without blocking writes. Never raises.
+
+    CONCURRENTLY takes no write lock, so the live poller keeps working while the
+    index builds; it must run outside a transaction (AUTOCOMMIT) and with no
+    statement_timeout, since a large table can take longer than the app's 20s cap.
+    A CONCURRENTLY build that is interrupted leaves an INVALID index behind which
+    IF NOT EXISTS would then skip forever, so invalid leftovers are dropped first.
+    Meant to run on a background thread at boot.
+
+    Returns {"built": [...], "already": [...], "failed": [(name, error)]}.
+    """
+    report: dict = {"built": [], "already": [], "failed": []}
+    settings = get_settings()
+    url = (settings.database_url or "").replace("postgres://", "postgresql://", 1)
+    if not url or url.startswith("sqlite"):
+        return report
+
+    eng = create_engine(
+        url,
+        poolclass=NullPool,
+        connect_args={"options": "-c statement_timeout=0 -c lock_timeout=10000"},
+    )
+    try:
+        with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            for name, ddl in REQUIRED_INDEXES:
+                try:
+                    row = conn.execute(text(
+                        "SELECT i.indisvalid FROM pg_class c JOIN pg_index i ON i.indexrelid = c.oid "
+                        "WHERE c.relname = :n"), {"n": name}).first()
+                    if row is not None and row[0]:
+                        report["already"].append(name)
+                        continue
+                    if row is not None:
+                        logger.warning("Index %s is INVALID (interrupted build) — dropping and rebuilding", name)
+                        conn.execute(text(f"DROP INDEX CONCURRENTLY IF EXISTS {name}"))
+                    logger.warning("Building missing index %s (CONCURRENTLY): %s", name, ddl)
+                    conn.execute(text(ddl))
+                    report["built"].append(name)
+                    logger.warning("Index %s built", name)
+                except Exception as exc:  # noqa: BLE001
+                    report["failed"].append((name, str(exc)[:300]))
+                    logger.error("Index %s FAILED: %s", name, exc)
+    except Exception as exc:  # noqa: BLE001
+        logger.error("Required indexes could not run — database unreachable: %s", exc)
+        report["failed"].append(("connect", str(exc)[:300]))
+    finally:
+        eng.dispose()
+    return report
+
+
 def create_tables():
     """Create all tables and run additive column migrations (idempotent)."""
     engine = _make_engine()

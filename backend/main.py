@@ -351,6 +351,20 @@ def _startup_work():
             verify_schema_matches_models()  # logs ERROR on mismatch; result shown on /health
         except Exception:
             logger.error("Schema verification failed (non-fatal).", exc_info=True)
+
+        # Hot-path indexes (see REQUIRED_INDEXES). CONCURRENTLY builds can take
+        # minutes on large tables, so they run on their own thread and never delay
+        # boot; the app keeps serving (just slower) until they finish.
+        def _build_indexes():
+            try:
+                from backend.models.db import apply_required_indexes
+                rep = apply_required_indexes()
+                if rep["built"] or rep["failed"]:
+                    logger.warning("Required indexes: %s", rep)
+            except Exception:
+                logger.exception("Could not apply required indexes")
+        if "pytest" not in sys.modules:
+            threading.Thread(target=_build_indexes, name="required-indexes", daemon=True).start()
     else:
         logger.warning("DATABASE_URL not set — skipping table creation. App will start but DB routes will fail.")
 
