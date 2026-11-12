@@ -16,7 +16,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import update
+from sqlalchemy import or_, update
 
 from backend.models.db import Draft, DraftEditLog, DraftStatus, ProcessedEmail, TalentToken
 from backend.routers.deps import get_db, verify_api_key
@@ -64,6 +64,10 @@ class EditBody(BaseModel):
 
 class ApproveBody(BaseModel):
     reviewed_by: Optional[str] = None
+    # Explicit human decision to send a draft whose previous send attempt died
+    # mid-flight (stale claim, > STALE_SEND_CLAIM_MINUTES old). Accepts the risk
+    # that the earlier attempt may have reached the brand. Never set automatically.
+    override_stale_claim: bool = False
 
 
 class DiscardBody(BaseModel):
@@ -561,13 +565,19 @@ def approve_draft(draft_id: int, body: ApproveBody = ApproveBody(), db: Session 
 
     # Claim the draft in the database before calling Gmail. This closes the
     # race between two manager clicks, auto-send, or multiple app workers.
+    claim_free = Draft.send_claimed_at.is_(None)
+    if body.override_stale_claim:
+        stale_before = datetime.utcnow() - timedelta(minutes=STALE_SEND_CLAIM_MINUTES)
+        claim_free = or_(claim_free, Draft.send_claimed_at < stale_before)
+        logger.warning("Draft %s: approve with override_stale_claim by %s (claim was %s)",
+                       draft.id, body.reviewed_by, draft.send_claimed_at)
     claimed = db.execute(
         update(Draft)
         .where(
             Draft.id == draft.id,
             Draft.status == DraftStatus.pending,
             Draft.reviewed_at.is_(None),
-            Draft.send_claimed_at.is_(None),
+            claim_free,
         )
         .values(send_claimed_at=datetime.utcnow())
     ).rowcount
