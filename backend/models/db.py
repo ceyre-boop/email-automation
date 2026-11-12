@@ -720,6 +720,18 @@ def apply_required_indexes() -> dict:
     )
     try:
         with eng.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+            # 2026-11-12 in production: the startup `options` above were NOT honored
+            # through the Supabase pooler — the first build was cancelled at exactly
+            # 2 min (role default). An explicit session SET overrides the role default;
+            # DATABASE_URL is the session-mode pooler (5432), so it persists across
+            # the statements below. Log the effective value so this is verifiable.
+            try:
+                conn.execute(text("SET statement_timeout = 0"))
+                conn.execute(text("SET lock_timeout = 0"))
+                eff = conn.execute(text("SHOW statement_timeout")).scalar()
+                logger.warning("Required indexes: effective statement_timeout=%s", eff)
+            except Exception as exc:  # noqa: BLE001
+                logger.warning("Could not clear statement_timeout for index builds: %s", exc)
             try:  # the trigram indexes need it; already present on Supabase normally
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS pg_trgm"))
             except Exception as exc:  # noqa: BLE001
